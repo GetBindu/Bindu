@@ -33,6 +33,7 @@ dependencies = [
     "tenacity==8.5.0",
     "pynacl==1.5.0",
     "numpy==2.3.5",
+
     # Telemetry
     "opentelemetry-api==1.35.0",
     "opentelemetry-sdk==1.35.0",
@@ -41,20 +42,24 @@ dependencies = [
     "opentelemetry-instrumentation-fastapi==0.56b0",
     "opentelemetry-instrumentation-httpx==0.56b0",
     "sentry-sdk==2.41.0",
+
     # x402 payments
     "x402==0.2.1",
     "web3==7.13.0",
     "eth-account==0.13.7",
     "cdp-sdk==0.21.0",
     "coinbase-advanced-py==1.8.2",
+
     # Database storage
     "sqlalchemy[asyncio]==2.0.44",
     "asyncpg==0.31.0",
     "alembic==1.17.2",
     "redis==7.1.0",
+
     # CLI tools
     "cookiecutter==2.6.0",
     "pyperclip==1.11.0",
+
     # Security
     "detect-secrets==1.5.0",
     "dotenv>=0.9.9",
@@ -66,6 +71,7 @@ dependencies = [
     "langchain-openai>=1.1.8",
     "langgraph>=1.0.8",
     "python-dotenv>=1.1.0",
+    "dspy>=2.5.0",
 ]
 
 [project.optional-dependencies]
