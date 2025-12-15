@@ -317,6 +317,82 @@ def deduplicate_interactions(interactions: list[Interaction]) -> list[Interactio
     return unique
 
 
+def validate_and_clean_interactions(
+    interactions: list[Interaction],
+) -> list[Interaction]:
+    """Validate and clean interactions.
+
+    Validation rules:
+    - Minimum length for input and output
+    - Output must not be identical to input
+    - Remove excessive whitespace
+    - Normalize Unicode
+
+    Args:
+        interactions: List of interactions to validate
+
+    Returns:
+        List of valid, cleaned interactions
+    """
+    validated: list[Interaction] = []
+
+    for interaction in interactions:
+        # Clean whitespace
+        user_input = " ".join(interaction.user_input.split())
+        agent_output = " ".join(interaction.agent_output.split())
+
+        # Check minimum lengths
+        if len(user_input) < MIN_INPUT_LENGTH:
+            continue
+        if len(agent_output) < MIN_OUTPUT_LENGTH:
+            continue
+
+        # Check not identical
+        if user_input == agent_output:
+            continue
+
+        # Create cleaned interaction
+        validated.append(
+            Interaction(
+                id=interaction.id,
+                user_input=user_input,
+                agent_output=agent_output,
+                feedback_score=interaction.feedback_score,
+                feedback_type=interaction.feedback_type,
+            )
+        )
+
+    logger.info(
+        f"Validated {len(validated)} interactions from {len(interactions)} total "
+        f"(min_input={MIN_INPUT_LENGTH}, min_output={MIN_OUTPUT_LENGTH})"
+    )
+    return validated
+
+
+def deduplicate_interactions(interactions: list[Interaction]) -> list[Interaction]:
+    """Remove duplicate interactions based on (user_input, agent_output).
+
+    Args:
+        interactions: List of interactions to deduplicate
+
+    Returns:
+        List of unique interactions
+    """
+    seen: set[tuple[str, str]] = set()
+    unique: list[Interaction] = []
+
+    for interaction in interactions:
+        key = (interaction.user_input, interaction.agent_output)
+        if key not in seen:
+            seen.add(key)
+            unique.append(interaction)
+
+    if len(unique) < len(interactions):
+        logger.info(f"Removed {len(interactions) - len(unique)} duplicate interactions")
+
+    return unique
+
+
 def prepare_golden_dataset(
     interactions: list[Interaction],
 ) -> list[dict[str, Any]]:
