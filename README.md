@@ -34,7 +34,10 @@ Built with a distributed architecture (Task Manager, scheduler, storage), Bindu 
   <strong>🌟 <a href="https://bindus.directory">Register your agent</a> • 🌻 <a href="https://docs.getbindu.com">Documentation</a> • 💬 <a href="https://discord.gg/3w5zuYUuwt">Discord Community</a></strong>
 </p>
 
+
 ---
+
+<br/>
 
 ## 🎥 Watch Bindu in Action
 
@@ -63,6 +66,8 @@ uv --version
 ```
 
 ---
+
+<br/>
 
 ## 📦 Installation
 <details>
@@ -361,6 +366,8 @@ Output:
 
 ---
 
+<br/>
+
 ## [Postgres Storage](https://docs.getbindu.com/bindu/learn/storage/overview)
 
 Bindu uses PostgreSQL as its persistent storage backend for production deployments. The storage layer is built with SQLAlchemy's async engine and uses imperative mapping with protocol TypedDicts.
@@ -400,9 +407,11 @@ config = {
 
 </details>
 
-> **💡 Task-First Pattern**: The storage supports Bindu's task-first approach where tasks can be continued by appending messages to non-terminal tasks, enabling incremental refinements and multi-turn conversations.
+ **💡 Task-First Pattern**: The storage supports Bindu's task-first approach where tasks can be continued by appending messages to non-terminal tasks, enabling incremental refinements and multi-turn conversations.
 
 ---
+
+<br/>
 
 ## [Redis Scheduler](https://docs.getbindu.com/bindu/learn/scheduler/overview)
 
@@ -437,6 +446,8 @@ All operations are queued in Redis and processed by available workers using a bl
 
 ---
 
+<br/>
+
 ## [Retry Mechanism](https://docs.getbindu.com/bindu/learn/retry/overview)
 
 > Automatic retry logic with exponential backoff for resilient Bindu agents
@@ -456,6 +467,8 @@ If not configured, Bindu uses these defaults:
 | API            | 4            | 1.0s     | 15.0s    |
 
 ---
+
+<br/>
 
 ## [Sentry Integration](https://docs.getbindu.com/bindu/learn/sentry/overview)
 
@@ -518,6 +531,8 @@ bindufy(config, handler)
 > 📚 See the [full Sentry documentation](https://docs.getbindu.com/bindu/learn/sentry/overview) for complete details.
 
 ---
+
+<br/>
 
 ## [Skills System](https://docs.getbindu.com/bindu/skills/introduction/overview)
 
@@ -743,6 +758,8 @@ GET /agent/skills/{skill_id}/documentation
 
 ---
 
+<br/>
+
 ## Negotiation
 
 > Capability-based agent selection for intelligent orchestration
@@ -914,6 +931,8 @@ config = {
  
 ---
 
+<br/>
+
 ## 🎨 Chat UI
 
 Bindu includes a beautiful chat interface at `http://localhost:3773/docs`
@@ -923,6 +942,8 @@ Bindu includes a beautiful chat interface at `http://localhost:3773/docs`
 </p>
 
 ---
+
+<br/>
 
 ## 🌐 Bindu Directory
 
@@ -974,6 +995,8 @@ Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 ---
 
+<br/>
+
 ## 🌌 The Vision
 
 ```
@@ -1009,6 +1032,8 @@ NightSky enables swarms of agents. Each Bindu is a dot annotating agents with th
 ---
 
 
+<br/>
+
 ## 🛠️ Supported Agent Frameworks
 
 Bindu is **framework-agnostic** and tested with:
@@ -1023,6 +1048,7 @@ Want integration with your favorite framework? [Let us know on Discord](https://
 
 ---
 
+<br/>
 
 ## 🧪 Testing
 
@@ -1034,6 +1060,7 @@ pytest -n auto --cov=bindu --cov-report= && coverage report --skip-covered --fai
 
 ---
 
+<br/>
 
 ## 🤝 Contributing
 
@@ -1052,6 +1079,7 @@ pre-commit run --all-files
 
 ---
 
+<br/>
 
 ## 📜 License
 
@@ -1059,6 +1087,7 @@ Bindu is open-source under the [Apache License 2.0](https://choosealicense.com/l
 
 ---
 
+<br/>
 
 ## 💬 Community
 
@@ -1069,6 +1098,7 @@ We 💛 contributions! Whether you're fixing bugs, improving documentation, or b
 
 ---
 
+<br/>
 
 ## 🙏 Acknowledgements
 
@@ -1084,6 +1114,7 @@ Grateful to these projects:
 
 ---
 
+<br/>
 
 ## 🗺️ Roadmap
 
@@ -1104,7 +1135,7 @@ Grateful to these projects:
 
 ---
 
-
+<br/>
 
 ## 🎓 Workshops
 
@@ -1112,7 +1143,7 @@ Grateful to these projects:
 
 ---
 
-
+<br/>
 
 ## ⭐ Star History
 
