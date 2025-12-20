@@ -48,7 +48,7 @@ logger = get_logger("bindu.dspy.train")
 async def train_async(
     optimizer: Any,
     current_prompt_text: str,
-    strategy: ExtractionStrategy = ExtractionStrategy.LAST_TURN,
+    strategy: BaseExtractionStrategy | None = None,
     require_feedback: bool = True,
 ) -> None:
     """Train and optimize agent prompts using DSPy.
@@ -72,11 +72,17 @@ async def train_async(
        - Zeros out all other prompts
 
     Args:
-        optimizer: DSPy optimizer instance to use for training (SIMBA or GEPA required).
         current_prompt_text: Current prompt text to initialize and optimize.
-        strategy: Extraction strategy (LAST_TURN or FULL_HISTORY)
+        optimizer: DSPy optimizer instance to use for training.
+            If None, uses BootstrapFewShot with default settings.
+        strategy: Extraction strategy to use. Defaults to LastTurnStrategy.
+            Use strategy classes from bindu.dspy.strategies:
+            - LastTurnStrategy()
+            - FullHistoryStrategy()
+            - LastNTurnsStrategy(n_turns=3)
+            - FirstNTurnsStrategy(n_turns=3)
+            - ContextWindowStrategy(n_turns=3, system_prompt="...")
         require_feedback: Whether to require feedback for inclusion in dataset
-
     Returns:
         None. The optimized prompt is inserted into the database as a candidate.
 
@@ -86,17 +92,17 @@ async def train_async(
         ValueError: If golden dataset pipeline fails
 
     Example:
-        >>> from dspy.teleprompt import SIMBA
-        >>> from bindu.dspy.extractor import ExtractionStrategy
+        >>> from dspy.teleprompt import MIPRO
+        >>> from bindu.dspy.strategies import ContextWindowStrategy
         >>> import asyncio
-        >>> optimizer = SIMBA()
-        >>> await train_async(
+        >>> strategy = ContextWindowStrategy(n_turns=3, system_prompt="Be helpful")
+        >>> optimizer = MIPRO(num_candidates=10, metric=my_metric)
+        >>> candidates = asyncio.run(train_async(
         ...     optimizer=optimizer,
-        ...     current_prompt_text="You are a helpful assistant.",
-        ...     strategy=ExtractionStrategy.FULL_HISTORY
-        ... )
-        # Candidate prompt now in database with 10% traffic
-        
+        ...     strategy=strategy
+        ... ))
+        >>> best_prompt = candidates[0]
+
     Note:
         This is an async function. When calling from async code, use await.
         For sync contexts, use the train() wrapper function instead.
@@ -106,7 +112,8 @@ async def train_async(
         - Rollback prompts
         - Adjust traffic beyond initial 90/10 split
     """
-    logger.info("Starting DSPy training pipeline")
+    strategy = strategy or LastTurnStrategy()
+    logger.info(f"Starting DSPy training pipeline with {strategy.name} strategy")
 
     # Step 0: Ensure system is stable (no active experiments)
     logger.info("Checking system stability")
@@ -128,7 +135,7 @@ async def train_async(
 
     # Step 3: Build golden dataset using complete pipeline
     logger.info(
-        f"Building golden dataset (strategy={strategy.value}, "
+        f"Building golden dataset (strategy={strategy.name}, "
         f"require_feedback={require_feedback}, "
         f"threshold={MIN_FEEDBACK_THRESHOLD})"
     )
@@ -224,7 +231,7 @@ async def train_async(
 def train(
     current_prompt_text: str,
     optimizer: Any = None,
-    strategy: ExtractionStrategy = ExtractionStrategy.LAST_TURN,
+    strategy: BaseExtractionStrategy | None = None,
     require_feedback: bool = True,
 ) -> None:
     """Synchronous wrapper for train_async().
