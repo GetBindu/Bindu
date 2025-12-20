@@ -39,6 +39,22 @@ MIN_OUTPUT_LENGTH = 10
 MAX_FULL_HISTORY_LENGTH = 10000
 """Maximum character length for full history extraction strategy."""
 
+DEFAULT_N_TURNS = 3
+"""Default number of turns to extract for LAST_N_TURNS and FIRST_N_TURNS strategies."""
+
+DEFAULT_WINDOW_SIZE = 2
+"""Default window size for sliding window strategy."""
+
+DEFAULT_STRIDE = 1
+"""Default stride for sliding window strategy (1 = overlapping windows)."""
+
+# Prompt Optimization Parameters
+NUM_PROMPT_CANDIDATES = 3
+"""Number of optimized prompt candidates to generate and return."""
+
+MAX_BOOTSTRAPPED_DEMOS = 8
+"""Maximum number of bootstrapped demonstrations for few-shot learning."""
+
 # Database Query Limits
 MAX_INTERACTIONS_QUERY_LIMIT = 10000
 """Maximum number of interactions to fetch from database in a single query."""
