@@ -16,7 +16,7 @@ including model settings, filtering thresholds, and optimization parameters.
 from __future__ import annotations
 
 # DSPy Model Configuration
-DEFAULT_DSPY_MODEL = "openai/gpt-3.5-turbo"
+DEFAULT_DSPY_MODEL = "openai/gpt-4o-mini"
 """Default language model for DSPy optimization."""
 
 # Dataset Filtering Thresholds
@@ -24,7 +24,7 @@ MIN_FEEDBACK_THRESHOLD = 0.8
 """Minimum normalized feedback score [0.0, 1.0] for interactions to be included in training dataset."""
 
 # Golden Dataset Constraints
-MIN_EXAMPLES = 10
+MIN_EXAMPLES = 8
 """Minimum number of examples required in golden dataset."""
 
 MAX_EXAMPLES = 10000
@@ -38,13 +38,6 @@ MIN_OUTPUT_LENGTH = 10
 
 MAX_FULL_HISTORY_LENGTH = 10000
 """Maximum character length for full history extraction strategy."""
-
-# Prompt Optimization Parameters
-NUM_PROMPT_CANDIDATES = 3
-"""Number of optimized prompt candidates to generate and return."""
-
-MAX_BOOTSTRAPPED_DEMOS = 8
-"""Maximum number of bootstrapped demonstrations for few-shot learning."""
 
 # Database Query Limits
 MAX_INTERACTIONS_QUERY_LIMIT = 10000

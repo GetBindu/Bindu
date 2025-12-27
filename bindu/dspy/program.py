@@ -30,10 +30,6 @@ class AgentProgram(dspy.Module):
         self.instructions = current_prompt_text
 
         self.predictor = dspy.Predict(AgentSignature)
-        # self.predictor = dspy.Predict(
-        #     AgentSignature,
-        #     instructions=current_prompt_text,
-        # )
 
     def forward(self, input: str) -> dspy.Prediction:
         return self.predictor(input=input)

@@ -19,8 +19,6 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-import os
-
 import dspy
 
 from bindu.utils.logging import get_logger
@@ -39,6 +37,8 @@ from .prompts import (
     update_prompt_traffic,
     zero_out_all_except,
 )
+
+from dspy.teleprompt import SIMBA, GEPA
 
 from dspy.teleprompt import SIMBA, GEPA
 
@@ -229,6 +229,7 @@ async def train_async(
     )
 
 def train(
+    current_prompt_text: str,
     optimizer: Any = None,
     strategy: BaseExtractionStrategy | None = None,
     require_feedback: bool = True,
