@@ -22,38 +22,14 @@ from .signature import AgentSignature
 
 
 class AgentProgram(dspy.Module):
-    """Agent program for response generation.
-
-    This program implements the core agent logic using DSPy's Module system.
-    It takes user input and generates a response using the defined signature.
-
-    The program uses DSPy's Predict module to generate predictions based on
-    the AgentSignature. During optimization, DSPy will refine the prompts
-    used by this predictor to improve output quality.
-
-    The program is intentionally minimal - it contains only the prediction
-    logic without training, evaluation, or instrumentation concerns.
-    """
+    """Agent program for response generation."""
 
     def __init__(self, current_prompt_text: str) -> None:
-        """Initialize the agent program with a predictor."""
         super().__init__()
+
+        self.instructions = current_prompt_text
+
         self.predictor = dspy.Predict(AgentSignature)
-        # self.predictor = dspy.Predict(
-        #     AgentSignature,
-        #     instructions=current_prompt_text,
-        # )
 
     def forward(self, input: str) -> dspy.Prediction:
-        """Generate a response for the given input.
-
-        This method is called during both training and inference. It takes
-        the user input and returns a prediction containing the agent's response.
-
-        Args:
-            input: User query or request
-
-        Returns:
-            DSPy prediction containing the agent's response
-        """
         return self.predictor(input=input)
