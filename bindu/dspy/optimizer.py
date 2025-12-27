@@ -42,14 +42,14 @@ def optimize(
     Args:
         program: The DSPy program to optimize (e.g., AgentProgram)
         dataset: List of DSPy examples for training
-        optimizer: DSPy optimizer instance (e.g., BootstrapFewShot, MIPRO, etc.)
+        optimizer: DSPy optimizer instance (SIMBA or GEPA)
 
     Returns:
         Optimized DSPy program with refined prompts
 
     Example:
-        >>> from dspy.teleprompt import BootstrapFewShot
-        >>> optimizer = BootstrapFewShot(max_bootstrapped_demos=8)
+        >>> from dspy.teleprompt import SIMBA
+        >>> optimizer = SIMBA()
         >>> optimized_program = optimize(program, dataset, optimizer)
     """
     logger.info(
@@ -57,8 +57,14 @@ def optimize(
         f"on {len(dataset)} examples"
     )
 
-    # Delegate compilation to the optimizer
-    # Most DSPy optimizers use compile(program, trainset=dataset)
+    if not hasattr(optimizer, "compile"):
+        raise TypeError(
+            f"Optimizer {type(optimizer).__name__} does not implement compile(). "
+            "DSPy optimizers must expose a compile(program, trainset) method."
+        )
+
+    # Delegate to the optimizer by calling it with the program and dataset
+    # DSPy optimizers are callable and accept (program, trainset=dataset)
     optimized_program = optimizer.compile(program, trainset=dataset)
 
     logger.info("Optimization completed successfully")
