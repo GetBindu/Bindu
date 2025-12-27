@@ -20,16 +20,7 @@ import dspy
 
 
 class AgentSignature(dspy.Signature):
-    """Signature for agent response generation.
-
-    This signature defines a simple input-output mapping where the agent
-    receives a user query or context and produces a response. It serves
-    as the contract between the DSPy optimizer and the agent program.
-
-    The signature uses DSPy's standard field definitions to specify:
-    - input: The user's query or request
-    - output: The agent's generated response
-    """
+    """Signature for agent response generation."""
 
     input = dspy.InputField(desc="User query or request")
     output = dspy.OutputField(desc="Agent response")
