@@ -130,43 +130,45 @@ def extract_interactions(
     return interactions
 
 
-def filter_by_feedback_quality(
-    interactions: list[Interaction],
-    require_feedback: bool = True,
-    min_threshold: float = MIN_FEEDBACK_THRESHOLD,
-) -> list[Interaction]:
-    """Filter interactions by feedback quality.
+# def filter_by_feedback_quality(
+#     interactions: list[Interaction],
+#     require_feedback: bool = True,
+#     min_threshold: float = MIN_FEEDBACK_THRESHOLD,
+# ) -> list[Interaction]:
+#     """Filter interactions by feedback quality.
 
-    Rules:
-    - If feedback exists: must be >= min_threshold
-    - If no feedback: drop (if require_feedback=True) or keep (if False)
+#     Rules:
+#     - If feedback exists: must be >= min_threshold
+#     - If no feedback: drop (if require_feedback=True) or keep (if False)
 
-    Args:
-        interactions: List of interactions to filter
-        require_feedback: Whether to drop interactions without feedback
-        min_threshold: Minimum feedback score threshold
+#     Args:
+#         interactions: List of interactions to filter
+#         require_feedback: Whether to drop interactions without feedback
+#         min_threshold: Minimum feedback score threshold
 
-    Returns:
-        Filtered list of high-quality interactions
-    """
-    filtered: list[Interaction] = []
+#     Returns:
+#         Filtered list of high-quality interactions
+#     """
+#     filtered: list[Interaction] = []
 
-    for interaction in interactions:
-        # Check if feedback exists
-        if interaction.feedback_score is None:
-            if not require_feedback:
-                filtered.append(interaction)
-            continue
+#     for interaction in interactions:
+#         # Check if feedback exists
+#         if interaction.feedback_score is None:
+#             # Keep only if feedback is not required
+#             if not require_feedback:
+#                 filtered.append(interaction)
+#             # Skip to next interaction (don't check threshold)
+#             continue
 
-        # Check threshold
-        if interaction.feedback_score >= min_threshold:
-            filtered.append(interaction)
+#         # Feedback exists - check if it meets threshold
+#         if interaction.feedback_score >= min_threshold:
+#             filtered.append(interaction)
 
-    logger.info(
-        f"Filtered {len(filtered)} high-quality interactions from {len(interactions)} total "
-        f"(require_feedback={require_feedback}, threshold={min_threshold})"
-    )
-    return filtered
+#     logger.info(
+#         f"Filtered {len(filtered)} high-quality interactions from {len(interactions)} total "
+#         f"(require_feedback={require_feedback}, threshold={min_threshold})"
+#     )
+#     return filtered
 
 
 def validate_and_clean_interactions(
@@ -265,6 +267,10 @@ def prepare_golden_dataset(
             {
                 "input": interaction.user_input,
                 "output": interaction.agent_output,
+                "feedback": {
+                    "score": interaction.feedback_score,
+                    "type": interaction.feedback_type,
+                },
             }
         )
 
@@ -332,14 +338,14 @@ def build_golden_dataset(
     if not interactions:
         raise ValueError("No interactions extracted from raw tasks")
 
-    # Step 2: Filter by feedback quality
-    interactions = filter_by_feedback_quality(
-        interactions,
-        require_feedback=require_feedback,
-        min_threshold=min_feedback_threshold,
-    )
-    if not interactions:
-        raise ValueError("No interactions passed feedback quality filter")
+    # # Step 2: Filter by feedback quality
+    # interactions = filter_by_feedback_quality(
+    #     interactions,
+    #     require_feedback=require_feedback,
+    #     min_threshold=min_feedback_threshold,
+    # )
+    # if not interactions:
+    #     raise ValueError("No interactions passed feedback quality filter")
 
     # Step 3: Validate and clean
     interactions = validate_and_clean_interactions(interactions)
@@ -381,8 +387,8 @@ def convert_to_dspy_examples(
         example = dspy.Example(
             input=item["input"],
             output=item["output"],
+            feedback=item.get("feedback"),
         ).with_inputs("input")
-
         examples.append(example)
 
     logger.info(f"Converted {len(examples)} examples to DSPy format")
