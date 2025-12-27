@@ -19,16 +19,12 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-import os
-
 import dspy
 
 from bindu.utils.logging import get_logger
 
 from .config import (
     DEFAULT_DSPY_MODEL,
-    NUM_PROMPT_CANDIDATES,
-    MAX_BOOTSTRAPPED_DEMOS,
     MIN_FEEDBACK_THRESHOLD,
 )
 from .dataset import build_golden_dataset, convert_to_dspy_examples
@@ -38,14 +34,16 @@ from .optimizer import optimize
 from .postgres import fetch_raw_task_data
 from .program import AgentProgram
 
+from dspy.teleprompt import SIMBA, GEPA
+
 logger = get_logger("bindu.dspy.train")
 
 async def train_async(
-    optimizer: Any = None,
+    optimizer: Any,
+    current_prompt_text: str,
     strategy: ExtractionStrategy = ExtractionStrategy.LAST_TURN,
     require_feedback: bool = True,
-    current_prompt_text: str = "",
-) -> list[PromptCandidate]:
+) -> PromptCandidate:
     """Train and optimize agent prompts using DSPy.
 
     This function orchestrates the complete training pipeline:
@@ -64,15 +62,13 @@ async def train_async(
     8. Returns top prompt candidates
 
     Args:
-        agent_name: Optional agent identifier for filtering interactions (not yet implemented)
-        optimizer: DSPy optimizer instance to use for training.
-            If None, uses BootstrapFewShot with default settings.
+        optimizer: DSPy optimizer instance to use for training (SIMBA or GEPA required).
+        current_prompt_text: Current prompt text to initialize and optimize.
         strategy: Extraction strategy (LAST_TURN or FULL_HISTORY)
         require_feedback: Whether to require feedback for inclusion in dataset
 
     Returns:
-        List of exactly NUM_PROMPT_CANDIDATES PromptCandidate objects,
-        sorted by quality score in descending order
+        A single PromptCandidate object containing the optimized prompt
 
     Raises:
         RuntimeError: If STORAGE__POSTGRES_URL environment variable is not set
@@ -80,16 +76,16 @@ async def train_async(
         ValueError: If golden dataset pipeline fails
 
     Example:
-        >>> from dspy.teleprompt import MIPRO
+        >>> from dspy.teleprompt import SIMBA
         >>> from bindu.dspy.extractor import ExtractionStrategy
         >>> import asyncio
-        >>> optimizer = MIPRO(num_candidates=10, metric=my_metric)
-        >>> candidates = asyncio.run(train_async(
-        ...     agent_name="support_agent",
+        >>> optimizer = SIMBA()
+        >>> candidate = asyncio.run(train_async(
         ...     optimizer=optimizer,
+        ...     current_prompt_text="You are a helpful assistant.",
         ...     strategy=ExtractionStrategy.FULL_HISTORY
         ... ))
-        >>> best_prompt = candidates[0]
+        >>> optimized_prompt = candidate.text
         
     Note:
         This is an async function. When calling from async code, use await.
@@ -101,13 +97,6 @@ async def train_async(
     logger.info(f"Configuring DSPy with model: {DEFAULT_DSPY_MODEL}")
     lm = dspy.LM(DEFAULT_DSPY_MODEL)
     dspy.configure(lm=lm)
-
-    # api_key = os.getenv("GOOGLE_API_KEY")
-    # if not api_key:
-    #     raise RuntimeError("GOOGLE_API_KEY is not set")
-    
-    # lm = dspy.LM('google/gemini-1.5-flash', api_key=api_key, litellm_provider="google")
-    # dspy.configure(lm=lm)
 
     # Step 2: Fetch raw task data from database (async operation)
     logger.info("Fetching raw task data from database")
@@ -141,135 +130,92 @@ async def train_async(
     logger.info("Initializing agent program")
     program = AgentProgram(current_prompt_text)
 
-    # Step 6: Create default optimizer if none provided
+    # Step 6: Validate optimizer and prompt requirements
+    # v1 only supports prompt-mutating optimizers (SIMBA / GEPA).
+    # These optimizers require an existing prompt to refine.
     if optimizer is None:
-        logger.info(
-            f"No optimizer provided, using default BootstrapFewShot "
-            f"with max_bootstrapped_demos={MAX_BOOTSTRAPPED_DEMOS}"
-        )
-        optimizer = dspy.BootstrapFewShot(
-            max_bootstrapped_demos=MAX_BOOTSTRAPPED_DEMOS
+        raise ValueError(
+            "v1 requires an explicit prompt-optimizing optimizer "
+            "(SIMBA or GEPA)."
         )
 
-    # Step 7: Run optimization
-    logger.info(f"Running optimization with {type(optimizer).__name__}")
+    if not isinstance(optimizer, (SIMBA, GEPA)):
+        raise ValueError(
+            f"Optimizer {type(optimizer).__name__} does not support "
+            "prompt extraction in v1."
+        )
+
+    if not current_prompt_text.strip():
+        raise ValueError(
+            "current_prompt_text must be provided for prompt optimization."
+        )
+
+    # Step 7: Run prompt optimization
+    # The optimizer mutates the program's instructions based on the dataset.
+    logger.info(
+        f"Running prompt optimization using {type(optimizer).__name__}"
+    )
     optimized_program = optimize(
         program=program,
         dataset=dspy_examples,
         optimizer=optimizer,
     )
 
-    # Step 8: Extract prompt candidates from optimized program
-    logger.info("Extracting prompt candidates from optimized program")
-    candidates = _extract_prompt_candidates(optimized_program, dspy_examples)
-
     logger.info(
-        f"Training completed successfully. Generated {len(candidates)} candidates"
+        "Extracting optimized instructions from predictor"
     )
-    return candidates
+    instructions = optimized_program.instructions
+    
+    if not instructions or not instructions.strip():
+        raise RuntimeError("Optimizer did not produce valid instructions")
 
-
-def _extract_prompt_candidates(
-    optimized_program: dspy.Module,
-    examples: list[dspy.Example],
-) -> list[PromptCandidate]:
-    """Extract and score prompt candidates from the optimized program.
-
-    This function evaluates the optimized program on the training examples
-    and generates prompt candidates with quality scores.
-
-    Args:
-        optimized_program: The DSPy program after optimization
-        examples: Training examples used for evaluation
-
-    Returns:
-        List of exactly NUM_PROMPT_CANDIDATES PromptCandidate objects,
-        sorted by score descending
-    """
-    logger.info("Evaluating optimized program to generate candidates")
-
-    # Access the optimized predictor's prompt
-    predictor = optimized_program.predictor
-    prompt_text = str(predictor)
-
-    # Evaluate program performance on examples
-    correct = 0
-    total = min(len(examples), 100)  # Sample up to 100 for efficiency
-
-    for example in examples[:total]:
-        try:
-            prediction = optimized_program.forward(input=example.input)
-            # Simple correctness check
-            if hasattr(example, "output") and prediction.output:
-                correct += 1
-        except Exception as e:
-            logger.debug(f"Evaluation error on example: {e}")
-            continue
-
-    score = correct / total if total > 0 else 0.0
-    logger.info(f"Optimized program achieved {score:.2%} success rate")
-
-    # Generate candidates with variations
-    candidates = []
-
-    # Main optimized prompt
-    candidates.append(
-        PromptCandidate(
-            text=prompt_text,
-            score=score,
-            metadata={
-                "type": "optimized",
-                "optimizer": type(optimized_program).__name__,
-                "examples_used": len(examples),
+    # Step 8: Extract optimized instructions
+    # SIMBA / GEPA store the optimized prompt directly on the predictor.
+    candidate = PromptCandidate(
+        text=instructions,
+        metadata={
+            "optimizer": type(optimizer).__name__,
+            "strategy": strategy.value,
+            "dataset_size": len(dspy_examples),
             },
-        )
-    )
-
-    # Generate additional candidates if needed
-    while len(candidates) < NUM_PROMPT_CANDIDATES:
-        # Create variations with slightly different metadata
-        variation_score = score * (0.95 - 0.05 * len(candidates))
-        candidates.append(
-            PromptCandidate(
-                text=prompt_text,
-                score=variation_score,
-                metadata={
-                    "type": "variation",
-                    "base_score": score,
-                    "variation_index": len(candidates),
-                },
             )
-        )
-
-    # Sort by score descending and return exactly NUM_PROMPT_CANDIDATES
-    candidates.sort(key=lambda c: c.score, reverse=True)
-    return candidates[:NUM_PROMPT_CANDIDATES]
-
+    logger.info(
+        "Prompt optimization completed successfully"
+    )
+    return candidate
 
 def train(
+    current_prompt_text: str,
     optimizer: Any = None,
     strategy: ExtractionStrategy = ExtractionStrategy.LAST_TURN,
     require_feedback: bool = True,
-) -> list[PromptCandidate]:
+) -> PromptCandidate:
     """Synchronous wrapper for train_async().
-    
+
     This function provides a synchronous interface to the async training pipeline.
     For use in async contexts, call train_async() directly.
-    
+
     Args:
-        agent_name: Optional agent identifier for filtering interactions
-        optimizer: DSPy optimizer instance (default: BootstrapFewShot)
+        current_prompt_text: Current prompt text to initialize the agent program.
+        optimizer: DSPy optimizer instance (default: None)
         strategy: Extraction strategy (LAST_TURN or FULL_HISTORY)
         require_feedback: Whether to require feedback for inclusion in dataset
-    
+
     Returns:
-        List of prompt candidates sorted by quality score
-        
+        A single optimized PromptCandidate returned by train_async().
+
     Raises:
         RuntimeError: If called from within an async event loop. Use train_async() instead.
     """
     try:
-        return asyncio.run(train_async(optimizer, strategy, require_feedback))
+        return asyncio.run(
+            train_async(
+                optimizer=optimizer,
+                current_prompt_text=current_prompt_text,
+                strategy=strategy,
+                require_feedback=require_feedback,
+            )
+        )
     except RuntimeError as e:
         if "event loop" in str(e):
             raise RuntimeError(
