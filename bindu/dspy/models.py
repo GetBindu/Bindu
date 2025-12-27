@@ -52,5 +52,4 @@ class PromptCandidate:
     """
 
     text: str
-    score: float
     metadata: dict[str, Any]
