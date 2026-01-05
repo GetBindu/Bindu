@@ -16,15 +16,26 @@ def add_extension_to_capabilities(
         extension: Extension instance (X402AgentExtension or DIDAgentExtension)
 
     Returns:
-        AgentCapabilities object with extension included
+        AgentCapabilities object with extension included, preserving all other fields
 
     """
     if capabilities is None:
         capabilities = {}
-
+    
+    # Ensure we're working with a dict (TypedDict is already a dict at runtime)
+    if not isinstance(capabilities, dict):
+        capabilities = {}
+    
+    # Get existing extensions and add new one
     extensions = capabilities.get("extensions", [])
     extensions.append(extension)
-    return AgentCapabilities(extensions=extensions)
+    
+    # Preserve all existing capability fields and add extensions
+    return AgentCapabilities(
+        extensions=extensions,
+        push_notifications=capabilities.get("push_notifications", False),
+        streaming=capabilities.get("streaming", False),
+    )
 
 
 def get_x402_extension_from_capabilities(manifest: Any) -> Optional[Any]:
