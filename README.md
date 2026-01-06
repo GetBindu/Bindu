@@ -1140,7 +1140,38 @@ We 💛 contributions! Whether you're fixing bugs, improving documentation, or b
 
 <br/>
 
-## 🙏 Acknowledgements
+## 👥 Active Moderators
+
+Our dedicated moderators help maintain a welcoming and productive community:
+
+<table>
+  <tr>
+    <td align="center">
+      <a href="https://github.com/raahulrahl">
+        <img src="https://avatars.githubusercontent.com/u/157174139?v=4" width="100px;" alt="Raahul Dutta"/>
+        <br />
+        <sub><b>Raahul Dutta</b></sub>
+      </a>
+      <br />
+    </td>
+    <td align="center">
+      <a href="https://github.com/Paraschamoli">
+        <img src="https://avatars.githubusercontent.com/u/157124537?v=4" width="100px;" alt="Paras Chamoli"/>
+        <br />
+        <sub><b>Paras Chamoli</b></sub>
+      </a>
+      <br />
+    </td>
+  </tr>
+</table>
+
+> Want to become a moderator? Reach out on [Discord](https://discord.gg/3w5zuYUuwt)!
+
+---
+
+<br/>
+
+## �� Acknowledgements
 
 Grateful to these projects:
 
