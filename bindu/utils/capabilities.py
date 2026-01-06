@@ -21,15 +21,15 @@ def add_extension_to_capabilities(
     """
     if capabilities is None:
         capabilities = {}
-    
+
     # Ensure we're working with a dict (TypedDict is already a dict at runtime)
     if not isinstance(capabilities, dict):
         capabilities = {}
-    
+
     # Get existing extensions and add new one
     extensions = capabilities.get("extensions", [])
     extensions.append(extension)
-    
+
     # Preserve all existing capability fields and add extensions
     return AgentCapabilities(
         extensions=extensions,

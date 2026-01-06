@@ -81,9 +81,7 @@ class MessageHandlers:
             # Use long_running flag to determine if config should be persisted
             is_long_running = config.get("long_running", False)
             await self.push_manager.register_push_config(
-                task["id"],
-                push_config,
-                persist=is_long_running
+                task["id"], push_config, persist=is_long_running
             )
 
         # Pass payment context from message metadata to worker if available

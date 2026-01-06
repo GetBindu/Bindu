@@ -25,16 +25,12 @@ config = {
     "description": "Echo agent with push notification support for testing webhooks.",
     "deployment": {"url": "http://localhost:3773", "expose": True},
     "skills": [],
-    
     # Enable push notifications capability
-    "capabilities": {
-        "push_notifications": True
-    },
-    
+    "capabilities": {"push_notifications": True},
     # Optional: Configure global webhook for all tasks
     # If not specified, clients must provide webhook in each request
     "global_webhook_url": "https://myapp.com/webhooks/global",
-    "global_webhook_token": "global_secret_token_123"
+    "global_webhook_token": "global_secret_token_123",
 }
 
 bindufy(config, handler)

@@ -840,7 +840,9 @@ class PostgresStorage(Storage[ContextT]):
                     await session.execute(delete(task_feedback_table))
                     await session.execute(delete(tasks_table))
                     await session.execute(delete(contexts_table))
-                    logger.info("Cleared all tasks, contexts, feedback, and webhook configs")
+                    logger.info(
+                        "Cleared all tasks, contexts, feedback, and webhook configs"
+                    )
 
         await self._retry_on_connection_error(_clear)
 
@@ -961,9 +963,7 @@ class PostgresStorage(Storage[ContextT]):
 
         await self._retry_on_connection_error(_save)
 
-    async def load_webhook_config(
-        self, task_id: UUID
-    ) -> PushNotificationConfig | None:
+    async def load_webhook_config(self, task_id: UUID) -> PushNotificationConfig | None:
         """Load a webhook configuration for a task using SQLAlchemy.
 
         Args:

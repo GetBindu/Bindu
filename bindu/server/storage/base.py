@@ -233,9 +233,7 @@ class Storage(ABC, Generic[ContextT]):
         """
 
     @abstractmethod
-    async def load_webhook_config(
-        self, task_id: UUID
-    ) -> PushNotificationConfig | None:
+    async def load_webhook_config(self, task_id: UUID) -> PushNotificationConfig | None:
         """Load a webhook configuration for a task.
 
         Args:

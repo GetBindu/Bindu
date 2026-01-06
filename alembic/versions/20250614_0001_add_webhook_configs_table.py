@@ -77,7 +77,9 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Remove webhook_configs table."""
     # Drop trigger
-    op.execute("DROP TRIGGER IF EXISTS update_webhook_configs_updated_at ON webhook_configs")
+    op.execute(
+        "DROP TRIGGER IF EXISTS update_webhook_configs_updated_at ON webhook_configs"
+    )
 
     # Drop index
     op.drop_index("idx_webhook_configs_created_at", table_name="webhook_configs")

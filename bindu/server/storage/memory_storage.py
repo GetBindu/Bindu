@@ -503,9 +503,7 @@ class InMemoryStorage(Storage[ContextT]):
         self._webhook_configs[task_id] = config
         logger.debug(f"Saved webhook config for task {task_id}")
 
-    async def load_webhook_config(
-        self, task_id: UUID
-    ) -> PushNotificationConfig | None:
+    async def load_webhook_config(self, task_id: UUID) -> PushNotificationConfig | None:
         """Load a webhook configuration for a task.
 
         Args:

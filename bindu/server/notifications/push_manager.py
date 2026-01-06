@@ -86,7 +86,9 @@ class PushNotificationManager:
         state after server restarts. Should be called during startup.
         """
         if self.storage is None:
-            logger.debug("No storage configured, skipping webhook config initialization")
+            logger.debug(
+                "No storage configured, skipping webhook config initialization"
+            )
             return
 
         try:
@@ -283,7 +285,10 @@ class PushNotificationManager:
             )
 
     def build_artifact_event(
-        self, task_id: uuid.UUID, context_id: uuid.UUID, artifact: Artifact | dict[str, Any]
+        self,
+        task_id: uuid.UUID,
+        context_id: uuid.UUID,
+        artifact: Artifact | dict[str, Any],
     ) -> dict[str, Any]:
         """Build an artifact update event payload for push notification."""
         timestamp = datetime.now(timezone.utc).isoformat()
@@ -298,7 +303,10 @@ class PushNotificationManager:
         }
 
     async def notify_artifact(
-        self, task_id: uuid.UUID, context_id: uuid.UUID, artifact: Artifact | dict[str, Any]
+        self,
+        task_id: uuid.UUID,
+        context_id: uuid.UUID,
+        artifact: Artifact | dict[str, Any],
     ) -> None:
         """Send an artifact update notification for a task.
 
@@ -320,7 +328,9 @@ class PushNotificationManager:
                 "Artifact notification delivery failed",
                 task_id=str(task_id),
                 context_id=str(context_id),
-                artifact_name=artifact.get("name") if isinstance(artifact, dict) else None,
+                artifact_name=artifact.get("name")
+                if isinstance(artifact, dict)
+                else None,
                 status=exc.status,
                 message=str(exc),
             )
@@ -372,7 +382,10 @@ class PushNotificationManager:
         )
 
     async def set_task_push_notification(
-        self, request: SetTaskPushNotificationRequest, task_loader, persist: bool = False
+        self,
+        request: SetTaskPushNotificationRequest,
+        task_loader,
+        persist: bool = False,
     ) -> SetTaskPushNotificationResponse:
         """Set push notification settings for a task.
 
@@ -406,7 +419,9 @@ class PushNotificationManager:
         is_long_running = params.get("long_running", False)
 
         try:
-            await self.register_push_config(task_id, push_config, persist=is_long_running)
+            await self.register_push_config(
+                task_id, push_config, persist=is_long_running
+            )
         except ValueError as exc:
             return self._jsonrpc_error(
                 SetTaskPushNotificationResponse,
@@ -472,7 +487,9 @@ class PushNotificationManager:
         )
 
     async def delete_task_push_notification(
-        self, request: DeleteTaskPushNotificationConfigRequest, delete_from_storage: bool = False
+        self,
+        request: DeleteTaskPushNotificationConfigRequest,
+        delete_from_storage: bool = False,
     ) -> DeleteTaskPushNotificationConfigResponse:
         """Delete a push notification configuration for a task.
 
@@ -504,7 +521,9 @@ class PushNotificationManager:
                 "Push notification configuration identifier mismatch.",
             )
 
-        removed = await self.remove_push_config(task_id, delete_from_storage=delete_from_storage)
+        removed = await self.remove_push_config(
+            task_id, delete_from_storage=delete_from_storage
+        )
         if removed is None:
             return self._jsonrpc_error(
                 DeleteTaskPushNotificationConfigResponse,

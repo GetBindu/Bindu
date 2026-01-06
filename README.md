@@ -864,17 +864,17 @@ assessment:
     - extract
     - table
     - invoice
-  
+
   specializations:
     - domain: invoice_processing
       confidence_boost: 0.3
     - domain: table_extraction
       confidence_boost: 0.2
-  
+
   anti_patterns:
     - "pdf editing"
     - "pdf creation"
-  
+
   complexity_indicators:
     simple:
       - "single page"
@@ -928,7 +928,7 @@ config = {
 </details>
 
 > 📚 See the [Negotiation Documentation](https://docs.getbindu.com/bindu/negotiation/overview) for complete details.
- 
+
 ---
 
 <br/>
@@ -975,7 +975,7 @@ Feedback is stored in the `task_feedback` table and can be used to:
 ## Push Notification
 
 Bindu supports **real-time webhook notifications** for long-running tasks, following the [A2A Protocol specification](https://a2a-protocol.org/latest/specification/). This enables clients to receive push notifications about task state changes and artifact generation without polling.
- 
+
 
 ### Quick Example
 
@@ -1043,14 +1043,14 @@ response = requests.post("http://localhost:3773/messages/send", json={
 async def handle_task_update(request: Request, authorization: str = Header(None)):
     if authorization != "Bearer secret_abc123":
         raise HTTPException(status_code=401)
-    
+
     event = await request.json()
-    
+
     if event["kind"] == "status-update":
         print(f"Task {event['task_id']} state: {event['status']['state']}")
     elif event["kind"] == "artifact-update":
         print(f"Artifact generated: {event['artifact']['name']}")
-    
+
     return {"status": "received"}
 ```
 
