@@ -1162,6 +1162,38 @@ Our dedicated moderators help maintain a welcoming and productive community:
       </a>
       <br />
     </td>
+    <td align="center">
+      <a href="https://github.com/Gaurika-Sethi">
+        <img src="https://avatars.githubusercontent.com/u/178935569?v=4" width="100px;" alt="Gaurika Sethi"/>
+        <br />
+        <sub><b>Gaurika Sethi</b></sub>
+      </a>
+      <br />
+    </td>
+    <td align="center">
+      <a href="https://github.com/lsvishaal">
+        <img src="https://avatars.githubusercontent.com/u/62366204?v=4" width="100px;" alt="Vishaal LS"/>
+        <br />
+        <sub><b>Vishaal LS</b></sub>
+      </a>
+      <br />
+    </td>
+    <td align="center">
+      <a href="https://github.com/Avngrstark62">
+        <img src="https://avatars.githubusercontent.com/u/133889196?v=4" width="100px;" alt="Abhijeet Singh Thakur"/>
+        <br />
+        <sub><b>Abhijeet Singh Thakur</b></sub>
+      </a>
+      <br />
+    </td>
+    <td align="center">
+      <a href="https://github.com/RajezMariner">
+        <img src="https://avatars.githubusercontent.com/u/30373242?v=4s" width="100px;" alt="Rajesh Somasundaram"/>
+        <br />
+        <sub><b>Rajesh Somasundaram</b></sub>
+      </a>
+      <br />
+    </td>
   </tr>
 </table>
 
