@@ -352,7 +352,7 @@ Output:
                         "kind": "text",
                         "text": "Quote",
                         "metadata": {
-                            "did.message.signature": "5opJuKrBDW4woezujm88FzTqRDWAB62qD3wxKz96Bt2izfuzsneo3zY7yqHnV77cq3BDKepdcro2puiGTVAB52qf"
+                            "did.message.signature": "5opJuKrBDW4woezujm88FzTqRDWAB62qD3wxKz96Bt2izfuzsneo3zY7yqHnV77cq3BDKepdcro2puiGTVAB52qf"  # pragma: allowlist secret
                         }
                     }
                 ]
@@ -972,73 +972,30 @@ Feedback is stored in the `task_feedback` table and can be used to:
 
 <br/>
 
-## Push Notification
+## 📬 Push Notifications
 
 Bindu supports **real-time webhook notifications** for long-running tasks, following the [A2A Protocol specification](https://a2a-protocol.org/latest/specification/). This enables clients to receive push notifications about task state changes and artifact generation without polling.
 
+### Quick Start
 
-### Quick Example
+1. **Start webhook receiver:** `python examples/webhook_client_example.py`
+2. **Configure agent** in `examples/echo_agent_with_webhooks.py`:
+   ```python
+   manifest = {
+       "capabilities": {"push_notifications": True},
+       "global_webhook_url": "http://localhost:8000/webhooks/task-updates",
+       "global_webhook_token": "secret_abc123",
+   }
+   ```
+3. **Run agent:** `python examples/echo_agent_with_webhooks.py`
+4. **Send tasks** - webhook notifications arrive automatically
 
-**Using `bindufy` (Recommended):**
-
-```python
-from bindu.penguin.bindufy import bindufy
-
-def handler(messages):
-    return [{"role": "assistant", "content": messages[-1]["content"]}]
-
-config = {
-    "author": "you@example.com",
-    "name": "my_agent",
-    "description": "Agent with push notifications",
-    "deployment": {"url": "http://localhost:3773"},
-    "capabilities": {
-        "push_notifications": True  # Enable push notifications
-    },
-    # Optional: Global webhook for all tasks
-    "global_webhook_url": "https://myapp.com/webhooks/global",
-    "global_webhook_token": "global_secret"
-}
-
-bindufy(config, handler)
-```
-
-**Using `AgentManifest` directly:**
+<details>
+<summary><b>View webhook receiver implementation</b> (click to expand)</summary>
 
 ```python
-manifest = AgentManifest(
-    name="Data Processor",
-    capabilities={"push_notifications": True},
-    global_webhook_url="https://myapp.com/webhooks/global",
-    global_webhook_token="global_secret"
-)
+from fastapi import FastAPI, Request, Header, HTTPException
 
-# 2. Send task with webhook configuration
-response = requests.post("http://localhost:3773/messages/send", json={
-    "jsonrpc": "2.0",
-    "method": "messages/send",
-    "params": {
-        "message": {
-            "message_id": str(uuid4()),
-            "task_id": str(uuid4()),
-            "context_id": str(uuid4()),
-            "kind": "message",
-            "role": "user",
-            "parts": [{"kind": "text", "text": "Process large dataset"}]
-        },
-        "configuration": {
-            "accepted_output_modes": ["application/json"],
-            "long_running": True,  # Persist webhook across restarts
-            "push_notification_config": {
-                "id": str(uuid4()),
-                "url": "https://myapp.com/webhooks/task-updates",
-                "token": "secret_abc123"
-            }
-        }
-    }
-})
-
-# 3. Implement webhook receiver
 @app.post("/webhooks/task-updates")
 async def handle_task_update(request: Request, authorization: str = Header(None)):
     if authorization != "Bearer secret_abc123":
@@ -1054,7 +1011,12 @@ async def handle_task_update(request: Request, authorization: str = Header(None)
     return {"status": "received"}
 ```
 
-### Notification Events
+</details>
+
+<details>
+<summary><b>View notification event types</b> (click to expand)</summary>
+
+<br/>
 
 **Status Update Event** - Sent when task state changes:
 ```json
@@ -1074,34 +1036,57 @@ async def handle_task_update(request: Request, authorization: str = Header(None)
   "artifact": {
     "artifact_id": "456e7890-...",
     "name": "results.json",
-    "parts": [{"kind": "data", "data": {...}}]
+    "parts": [...]
   }
 }
 ```
 
-### Long-Running Tasks
+</details>
 
-For tasks that run longer than typical request timeouts (minutes, hours, or days), set `long_running=true` to persist webhook configurations across server restarts:
+### ⚙️ Configuration
+
+<details>
+<summary><b>View configuration example</b> (click to expand)</summary>
+
+**Using `bindufy`:**
+
+```python
+from bindu.penguin.bindufy import bindufy
+
+def handler(messages):
+    return [{"role": "assistant", "content": messages[-1]["content"]}]
+
+config = {
+    "author": "you@example.com",
+    "name": "my_agent",
+    "description": "Agent with push notifications",
+    "deployment": {"url": "http://localhost:3773"},
+    "capabilities": {"push_notifications": True},
+    "global_webhook_url": "https://myapp.com/webhooks/global",
+    "global_webhook_token": "global_secret"
+}
+
+bindufy(config, handler)
+```
+
+**Per-Task Webhook Override:**
 
 ```python
 "configuration": {
-    "long_running": True,  # Webhook survives server restarts
-    "push_notification_config": {...}
+    "long_running": True,  # Persist webhook in database
+    "push_notification_config": {
+        "id": str(uuid4()),
+        "url": "https://custom-endpoint.com/webhooks",
+        "token": "custom_token_123"
+    }
 }
 ```
 
-### Global Webhook Fallback
+**Long-Running Tasks:**
 
-Configure a default webhook for all tasks without explicit configuration:
+For tasks that run longer than typical request timeouts (minutes, hours, or days), set `long_running=True` to persist webhook configurations across server restarts. The webhook config will be stored in the database (`webhook_configs` table).
 
-```python
-manifest = AgentManifest(
-    global_webhook_url="https://myapp.com/webhooks/global",
-    global_webhook_token="global_secret"
-)
-
-# Tasks without explicit webhook automatically use global webhook
-```
+</details>
 
 📖 **[Complete Documentation](docs/long-running-task-notifications.md)** - Detailed guide with architecture, security, examples, and troubleshooting.
 

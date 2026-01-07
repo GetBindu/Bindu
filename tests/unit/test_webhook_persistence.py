@@ -14,8 +14,6 @@ import pytest
 from uuid import uuid4
 from unittest.mock import AsyncMock, MagicMock
 
-from bindu.common.protocol.types import PushNotificationConfig
-
 
 # =============================================================================
 # Storage Interface Tests
@@ -29,7 +27,7 @@ class TestWebhookStorageMemory:
     async def test_save_and_load_webhook_config(self, storage):
         """Test saving and loading a webhook configuration."""
         task_id = uuid4()
-        config: PushNotificationConfig = {
+        config = {
             "id": uuid4(),
             "url": "https://example.com/webhook",
             "token": "secret_token_123",
@@ -53,7 +51,7 @@ class TestWebhookStorageMemory:
     async def test_delete_webhook_config(self, storage):
         """Test deleting a webhook configuration."""
         task_id = uuid4()
-        config: PushNotificationConfig = {
+        config = {
             "id": uuid4(),
             "url": "https://example.com/webhook",
         }
@@ -76,11 +74,11 @@ class TestWebhookStorageMemory:
         """Test loading all webhook configurations."""
         task_id_1 = uuid4()
         task_id_2 = uuid4()
-        config_1: PushNotificationConfig = {
+        config_1 = {
             "id": uuid4(),
             "url": "https://example.com/webhook1",
         }
-        config_2: PushNotificationConfig = {
+        config_2 = {
             "id": uuid4(),
             "url": "https://example.com/webhook2",
         }
@@ -98,11 +96,11 @@ class TestWebhookStorageMemory:
     async def test_update_existing_webhook_config(self, storage):
         """Test updating an existing webhook configuration."""
         task_id = uuid4()
-        config_1: PushNotificationConfig = {
+        config_1 = {
             "id": uuid4(),
             "url": "https://example.com/webhook1",
         }
-        config_2: PushNotificationConfig = {
+        config_2 = {
             "id": uuid4(),
             "url": "https://example.com/webhook2",
             "token": "new_token",
@@ -130,7 +128,7 @@ class TestPushManagerPersistence:
         from bindu.server.notifications.push_manager import PushNotificationManager
 
         task_id = uuid4()
-        config: PushNotificationConfig = {
+        config = {
             "id": uuid4(),
             "url": "https://example.com/webhook",
         }
@@ -157,7 +155,7 @@ class TestPushManagerPersistence:
         from bindu.server.notifications.push_manager import PushNotificationManager
 
         task_id = uuid4()
-        config: PushNotificationConfig = {
+        config = {
             "id": uuid4(),
             "url": "https://example.com/webhook",
         }
@@ -168,7 +166,7 @@ class TestPushManagerPersistence:
 
         manager = PushNotificationManager(manifest=mock_manifest, storage=mock_storage)
 
-        await manager.register_push_config(task_id, config, persist=True)
+        await manager.register_push_config(task_id, config, persist=True)  # type: ignore[arg-type]
 
         mock_storage.save_webhook_config.assert_called_once_with(task_id, config)
 
@@ -178,7 +176,7 @@ class TestPushManagerPersistence:
         from bindu.server.notifications.push_manager import PushNotificationManager
 
         task_id = uuid4()
-        config: PushNotificationConfig = {
+        config = {
             "id": uuid4(),
             "url": "https://example.com/webhook",
         }
@@ -189,7 +187,7 @@ class TestPushManagerPersistence:
 
         manager = PushNotificationManager(manifest=mock_manifest, storage=mock_storage)
 
-        await manager.register_push_config(task_id, config, persist=False)
+        await manager.register_push_config(task_id, config, persist=False)  # type: ignore[arg-type]
 
         mock_storage.save_webhook_config.assert_not_called()
 
@@ -199,7 +197,7 @@ class TestPushManagerPersistence:
         from bindu.server.notifications.push_manager import PushNotificationManager
 
         task_id = uuid4()
-        config: PushNotificationConfig = {
+        config = {
             "id": uuid4(),
             "url": "https://example.com/webhook",
         }
@@ -260,7 +258,7 @@ class TestGlobalWebhookFallback:
         from bindu.server.notifications.push_manager import PushNotificationManager
 
         task_id = uuid4()
-        task_config: PushNotificationConfig = {
+        task_config = {
             "id": uuid4(),
             "url": "https://task.example.com/webhook",
         }
@@ -274,6 +272,7 @@ class TestGlobalWebhookFallback:
 
         effective = manager.get_effective_webhook_config(task_id)
 
+        assert effective is not None
         assert effective["url"] == "https://task.example.com/webhook"
 
     def test_get_effective_webhook_config_falls_back_to_global(self):
@@ -310,7 +309,7 @@ class TestArtifactNotifications:
 
         task_id = uuid4()
         context_id = uuid4()
-        config: PushNotificationConfig = {
+        config = {
             "id": uuid4(),
             "url": "https://example.com/webhook",
         }
@@ -325,12 +324,13 @@ class TestArtifactNotifications:
 
         manager = PushNotificationManager(manifest=mock_manifest)
         manager._push_notification_configs[task_id] = config
-        manager.notification_service.send_event = AsyncMock()
+        mock_send_event = AsyncMock()
+        manager.notification_service.send_event = mock_send_event  # type: ignore[method-assign]
 
         await manager.notify_artifact(task_id, context_id, artifact)
 
-        manager.notification_service.send_event.assert_called_once()
-        call_args = manager.notification_service.send_event.call_args
+        mock_send_event.assert_called_once()
+        call_args = mock_send_event.call_args
         event = call_args[0][1]
         assert event["kind"] == "artifact-update"
         assert event["task_id"] == str(task_id)
@@ -347,9 +347,8 @@ class TestMessageSendConfigurationLongRunning:
 
     def test_long_running_flag_in_configuration(self):
         """Test that MessageSendConfiguration accepts long_running flag."""
-        from bindu.common.protocol.types import MessageSendConfiguration
 
-        config: MessageSendConfiguration = {
+        config = {
             "accepted_output_modes": ["application/json"],
             "long_running": True,
             "push_notification_config": {
@@ -362,9 +361,8 @@ class TestMessageSendConfigurationLongRunning:
 
     def test_long_running_flag_defaults_to_false(self):
         """Test that long_running defaults to False when not specified."""
-        from bindu.common.protocol.types import MessageSendConfiguration
 
-        config: MessageSendConfiguration = {
+        config = {
             "accepted_output_modes": ["application/json"],
         }
 
@@ -397,7 +395,7 @@ class TestAgentManifestGlobalWebhook:
             url="http://localhost:3773",
             version="1.0.0",
             protocol_version="1.0.0",
-            agent_trust={
+            agent_trust={  # type: ignore[arg-type]
                 "identity_provider": "auth0",
                 "inherited_roles": [],
                 "creator_id": "test",
@@ -405,7 +403,7 @@ class TestAgentManifestGlobalWebhook:
                 "trust_verification_required": False,
                 "allowed_operations": {},
             },
-            capabilities={"push_notifications": True},
+            capabilities={"push_notifications": True},  # type: ignore[arg-type]
             skills=[],
             kind="agent",
             num_history_sessions=10,
