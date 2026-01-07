@@ -1,9 +1,11 @@
-import { apiFetch } from "../core/api.js";
+import { createTask } from "../api/tasks.js";
+import { handlePaymentFlow } from "../api/payment.js";
 import { parseTaskResponse } from "../core/protocol.js";
 import { applyTask } from "../tasks/tasks.js";
 import { store } from "../state/store.js";
 import { emit } from "../core/events.js";
-import { A2A_ENDPOINTS } from "../core/constants.js";
+import { UI_FLAGS } from "../core/constants.js";
+import { ApiError } from "../api/client.js";
 
 export async function sendMessage(text) {
   if (!text || typeof text !== "string") return;
@@ -12,16 +14,27 @@ export async function sendMessage(text) {
   store.setIndicator("🤖 Agent is thinking…");
 
   try {
-    const res = await apiFetch(A2A_ENDPOINTS.A2A, {
-      method: "POST",
-      body: JSON.stringify({ input: text }),
-    });
-
-    const payload = await res.json();
-    const parsed = parseTaskResponse(payload);
+    const result = await createTask(text);
+    const parsed = parseTaskResponse(result);
 
     if (parsed.uiFlag) {
-      store.setIndicator(null);
+      store.clearIndicator();
+      
+      if (parsed.uiFlag === UI_FLAGS.PAYMENT_REQUIRED) {
+        try {
+          store.setIndicator("💰 Processing payment...");
+          const paymentResult = await handlePaymentFlow();
+          
+          if (paymentResult.success) {
+            store.setIndicator("✅ Payment complete! Retrying...");
+            return await sendMessage(text);
+          }
+        } catch (error) {
+          store.setError(`Payment failed: ${error.message}`);
+          return;
+        }
+      }
+      
       emit(parsed.uiFlag);
       return;
     }
@@ -32,9 +45,19 @@ export async function sendMessage(text) {
     }
 
     applyTask(parsed.task);
-  } catch {
-    store.setError("Network error");
+  } catch (error) {
+    if (error instanceof ApiError) {
+      if (error.status === 401) {
+        emit(UI_FLAGS.AUTH_REQUIRED);
+      } else if (error.status === 402) {
+        emit(UI_FLAGS.PAYMENT_REQUIRED);
+      } else {
+        store.setError(error.message || "Request failed");
+      }
+    } else {
+      store.setError("Network error");
+    }
   } finally {
-    store.setIndicator(null);
+    store.clearIndicator();
   }
 }
