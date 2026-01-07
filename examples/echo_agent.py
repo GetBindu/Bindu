@@ -25,6 +25,8 @@ config = {
     "description": "A basic echo agent for quick testing.",
     "deployment": {"url": "http://localhost:3773", "expose": True},
     "skills": [],
+    # Enable push notifications for long-running task support
+    "capabilities": {"push_notifications": True},
     "storage": {
         "type": "postgres",
         "database_url": "postgresql+asyncpg://bindu:bindu@localhost:5432/bindu",  # pragma: allowlist secret

@@ -82,3 +82,37 @@ class TestAddExtensionToCapabilities:
         assert "extensions" in result
         assert len(result["extensions"]) == 1
         assert result["extensions"][0] == x402_ext
+
+    def test_preserves_push_notifications_when_adding_extension(self):
+        """Test that push_notifications is preserved when adding an extension (Issue #69)."""
+        x402_ext = X402AgentExtension(
+            amount="10000",
+            token="USDC",
+            network="base-sepolia",
+            pay_to_address="0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0",
+        )
+
+        capabilities = {"push_notifications": True, "streaming": True}
+
+        result = add_extension_to_capabilities(capabilities, x402_ext)
+
+        # Must preserve existing keys
+        assert result.get("push_notifications") is True
+        assert result.get("streaming") is True
+        # And add the extension
+        assert "extensions" in result
+        assert len(result["extensions"]) == 1
+
+    def test_handles_none_capabilities(self):
+        """Test that None capabilities are handled correctly."""
+        x402_ext = X402AgentExtension(
+            amount="10000",
+            token="USDC",
+            network="base-sepolia",
+            pay_to_address="0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0",
+        )
+
+        result = add_extension_to_capabilities(None, x402_ext)
+
+        assert "extensions" in result
+        assert len(result["extensions"]) == 1

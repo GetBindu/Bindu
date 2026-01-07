@@ -34,6 +34,7 @@ from bindu.utils.task_telemetry import trace_task_operation, track_active_task
 
 from bindu.server.scheduler import Scheduler
 from bindu.server.storage import Storage
+from bindu.server.notifications.push_manager import PushNotificationManager
 
 
 @dataclass
@@ -45,6 +46,7 @@ class MessageHandlers:
     manifest: Any | None = None
     workers: list[Any] | None = None
     context_id_parser: Any = None
+    push_manager: PushNotificationManager | None = None
 
     @trace_task_operation("send_message")
     @track_active_task
@@ -61,6 +63,22 @@ class MessageHandlers:
         # Submit task to storage
         task: Task = await self.storage.submit_task(context_id, message)
 
+        # Handle long-running task webhook persistence.
+        # Accept both camelCase (JSON-RPC standard) and snake_case for flexibility.
+        config = request["params"].get("configuration", {})
+        long_running = bool(config.get("long_running") or config.get("longRunning"))
+        push_notification_config = config.get("push_notification_config") or config.get(
+            "pushNotificationConfig"
+        )
+
+        if long_running and push_notification_config and self.push_manager:
+            # Persist webhook config for long-running tasks
+            await self.push_manager.register_push_config(
+                task_id=task["id"],
+                config=push_notification_config,
+                persist=True,
+            )
+
         # Schedule task for execution
         scheduler_params: TaskSendParams = TaskSendParams(
             task_id=task["id"],
@@ -69,8 +87,8 @@ class MessageHandlers:
         )
 
         # Add optional configuration parameters
-        config = request["params"].get("configuration", {})
-        if history_length := config.get("history_length"):
+        history_length = config.get("history_length") or config.get("historyLength")
+        if history_length:
             scheduler_params["history_length"] = history_length
 
         # Pass payment context from message metadata to worker if available
