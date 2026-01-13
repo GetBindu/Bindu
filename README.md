@@ -137,9 +137,6 @@ That's it! Your local agent becomes a live, secure, discoverable service. [Learn
 
 ### Option 2: Manual Setup
 
-<details>
-<summary><b>View code example</b> (click to expand)</summary>
-
 Create your agent script `my_agent.py`:
 
 ```python
@@ -181,7 +178,7 @@ def handler(messages: list[dict[str, str]]):
 bindufy(config, handler)
 ```
 
-</details>
+![Sample Agent](assets/agno-simple.png)
 
 Your agent is now live at `http://localhost:3773` and ready to communicate with other agents.
 
