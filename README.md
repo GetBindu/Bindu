@@ -131,7 +131,7 @@ uv add cookiecutter
 uvx cookiecutter https://github.com/getbindu/create-bindu-agent.git
 ```
 
-## 🎥 Watch Bindu in Action
+## 🎥 Create Production Ready Agent in Minutes
 
 <div align="center">
   <a href="https://youtu.be/obY1bGOoWG8?si=uEeDb0XWrtYOQTL7" target="_blank">
