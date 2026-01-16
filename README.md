@@ -11,6 +11,18 @@
 </p>
 
 <p align="center">
+  <a href="README.md">🇬🇧 English</a> •
+  <a href="README.de.md">🇩🇪 Deutsch</a> •
+  <a href="README.es.md">🇪🇸 Español</a> •
+  <a href="README.fr.md">🇫🇷 Français</a> •
+  <a href="README.hi.md">🇮🇳 हिंदी</a> •
+  <a href="README.bn.md">🇧🇩 বাংলা</a> •
+  <a href="README.zh.md">🇨🇳 中文</a> •
+  <a href="README.nl.md">🇳🇱 Nederlands</a> •
+  <a href="README.ta.md">🇮🇳 தமிழ்</a>
+</p>
+
+<p align="center">
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
   <a href="https://hits.sh/github.com/Saptha-me/Bindu.svg"><img src="https://hits.sh/github.com/Saptha-me/Bindu.svg" alt="Hits"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="Python Version"></a>
