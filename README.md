@@ -404,8 +404,14 @@ The storage layer uses three main tables:
 <details>
 <summary><b>View configuration example</b> (click to expand)</summary>
 
-Configure PostgreSQL connection in your environment or settings:
-provide the connection string in the config of the agent.
+Configure PostgreSQL connection via environment variables:
+
+```bash
+STORAGE_TYPE=postgres
+DATABASE_URL=postgresql+asyncpg://bindu:bindu@localhost:5432/bindu
+```
+
+Then use the simplified config:
 
 ```json
 config = {
@@ -414,11 +420,6 @@ config = {
     "description": "A research assistant agent",
     "deployment": {"url": "http://localhost:3773", "expose": True},
     "skills": ["skills/question-answering", "skills/pdf-processing"],
-    "storage": {
-        "type": "postgres",
-        "database_url": "postgresql+asyncpg://bindu:bindu@localhost:5432/bindu",  # pragma: allowlist secret
-        "run_migrations_on_startup": False,
-    },
 }
 ```
 
@@ -441,7 +442,14 @@ Its Optional - InMemoryScheduler is used by default.
 <details>
 <summary><b>View configuration example</b> (click to expand)</summary>
 
-Configure Redis connection in your agent config:
+Configure Redis connection via environment variables:
+
+```bash
+SCHEDULER_TYPE=redis
+REDIS_URL=redis://localhost:6379/0
+```
+
+Then use the simplified config:
 
 ```json
 config = {
@@ -450,10 +458,6 @@ config = {
     "description": "A research assistant agent",
     "deployment": {"url": "http://localhost:3773", "expose": True},
     "skills": ["skills/question-answering", "skills/pdf-processing"],
-     "scheduler": {
-        "type": "redis",
-        "redis_url": "redis://localhost:6379/0",
-    },
 }
 ```
 
@@ -507,26 +511,7 @@ config = {
     "description": "A basic echo agent for quick testing.",
     "deployment": {"url": "http://localhost:3773", "expose": True},
     "skills": [],
-    "storage": {
-        "type": "postgres",
-        "database_url": "postgresql+asyncpg://bindu:bindu@localhost:5432/bindu",  # pragma: allowlist secret
-        "run_migrations_on_startup": False,
-    },
-    # Scheduler configuration (optional)
-    # Use "memory" for single-process (default) or "redis" for distributed multi-process
-    "scheduler": {
-        "type": "redis",
-        "redis_url": "redis://localhost:6379/0",
-    },
-    # Sentry error tracking (optional)
-    # Configure Sentry directly in code instead of environment variables
-    "sentry": {
-        "enabled": True,
-        "dsn": "https://252c0197ddeafb621f91abdbb59fa819@o4510504294612992.ingest.de.sentry.io/4510504299069520",
-        "environment": "development",
-        "traces_sample_rate": 1.0,
-        "profiles_sample_rate": 0.1,
-    },
+    # Storage, scheduler, sentry, and telemetry are now configured via environment variables
 }
 
 def handler(messages):
@@ -535,6 +520,16 @@ def handler(messages):
 
 bindufy(config, handler)
 ```
+
+**Environment Variables:**
+
+```bash
+# Sentry Error Tracking (Optional)
+SENTRY_ENABLED=true
+SENTRY_DSN=https://<key>@<org-id>.ingest.sentry.io/<project-id>
+
+# See examples/.env.example for complete configuration
+``
 
 </details>
 
@@ -989,6 +984,77 @@ Feedback is stored in the `task_feedback` table and can be used to:
 
 <br/>
 
+## OpenTelemetry
+
+Bindu integrates with **OpenTelemetry (OTEL)** to provide observability and tracing for your agents. Track agent execution, monitor performance, and debug issues using industry-standard observability platforms like **Arize** and **Langfuse**.
+
+### Supported Platforms
+
+- **[Arize](https://arize.com/)** - AI observability platform for monitoring and debugging ML models
+- **[Langfuse](https://langfuse.com/)** - Open-source LLM engineering platform with tracing and analytics
+
+### Configuration
+
+Enable OpenTelemetry tracing via environment variables:
+
+```bash
+# Enable telemetry
+TELEMETRY_ENABLED=true
+
+# OTEL endpoint (Langfuse example)
+OLTP_ENDPOINT=https://cloud.langfuse.com/api/public/otel/v1/traces
+
+# Service name for your agent
+OLTP_SERVICE_NAME=research-agent
+
+# Authentication headers (Langfuse uses Basic Auth with API keys)
+OLTP_HEADERS={"Authorization":"Basic <base64-encoded-public-key:secret-key>"}
+
+# Optional: Enable verbose logging
+OLTP_VERBOSE_LOGGING=true
+```
+
+### Features
+
+- **Automatic Instrumentation**: Traces are automatically generated for agent execution, skill invocations, and LLM calls
+- **Distributed Tracing**: Track requests across multiple services and workers
+- **Performance Monitoring**: Measure latency, token usage, and resource consumption
+- **Error Tracking**: Capture exceptions and failures with full context
+- **Custom Attributes**: Add metadata to traces for filtering and analysis
+
+### Platform-Specific Setup
+
+**Langfuse:**
+1. Create an account at [cloud.langfuse.com](https://cloud.langfuse.com)
+2. Generate API keys (public and secret)
+3. Base64 encode `public-key:secret-key` for the Authorization header
+4. Configure environment variables:
+   ```bash
+   TELEMETRY_ENABLED=true
+   OLTP_ENDPOINT=https://cloud.langfuse.com/api/public/otel/v1/traces
+   OLTP_SERVICE_NAME=your-agent-name
+   OLTP_HEADERS={"Authorization":"Basic <base64-encoded-public-key:secret-key>"}
+   OLTP_VERBOSE_LOGGING=true  # Optional
+   ```
+
+**Arize:**
+1. Create an account at [arize.com](https://arize.com)
+2. Get your Space ID and API key from the Arize dashboard
+3. Configure environment variables:
+   ```bash
+   TELEMETRY_ENABLED=true
+   OLTP_ENDPOINT=https://otlp.arize.com/v1
+   OLTP_SERVICE_NAME=your-agent-name
+   OLTP_HEADERS={"space_id":"<your-space-id>","api_key":"<your-api-key>"}
+   OLTP_VERBOSE_LOGGING=true  # Optional
+   ```
+
+
+
+---
+
+<br/>
+
 ## 📬 Push Notifications
 
 Bindu supports **real-time webhook notifications** for long-running tasks, following the [A2A Protocol specification](https://a2a-protocol.org/latest/specification/). This enables clients to receive push notifications about task state changes and artifact generation without polling.
@@ -1079,8 +1145,8 @@ config = {
     "description": "Agent with push notifications",
     "deployment": {"url": "http://localhost:3773"},
     "capabilities": {"push_notifications": True},
-    "global_webhook_url": "https://myapp.com/webhooks/global",
-    "global_webhook_token": "global_secret"
+    # Global webhook configuration is now set via environment variables:
+    # GLOBAL_WEBHOOK_URL and GLOBAL_WEBHOOK_TOKEN
 }
 
 bindufy(config, handler)
