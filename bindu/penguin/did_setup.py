@@ -21,10 +21,10 @@ def initialize_did_extension(
     agent_name: Optional[str],
     key_dir: Path,
     recreate_keys: bool = True,
-    key_password: Optional[str] = None
+    key_password: Optional[str] = None,
 ) -> DIDAgentExtension:
     """Initialize DID extension with key management.
-    
+
     Args:
         agent_id: Unique agent identifier
         author: Agent author email
@@ -32,16 +32,16 @@ def initialize_did_extension(
         key_dir: Directory for storing DID keys
         recreate_keys: Force regeneration of existing keys
         key_password: Optional password for key encryption
-        
+
     Returns:
         Initialized DIDAgentExtension instance
-        
+
     Raises:
         Exception: If DID initialization fails
     """
     try:
         logger.info(f"Initializing DID extension for agent: {agent_name}")
-        
+
         # Create DID extension
         did_extension = DIDAgentExtension(
             recreate_keys=recreate_keys,
@@ -51,13 +51,13 @@ def initialize_did_extension(
             agent_id=str(agent_id),
             key_password=key_password,
         )
-        
+
         # Generate and save key pair
         did_extension.generate_and_save_key_pair()
-        
+
         logger.info(f"DID extension initialized successfully: {did_extension.did}")
         return did_extension
-        
+
     except Exception as exc:
         logger.error(f"Failed to initialize DID extension: {exc}")
         raise

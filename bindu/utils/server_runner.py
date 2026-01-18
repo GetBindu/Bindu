@@ -16,10 +16,11 @@ logger = get_logger("bindu.utils.server_runner")
 
 
 def setup_signal_handlers() -> None:
-    """Setup signal handlers for graceful shutdown.
-    
+    """Register signal handlers for graceful shutdown.
+
     Registers handlers for SIGINT (Ctrl+C) and SIGTERM (Docker/systemd stop).
     """
+
     def handle_shutdown(signum: int, frame: Any) -> None:
         """Handle shutdown signals gracefully."""
         signal_name = signal.Signals(signum).name
@@ -27,22 +28,17 @@ def setup_signal_handlers() -> None:
         logger.info("Cleaning up resources (storage, scheduler, tasks)...")
         # uvicorn will handle the actual cleanup via lifespan context
         sys.exit(0)
-    
+
     # Register signal handlers
-    signal.signal(signal.SIGINT, handle_shutdown)   # Ctrl+C
+    signal.signal(signal.SIGINT, handle_shutdown)  # Ctrl+C
     signal.signal(signal.SIGTERM, handle_shutdown)  # Docker/systemd stop
-    
+
     logger.debug("Signal handlers registered for graceful shutdown")
 
 
-def run_server(
-    app: Any,
-    host: str,
-    port: int,
-    display_info: bool = True
-) -> None:
+def run_server(app: Any, host: str, port: int, display_info: bool = True) -> None:
     """Run uvicorn server with graceful shutdown handling.
-    
+
     Args:
         app: ASGI application to serve
         host: Host address to bind to
@@ -51,11 +47,11 @@ def run_server(
     """
     # Setup signal handlers
     setup_signal_handlers()
-    
+
     if display_info:
         logger.info(f"Starting uvicorn server at {host}:{port}...")
         logger.info("Press Ctrl+C to stop the server gracefully")
-    
+
     try:
         uvicorn.run(app, host=host, port=port)
     except KeyboardInterrupt:
