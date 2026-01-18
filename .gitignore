@@ -196,3 +196,5 @@ examples/.pebbling/*
 
 # Auto-generated version file (generated during build)
 bindu/_version.py
+bindu/penguin/.bindu/private.pem
+bindu/penguin/.bindu/public.pem

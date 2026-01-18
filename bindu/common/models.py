@@ -98,6 +98,7 @@ class TelemetryConfig:
     enabled: bool = False
     endpoint: str | None = None
     service_name: str | None = None
+    headers: dict[str, str] | None = None
     verbose_logging: bool = False
     service_version: str = "1.0.0"
     deployment_environment: str = "production"

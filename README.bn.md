@@ -358,7 +358,7 @@ curl --location 'http://localhost:3773/' \
                         "kind": "text",
                         "text": "Quote",
                         "metadata": {
-                            "did.message.signature": "5opJuKrBDW4woezujm88FzTqRDWAB62qD3wxKz96Bt2izfuzsneo3zY7yqHnV77cq3BDKepdcro2puiGTVAB52qf"
+                            "did.message.signature": "5opJuKrBDW4woezujm88FzTqRDWAB62qD3wxKz96Bt2izfuzsneo3zY7yqHnV77cq3BDKepdcro2puiGTVAB52qf"  # pragma: allowlist secret
                         }
                     }
                 ]
@@ -405,7 +405,7 @@ config = {
     "skills": ["skills/question-answering", "skills/pdf-processing"],
     "storage": {
         "type": "postgres",
-        "database_url": "postgresql+asyncpg://bindu:bindu@localhost:5432/bindu",
+        "database_url": "postgresql+asyncpg://bindu:bindu@localhost:5432/bindu",  # pragma: allowlist secret
         "run_migrations_on_startup": False,
     },
 }
@@ -497,7 +497,7 @@ config = {
     "skills": [],
     "storage": {
         "type": "postgres",
-        "database_url": "postgresql+asyncpg://bindu:bindu@localhost:5432/bindu",
+        "database_url": "postgresql+asyncpg://bindu:bindu@localhost:5432/bindu",  # pragma: allowlist secret
         "run_migrations_on_startup": False,
     },
     # Scheduler কনফিগারেশন (ঐচ্ছিক)

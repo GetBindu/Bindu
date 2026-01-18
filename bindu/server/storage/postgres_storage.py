@@ -110,14 +110,17 @@ class PostgresStorage(Storage[ContextT]):
             timeout: Connection timeout in seconds (defaults to settings)
             command_timeout: Command timeout in seconds (defaults to settings)
         """
-        # Convert postgresql:// to postgresql+asyncpg://
+        # Use database URL from settings or parameter
         db_url = database_url or app_settings.storage.postgres_url
-        if db_url.startswith("postgresql://"):
-            db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
-        elif not db_url.startswith("postgresql+asyncpg://"):
-            db_url = f"postgresql+asyncpg://{db_url}"
 
-        self.database_url = db_url
+        # Ensure asyncpg driver is specified
+        if db_url is not None:
+            if db_url.startswith("postgresql://"):
+                db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+            elif not db_url.startswith("postgresql+asyncpg://"):
+                db_url = f"postgresql+asyncpg://{db_url}"
+
+        self.database_url: str | None = db_url
         self.pool_min = pool_min or app_settings.storage.postgres_pool_min
         self.pool_max = pool_max or app_settings.storage.postgres_pool_max
         self.timeout = timeout or app_settings.storage.postgres_timeout

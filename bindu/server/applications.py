@@ -453,6 +453,7 @@ class BinduApplication(Starlette):
             setup_observability(
                 oltp_endpoint=config.endpoint,
                 oltp_service_name=config.service_name,
+                oltp_headers=config.headers,
                 verbose_logging=config.verbose_logging,
                 service_version=config.service_version,
                 deployment_environment=config.deployment_environment,

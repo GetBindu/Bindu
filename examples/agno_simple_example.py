@@ -2,17 +2,18 @@
 
 This example demonstrates how to create a simple research assistant agent
 that uses DuckDuckGo for web searches and can be deployed as a Bindu agent.
-"""
 
-import os
-from dotenv import load_dotenv
+Run with: bindu examples/agno_simple_example.py
+Or set environment variables directly and run: python examples/agno_simple_example.py
+"""
 
 from bindu.penguin.bindufy import bindufy
 from agno.agent import Agent
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.models.openai import OpenAIChat
 
-# Load environment variables from .env file
+from dotenv import load_dotenv
+
 load_dotenv()
 
 # Define your agent
@@ -24,20 +25,14 @@ agent = Agent(
 
 
 # Configuration
+# Note: Infrastructure configs (storage, scheduler, sentry, API keys) are now
+# automatically loaded from environment variables. See .env.example for details.
 config = {
     "author": "your.email@example.com",
     "name": "research_agent",
     "description": "A research assistant agent",
     "deployment": {"url": "http://localhost:3773", "expose": True},
     "skills": ["skills/question-answering", "skills/pdf-processing"],
-    "storage": {
-        "type": "postgres",
-        "database_url": "postgresql+asyncpg://bindu:bindu@localhost:5432/bindu",  # pragma: allowlist secret
-        "run_migrations_on_startup": False,
-    },
-    "negotiation": {
-        "embedding_api_key": os.getenv("OPENROUTER_API_KEY"),  # Load from environment
-    },
 }
 
 

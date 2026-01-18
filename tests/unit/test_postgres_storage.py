@@ -65,9 +65,10 @@ class TestPostgresStorageInit:
 
     def test_init_default_values(self):
         """Test initialization with default values."""
-        storage = PostgresStorage()
+        storage = PostgresStorage(database_url="localhost:5432/testdb")
         assert storage._engine is None
         assert storage._session_factory is None
+        assert storage.database_url is not None
         assert "postgresql+asyncpg://" in storage.database_url
 
     def test_init_custom_url(self):
@@ -76,6 +77,7 @@ class TestPostgresStorageInit:
             "postgresql://user:pass@localhost:5432/testdb"  # pragma: allowlist secret
         )
         storage = PostgresStorage(database_url=custom_url)
+        assert storage.database_url is not None
         assert "postgresql+asyncpg://" in storage.database_url
         assert "user:pass@localhost:5432/testdb" in storage.database_url
 
@@ -277,10 +279,12 @@ class TestPostgresStorageEdgeCases:
         """Test various URL format conversions."""
         # Plain URL without scheme
         storage1 = PostgresStorage(database_url="localhost:5432/db")
+        assert storage1.database_url is not None
         assert storage1.database_url.startswith("postgresql+asyncpg://")
 
         # URL with postgresql:// scheme
         storage2 = PostgresStorage(database_url="postgresql://localhost:5432/db")
+        assert storage2.database_url is not None
         assert storage2.database_url.startswith("postgresql+asyncpg://")
         assert "postgresql://postgresql+asyncpg://" not in storage2.database_url
 

@@ -522,13 +522,26 @@ class StorageSettings(BaseSettings):
     Supports multiple storage backends:
     - memory: In-memory storage (default, non-persistent)
     - postgres: PostgreSQL storage (persistent)
+
+    PostgreSQL settings must be provided via environment variables or config.
     """
 
-    # Storage backend selection
-    backend: Literal["memory", "postgres"] = "memory"
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        extra="allow",
+    )
 
-    # PostgreSQL Configuration
-    postgres_url: str = "postgresql+asyncpg://bindu:bindu@localhost:5432/bindu"  # pragma: allowlist secret
+    # Storage backend selection
+    backend: Literal["memory", "postgres"] = Field(
+        default="memory",
+        validation_alias=AliasChoices("backend", "STORAGE_TYPE"),
+    )
+
+    # PostgreSQL Configuration - must be provided via env vars or config
+    postgres_url: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("postgres_url", "DATABASE_URL"),
+    )
     postgres_pool_min: int = 2
     postgres_pool_max: int = 10
     postgres_timeout: int = 60
@@ -539,7 +552,7 @@ class StorageSettings(BaseSettings):
     postgres_retry_delay: float = 1.0
 
     # Migration settings
-    run_migrations_on_startup: bool = True
+    run_migrations_on_startup: bool = False  # Safer default for production
 
 
 class SchedulerSettings(BaseSettings):
@@ -548,20 +561,33 @@ class SchedulerSettings(BaseSettings):
     Supports multiple scheduler backends:
     - memory: In-memory scheduler (default, single-process)
     - redis: Redis scheduler (distributed, multi-process)
+
+    Redis settings must be provided via environment variables or config.
     """
 
-    # Scheduler backend selection
-    backend: Literal["memory", "redis"] = "memory"
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        extra="allow",
+    )
 
-    # Redis Configuration - passed from user config
-    redis_url: str | None = None
-    redis_host: str = "localhost"
-    redis_port: int = 6379
+    # Scheduler backend selection
+    backend: Literal["memory", "redis"] = Field(
+        default="memory",
+        validation_alias=AliasChoices("backend", "SCHEDULER_TYPE"),
+    )
+
+    # Redis Configuration - must be provided via env vars or config
+    redis_url: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("redis_url", "REDIS_URL"),
+    )
+    redis_host: str | None = None
+    redis_port: int | None = None
     redis_password: str | None = None
-    redis_db: int = 0
-    queue_name: str = "bindu:tasks"
-    max_connections: int = 10
-    retry_on_timeout: bool = True
+    redis_db: int | None = None
+    queue_name: str = "bindu:tasks"  # Can keep default queue name
+    max_connections: int = 10  # Connection pool setting
+    retry_on_timeout: bool = True  # Retry behavior setting
 
 
 class RetrySettings(BaseSettings):
