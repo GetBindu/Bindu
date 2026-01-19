@@ -62,16 +62,6 @@ This example demonstrates:
 - Formatted response generation
 
 
-Commit: `docs: add Hacker News agent documentation`
 
 ---
 
-### Step 4: Create Pull Request
-
-1. Go to `https://github.com/shiv4321/Bindu`
-2. Click **"Contribute"** → **"Open pull request"**
-3. Click **"Create pull request"**
-
-**Title:**
-```
-feat: Add Hacker News agent example with real-time API integration
