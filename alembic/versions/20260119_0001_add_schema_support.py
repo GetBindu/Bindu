@@ -16,8 +16,6 @@ helper functions to support that workflow.
 from typing import Sequence, Union
 
 from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "20260119_0001"
@@ -28,7 +26,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade database schema - add schema management support.
-    
+
     This migration creates a helper function that can be used to create
     all tables in a specific schema for a DID.
     """
@@ -50,7 +48,7 @@ def upgrade() -> None:
                     metadata JSONB DEFAULT ''{}''::jsonb,
                     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
                     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-                    CONSTRAINT fk_tasks_context FOREIGN KEY (context_id) 
+                    CONSTRAINT fk_tasks_context FOREIGN KEY (context_id)
                         REFERENCES %I.contexts(id) ON DELETE CASCADE
                 )', schema_name, schema_name);
 
@@ -71,7 +69,7 @@ def upgrade() -> None:
                     task_id UUID NOT NULL,
                     feedback_data JSONB NOT NULL,
                     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-                    CONSTRAINT fk_task_feedback_task FOREIGN KEY (task_id) 
+                    CONSTRAINT fk_task_feedback_task FOREIGN KEY (task_id)
                         REFERENCES %I.tasks(id) ON DELETE CASCADE
                 )', schema_name, schema_name);
 
@@ -82,7 +80,7 @@ def upgrade() -> None:
                     config JSONB NOT NULL,
                     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
                     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-                    CONSTRAINT fk_webhook_configs_task FOREIGN KEY (task_id) 
+                    CONSTRAINT fk_webhook_configs_task FOREIGN KEY (task_id)
                         REFERENCES %I.tasks(id) ON DELETE CASCADE
                 )', schema_name, schema_name);
 
@@ -144,7 +142,7 @@ def upgrade() -> None:
             EXECUTE format('DROP TABLE IF EXISTS %I.webhook_configs CASCADE', schema_name);
             EXECUTE format('DROP TABLE IF EXISTS %I.tasks CASCADE', schema_name);
             EXECUTE format('DROP TABLE IF EXISTS %I.contexts CASCADE', schema_name);
-            
+
             RAISE NOTICE 'Dropped all Bindu tables in schema: %', schema_name;
         END;
         $$ LANGUAGE plpgsql;
@@ -152,12 +150,12 @@ def upgrade() -> None:
 
     # Add a comment explaining the schema-based approach
     op.execute("""
-        COMMENT ON FUNCTION create_bindu_tables_in_schema(TEXT) IS 
+        COMMENT ON FUNCTION create_bindu_tables_in_schema(TEXT) IS
         'Creates all Bindu tables (tasks, contexts, task_feedback, webhook_configs) in the specified schema for DID-based multi-tenancy isolation';
     """)
 
     op.execute("""
-        COMMENT ON FUNCTION drop_bindu_tables_in_schema(TEXT) IS 
+        COMMENT ON FUNCTION drop_bindu_tables_in_schema(TEXT) IS
         'Drops all Bindu tables from the specified schema';
     """)
 

@@ -1,7 +1,17 @@
+"""Security utilities for storage operations."""
+
 import re
 
 
 def mask_database_url(url: str) -> str:
+    """Mask password in database URL for safe logging.
+
+    Args:
+        url: Database URL (e.g., postgresql+asyncpg://user:password@host:port/db)  # pragma: allowlist secret
+
+    Returns:
+        URL with password masked (e.g., postgresql+asyncpg://user:***@host:port/db)  # pragma: allowlist secret
+    """
     try:
         if "://" in url and "@" in url:
             scheme, rest = url.split("://", 1)
@@ -16,6 +26,21 @@ def mask_database_url(url: str) -> str:
 
 
 def sanitize_identifier(identifier: str) -> str:
-    if not re.match(r'^[a-zA-Z0-9_]+$', identifier):
-        raise ValueError(f"Invalid identifier: {identifier}. Must contain only alphanumeric characters and underscores.")
+    """Sanitize SQL identifier to prevent SQL injection.
+
+    Validates that identifier contains only alphanumeric characters and underscores.
+
+    Args:
+        identifier: SQL identifier to sanitize (e.g., schema name, table name)
+
+    Returns:
+        Sanitized identifier (unchanged if valid)
+
+    Raises:
+        ValueError: If identifier contains invalid characters
+    """
+    if not re.match(r"^[a-zA-Z0-9_]+$", identifier):
+        raise ValueError(
+            f"Invalid identifier: {identifier}. Must contain only alphanumeric characters and underscores."
+        )
     return identifier

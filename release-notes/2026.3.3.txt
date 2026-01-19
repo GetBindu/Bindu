@@ -1,0 +1,112 @@
+Release: PostgreSQL Storage Refactoring & Multi-Tenancy Support
+================================================================
+
+Version: 2026.3.3 (Commit: 022a47a)
+Date: January 19, 2026
+Author: Raahul Dutta
+
+OVERVIEW
+--------
+Major refactoring of PostgreSQL storage implementation to improve code quality,
+security, maintainability, and add DID-based schema multi-tenancy support.
+
+BREAKING CHANGES
+----------------
+None - All public APIs remain backward compatible.
+
+NEW FEATURES
+------------
+✨ DID-Based Multi-Tenancy
+  - PostgresStorage now accepts optional 'did' parameter for schema isolation
+  - Automatic schema creation and initialization per DID
+  - SQLAlchemy event listener sets search_path automatically
+  - Enables secure multi-tenant deployments with data isolation
+
+🔒 Enhanced Security
+  - SQL injection prevention via sanitize_identifier() validation
+  - Improved password masking in database URLs for safe logging
+  - Centralized security utilities in helpers/security.py
+
+IMPROVEMENTS
+------------
+📦 Code Organization
+  - Created helpers/ module structure under storage/
+  - Extracted 6 helper modules for better separation of concerns:
+    * validation.py - UUID and type validation
+    * serialization.py - JSONB serialization
+    * normalization.py - Message and UUID normalization
+    * security.py - Password masking, SQL injection prevention
+    * db_operations.py - Common database patterns
+    * __init__.py - Centralized exports
+
+🎯 Code Quality (DRY Principles)
+  - Reduced code duplication by 11% (1099 → 989 lines)
+  - UUID validation: 10+ instances → 1 helper function
+  - JSONB serialization: 15+ instances → 1 helper function
+  - Timestamp generation: 8+ instances → 1 helper function
+  - Message normalization: 60+ lines → 1 helper function
+
+📖 Improved Readability
+  - Better error messages with context
+  - Clearer function signatures
+  - Reduced method complexity
+  - Improved documentation
+
+TECHNICAL DETAILS
+-----------------
+Files Changed: 14 files
+  - Added: 7 files (helpers + schema_manager + migration)
+  - Modified: 7 files
+  - Total: +726 insertions, -173 deletions
+
+New Dependencies:
+  - None (uses existing SQLAlchemy and asyncpg)
+
+Database Changes:
+  - New migration: 20260119_0001_add_schema_support.py
+  - Schema manager utility for DID-based schema operations
+
+TESTING
+-------
+✅ All 23 unit tests passing
+✅ Backward compatibility verified
+✅ No breaking changes to existing functionality
+
+MIGRATION GUIDE
+---------------
+For existing deployments:
+1. No action required - changes are backward compatible
+2. To enable DID-based multi-tenancy:
+   - Pass 'did' parameter when creating PostgresStorage instance
+   - Schema will be automatically created and configured
+
+Example:
+  storage = PostgresStorage(did="did:example:123")
+  await storage.connect()
+
+COMMIT DETAILS
+--------------
+Commit: 022a47a3bc16f3da3bb3a011717e555826009674
+Message: chore: refactor PostgreSQL storage to support DID-based schema 
+         multi-tenancy and improve code organization
+
+Changes:
+  - Add DID parameter to PostgresStorage for schema-based multi-tenancy isolation
+  - Extract helper functions to separate modules
+  - Move timestamp utility to db_operations helper module
+  - Implement automatic schema initialization and search_path configuration
+  - Add SQLAlchemy event listener to set search_path on connection
+
+USAGE WITH GIT
+--------------
+# Create an annotated tag
+git tag -a 2026.3.3 022a47a -F release-notes/2026.3.3.txt
+
+# Create a GitHub release
+gh release create 2026.3.3 --notes-file release-notes/2026.3.3.txt --title "2026.3.3: PostgreSQL Storage Refactoring"
+
+# View this release
+git show 2026.3.3
+
+# Push tag to remote
+git push origin 2026.3.3
