@@ -347,6 +347,7 @@ class BinduApplication(Starlette):
                 max_attempts=app_settings.retry.storage_max_attempts,
                 min_wait=app_settings.retry.storage_min_wait,
                 max_wait=app_settings.retry.storage_max_wait,
+                did=self.manifest.did_extension.did,
             )
             app._storage = storage
             logger.info(f"✅ Storage initialized: {type(storage).__name__}")

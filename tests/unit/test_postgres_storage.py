@@ -13,7 +13,8 @@ from datetime import datetime, timezone
 from uuid import uuid4
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from bindu.server.storage.postgres_storage import PostgresStorage, _serialize_for_jsonb
+from bindu.server.storage.postgres_storage import PostgresStorage
+from bindu.server.storage.helpers import serialize_for_jsonb as _serialize_for_jsonb
 from tests.utils import create_test_message
 
 
@@ -176,7 +177,7 @@ class TestPostgresStorageTaskOperations:
         """Test load_task with invalid task_id type."""
         storage = PostgresStorage()
 
-        with pytest.raises(TypeError, match="task_id must be UUID"):
+        with pytest.raises(TypeError, match="task_id must be a valid UUID string"):
             await storage.load_task("not-a-uuid")  # type: ignore
 
     @pytest.mark.asyncio
@@ -194,7 +195,7 @@ class TestPostgresStorageTaskOperations:
         storage = PostgresStorage()
         message = create_test_message()
 
-        with pytest.raises(TypeError, match="context_id must be UUID"):
+        with pytest.raises(TypeError, match="context_id must be a valid UUID string"):
             await storage.submit_task("not-a-uuid", message)  # type: ignore
 
     @pytest.mark.asyncio

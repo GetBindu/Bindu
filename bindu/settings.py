@@ -547,6 +547,12 @@ class StorageSettings(BaseSettings):
     postgres_timeout: int = 60
     postgres_command_timeout: int = 30
 
+    # DID-based schema isolation
+    postgres_did: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("postgres_did", "POSTGRES_DID", "DID"),
+    )
+
     # Connection retry settings
     postgres_max_retries: int = 3
     postgres_retry_delay: float = 1.0

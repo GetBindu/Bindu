@@ -34,7 +34,7 @@ except ImportError:
 logger = get_logger("bindu.server.storage.factory")
 
 
-async def create_storage() -> Storage:
+async def create_storage(did: str | None = None) -> Storage:
     """Create storage backend based on configuration.
 
     Reads the storage backend type from app_settings.storage.backend and
@@ -43,6 +43,9 @@ async def create_storage() -> Storage:
     Supported backends:
     - "memory": InMemoryStorage (default, non-persistent)
     - "postgres": PostgresStorage (persistent)
+
+    Args:
+        did: Optional DID for schema-based multi-tenancy (PostgreSQL only)
 
     Returns:
         Storage instance ready to use
@@ -54,6 +57,9 @@ async def create_storage() -> Storage:
     Example:
         >>> storage = await create_storage()
         >>> task = await storage.load_task(task_id)
+        >>>
+        >>> # With DID for schema isolation
+        >>> storage = await create_storage(did="did:bindu:alice:agent1:abc123")
     """
     backend = app_settings.storage.backend.lower()
 
@@ -84,6 +90,7 @@ async def create_storage() -> Storage:
             pool_max=app_settings.storage.postgres_pool_max,
             timeout=app_settings.storage.postgres_timeout,
             command_timeout=app_settings.storage.postgres_command_timeout,
+            did=did,
         )
 
         # Connect to database
