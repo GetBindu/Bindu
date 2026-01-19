@@ -87,7 +87,7 @@ Example:
 COMMIT DETAILS
 --------------
 Commit: 022a47a3bc16f3da3bb3a011717e555826009674
-Message: chore: refactor PostgreSQL storage to support DID-based schema 
+Message: chore: refactor PostgreSQL storage to support DID-based schema
          multi-tenancy and improve code organization
 
 Changes:
