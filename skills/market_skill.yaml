@@ -1,0 +1,42 @@
+id: market-analysis-v1
+name: market-analysis
+version: 1.0.0
+author: student@getbindu.com
+description: |
+  Provides real-time financial analysis, stock quotes, and sentiment for global companies.
+  Can resolve company names (e.g., "Tesla") to ticker symbols (e.g., "TSLA") automatically.
+
+tags:
+  - finance
+  - stocks
+  - investment
+  - analysis
+
+input_modes:
+  - text/plain
+
+output_modes:
+  - application/json
+
+examples:
+  - "Analyze Tesla"
+  - "Get stock price for RELIANCE"
+  - "How is Apple performing?"
+
+capabilities_detail:
+  market_data:
+    provider: yfinance
+    real_time: true
+  
+  resolution:
+    provider: duckduckgo
+    supported: true
+    description: "Resolves fuzzy company names to exact tickers"
+
+requirements:
+  packages:
+    - yfinance
+    - duckduckgo-search
+
+performance:
+  avg_latency_ms: 1500
