@@ -1,0 +1,147 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply px-6 py-3 rounded-xl font-semibold transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 shadow-lg hover:shadow-xl;
+  }
+  
+  .btn-primary {
+    @apply btn bg-gradient-to-r from-primary-600 to-accent-600 hover:from-primary-500 hover:to-accent-500 text-white focus:ring-primary-500;
+  }
+  
+  .btn-secondary {
+    @apply btn bg-white/10 hover:bg-white/20 text-white border border-white/20 backdrop-blur-sm focus:ring-primary-500;
+  }
+  
+  .btn-outline {
+    @apply btn border-2 border-primary-600 text-primary-600 hover:bg-gradient-to-r hover:from-primary-600 hover:to-accent-600 hover:text-white focus:ring-primary-500;
+  }
+  
+  .input {
+    @apply w-full px-4 py-3 border border-primary-600/30 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-300 bg-dark-800/50 text-white placeholder-gray-400 backdrop-blur-sm;
+  }
+  
+  .select {
+    @apply input appearance-none cursor-pointer;
+  }
+  
+  .card {
+    @apply bg-white/5 rounded-2xl shadow-2xl border border-white/10 p-6 backdrop-blur-xl;
+  }
+  
+  .message-bubble {
+    @apply px-4 py-3 rounded-2xl max-w-md break-words shadow-lg;
+  }
+  
+  .message-ai {
+    @apply message-bubble bg-gradient-to-r from-primary-600 to-accent-600 text-white;
+  }
+  
+  .message-seller {
+    @apply message-bubble bg-white/10 text-white border border-white/20 backdrop-blur-sm;
+  }
+  
+  .message-user {
+    @apply message-bubble bg-gradient-to-r from-accent-600 to-primary-600 text-white;
+  }
+
+  /* Custom scrollbar */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Glassmorphism effects */
+  .glass {
+    @apply backdrop-blur-xl bg-white/5 border border-white/10;
+  }
+
+  .glass-card {
+    @apply glass rounded-2xl shadow-2xl;
+  }
+
+  /* Animated gradient backgrounds */
+  .bg-gradient-animated {
+    background: linear-gradient(-45deg, #a855f7, #d946ef, #c026d3, #9333ea);
+    background-size: 400% 400%;
+    animation: gradientShift 15s ease infinite;
+  }
+
+  @keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  /* Violet theme specific utilities */
+  .text-gradient-violet {
+    @apply bg-gradient-to-r from-primary-300 to-accent-300 bg-clip-text text-transparent;
+  }
+
+  .border-gradient-violet {
+    border-image: linear-gradient(45deg, theme('colors.primary.500'), theme('colors.accent.500')) 1;
+  }
+
+  /* Enhanced focus states */
+  .focus-violet {
+    @apply focus:ring-2 focus:ring-primary-500 focus:border-primary-500;
+  }
+
+  /* Hover effects */
+  .hover-lift {
+    @apply transition-transform duration-300 hover:scale-105;
+  }
+
+  .hover-glow {
+    @apply transition-all duration-300 hover:shadow-2xl hover:shadow-primary-500/25;
+  }
+  
+  .status-badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+  
+  .status-active {
+    @apply status-badge bg-green-100 text-green-800;
+  }
+  
+  .status-connecting {
+    @apply status-badge bg-yellow-100 text-yellow-800;
+  }
+  
+  .status-error {
+    @apply status-badge bg-red-100 text-red-800;
+  }
+}
+
+@layer utilities {
+  .gradient-bg {
+    background: linear-gradient(135deg, #0ea5e9 0%, #3b82f6 50%, #6366f1 100%);
+  }
+  
+  .glass {
+    backdrop-filter: blur(10px);
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+  
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}

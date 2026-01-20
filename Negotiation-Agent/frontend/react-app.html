@@ -1,0 +1,2235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NegotiBot AI - Professional Negotiation Assistant</title>
+    
+    <!-- React and Babel CDN -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind Config -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        },
+                        secondary: {
+                            50: '#f8fafc',
+                            100: '#f1f5f9',
+                            200: '#e2e8f0',
+                            300: '#cbd5e1',
+                            400: '#94a3b8',
+                            500: '#64748b',
+                            600: '#475569',
+                            700: '#334155',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                        },
+                        accent: {
+                            50: '#ecfeff',
+                            100: '#cffafe',
+                            200: '#a5f3fc',
+                            300: '#67e8f9',
+                            400: '#22d3ee',
+                            500: '#06b6d4',
+                            600: '#0891b2',
+                            700: '#0e7490',
+                            800: '#155e75',
+                            900: '#164e63',
+                        },
+                        success: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            200: '#bbf7d0',
+                            300: '#86efac',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            800: '#166534',
+                            900: '#14532d',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    animation: {
+                        'gradient-x': 'gradient-x 15s ease infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'fade-in': 'fadeIn 0.5s ease-in-out',
+                        'slide-up': 'slideUp 0.3s ease-out',
+                        'spin-slow': 'spin 2s linear infinite',
+                    },
+                    keyframes: {
+                        'gradient-x': {
+                            '0%, 100%': {
+                                'background-size': '200% 200%',
+                                'background-position': 'left center'
+                            },
+                            '50%': {
+                                'background-size': '200% 200%',
+                                'background-position': 'right center'
+                            },
+                        },
+                        'float': {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-20px)' },
+                        },
+                        'fadeIn': {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' }
+                        },
+                        'slideUp': {
+                            '0%': { transform: 'translateY(20px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' }
+                        }
+                    },
+                }
+            }
+        }
+    </script>
+    <!-- Modern CSS Styles -->
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        .glass-effect {
+            backdrop-filter: blur(16px) saturate(180%);
+            background-color: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        .glass-dark {
+            backdrop-filter: blur(20px) saturate(180%);
+            background-color: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(100, 116, 139, 0.2);
+        }
+        .gradient-text {
+            background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 50%, #22c55e 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .bg-gradient-animated {
+            background: linear-gradient(-45deg, #0ea5e9, #06b6d4, #22c55e, #0284c7);
+            background-size: 400% 400%;
+            animation: gradient-x 15s ease infinite;
+        }
+        .professional-card {
+            background: linear-gradient(135deg, rgba(14, 165, 233, 0.1) 0%, rgba(6, 182, 212, 0.05) 100%);
+            border: 1px solid rgba(14, 165, 233, 0.2);
+        }
+        .neo-card {
+            background: linear-gradient(145deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        .sidebar-gradient {
+            background: linear-gradient(180deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+        }
+        .chat-gradient {
+            background: linear-gradient(135deg, rgba(248, 250, 252, 0.05) 0%, rgba(241, 245, 249, 0.1) 100%);
+        }
+        .btn-gradient {
+            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+            box-shadow: 0 4px 15px rgba(14, 165, 233, 0.3);
+            transition: all 0.3s ease;
+        }
+        .btn-gradient:hover {
+            background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+            box-shadow: 0 8px 25px rgba(14, 165, 233, 0.4);
+            transform: translateY(-2px);
+        }
+        .metric-card {
+            background: linear-gradient(135deg, rgba(6, 182, 212, 0.1) 0%, rgba(34, 211, 238, 0.05) 100%);
+            border: 1px solid rgba(6, 182, 212, 0.2);
+            backdrop-filter: blur(8px);
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-15px) rotate(2deg); }
+        }
+        
+        @keyframes shimmer {
+            0% { background-position: -200px 0; }
+            100% { background-position: calc(200px + 100%) 0; }
+        }
+        
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 25%, #475569 50%, #64748b 100%);
+            position: relative;
+        }
+        
+        .gradient-bg::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><g fill="%23ffffff" fill-opacity="0.02"><circle cx="20" cy="20" r="2"/></g></svg>') repeat;
+            pointer-events: none;
+        }
+        
+        .message {
+            animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid rgba(226, 232, 240, 0.5);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .btn-enhanced {
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn-enhanced::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+            animation: shimmer 2s infinite;
+        }
+        
+        .btn-enhanced:hover {
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+        }
+        
+        .card-hover {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15);
+        }
+        
+        .gradient-text {
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .animate-float {
+            animation: float 6s ease-in-out infinite;
+        }
+        
+        .loading-dot {
+            animation: pulse 1.4s ease-in-out infinite both;
+        }
+        
+        .loading-dot:nth-child(1) { animation-delay: -0.32s; }
+        .loading-dot:nth-child(2) { animation-delay: -0.16s; }
+        
+        @keyframes pulse {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="font-sans bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;        
+        // Utility functions
+        const formatNumber = (num) => {
+            return new Intl.NumberFormat('en-IN').format(num || 0);
+        };
+
+        // Toast notifications (simple implementation)
+        const showToast = (message, type = 'info') => {
+            const toast = document.createElement('div');
+            toast.className = `fixed top-4 right-4 px-6 py-3 rounded-lg text-white z-50 ${
+                type === 'success' ? 'bg-green-500' :
+                type === 'error' ? 'bg-red-500' :
+                type === 'warning' ? 'bg-yellow-500' :
+                'bg-blue-500'
+            }`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 4000);
+        };
+
+        // Main App State
+        const useAppState = () => {
+            const [state, setState] = useState({
+                // Connection state
+                isConnected: false,
+                connectionStatus: 'disconnected', // disconnected, connecting, connected, error
+                
+                // Session state
+                sessionId: null,
+                isNegotiating: false,
+                
+                // Product data
+                product: null,
+                marketAnalysis: null,
+                
+                // Messages
+                messages: [],
+                
+                // Form data
+                formData: {
+                    productUrl: '',
+                    targetPrice: '',
+                    maxBudget: '',
+                    approach: 'diplomatic',
+                    timeline: 'flexible',
+                    specialRequirements: ''
+                },
+                
+                // Metrics
+                metrics: {
+                    negotiationProgress: 0,
+                    currentOffer: 0,
+                    savingsPotential: 0,
+                    aiConfidence: 'Medium'
+                }
+            });
+
+            const updateState = (updates) => {
+                setState(prev => ({ ...prev, ...updates }));
+            };
+
+            const updateFormData = (updates) => {
+                setState(prev => ({
+                    ...prev,
+                    formData: { ...prev.formData, ...updates }
+                }));
+            };
+
+            const updateMetrics = (updates) => {
+                setState(prev => ({
+                    ...prev,
+                    metrics: { ...prev.metrics, ...updates }
+                }));
+            };
+
+            const addMessage = (message) => {
+                setState(prev => ({
+                    ...prev,
+                    messages: [...prev.messages, { ...message, id: Date.now(), timestamp: new Date() }]
+                }));
+            };
+
+            const reset = () => {
+                setState(prev => ({
+                    ...prev,
+                    isConnected: false,
+                    connectionStatus: 'disconnected',
+                    sessionId: null,
+                    isNegotiating: false,
+                    product: null,
+                    marketAnalysis: null,
+                    messages: [],
+                    metrics: {
+                        negotiationProgress: 0,
+                        currentOffer: 0,
+                        savingsPotential: 0,
+                        aiConfidence: 'Medium'
+                    }
+                }));
+            };
+
+            return { state, updateState, updateFormData, updateMetrics, addMessage, reset };
+        };
+
+        // WebSocket Hook
+        const useWebSocket = (sessionId, onMessage) => {
+            const wsRef = useRef(null);
+            const [isConnected, setIsConnected] = useState(false);
+
+            useEffect(() => {
+                if (!sessionId) return;
+
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}/ws/user/${sessionId}`;
+
+                try {
+                    wsRef.current = new WebSocket(wsUrl);
+
+                    wsRef.current.onopen = () => {
+                        setIsConnected(true);
+                        console.log('WebSocket connected');
+                        onMessage({ type: 'system', content: 'Connected to AI negotiation assistant' });
+                    };
+
+                    wsRef.current.onmessage = (event) => {
+                        try {
+                            const data = JSON.parse(event.data);
+                            onMessage(data);
+                        } catch (error) {
+                            console.error('Error parsing WebSocket message:', error);
+                        }
+                    };
+
+                    wsRef.current.onclose = () => {
+                        setIsConnected(false);
+                        console.log('WebSocket disconnected');
+                        onMessage({ type: 'system', content: 'Connection lost. Please refresh the page.' });
+                    };
+
+                    wsRef.current.onerror = (error) => {
+                        console.error('WebSocket error:', error);
+                        setIsConnected(false);
+                        onMessage({ type: 'system', content: 'Connection error occurred' });
+                    };
+
+                } catch (error) {
+                    console.error('Failed to create WebSocket connection:', error);
+                    setIsConnected(false);
+                }
+
+                return () => {
+                    if (wsRef.current) {
+                        wsRef.current.close();
+                    }
+                };
+            }, [sessionId]);
+
+            return { isConnected };
+        };
+
+        // API Service
+        const apiService = {
+            getAuthHeaders() {
+                const token = localStorage.getItem('negotibot_token');
+                console.log('Getting auth headers, token available:', !!token);
+                if (token) {
+                    console.log('Token preview:', token.substring(0, 20) + '...');
+                }
+                return token ? { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                } : { 'Content-Type': 'application/json' };
+            },
+
+            async startNegotiation(data) {
+                const response = await fetch('/api/negotiate-url', {
+                    method: 'POST',
+                    headers: this.getAuthHeaders(),
+                    body: JSON.stringify(data)
+                });
+                
+                if (response.status === 401) {
+                    throw new Error('401 Unauthorized - Please log in again');
+                }
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                return response.json();
+            },
+
+            async startDemo(data) {
+                const response = await fetch('/api/demo-negotiate', {
+                    method: 'POST',
+                    headers: this.getAuthHeaders(),
+                    body: JSON.stringify(data)
+                });
+                return response.json();
+            },
+
+            async sendMessage(sessionId, message) {
+                const response = await fetch('/api/seller-response', {
+                    method: 'POST',
+                    headers: this.getAuthHeaders(),
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        message: message
+                    })
+                });
+                return response.json();
+            },
+
+            // Authentication methods
+            async login(credentials) {
+                console.log('Login request:', credentials);
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(credentials)
+                });
+                const result = await response.json();
+                console.log('Login response:', result);
+                
+                if (!response.ok) {
+                    // Handle different types of errors
+                    if (result.errors && Array.isArray(result.errors)) {
+                        // Validation errors - show all errors in a user-friendly way
+                        const errorMessage = result.errors.join(', ');
+                        const hint = result.hint ? `\n\n💡 ${result.hint}` : '';
+                        throw new Error(`${result.message || 'Please fix the following issues:'}\n• ${errorMessage}${hint}`);
+                    } else if (result.message) {
+                        // Single error message from backend
+                        const hint = result.hint ? `\n\n💡 ${result.hint}` : '';
+                        throw new Error(result.message + hint);
+                    } else if (typeof result.detail === 'object' && result.detail.message) {
+                        // FastAPI HTTPException with object detail
+                        const hint = result.detail.hint ? `\n\n💡 ${result.detail.hint}` : '';
+                        throw new Error(result.detail.message + hint);
+                    } else if (typeof result.detail === 'string') {
+                        // FastAPI HTTPException with string detail
+                        throw new Error(result.detail);
+                    } else {
+                        // Generic error
+                        throw new Error('Login failed. Please try again.');
+                    }
+                }
+                
+                return result;
+            },
+
+            async register(userData) {
+                console.log('Register request:', userData);
+                const response = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(userData)
+                });
+                const result = await response.json();
+                console.log('Register response:', result);
+                
+                if (!response.ok) {
+                    // Handle different types of errors
+                    if (result.errors && Array.isArray(result.errors)) {
+                        // Validation errors - show all errors in a user-friendly way
+                        const errorMessage = result.errors.join(', ');
+                        const hint = result.hint ? `\n\n💡 ${result.hint}` : '';
+                        throw new Error(`${result.message || 'Please fix the following issues:'}\n• ${errorMessage}${hint}`);
+                    } else if (result.message) {
+                        // Single error message from backend
+                        const hint = result.hint ? `\n\n💡 ${result.hint}` : '';
+                        throw new Error(result.message + hint);
+                    } else if (typeof result.detail === 'object' && result.detail.message) {
+                        // FastAPI HTTPException with object detail
+                        const hint = result.detail.hint ? `\n\n💡 ${result.detail.hint}` : '';
+                        throw new Error(result.detail.message + hint);
+                    } else if (typeof result.detail === 'string') {
+                        // FastAPI HTTPException with string detail
+                        throw new Error(result.detail);
+                    } else {
+                        // Generic error
+                        throw new Error('Registration failed. Please try again.');
+                    }
+                }
+                
+                return result;
+            },
+
+            async logout(logoutData) {
+                const response = await fetch('/api/auth/logout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(logoutData)
+                });
+                return response.json();
+            },
+
+            async getProfile(userId) {
+                const response = await fetch(`/api/auth/profile/${userId}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                return response.json();
+            }
+        };
+
+        // Message Bubble Component
+        const MessageBubble = ({ message }) => {
+            const getMessageStyles = () => {
+                switch (message.type) {
+                    case 'ai':
+                    case 'ai_message':
+                        return {
+                            container: 'flex items-start gap-3 max-w-4xl mb-4',
+                            avatar: 'w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white text-xl',
+                            bubble: 'bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm flex-1',
+                            text: 'text-gray-900'
+                        };
+                    case 'user':
+                    case 'seller':
+                        return {
+                            container: 'flex items-start gap-3 max-w-4xl ml-auto flex-row-reverse mb-4',
+                            avatar: 'w-10 h-10 bg-gray-600 rounded-full flex items-center justify-center text-white text-xl',
+                            bubble: 'bg-gray-100 border border-gray-200 rounded-2xl rounded-tr-sm px-4 py-3 flex-1',
+                            text: 'text-gray-900'
+                        };
+                    case 'system':
+                        return {
+                            container: 'flex items-center justify-center max-w-4xl mx-auto mb-4',
+                            avatar: 'w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm',
+                            bubble: 'bg-blue-50 border-blue-200 border rounded-lg px-4 py-3',
+                            text: 'text-blue-900 text-sm'
+                        };
+                    default:
+                        return {
+                            container: 'flex items-start gap-3 max-w-4xl mb-4',
+                            avatar: 'w-10 h-10 bg-gray-400 rounded-full flex items-center justify-center text-white',
+                            bubble: 'bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 flex-1',
+                            text: 'text-gray-900'
+                        };
+                }
+            };
+
+            const styles = getMessageStyles();
+
+            return React.createElement('div', {
+                className: `${styles.container} message`
+            }, [
+                React.createElement('div', {
+                    key: 'avatar',
+                    className: styles.avatar
+                }, React.createElement('div', {
+                    className: message.type === 'ai' || message.type === 'ai_message' ? 
+                        'w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center' :
+                        message.type === 'system' ? 
+                        'w-full h-full bg-gradient-to-br from-green-500 to-teal-600 rounded-full flex items-center justify-center' :
+                        'w-full h-full bg-gradient-to-br from-gray-500 to-gray-600 rounded-full flex items-center justify-center'
+                }, React.createElement('svg', {
+                    className: 'w-5 h-5 text-white',
+                    fill: 'currentColor',
+                    viewBox: '0 0 20 20'
+                }, React.createElement('path', {
+                    fillRule: 'evenodd',
+                    d: message.type === 'ai' || message.type === 'ai_message' ? 
+                        'M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z' :
+                        message.type === 'system' ? 
+                        'M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z' :
+                        'M10 9a3 3 0 100-6 3 3 0 000 6zm5 8a5 5 0 11-10 0v-.001M15 15v.01',
+                    clipRule: 'evenodd'
+                })))),
+                
+                React.createElement('div', {
+                    key: 'content',
+                    className: styles.bubble
+                }, [
+                    React.createElement('div', {
+                        key: 'text',
+                        className: styles.text
+                    }, message.content || message.message),
+                    
+                    React.createElement('div', {
+                        key: 'timestamp',
+                        className: 'text-xs text-gray-500 mt-2'
+                    }, new Date(message.timestamp).toLocaleTimeString())
+                ])
+            ]);
+        };
+
+        // Product Info Component
+        const ProductInfo = ({ product, isVisible }) => {
+            if (!isVisible || !product) return null;
+
+            return React.createElement('div', {
+                className: 'bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-6'
+            }, [
+                React.createElement('div', {
+                    key: 'content',
+                    className: 'p-6'
+                }, [
+                    React.createElement('div', {
+                        key: 'header',
+                        className: 'flex items-start gap-4 mb-4'
+                    }, [
+                        React.createElement('div', {
+                            key: 'icon',
+                            className: 'w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center flex-shrink-0'
+                        }, React.createElement('svg', {
+                            className: 'w-8 h-8 text-white',
+                            fill: 'currentColor',
+                            viewBox: '0 0 20 20'
+                        }, React.createElement('path', {
+                            fillRule: 'evenodd',
+                            d: 'M10 2L3 7l7 5 7-5-7-5zM3 16l7-5 7 5-7 5-7-5zm14-7l-7 5-7-5 7-5 7 5z',
+                            clipRule: 'evenodd'
+                        }))),
+                        
+                        React.createElement('div', {
+                            key: 'info',
+                            className: 'flex-1 min-w-0'
+                        }, [
+                            React.createElement('h3', {
+                                key: 'title',
+                                className: 'text-xl font-semibold text-gray-900 mb-2'
+                            }, product.title),
+                            
+                            React.createElement('div', {
+                                key: 'price',
+                                className: 'text-2xl font-bold text-green-600 mb-3'
+                            }, `₹${formatNumber(product.price)}`),
+                            
+                            React.createElement('div', {
+                                key: 'details',
+                                className: 'flex gap-6 text-sm'
+                            }, [
+                                React.createElement('div', { 
+                                    key: 'platform',
+                                    className: 'flex gap-1'
+                                }, [
+                                    React.createElement('span', { key: 'label', className: 'text-gray-600' }, 'Platform:'),
+                                    React.createElement('span', { key: 'value', className: 'font-medium' }, product.platform || 'Unknown')
+                                ]),
+                                React.createElement('div', { 
+                                    key: 'location',
+                                    className: 'flex gap-1'
+                                }, [
+                                    React.createElement('span', { key: 'label', className: 'text-gray-600' }, 'Location:'),
+                                    React.createElement('span', { key: 'value', className: 'font-medium' }, product.location || 'Not specified')
+                                ])
+                            ])
+                        ])
+                    ])
+                ])
+            ]);
+        };
+
+        // Metrics Panel Component
+        const MetricsPanel = ({ metrics, product }) => {
+            const targetPrice = product?.price || 0;
+            const savings = Math.max(0, targetPrice - (metrics.currentOffer || 0));
+            
+            return React.createElement('div', {
+                className: 'space-y-4'
+            }, [
+                React.createElement('div', {
+                    key: 'progress',
+                    className: 'bg-gray-50 rounded-lg p-4 border border-gray-200'
+                }, [
+                    React.createElement('div', {
+                        key: 'label',
+                        className: 'text-xs font-medium text-gray-600 uppercase tracking-wide mb-2'
+                    }, 'Negotiation Progress'),
+                    
+                    React.createElement('div', {
+                        key: 'value',
+                        className: 'text-lg font-bold text-gray-900 mb-2'
+                    }, `${metrics.negotiationProgress}%`),
+                    
+                    React.createElement('div', {
+                        key: 'bar',
+                        className: 'w-full h-2 bg-gray-200 rounded-full overflow-hidden'
+                    }, [
+                        React.createElement('div', {
+                            key: 'fill',
+                            className: 'h-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-300',
+                            style: { width: `${metrics.negotiationProgress}%` }
+                        })
+                    ])
+                ]),
+
+                React.createElement('div', {
+                    key: 'offer',
+                    className: 'bg-gray-50 rounded-lg p-4 border border-gray-200'
+                }, [
+                    React.createElement('div', {
+                        key: 'label',
+                        className: 'text-xs font-medium text-gray-600 uppercase tracking-wide mb-1'
+                    }, 'Current Offer'),
+                    
+                    React.createElement('div', {
+                        key: 'value',
+                        className: 'text-lg font-bold text-gray-900'
+                    }, `₹${formatNumber(metrics.currentOffer)}`)
+                ]),
+
+                React.createElement('div', {
+                    key: 'savings',
+                    className: 'bg-gray-50 rounded-lg p-4 border border-gray-200'
+                }, [
+                    React.createElement('div', {
+                        key: 'label',
+                        className: 'text-xs font-medium text-gray-600 uppercase tracking-wide mb-1'
+                    }, 'Potential Savings'),
+                    
+                    React.createElement('div', {
+                        key: 'value',
+                        className: 'text-lg font-bold text-green-600'
+                    }, `₹${formatNumber(savings)}`)
+                ]),
+
+                React.createElement('div', {
+                    key: 'confidence',
+                    className: 'bg-gray-50 rounded-lg p-4 border border-gray-200'
+                }, [
+                    React.createElement('div', {
+                        key: 'label',
+                        className: 'text-xs font-medium text-gray-600 uppercase tracking-wide mb-1'
+                    }, 'AI Confidence'),
+                    
+                    React.createElement('div', {
+                        key: 'value',
+                        className: 'text-lg font-bold text-gray-900'
+                    }, metrics.aiConfidence)
+                ])
+            ]);
+        };
+
+        // Chat Interface Component
+        const ChatInterface = ({ messages, isNegotiating, onSendMessage, sessionId }) => {
+            const [messageInput, setMessageInput] = useState('');
+            const messagesEndRef = useRef(null);
+
+            useEffect(() => {
+                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            }, [messages]);
+
+            const handleSendMessage = async () => {
+                if (!messageInput.trim() || !sessionId) return;
+                
+                const message = messageInput.trim();
+                setMessageInput('');
+                
+                // Add user message immediately
+                onSendMessage({ type: 'user', content: message });
+                
+                try {
+                    await apiService.sendMessage(sessionId, message);
+                } catch (error) {
+                    console.error('Error sending message:', error);
+                    onSendMessage({ type: 'system', content: 'Failed to send message. Please try again.' });
+                }
+            };
+
+            const handleKeyPress = (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                }
+            };
+
+            if (!isNegotiating && messages.length === 0) {
+                return React.createElement('div', {
+                    className: 'flex-1 flex items-center justify-center p-8 chat-gradient'
+                }, [
+                    React.createElement('div', {
+                        key: 'empty-state',
+                        className: 'text-center max-w-lg glass-dark p-8 rounded-2xl border border-secondary-600/30 backdrop-blur-lg'
+                    }, [
+                        React.createElement('div', {
+                            key: 'icon',
+                            className: 'w-28 h-28 bg-gradient-animated rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl animate-float'
+                        }, React.createElement('svg', {
+                            className: 'w-14 h-14 text-white',
+                            fill: 'currentColor',
+                            viewBox: '0 0 20 20'
+                        }, React.createElement('path', {
+                            fillRule: 'evenodd',
+                            d: 'M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z',
+                            clipRule: 'evenodd'
+                        }))),
+                        
+                        React.createElement('h3', {
+                            key: 'title',
+                            className: 'text-2xl font-bold text-white mb-4 gradient-text'
+                        }, 'Ready to Start Negotiating'),
+                        
+                        React.createElement('p', {
+                            key: 'description',
+                            className: 'text-secondary-300 leading-relaxed text-lg'
+                        }, 'Configure your negotiation parameters in the sidebar and start your AI-powered marketplace negotiation session.')
+                    ])
+                ]);
+            }
+
+            return React.createElement('div', {
+                className: 'flex-1 flex flex-col overflow-hidden'
+            }, [
+                React.createElement('div', {
+                    key: 'messages',
+                    className: 'flex-1 overflow-y-auto scrollbar-hide p-6'
+                }, [
+                    ...messages.map((message, index) => 
+                        React.createElement(MessageBubble, { key: message.id || index, message })
+                    ),
+                    
+                    React.createElement('div', { key: 'end-ref', ref: messagesEndRef })
+                ]),
+                
+                isNegotiating && React.createElement('div', {
+                    key: 'input-area',
+                    className: 'border-t border-gray-200 p-4 bg-white'
+                }, [
+                    React.createElement('div', {
+                        key: 'input-row',
+                        className: 'flex gap-3'
+                    }, [
+                        React.createElement('textarea', {
+                            key: 'input',
+                            className: 'flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none',
+                            placeholder: 'Type your message or let AI handle the negotiation...',
+                            rows: 2,
+                            value: messageInput,
+                            onChange: (e) => setMessageInput(e.target.value),
+                            onKeyPress: handleKeyPress
+                        }),
+                        
+                        React.createElement('button', {
+                            key: 'send-btn',
+                            className: 'px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors',
+                            onClick: handleSendMessage,
+                            disabled: !messageInput.trim()
+                        }, 'Send')
+                    ])
+                ])
+            ]);
+        };
+
+        // Sidebar Component
+        const Sidebar = ({ formData, onFormDataChange, onStartNegotiation, onStartDemo, onReset, isNegotiating, sessionInfo }) => {
+            const [isLoading, setIsLoading] = useState(false);
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                
+                if (!formData.productUrl || !formData.targetPrice || !formData.maxBudget) {
+                    showToast('Please fill in all required fields', 'error');
+                    return;
+                }
+
+                if (parseInt(formData.targetPrice) >= parseInt(formData.maxBudget)) {
+                    showToast('Target price must be less than maximum budget', 'error');
+                    return;
+                }
+
+                setIsLoading(true);
+                try {
+                    await onStartNegotiation({
+                        product_url: formData.productUrl,
+                        target_price: parseInt(formData.targetPrice),
+                        max_budget: parseInt(formData.maxBudget),
+                        approach: formData.approach,
+                        timeline: formData.timeline,
+                        special_requirements: formData.specialRequirements || undefined
+                    });
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            const handleDemo = async () => {
+                const targetPrice = parseInt(formData.targetPrice) || 40000;
+                const maxBudget = parseInt(formData.maxBudget) || 60000;
+
+                if (targetPrice >= maxBudget) {
+                    showToast('Target price must be less than maximum budget', 'error');
+                    return;
+                }
+
+                setIsLoading(true);
+                try {
+                    await onStartDemo({
+                        product_url: 'demo://laptop-macbook-air-m2',
+                        target_price: targetPrice,
+                        max_budget: maxBudget,
+                        approach: formData.approach,
+                        timeline: formData.timeline,
+                        special_requirements: formData.specialRequirements || 'Demo negotiation'
+                    });
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            return React.createElement('div', {
+                className: 'w-96 sidebar-gradient text-white flex flex-col overflow-hidden shadow-2xl border-r border-secondary-600/30 backdrop-blur-lg'
+            }, [
+                // Header
+                React.createElement('div', {
+                    key: 'header',
+                    className: 'p-6 border-b border-secondary-600/50 bg-gradient-to-r from-secondary-800/50 to-secondary-700/30 backdrop-blur-sm'
+                }, [
+                    React.createElement('div', {
+                        key: 'logo',
+                        className: 'mb-6'
+                    }, [
+                        React.createElement('h1', {
+                            key: 'title',
+                            className: 'text-2xl font-bold mb-2 gradient-text'
+                        }, 'NegotiBot AI'),
+                        React.createElement('p', {
+                            key: 'subtitle',
+                            className: 'text-secondary-300 text-sm'
+                        }, 'Professional Negotiation Assistant')
+                    ])
+                ]),
+
+                // Form
+                React.createElement('div', {
+                    key: 'form-section',
+                    className: 'flex-1 overflow-y-auto scrollbar-hide p-6'
+                }, [
+                    React.createElement('form', {
+                        key: 'form',
+                        onSubmit: handleSubmit,
+                        className: 'space-y-6'
+                    }, [
+                        React.createElement('div', {
+                            key: 'section-title',
+                            className: 'text-lg font-semibold mb-6 text-white px-4 py-3 bg-primary-500/20 rounded-xl border border-primary-400/30'
+                        }, 'New Negotiation'),
+
+                        // Product URL
+                        React.createElement('div', { key: 'url-field' }, [
+                            React.createElement('label', {
+                                className: 'block text-sm font-medium mb-3 text-secondary-200'
+                            }, 'Marketplace URL'),
+                            React.createElement('input', {
+                                type: 'url',
+                                className: 'w-full px-4 py-3 glass-dark border border-secondary-500/50 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-white placeholder-secondary-400 transition-all duration-200 hover:border-primary-400/50',
+                                placeholder: 'Paste product URL from OLX, Facebook Marketplace, etc.',
+                                value: formData.productUrl,
+                                onChange: (e) => onFormDataChange({ productUrl: e.target.value }),
+                                disabled: isNegotiating || isLoading,
+                                required: true
+                            })
+                        ]),
+
+                        // Price fields
+                        React.createElement('div', {
+                            key: 'price-fields',
+                            className: 'grid grid-cols-2 gap-4'
+                        }, [
+                            React.createElement('div', { key: 'target' }, [
+                                React.createElement('label', {
+                                    className: 'block text-sm font-medium mb-3 text-secondary-200'
+                                }, 'Target Price (₹)'),
+                                React.createElement('input', {
+                                    type: 'number',
+                                    className: 'w-full px-4 py-3 glass-dark border border-secondary-500/50 rounded-xl focus:ring-2 focus:ring-success-500 focus:border-success-500 text-white placeholder-secondary-400 transition-all duration-200',
+                                    placeholder: '50,000',
+                                    min: '1',
+                                    value: formData.targetPrice,
+                                    onChange: (e) => onFormDataChange({ targetPrice: e.target.value }),
+                                    disabled: isNegotiating || isLoading,
+                                    required: true
+                                })
+                            ]),
+                            React.createElement('div', { key: 'budget' }, [
+                                React.createElement('label', {
+                                    className: 'block text-sm font-medium mb-3 text-secondary-200'
+                                }, 'Max Budget (₹)'),
+                                React.createElement('input', {
+                                    type: 'number',
+                                    className: 'w-full px-4 py-3 glass-dark border border-secondary-500/50 rounded-xl focus:ring-2 focus:ring-accent-500 focus:border-accent-500 text-white placeholder-secondary-400 transition-all duration-200',
+                                    placeholder: '70,000',
+                                    min: '1',
+                                    value: formData.maxBudget,
+                                    onChange: (e) => onFormDataChange({ maxBudget: e.target.value }),
+                                    disabled: isNegotiating || isLoading,
+                                    required: true
+                                })
+                            ])
+                        ]),
+
+                        // Negotiation Style
+                        React.createElement('div', { key: 'approach' }, [
+                            React.createElement('label', {
+                                className: 'block text-sm font-medium mb-3 text-secondary-200'
+                            }, 'Negotiation Style'),
+                            React.createElement('select', {
+                                className: 'w-full px-4 py-3 glass-dark border border-secondary-500/50 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-white transition-all duration-200',
+                                value: formData.approach,
+                                onChange: (e) => onFormDataChange({ approach: e.target.value }),
+                                disabled: isNegotiating || isLoading
+                            }, [
+                                React.createElement('option', { key: 'diplomatic', value: 'diplomatic' }, 'Diplomatic - Balanced & Professional'),
+                                React.createElement('option', { key: 'assertive', value: 'assertive' }, 'Assertive - Direct & Confident'),
+                                React.createElement('option', { key: 'considerate', value: 'considerate' }, 'Considerate - Empathetic & Budget-conscious')
+                            ])
+                        ]),
+
+                        // Timeline
+                        React.createElement('div', { key: 'timeline' }, [
+                            React.createElement('label', {
+                                className: 'block text-sm font-medium mb-3 text-secondary-200'
+                            }, 'Purchase Timeline'),
+                            React.createElement('select', {
+                                className: 'w-full px-4 py-3 glass-dark border border-secondary-500/50 rounded-xl focus:ring-2 focus:ring-accent-500 focus:border-accent-500 text-white transition-all duration-200',
+                                value: formData.timeline,
+                                onChange: (e) => onFormDataChange({ timeline: e.target.value }),
+                                disabled: isNegotiating || isLoading
+                            }, [
+                                React.createElement('option', { key: 'flexible', value: 'flexible' }, 'Flexible - No specific timeline'),
+                                React.createElement('option', { key: 'week', value: 'week' }, 'Within a week'),
+                                React.createElement('option', { key: 'urgent', value: 'urgent' }, 'Urgent - ASAP')
+                            ])
+                        ]),
+
+                        // Special Requirements
+                        React.createElement('div', { key: 'requirements' }, [
+                            React.createElement('label', {
+                                className: 'block text-sm font-medium mb-3 text-secondary-200'
+                            }, 'Additional Requirements'),
+                            React.createElement('input', {
+                                type: 'text',
+                                className: 'w-full px-4 py-3 glass-dark border border-secondary-500/50 rounded-xl focus:ring-2 focus:ring-success-500 focus:border-success-500 text-white placeholder-secondary-400 transition-all duration-200',
+                                placeholder: 'Warranty, delivery, accessories (optional)',
+                                value: formData.specialRequirements,
+                                onChange: (e) => onFormDataChange({ specialRequirements: e.target.value }),
+                                disabled: isNegotiating || isLoading
+                            })
+                        ]),
+
+                        // Buttons
+                        React.createElement('div', {
+                            key: 'buttons',
+                            className: 'space-y-3'
+                        }, [
+                            React.createElement('button', {
+                                key: 'start-btn',
+                                type: 'submit',
+                                className: `w-full px-6 py-4 font-bold rounded-xl transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 flex items-center justify-center gap-3 transform shadow-lg ${
+                                    (isNegotiating || isLoading)
+                                        ? 'bg-secondary-600 text-secondary-400 cursor-not-allowed opacity-50'
+                                        : 'btn-gradient text-white hover:shadow-2xl hover:-translate-y-1 animate-pulse-slow'
+                                }`,
+                                disabled: isNegotiating || isLoading
+                            }, [
+                                isLoading ? [
+                                    React.createElement('div', {
+                                        key: 'spinner',
+                                        className: 'w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin'
+                                    }),
+                                    React.createElement('span', { key: 'text' }, 'Analyzing Product...')
+                                ] : [
+                                    React.createElement('span', { key: 'text' }, 'Analyze Product & Start Negotiation')
+                                ]
+                            ]),
+
+
+
+                            isNegotiating && React.createElement('button', {
+                                key: 'reset-btn',
+                                type: 'button',
+                                className: 'w-full px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl font-medium transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1 flex items-center justify-center gap-2',
+                                onClick: onReset
+                            }, 'Reset Session')
+                        ])
+                    ])
+                ]),
+
+                // Session Status
+                sessionInfo && React.createElement('div', {
+                    key: 'session-status',
+                    className: 'p-6 glass-dark border-t border-secondary-500/50 backdrop-blur-lg'
+                }, [
+                    React.createElement('div', {
+                        key: 'status-content',
+                        className: 'text-sm'
+                    }, [
+                        React.createElement('div', {
+                            key: 'title',
+                            className: 'font-semibold text-success-400 mb-4 flex items-center gap-2 text-base'
+                        }, [React.createElement('span', {className: 'animate-pulse'}, '🟢'), 'Session Active']),
+                        React.createElement('div', {
+                            key: 'session-id-container',
+                            className: 'professional-card p-4 rounded-xl border border-primary-400/30 shadow-lg backdrop-blur-sm'
+                        }, [
+                            React.createElement('div', {
+                                key: 'session-label',
+                                className: 'text-sm text-secondary-300 mb-2 flex items-center gap-2'
+                            }, [React.createElement('span', {className: 'text-primary-400'}, ''), 'Session ID (Share with seller):']),
+                            React.createElement('div', {
+                                key: 'session-id-wrapper',
+                                className: 'flex items-center gap-3'
+                            }, [
+                                React.createElement('code', {
+                                    key: 'session-id',
+                                    className: 'text-sm font-mono text-success-400 break-all flex-1 bg-secondary-800/50 px-3 py-2 rounded-lg border border-success-400/30'
+                                }, sessionInfo),
+                            ])
+                        ])
+                    ])
+                ])
+            ]);
+        };
+
+        // Main App Component
+        // Authentication Modal Component
+        const AuthModal = ({ isOpen, mode, onClose, onLogin, onRegister, onSwitchMode }) => {
+            const [formData, setFormData] = useState({
+                username: '',
+                email: '',
+                password: '',
+                full_name: '',
+                phone: '',
+                role: 'buyer'
+            });
+            const [showPassword, setShowPassword] = useState(false);
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                
+                if (mode === 'login') {
+                    await onLogin({
+                        username: formData.username,
+                        password: formData.password,
+                        role: formData.role
+                    });
+                } else {
+                    await onRegister(formData);
+                }
+            };
+
+            const handleInputChange = (field, value) => {
+                setFormData(prev => ({ ...prev, [field]: value }));
+            };
+
+            if (!isOpen) return null;
+
+            return React.createElement('div', {
+                className: 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50',
+                onClick: onClose
+            }, [
+                React.createElement('div', {
+                    key: 'modal',
+                    className: 'bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 p-6',
+                    onClick: (e) => e.stopPropagation()
+                }, [
+                    React.createElement('div', {
+                        key: 'header',
+                        className: 'flex items-center justify-between mb-6'
+                    }, [
+                        React.createElement('h2', {
+                            key: 'title',
+                            className: 'text-2xl font-bold text-gray-900'
+                        }, mode === 'login' ? 'Login' : 'Register'),
+                        
+                        React.createElement('button', {
+                            key: 'close',
+                            className: 'text-gray-400 hover:text-gray-600 p-1',
+                            onClick: onClose
+                        }, React.createElement('svg', {
+                            className: 'w-6 h-6',
+                            fill: 'none',
+                            stroke: 'currentColor',
+                            viewBox: '0 0 24 24'
+                        }, React.createElement('path', {
+                            strokeLinecap: 'round',
+                            strokeLinejoin: 'round',
+                            strokeWidth: 2,
+                            d: 'M6 18L18 6M6 6l12 12'
+                        })))
+                    ]),
+
+                    React.createElement('form', {
+                        key: 'form',
+                        onSubmit: handleSubmit,
+                        className: 'space-y-4'
+                    }, [
+                        React.createElement('div', { key: 'username' }, [
+                            React.createElement('label', {
+                                key: 'label',
+                                className: 'block text-sm font-medium text-gray-700 mb-1'
+                            }, 'Username'),
+                            React.createElement('input', {
+                                key: 'input',
+                                type: 'text',
+                                value: formData.username,
+                                onChange: (e) => handleInputChange('username', e.target.value),
+                                className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+                                required: true
+                            })
+                        ]),
+
+                        React.createElement('div', { key: 'role' }, [
+                            React.createElement('label', {
+                                key: 'label',
+                                className: 'block text-sm font-medium text-gray-700 mb-1'
+                            }, 'I am a:'),
+                            React.createElement('select', {
+                                key: 'select',
+                                value: formData.role,
+                                onChange: (e) => handleInputChange('role', e.target.value),
+                                className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+                                required: true
+                            }, [
+                                React.createElement('option', {
+                                    key: 'buyer',
+                                    value: 'buyer'
+                                }, 'Buyer'),
+                                React.createElement('option', {
+                                    key: 'seller',
+                                    value: 'seller'
+                                }, 'Seller')
+                            ])
+                        ]),
+
+                        mode === 'register' && React.createElement('div', { key: 'email' }, [
+                            React.createElement('label', {
+                                key: 'label',
+                                className: 'block text-sm font-medium text-gray-700 mb-1'
+                            }, 'Email'),
+                            React.createElement('input', {
+                                key: 'input',
+                                type: 'email',
+                                value: formData.email,
+                                onChange: (e) => handleInputChange('email', e.target.value),
+                                className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+                                required: true
+                            })
+                        ]),
+
+                        React.createElement('div', { key: 'password' }, [
+                            React.createElement('label', {
+                                key: 'label',
+                                className: 'block text-sm font-medium text-gray-700 mb-1'
+                            }, 'Password'),
+                            React.createElement('div', {
+                                key: 'password-container',
+                                className: 'relative'
+                            }, [
+                                React.createElement('input', {
+                                    key: 'input',
+                                    type: showPassword ? 'text' : 'password',
+                                    value: formData.password,
+                                    onChange: (e) => handleInputChange('password', e.target.value),
+                                    className: 'w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+                                    required: true
+                                }),
+                                React.createElement('button', {
+                                    key: 'toggle',
+                                    type: 'button',
+                                    onClick: () => setShowPassword(!showPassword),
+                                    className: 'absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600'
+                                }, React.createElement('svg', {
+                                    className: 'w-5 h-5',
+                                    fill: 'none',
+                                    stroke: 'currentColor',
+                                    viewBox: '0 0 24 24'
+                                }, showPassword ? [
+                                    React.createElement('path', {
+                                        key: 'eye-off-1',
+                                        strokeLinecap: 'round',
+                                        strokeLinejoin: 'round',
+                                        strokeWidth: 2,
+                                        d: 'M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21'
+                                    })
+                                ] : [
+                                    React.createElement('path', {
+                                        key: 'eye-1',
+                                        strokeLinecap: 'round',
+                                        strokeLinejoin: 'round',
+                                        strokeWidth: 2,
+                                        d: 'M15 12a3 3 0 11-6 0 3 3 0 016 0z'
+                                    }),
+                                    React.createElement('path', {
+                                        key: 'eye-2',
+                                        strokeLinecap: 'round',
+                                        strokeLinejoin: 'round',
+                                        strokeWidth: 2,
+                                        d: 'M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.543 7-1.274 4.057-5.064 7-9.543 7-4.477 0-8.268-2.943-9.542-7z'
+                                    })
+                                ]))
+                            ])
+                        ]),
+
+                        mode === 'register' && React.createElement('div', { key: 'fullname' }, [
+                            React.createElement('label', {
+                                key: 'label',
+                                className: 'block text-sm font-medium text-gray-700 mb-1'
+                            }, 'Full Name'),
+                            React.createElement('input', {
+                                key: 'input',
+                                type: 'text',
+                                value: formData.full_name,
+                                onChange: (e) => handleInputChange('full_name', e.target.value),
+                                className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+                                required: true
+                            })
+                        ]),
+
+                        mode === 'register' && React.createElement('div', { key: 'phone' }, [
+                            React.createElement('label', {
+                                key: 'label',
+                                className: 'block text-sm font-medium text-gray-700 mb-1'
+                            }, 'Phone (Required)'),
+                            React.createElement('input', {
+                                key: 'input',
+                                type: 'tel',
+                                value: formData.phone,
+                                onChange: (e) => handleInputChange('phone', e.target.value),
+                                className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+                                required: true,
+                                minLength: 10,
+                                placeholder: 'Enter phone number (minimum 10 digits)'
+                            })
+                        ]),
+
+                        React.createElement('button', {
+                            key: 'submit',
+                            type: 'submit',
+                            className: 'w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 font-medium'
+                        }, mode === 'login' ? 'Login' : 'Register')
+                    ]),
+
+                    React.createElement('div', {
+                        key: 'switch',
+                        className: 'mt-4 text-center'
+                    }, [
+                        React.createElement('span', {
+                            key: 'text',
+                            className: 'text-gray-600'
+                        }, mode === 'login' ? "Don't have an account? " : 'Already have an account? '),
+                        
+                        React.createElement('button', {
+                            key: 'link',
+                            type: 'button',
+                            onClick: onSwitchMode,
+                            className: 'text-blue-600 hover:text-blue-700 font-medium'
+                        }, mode === 'login' ? 'Register' : 'Login')
+                    ])
+                ])
+            ]);
+        };
+
+        const App = () => {
+            const { 
+                state, 
+                updateState, 
+                updateFormData, 
+                updateMetrics, 
+                addMessage, 
+                reset 
+            } = useAppState();
+
+            // Authentication state
+            const [user, setUser] = useState(null);
+            const [showAuthModal, setShowAuthModal] = useState(false);
+            const [authMode, setAuthMode] = useState('login'); // 'login' or 'register'
+            const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+            // Make debug functions available globally for testing
+            useEffect(() => {
+                window.debugNegotiBot = {
+                    getCurrentUser: () => user,
+                    getLocalStorageUser: () => localStorage.getItem('negotibot_user'),
+                    getLocalStorageToken: () => localStorage.getItem('negotibot_token'),
+                    setTestUser: () => {
+                        const testUser = {
+                            username: 'testuser',
+                            full_name: 'Test User',
+                            email: 'test@example.com',
+                            role: 'buyer'
+                        };
+                        localStorage.setItem('negotibot_user', JSON.stringify(testUser));
+                        localStorage.setItem('negotibot_token', 'test-token-123');
+                        setUser(testUser);
+                        console.log('Test user set:', testUser);
+                    },
+                    clearUser: () => {
+                        setUser(null);
+                        localStorage.removeItem('negotibot_user');
+                        localStorage.removeItem('negotibot_token');
+                        localStorage.removeItem('negotibot_session');
+                        console.log('User data cleared');
+                    }
+                };
+            }, [user]);
+
+            // Check for existing session on load
+            useEffect(() => {
+                const checkAuth = () => {
+                    let savedUser = localStorage.getItem('negotibot_user');
+                    let savedToken = localStorage.getItem('negotibot_token');
+                    
+                    // Also check for data from landing page
+                    if (!savedUser || !savedToken) {
+                        const landingPageSession = localStorage.getItem('negotiation_session');
+                        if (landingPageSession) {
+                            try {
+                                const sessionData = JSON.parse(landingPageSession);
+                                if (sessionData.role === 'buyer') {
+                                    // Convert landing page format to buyer portal format
+                                    const userData = {
+                                        user_id: sessionData.user_id,
+                                        username: sessionData.username,
+                                        email: sessionData.email,
+                                        full_name: sessionData.full_name,
+                                        role: sessionData.role
+                                    };
+                                    localStorage.setItem('negotibot_user', JSON.stringify(userData));
+                                    localStorage.setItem('negotibot_token', sessionData.token);
+                                    localStorage.setItem('negotibot_session', sessionData.session_id);
+                                    savedUser = JSON.stringify(userData);
+                                    savedToken = sessionData.token;
+                                }
+                            } catch (error) {
+                                console.error('Error parsing landing page session:', error);
+                            }
+                        }
+                    }
+                    
+                    console.log('=== AUTH CHECK ===');
+                    console.log('Saved user string:', savedUser);
+                    console.log('Saved token:', savedToken ? 'exists' : 'missing');
+                    
+                    if (savedUser && savedToken) {
+                        try {
+                            const userData = JSON.parse(savedUser);
+                            console.log('Parsed user data:', userData);
+                            console.log('User full_name:', userData.full_name);
+                            console.log('User username:', userData.username);
+                            console.log('User role:', userData.role);
+                            
+                            // Force re-render by setting user state
+                            setUser(null); // Clear first
+                            setTimeout(() => {
+                                setUser(userData);
+                                console.log('User state set to:', userData);
+                            }, 10);
+                            setIsCheckingAuth(false);
+                        } catch (error) {
+                            console.error('Error parsing saved user data:', error);
+                            // Clear corrupted data
+                            localStorage.removeItem('negotibot_user');
+                            localStorage.removeItem('negotibot_token');
+                            localStorage.removeItem('negotibot_session');
+                            localStorage.removeItem('negotiation_session');
+                            setIsCheckingAuth(false);
+                        }
+                    } else {
+                        console.log('No authentication found, showing guest mode');
+                        setUser(null);
+                        setIsCheckingAuth(false);
+                    }
+                };
+                
+                // Call immediately
+                checkAuth();
+                
+                // Listen for storage changes
+                const handleStorageChange = (e) => {
+                    if (e.key === 'negotibot_user' || e.key === 'negotibot_token') {
+                        console.log('Storage changed, rechecking auth');
+                        setTimeout(checkAuth, 100); // Small delay to ensure all storage changes are complete
+                    }
+                };
+                
+                window.addEventListener('storage', handleStorageChange);
+                
+                // Also check every 2 seconds for immediate feedback
+                const interval = setInterval(checkAuth, 2000);
+                
+                return () => {
+                    clearInterval(interval);
+                    window.removeEventListener('storage', handleStorageChange);
+                };
+            }, []);
+
+            // Authentication functions
+            const handleLogin = async (credentials) => {
+                try {
+                    const response = await apiService.login(credentials);
+                    
+                    if (response.success) {
+                        console.log('Login successful, setting user:', response.user);
+                        setUser(response.user);
+                        localStorage.setItem('negotibot_user', JSON.stringify(response.user));
+                        localStorage.setItem('negotibot_token', response.token);
+                        localStorage.setItem('negotibot_session', response.session_id);
+                        
+                        setShowAuthModal(false);
+                        showToast(`Welcome back, ${response.user.full_name || response.user.username}!`, 'success');
+                    } else {
+                        showToast(response.message || 'Login failed', 'error');
+                    }
+                } catch (error) {
+                    console.error('Login error:', error);
+                    
+                    // Parse error message more intelligently
+                    let userMessage = 'Login failed. Please check your credentials and try again.';
+                    
+                    if (error.message) {
+                        if (error.message.includes('Validation Error')) {
+                            // Extract the actual validation message
+                            const validationMatch = error.message.match(/Validation Error: (.+?)(?:\.|$)/);
+                            if (validationMatch) {
+                                userMessage = validationMatch[1];
+                            } else {
+                                userMessage = 'Please fill in all required fields correctly.';
+                            }
+                        } else if (error.message.includes('Username not found')) {
+                            userMessage = 'Username not found. Please check your username or register for a new account.';
+                        } else if (error.message.includes('Incorrect password')) {
+                            userMessage = 'Incorrect password. Please try again.';
+                        } else if (error.message.includes('connection') || error.message.includes('network')) {
+                            userMessage = 'Connection problem. Please check your internet and try again.';
+                        } else if (error.message.includes('timeout')) {
+                            userMessage = 'Request timed out. Please try again.';
+                        } else {
+                            userMessage = error.message;
+                        }
+                    }
+                    
+                    showToast(userMessage, 'error');
+                }
+            };
+
+            const handleRegister = async (userData) => {
+                try {
+                    const response = await apiService.register(userData);
+                    
+                    if (response.success) {
+                        showToast('Registration successful! Logging you in...', 'success');
+                        
+                        // Auto-login after successful registration
+                        setTimeout(async () => {
+                            try {
+                                await handleLogin({
+                                    username: userData.username,
+                                    password: userData.password,
+                                    role: userData.role
+                                });
+                            } catch (loginError) {
+                                console.error('Auto-login failed:', loginError);
+                                // Fallback to manual login
+                                setAuthMode('login');
+                                showToast('Registration successful! Please login.', 'success');
+                            }
+                        }, 1000);
+                    } else {
+                        showToast(response.message || 'Registration failed', 'error');
+                    }
+                } catch (error) {
+                    console.error('Registration error:', error);
+                    
+                    // Parse error message more intelligently for registration
+                    let userMessage = 'Registration failed. Please check all required fields and try again.';
+                    
+                    if (error.message) {
+                        if (error.message.includes('Validation Error')) {
+                            // Extract the actual validation message
+                            const validationMatch = error.message.match(/Validation Error: (.+?)(?:\.|$)/);
+                            if (validationMatch) {
+                                userMessage = validationMatch[1];
+                            } else {
+                                userMessage = 'Please fill in all required fields correctly.';
+                            }
+                        } else if (error.message.includes('username.*already') || error.message.includes('already taken')) {
+                            userMessage = 'This username is already taken. Please choose a different one.';
+                        } else if (error.message.includes('email.*already') || error.message.includes('email.*exists')) {
+                            userMessage = 'An account with this email already exists. Try logging in instead.';
+                        } else if (error.message.includes('phone') && error.message.includes('invalid')) {
+                            userMessage = 'Please enter a valid phone number with at least 10 digits.';
+                        } else if (error.message.includes('password.*short') || error.message.includes('password.*weak')) {
+                            userMessage = 'Password must be at least 6 characters long.';
+                        } else if (error.message.includes('email.*valid')) {
+                            userMessage = 'Please enter a valid email address.';
+                        } else if (error.message.includes('connection') || error.message.includes('network')) {
+                            userMessage = 'Connection problem. Please check your internet and try again.';
+                        } else if (error.message.includes('timeout')) {
+                            userMessage = 'Request timed out. Please try again.';
+                        } else {
+                            userMessage = error.message;
+                        }
+                    }
+                    showToast(userMessage, 'error');
+                }
+            };
+
+            const handleLogout = async () => {
+                try {
+                    const sessionId = localStorage.getItem('negotibot_session');
+                    if (sessionId) {
+                        await apiService.logout({ session_id: sessionId });
+                    }
+                    
+                    setUser(null);
+                    localStorage.removeItem('negotibot_user');
+                    localStorage.removeItem('negotibot_token');
+                    localStorage.removeItem('negotibot_session');
+                    
+                    showToast('Logged out successfully', 'success');
+                    setTimeout(() => {
+                        window.location.href = 'http://localhost:8000/';
+                    }, 1000);
+                } catch (error) {
+                    console.error('Logout error:', error);
+                    // Still clear local data even if server request fails
+                    setUser(null);
+                    localStorage.removeItem('negotibot_user');
+                    localStorage.removeItem('negotibot_token');
+                    localStorage.removeItem('negotibot_session');
+                    setTimeout(() => {
+                        window.location.href = 'http://0.0.0.0:8000/';
+                    }, 1000);
+                }
+            };
+
+            // Handle WebSocket messages
+            const handleWebSocketMessage = (data) => {
+                switch (data.type) {
+                    case 'ai_message':
+                    case 'ai_response':
+                    case 'negotiation_update':
+                        addMessage({
+                            type: 'ai',
+                            content: data.message,
+                            phase: data.phase,
+                            strategy: data.strategy
+                        });
+                        
+                        // Update metrics if available
+                        if (data.progress !== undefined || data.current_offer !== undefined || data.confidence !== undefined) {
+                            updateMetrics({
+                                negotiationProgress: data.progress || state.metrics.negotiationProgress,
+                                currentOffer: data.current_offer || state.metrics.currentOffer,
+                                aiConfidence: data.confidence || state.metrics.aiConfidence
+                            });
+                        }
+                        break;
+
+                    case 'seller_message':
+                        addMessage({
+                            type: 'seller',
+                            content: data.message
+                        });
+                        break;
+
+                    case 'negotiation_complete':
+                        updateState({ isNegotiating: false });
+                        addMessage({
+                            type: 'system',
+                            content: data.message || 'Negotiation completed!',
+                            success: data.success,
+                            finalPrice: data.final_price
+                        });
+                        
+                        if (data.success) {
+                            showToast(`Negotiation successful! Final price: ₹${formatNumber(data.final_price)}`, 'success');
+                        } else {
+                            showToast('Negotiation was not successful', 'warning');
+                        }
+                        break;
+
+                    case 'system':
+                        addMessage(data);
+                        break;
+
+                    default:
+                        if (data.content || data.message) {
+                            addMessage(data);
+                        }
+                        console.log('Unknown message type:', data.type);
+                }
+            };
+
+            const { isConnected } = useWebSocket(state.sessionId, handleWebSocketMessage);
+
+            useEffect(() => {
+                updateState({ isConnected });
+            }, [isConnected]);
+
+            // Handle start negotiation
+            const handleStartNegotiation = async (negotiationData) => {
+                try {
+                    // Double-check authentication from localStorage before proceeding
+                    const savedUser = localStorage.getItem('negotibot_user');
+                    const savedToken = localStorage.getItem('negotibot_token');
+                    
+                    console.log('=== NEGOTIATION START ===');
+                    console.log('Current user state:', user);
+                    console.log('localStorage user:', savedUser);
+                    console.log('localStorage token:', savedToken ? 'exists' : 'missing');
+                    
+                    let currentUser = user;
+                    
+                    // If user state is null but localStorage has data, try to restore it
+                    if (!currentUser && savedUser && savedToken) {
+                        try {
+                            currentUser = JSON.parse(savedUser);
+                            setUser(currentUser);
+                            console.log('Restored user from localStorage:', currentUser);
+                            showToast(`Welcome back, ${currentUser.username || currentUser.full_name}!`, 'success');
+                        } catch (e) {
+                            console.error('Error parsing saved user:', e);
+                        }
+                    }
+                    
+                    // Check if user is authenticated
+                    if (!currentUser) {
+                        showToast('You must be logged in to start a negotiation. Please log in from the main page.', 'error');
+                        setTimeout(() => {
+                            window.location.href = 'http://0.0.0.0:8000/';
+                        }, 3000);
+                        return;
+                    }
+
+                    // Check if user is a buyer
+                    if (currentUser.role !== 'buyer') {
+                        showToast('Only buyers can start negotiations', 'error');
+                        return;
+                    }
+
+                    updateState({ connectionStatus: 'connecting' });
+                    
+                    console.log('Starting negotiation with data:', negotiationData);
+                    console.log('Current user:', user);
+                    console.log('Token available:', !!localStorage.getItem('negotibot_token'));
+                    
+                    const response = await apiService.startNegotiation(negotiationData);
+                    console.log('Negotiation response:', response);
+
+                    if (response.success) {
+                        // Handle different response formats - some endpoints return session_id directly, others nested
+                        const sessionId = response.session_id || (response.session && response.session.session_id);
+                        const productInfo = response.product_info || response.product;
+                        
+                        if (!sessionId) {
+                            throw new Error('No session ID received from server');
+                        }
+                        
+                        updateState({
+                            sessionId: sessionId,
+                            product: productInfo,
+                            marketAnalysis: response.market_analysis,
+                            isNegotiating: true
+                        });
+
+                        // Initialize metrics
+                        const product = productInfo;
+                        updateMetrics({
+                            currentOffer: product.price,
+                            savingsPotential: Math.max(0, product.price - negotiationData.target_price),
+                            aiConfidence: 'High'
+                        });
+                        
+                        showToast('Negotiation started successfully!', 'success');
+                    } else {
+                        console.error('Negotiation failed:', response);
+                        showToast(response.message || 'Failed to start negotiation', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error starting negotiation:', error);
+                    console.error('Error details:', {
+                        message: error.message,
+                        status: error.status,
+                        response: error.response
+                    });
+                    
+                    if (error.message && (error.message.includes('401') || error.message.includes('Unauthorized'))) {
+                        showToast('Authentication failed. Your session has expired. Redirecting to login...', 'error');
+                        localStorage.removeItem('negotibot_user');
+                        localStorage.removeItem('negotibot_token');
+                        localStorage.removeItem('negotibot_session');
+                        setTimeout(() => {
+                            window.location.href = 'http://0.0.0.0:8000/';
+                        }, 3000);
+                    } else {
+                        showToast(error.message || 'Failed to start negotiation. Please try again.', 'error');
+                    }
+                    updateState({ connectionStatus: 'error' });
+                }
+            };
+
+            // Handle start demo
+            const handleStartDemo = async (demoData) => {
+                try {
+                    // Check if user is authenticated
+                    if (!user) {
+                        showToast('Please login as a buyer to start negotiation', 'error');
+                        setShowAuthModal(true);
+                        setAuthMode('login');
+                        return;
+                    }
+
+                    // Check if user is a buyer
+                    if (user.role !== 'buyer') {
+                        showToast('Only buyers can start negotiations', 'error');
+                        return;
+                    }
+
+                    updateState({ connectionStatus: 'connecting' });
+                    
+                    const response = await apiService.startDemo(demoData);
+
+                    if (response.success) {
+                        // Handle different response formats - some endpoints return session_id directly, others nested
+                        const sessionId = response.session_id || (response.session && response.session.session_id);
+                        const productInfo = response.product_info || response.product;
+                        
+                        if (!sessionId) {
+                            throw new Error('No session ID received from server');
+                        }
+                        
+                        updateState({
+                            sessionId: sessionId,
+                            product: productInfo,
+                            marketAnalysis: response.market_analysis,
+                            isNegotiating: true
+                        });
+
+                        // Initialize metrics
+                        const product = productInfo;
+                        updateMetrics({
+                            currentOffer: product.price,
+                            savingsPotential: Math.max(0, product.price - demoData.target_price),
+                            aiConfidence: 'High'
+                        });
+                        
+                        showToast('Demo negotiation started successfully!', 'success');
+                    } else {
+                        showToast('Failed to start demo negotiation', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error starting demo:', error);
+                    showToast('Failed to start demo negotiation', 'error');
+                    updateState({ connectionStatus: 'error' });
+                }
+            };
+
+            // Handle reset
+            const handleReset = () => {
+                if (confirm('Are you sure you want to reset the current session?')) {
+                    reset();
+                    showToast('Session reset successfully', 'success');
+                }
+            };
+
+            const sessionInfo = state.sessionId ? 
+                state.sessionId : 
+                null;
+
+            // Show loading screen while checking authentication
+            if (isCheckingAuth) {
+                return React.createElement('div', {
+                    className: 'min-h-screen bg-gradient-to-br from-secondary-900 via-secondary-800 to-primary-900 flex items-center justify-center'
+                }, [
+                    React.createElement('div', {
+                        key: 'loading',
+                        className: 'text-center glass-dark p-8 rounded-2xl border border-secondary-600/30 backdrop-blur-lg'
+                    }, [
+                        React.createElement('div', {
+                            key: 'spinner',
+                            className: 'w-16 h-16 border-4 border-primary-200/30 border-t-primary-500 rounded-full animate-spin mx-auto mb-6 shadow-lg'
+                        }),
+                        React.createElement('p', {
+                            key: 'text',
+                            className: 'text-white text-xl font-semibold flex items-center gap-2 justify-center'
+                        }, 'Loading NegotiBot AI...')
+                    ])
+                ]);
+            }
+
+            return React.createElement('div', {
+                className: 'min-h-screen bg-gradient-to-br from-secondary-900 via-secondary-800 to-primary-900 p-6'
+            }, [
+                React.createElement('div', {
+                    key: 'container',
+                    className: 'flex h-full max-w-7xl mx-auto glass-dark shadow-2xl rounded-2xl overflow-hidden border border-secondary-600/20 backdrop-blur-xl'
+                }, [
+                    // Sidebar
+                    React.createElement(Sidebar, {
+                        key: 'sidebar',
+                        formData: state.formData,
+                        onFormDataChange: updateFormData,
+                        onStartNegotiation: handleStartNegotiation,
+                        onStartDemo: handleStartDemo,
+                        onReset: handleReset,
+                        isNegotiating: state.isNegotiating,
+                        sessionInfo
+                    }),
+
+                    // Main Content
+                    React.createElement('div', {
+                        key: 'main',
+                        className: 'flex-1 flex flex-col overflow-hidden'
+                    }, [
+                        // Header
+                        React.createElement('header', {
+                            key: 'header',
+                            className: 'bg-gradient-to-r from-secondary-800/80 to-secondary-700/60 backdrop-blur-lg border-b border-secondary-600/30 px-6 py-4 shadow-lg'
+                        }, [
+                            React.createElement('div', {
+                                key: 'header-content',
+                                className: 'flex items-center justify-between gap-4 w-full max-w-full'
+                            }, [
+                                React.createElement('div', { key: 'title', className: 'flex-shrink-0' }, [
+                                    React.createElement('h1', {
+                                        key: 'heading',
+                                        className: 'text-2xl font-bold text-white flex items-center gap-2'
+                                    }, [
+                                        React.createElement('div', {
+                                            key: 'icon',
+                                            className: 'p-2 bg-gradient-animated rounded-lg text-white shadow-lg animate-float'
+                                        }, React.createElement('svg', {
+                                            className: 'w-5 h-5',
+                                            fill: 'currentColor',
+                                            viewBox: '0 0 20 20'
+                                        }, React.createElement('path', {
+                                            fillRule: 'evenodd',
+                                            d: 'M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z',
+                                            clipRule: 'evenodd'
+                                        }))),
+                                        React.createElement('span', {
+                                            key: 'title',
+                                            className: 'gradient-text'
+                                        }, 'NegotiBot AI')
+                                    ]),
+                                    
+                                    React.createElement('p', {
+                                        key: 'subtitle',
+                                        className: 'text-secondary-300 mt-1 text-sm'
+                                    }, state.isNegotiating ? 
+                                        `Negotiating ${state.product?.title || 'product'}` : 
+                                        'Ready to negotiate'
+                                    )
+                                ]),
+                                
+                                React.createElement('div', {
+                                    key: 'header-right',
+                                    className: 'flex items-center gap-3 flex-shrink-0'
+                                }, [
+                                    // Compact status indicators
+                                    React.createElement('div', {
+                                        key: 'status',
+                                        className: 'hidden lg:flex items-center gap-2 text-xs text-secondary-300'
+                                    }),
+
+                                    // Authentication section
+                                    React.createElement('div', {
+                                        key: 'user-menu',
+                                        className: 'flex items-center gap-2'
+                                    }, [
+                                        React.createElement('span', {
+                                            key: 'greeting',
+                                            className: 'hidden md:flex text-sm font-medium text-white items-center gap-2'
+                                        }, (() => {
+                                            console.log('Rendering header - Current user state:', user);
+                                            if (user) {
+                                                console.log('User full_name:', user.full_name);
+                                                console.log('User username:', user.username);
+                                                return [React.createElement('span', {key: 'icon', className: 'text-success-400'}, '👤'), `Welcome, ${user.full_name || user.username || 'User'}!`];
+                                            } else {
+                                                return [React.createElement('span', {key: 'icon', className: 'text-secondary-400'}, '👤'), 'Welcome, Guest!'];
+                                            }
+                                        })()),
+                                        
+                                        React.createElement('div', {
+                                            key: 'auth-buttons',
+                                            className: 'flex items-center gap-2'
+                                        }, [
+                                            // Refresh button to manually check auth
+                                            React.createElement('button', {
+                                                key: 'refresh',
+                                                onClick: () => {
+                                                    const savedUser = localStorage.getItem('negotibot_user');
+                                                    const savedToken = localStorage.getItem('negotibot_token');
+                                                    console.log('Manual refresh - User:', savedUser);
+                                                    console.log('Manual refresh - Token:', savedToken);
+                                                    if (savedUser && savedToken) {
+                                                        try {
+                                                            const userData = JSON.parse(savedUser);
+                                                            console.log('Parsed user data:', userData);
+                                                            setUser(userData);
+                                                            showToast(`Welcome ${userData.username || userData.full_name || 'User'}!`, 'success');
+                                                        } catch (e) {
+                                                            console.error('Error parsing user:', e);
+                                                            showToast('Error parsing user data', 'error');
+                                                        }
+                                                    } else {
+                                                        showToast('Please log in from the main page first', 'warning');
+                                                        setTimeout(() => {
+                                                            window.location.href = 'http://localhost:8000/';
+                                                        }, 2000);
+                                                    }
+                                                },
+                                                className: 'p-2 bg-gradient-to-r from-accent-500 to-accent-600 text-white text-sm font-medium rounded-lg hover:from-accent-600 hover:to-accent-700 transition-all duration-300 shadow-md hover:shadow-lg',
+                                                title: 'Refresh authentication status'
+                                            }, React.createElement('span', { key: 'icon' }, '↻')),
+                                            
+                                            // Main auth button
+                                            user ? React.createElement('button', {
+                                                key: 'logout',
+                                                onClick: () => {
+                                                    // Clear session and redirect to landing page
+                                                    localStorage.removeItem('negotibot_user');
+                                                    localStorage.removeItem('negotibot_token');
+                                                    localStorage.removeItem('negotibot_session');
+                                                    window.location.href = 'http://localhost:8000/';
+                                                },
+                                                className: 'px-3 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white font-medium text-sm rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-300 shadow-md hover:shadow-lg flex items-center gap-1'
+                                            }, [React.createElement('span', { key: 'icon' }, '🚪'), React.createElement('span', { key: 'text' }, 'Logout')]) : React.createElement('button', {
+                                                key: 'login-redirect',
+                                                onClick: () => {
+                                                    showToast('Redirecting to login page... 🚀', 'info');
+                                                    window.location.href = 'http://localhost:8000/';
+                                                },
+                                                className: 'px-3 py-2 btn-gradient text-white font-medium text-sm rounded-lg transition-all duration-300 shadow-md hover:shadow-lg flex items-center gap-1'
+                                            }, [React.createElement('span', { key: 'icon' }, '🔑'), React.createElement('span', { key: 'text' }, 'Login')])
+                                        ])
+                                    ])
+                                ])
+                            ])
+                        ]),
+
+                        // Content Area
+                        React.createElement('div', {
+                            key: 'content',
+                            className: 'flex-1 flex overflow-hidden'
+                        }, [
+                            // Chat Interface
+                            React.createElement('div', {
+                                key: 'chat-area',
+                                className: 'flex-1 flex flex-col'
+                            }, [
+                                React.createElement(ProductInfo, {
+                                    key: 'product-info',
+                                    product: state.product,
+                                    isVisible: !!state.product
+                                }),
+                                
+                                React.createElement(ChatInterface, {
+                                    key: 'chat',
+                                    messages: state.messages,
+                                    isNegotiating: state.isNegotiating,
+                                    onSendMessage: addMessage,
+                                    sessionId: state.sessionId
+                                })
+                            ]),
+
+                            // Analytics Panel
+                            state.isNegotiating && React.createElement('div', {
+                                key: 'analytics',
+                                className: 'w-80 border-l border-secondary-600/30 glass-dark backdrop-blur-lg overflow-y-auto'
+                            }, [
+                                React.createElement('div', {
+                                    key: 'panel-header',
+                                    className: 'p-6 border-b border-secondary-600/30 bg-gradient-to-r from-secondary-800/50 to-secondary-700/30 backdrop-blur-sm'
+                                }, [
+                                    React.createElement('h3', {
+                                        key: 'title',
+                                        className: 'text-lg font-semibold text-white flex items-center gap-2'
+                                    }, 'Product Analysis'),
+                                    React.createElement('p', {
+                                        key: 'subtitle',
+                                        className: 'text-sm text-secondary-300 mt-1'
+                                    }, 'Market intelligence & insights')
+                                ]),
+
+                                React.createElement('div', {
+                                    key: 'metrics',
+                                    className: 'p-6'
+                                }, [
+                                    React.createElement(MetricsPanel, {
+                                        key: 'metrics-panel',
+                                        metrics: state.metrics,
+                                        product: state.product
+                                    })
+                                ])
+                            ])
+                        ]),
+                        
+                        // Footer
+                        React.createElement('footer', {
+                            key: 'footer',
+                            className: 'glass-dark border-t border-secondary-600/30 px-8 py-4 backdrop-blur-lg'
+                        }, [
+                            React.createElement('div', {
+                                key: 'footer-content',
+                                className: 'flex items-center justify-between text-sm text-secondary-300'
+                            }, [
+                                React.createElement('div', { 
+                                    key: 'copyright',
+                                    className: 'flex items-center gap-2'
+                                }, [React.createElement('span', {className: 'text-primary-400'}, '©'), '2025 NegotiBot AI. Professional marketplace negotiation assistant.']),
+                                
+                                React.createElement('div', {
+                                    key: 'system-status',
+                                    className: 'flex items-center gap-3'
+                                }, [
+                                    React.createElement('div', {
+                                        key: 'indicator',
+                                        className: `w-3 h-3 rounded-full shadow-lg ${isConnected ? 'bg-success-500 animate-pulse shadow-success-500/50' : 'bg-secondary-400 shadow-secondary-400/50'}`
+                                    }),
+                                    React.createElement('span', { 
+                                        key: 'text',
+                                        className: 'font-medium'
+                                    }, isConnected ? 'Connected' : 'System Online')
+                                ])
+                            ])
+                        ])
+                    ])
+                ]),
+
+                // Authentication Modal
+                React.createElement(AuthModal, {
+                    key: 'auth-modal',
+                    isOpen: showAuthModal,
+                    mode: authMode,
+                    onClose: () => setShowAuthModal(false),
+                    onLogin: handleLogin,
+                    onRegister: handleRegister,
+                    onSwitchMode: () => setAuthMode(authMode === 'login' ? 'register' : 'login')
+                })
+            ]);
+        };
+
+        // Render the app
+        ReactDOM.render(React.createElement(App), document.getElementById('root'));
+    </script>
+</body>
+</html>

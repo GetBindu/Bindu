@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NegotiBot AI - Smart Marketplace Negotiation Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/framer-motion@10/dist/framer-motion.umd.js" onload="console.log('Framer Motion loaded successfully')" onerror="console.error('Failed to load Framer Motion')"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        },
+                        secondary: {
+                            50: '#f8fafc',
+                            100: '#f1f5f9',
+                            200: '#e2e8f0',
+                            300: '#cbd5e1',
+                            400: '#94a3b8',
+                            500: '#64748b',
+                            600: '#475569',
+                            700: '#334155',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                        },
+                        accent: {
+                            50: '#ecfeff',
+                            100: '#cffafe',
+                            200: '#a5f3fc',
+                            300: '#67e8f9',
+                            400: '#22d3ee',
+                            500: '#06b6d4',
+                            600: '#0891b2',
+                            700: '#0e7490',
+                            800: '#155e75',
+                            900: '#164e63',
+                        },
+                        success: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            200: '#bbf7d0',
+                            300: '#86efac',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            800: '#166534',
+                            900: '#14532d',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    animation: {
+                        'gradient-x': 'gradient-x 15s ease infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        'gradient-x': {
+                            '0%, 100%': {
+                                'background-size': '200% 200%',
+                                'background-position': 'left center'
+                            },
+                            '50%': {
+                                'background-size': '200% 200%',
+                                'background-position': 'right center'
+                            },
+                        },
+                        'float': {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-20px)' },
+                        }
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        .glass-effect {
+            backdrop-filter: blur(16px) saturate(180%);
+            background-color: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        .gradient-text {
+            background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 50%, #22c55e 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .bg-gradient-animated {
+            background: linear-gradient(-45deg, #0ea5e9, #06b6d4, #22c55e, #0284c7);
+            background-size: 400% 400%;
+            animation: gradient-x 15s ease infinite;
+        }
+        .professional-card {
+            background: linear-gradient(135deg, rgba(14, 165, 233, 0.1) 0%, rgba(6, 182, 212, 0.05) 100%);
+            border: 1px solid rgba(14, 165, 233, 0.2);
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-secondary-900 via-secondary-800 to-primary-900 text-secondary-100">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        // Fix for React 18 - use createRoot instead of render
+        const { createRoot } = ReactDOM;
+        
+        // Framer Motion setup with proper error handling
+        let motion, AnimatePresence;
+        
+        try {
+            if (typeof Motion !== 'undefined' && Motion.motion) {
+                ({ motion, AnimatePresence } = Motion);
+            } else {
+                throw new Error('Motion not available');
+            }
+        } catch (error) {
+            console.warn('Framer Motion not loaded properly, using fallback components');
+            // Enhanced fallback motion components
+            const createMotionComponent = (tag) => ({ 
+                children, 
+                initial, 
+                animate, 
+                transition, 
+                whileHover, 
+                whileTap, 
+                whileInView,
+                viewport,
+                className, 
+                onClick, 
+                style, 
+                ...props 
+            }) => React.createElement(tag, { 
+                className, 
+                onClick, 
+                style, 
+                ...props 
+            }, children);
+            
+            motion = {
+                div: createMotionComponent('div'),
+                button: createMotionComponent('button'),
+                section: createMotionComponent('section'),
+                h1: createMotionComponent('h1'),
+                h2: createMotionComponent('h2'),
+                p: createMotionComponent('p'),
+            };
+            AnimatePresence = ({ children }) => children;
+        }
+
+        // Icons component (using FontAwesome for simplicity)
+        const Icon = ({ name, className = "w-5 h-5" }) => (
+            <i className={`fas fa-${name} ${className}`}></i>
+        );
+
+        // Main Landing Page Component
+        const LandingPage = () => {
+            const [showAuth, setShowAuth] = useState(false);
+            const [userType, setUserType] = useState('buyer');
+            const [user, setUser] = useState(null);
+
+            const handleGetStarted = (type) => {
+                setUserType(type);
+                setShowAuth(true);
+            };
+
+            const handleAuthSuccess = (userData, token, sessionId) => {
+                // Store session data in localStorage using the same keys as buyer portal
+                const sessionData = {
+                    user_id: userData.user_id,
+                    username: userData.username || userData.email,
+                    email: userData.email,
+                    full_name: userData.full_name,
+                    role: userData.role,
+                    token: token,
+                    session_id: sessionId,
+                    login_time: new Date().toISOString()
+                };
+                
+                try {
+                    localStorage.setItem('negotiation_session', JSON.stringify(sessionData));
+                    // Also store in buyer portal format for sync
+                    localStorage.setItem('negotibot_user', JSON.stringify(userData));
+                    localStorage.setItem('negotibot_token', token);
+                    localStorage.setItem('negotibot_session', sessionId);
+                } catch (e) {
+                    console.warn('Failed to store session data:', e);
+                }
+                
+                setUser(userData);
+                setShowAuth(false);
+                
+                // Redirect based on user type
+                console.log('Redirecting user with role:', userData?.role);
+                if (userData && userData.role === 'seller') {
+                    console.log('Redirecting to seller portal...');
+                    window.location.href = './seller-portal.html';
+                } else {
+                    console.log('Redirecting to buyer portal...');
+                    window.location.href = './react-app.html';
+                }
+            };
+
+            if (showAuth) {
+                return <UnifiedAuth onAuthSuccess={handleAuthSuccess} userType={userType} />;
+            }
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-secondary-900 via-secondary-800 to-primary-900">
+                    {/* Hero Section */}
+                    <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+                        {/* Background Effects */}
+                        <div className="absolute inset-0 bg-gradient-animated opacity-15"></div>
+                        <div className="absolute inset-0">
+                            <div className="absolute top-20 left-10 w-72 h-72 bg-primary-600 rounded-full mix-blend-multiply filter blur-xl opacity-15 animate-float"></div>
+                            <div className="absolute top-40 right-10 w-72 h-72 bg-accent-600 rounded-full mix-blend-multiply filter blur-xl opacity-15 animate-float" style={{animationDelay: '2s'}}></div>
+                            <div className="absolute bottom-20 left-1/2 w-72 h-72 bg-success-600 rounded-full mix-blend-multiply filter blur-xl opacity-15 animate-float" style={{animationDelay: '4s'}}></div>
+                        </div>
+
+                        <div className="relative z-10 text-center px-4 max-w-6xl mx-auto">
+                            <motion.div
+                                initial={{ opacity: 0, y: 30 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.8 }}
+                            >
+                                <motion.div 
+                                    className="inline-flex items-center gap-2 px-6 py-3 professional-card rounded-full text-primary-300 text-sm font-semibold mb-8"
+                                    whileHover={{ scale: 1.05 }}
+                                >
+                                    <Icon name="cpu" className="w-4 h-4" />
+                                    Powered by Advanced AI Technology
+                                </motion.div>
+
+                                <h1 className="text-6xl md:text-8xl font-black mb-6 leading-tight">
+                                    <span className="gradient-text">NegotiateBot AI</span>
+                                    <br />
+                                </h1>
+
+                                <p className="text-xl md:text-2xl text-secondary-300 mb-12 max-w-3xl mx-auto leading-relaxed">
+                                    Enterprise-grade AI negotiation platform delivering superior results through 
+                                    intelligent strategies and comprehensive market analysis.
+                                </p>
+
+                                <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
+                                    <motion.button
+                                        onClick={() => handleGetStarted('buyer')}
+                                        className="px-10 py-5 bg-gradient-to-r from-primary-600 to-accent-500 text-white font-semibold rounded-xl shadow-2xl hover:shadow-primary-500/30 transition-all duration-300 flex items-center gap-3 text-lg group"
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                    >
+                                        <Icon name="shopping-cart" />
+                                        Start as Buyer
+                                        <Icon name="arrow-right" className="group-hover:translate-x-1 transition-transform" />
+                                    </motion.button>
+
+                                    <motion.button
+                                        onClick={() => handleGetStarted('seller')}
+                                        className="px-10 py-5 professional-card text-white font-semibold rounded-xl hover:bg-white/15 transition-all duration-300 flex items-center gap-3 text-lg group"
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                    >
+                                        <Icon name="store" />
+                                        Join as Seller
+                                        <Icon name="external-link-alt" className="group-hover:translate-x-1 transition-transform" />
+                                    </motion.button>
+                                </div>
+
+                                <div className="mt-16 flex items-center justify-center gap-12 text-sm text-secondary-400">
+                                    <div className="flex items-center gap-3">
+                                        <Icon name="check-circle" className="w-5 h-5 text-success-400" />
+                                        <span className="font-medium">Free to Start</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <Icon name="shield-alt" className="w-5 h-5 text-primary-400" />
+                                        <span className="font-medium">Enterprise Security</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <Icon name="bolt" className="w-5 h-5 text-accent-400" />
+                                        <span className="font-medium">Instant Results</span>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        </div>
+                    </section>
+
+                    {/* Features Section */}
+                    <section className="py-20 px-4">
+                        <div className="max-w-7xl mx-auto">
+                            <motion.div 
+                                className="text-center mb-16"
+                                initial={{ opacity: 0, y: 30 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                viewport={{ once: true }}
+                            >
+                                <h2 className="text-4xl md:text-5xl font-bold gradient-text mb-6">
+                                    Enterprise Negotiation Platform
+                                </h2>
+                                <p className="text-xl text-secondary-300 max-w-3xl mx-auto">
+                                    Professional-grade AI technology delivering superior negotiation outcomes 
+                                    through intelligent market analysis and strategic automation.
+                                </p>
+                            </motion.div>
+
+                            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                {[
+                                    {
+                                        icon: 'brain',
+                                        title: 'AI-Powered Analytics',
+                                        description: 'Advanced algorithms analyze market patterns and seller behavior to optimize negotiation strategies.',
+                                        color: 'from-primary-500 to-primary-700'
+                                    },
+                                    {
+                                        icon: 'chart-line',
+                                        title: 'Market Intelligence',
+                                        description: 'Real-time price analysis and market insights provide strategic advantages in negotiations.',
+                                        color: 'from-accent-500 to-accent-700'
+                                    },
+                                    {
+                                        icon: 'comments',
+                                        title: 'Professional Communication',
+                                        description: 'Seamless integration between buyers and sellers with AI-assisted communication tools.',
+                                        color: 'from-success-500 to-success-700'
+                                    },
+                                    {
+                                        icon: 'shield-alt',
+                                        title: 'Enterprise Security',
+                                        description: 'Bank-level encryption and security protocols protect your business negotiations.',
+                                        color: 'from-primary-600 to-accent-600'
+                                    },
+                                    {
+                                        icon: 'bolt',
+                                        title: 'Instant Processing',
+                                        description: 'High-performance systems deliver negotiation results and market analysis in real-time.',
+                                        color: 'from-accent-600 to-success-600'
+                                    },
+                                    {
+                                        icon: 'trophy',
+                                        title: 'Superior Results',
+                                        description: 'Proven track record of 25-40% better negotiation outcomes compared to traditional methods.',
+                                        color: 'from-success-600 to-primary-600'
+                                    }
+                                ].map((feature, index) => (
+                                    <motion.div
+                                        key={index}
+                                        className="professional-card rounded-xl p-8 hover:bg-white/10 transition-all duration-300 border-l-4 border-l-primary-500"
+                                        initial={{ opacity: 0, y: 30 }}
+                                        whileInView={{ opacity: 1, y: 0 }}
+                                        viewport={{ once: true }}
+                                        transition={{ delay: index * 0.1 }}
+                                        whileHover={{ scale: 1.02 }}
+                                    >
+                                        <div className={`w-14 h-14 bg-gradient-to-r ${feature.color} rounded-lg flex items-center justify-center mb-6 shadow-lg`}>
+                                            <Icon name={feature.icon} className="w-7 h-7 text-white" />
+                                        </div>
+                                        <h3 className="text-xl font-semibold text-white mb-4">{feature.title}</h3>
+                                        <p className="text-secondary-300 leading-relaxed">{feature.description}</p>
+                                    </motion.div>
+                                ))}
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* CTA Section */}
+                    <section className="py-20 px-4">
+                        <div className="max-w-4xl mx-auto text-center">
+                            <motion.div
+                                className="glass-effect rounded-3xl p-12 bg-gradient-to-r from-primary-600/20 to-accent-600/20"
+                                initial={{ opacity: 0, y: 30 }}
+                                whileInView={{ opacity: 1, y: 0 }}
+                                viewport={{ once: true }}
+                            >
+                                <h2 className="text-4xl md:text-5xl font-bold gradient-text mb-6">
+                                    Ready to Transform Your Negotiations?
+                                </h2>
+                                <p className="text-xl text-gray-300 mb-8">
+                                    Join thousands of users who are already getting better deals with AI
+                                </p>
+                                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                                    <motion.button
+                                        onClick={() => handleGetStarted('buyer')}
+                                        className="px-8 py-4 bg-gradient-to-r from-primary-600 to-accent-600 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                    >
+                                        Get Started Free
+                                    </motion.button>
+                                </div>
+                            </motion.div>
+                        </div>
+                    </section>
+
+                    {/* Footer */}
+                    <footer className="py-12 px-4 border-t border-white/10">
+                        <div className="max-w-7xl mx-auto text-center">
+                            <div className="flex items-center justify-center gap-2 mb-4">
+                                <div className="w-8 h-8 bg-gradient-to-r from-primary-500 to-accent-500 rounded-lg flex items-center justify-center">
+                                    <Icon name="robot" className="w-4 h-4 text-white" />
+                                </div>
+                                <span className="text-xl font-bold gradient-text">NegotiBot AI</span>
+                            </div>
+                            <p className="text-gray-400 text-sm">
+                                © 2024 NegotiBot AI. All rights reserved. Powered by advanced AI technology.
+                            </p>
+                        </div>
+                    </footer>
+                </div>
+            );
+        };
+
+        // Unified Auth Component
+        const UnifiedAuth = ({ onAuthSuccess, userType = 'buyer' }) => {
+            const [isLogin, setIsLogin] = useState(true);
+            const [showPassword, setShowPassword] = useState(false);
+            const [isLoading, setIsLoading] = useState(false);
+            const [formData, setFormData] = useState({
+                name: '',
+                email: '',
+                phone: '',
+                password: '',
+                confirmPassword: '',
+                userType: userType
+            });
+
+            const handleInputChange = (e) => {
+                setFormData(prev => ({
+                    ...prev,
+                    [e.target.name]: e.target.value
+                }));
+            };
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setIsLoading(true);
+
+                try {
+                    // Client-side validation
+                    if (!formData.email || !formData.password) {
+                        alert('Please fill in all required fields');
+                        return;
+                    }
+
+                    if (!isLogin) {
+                        if (!formData.name || !formData.phone) {
+                            alert('Please fill in all required fields (Name and Phone are required for registration)');
+                            return;
+                        }
+                        if (formData.password !== formData.confirmPassword) {
+                            alert('Passwords do not match');
+                            return;
+                        }
+                        if (formData.phone.length < 10) {
+                            alert('Please enter a valid phone number (at least 10 digits)');
+                            return;
+                        }
+                    }
+
+                    // Use relative URLs since we'll serve from the same backend
+                    const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
+                    
+                    // Fix: Use correct field names for backend API
+                    const payload = isLogin 
+                        ? { 
+                            username: formData.email, 
+                            password: formData.password, 
+                            role: formData.userType 
+                        }
+                        : { 
+                            username: formData.email, // Using email as username
+                            email: formData.email,
+                            full_name: formData.name, 
+                            phone: formData.phone || '1234567890', // Use provided phone or default
+                            password: formData.password,
+                            role: formData.userType
+                        };
+
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok && data.success && data.user) {
+                        console.log('Authentication successful:', data);
+                        console.log('User data:', data.user);
+                        console.log('User role:', data.user.role);
+                        onAuthSuccess(data.user, data.token, data.session_id);
+                    } else {
+                        // Handle different types of errors with user-friendly messages
+                        let errorMessage = 'Authentication failed';
+                        let detailsMessage = '';
+                        
+                        if (data && typeof data === 'object') {
+                            if (data.message) {
+                                errorMessage = data.message;
+                            }
+                            
+                            if (data.errors && Array.isArray(data.errors)) {
+                                detailsMessage = '\n\nPlease fix the following:\n• ' + data.errors.join('\n• ');
+                            }
+                            
+                            if (data.hint) {
+                                detailsMessage += '\n\n💡 ' + data.hint;
+                            }
+                        } else if (typeof data === 'string') {
+                            errorMessage = data;
+                        }
+                        
+                        // Show user-friendly error in a better format
+                        const fullMessage = errorMessage + detailsMessage;
+                        alert(fullMessage);
+                        console.error('Authentication response:', data);
+                    }
+                } catch (error) {
+                    console.error('Auth error:', error);
+                    
+                    // More specific network error messages
+                    let errorMessage = 'Connection failed. Please check your internet connection and try again.';
+                    
+                    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                        errorMessage = 'Unable to connect to the backend server. Please ensure the server is running on port 8000.';
+                    } else if (error.message.includes('timeout')) {
+                        errorMessage = 'Request timed out. Please try again.';
+                    } else if (error.message.includes('ERR_BLOCKED_BY_CLIENT')) {
+                        errorMessage = 'Request blocked by browser or ad blocker. Please disable ad blockers and try again.';
+                    }
+                    
+                    // Also show the actual error for debugging
+                    alert(errorMessage + '\n\nDebug info: ' + error.message);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            const userTypeConfig = {
+                buyer: {
+                    title: 'Buyer Portal',
+                    subtitle: 'Smart AI-powered negotiation for better deals',
+                    icon: 'shopping-cart',
+                    gradient: 'from-primary-600 to-accent-600'
+                },
+                seller: {
+                    title: 'Seller Portal',
+                    subtitle: 'Manage negotiations and connect with buyers',
+                    icon: 'store',
+                    gradient: 'from-accent-600 to-primary-600'
+                }
+            };
+
+            const config = userTypeConfig[userType];
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-secondary-950 via-secondary-900 to-primary-950 flex items-center justify-center p-4">
+                    <div className="w-full max-w-md">
+                        <motion.div 
+                            initial={{ opacity: 0, y: -20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="text-center mb-8"
+                        >
+                            <div className={`w-20 h-20 bg-gradient-to-br ${config.gradient} rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-2xl`}>
+                                <Icon name={config.icon} className="w-10 h-10 text-white" />
+                            </div>
+                            <h1 className="text-3xl font-bold gradient-text mb-2">
+                                {config.title}
+                            </h1>
+                            <p className="text-gray-400 text-sm">{config.subtitle}</p>
+                        </motion.div>
+
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="glass-effect rounded-2xl shadow-2xl overflow-hidden"
+                        >
+                            <div className="flex border-b border-white/10">
+                                <button
+                                    onClick={() => setIsLogin(true)}
+                                    className={`flex-1 px-6 py-4 text-sm font-semibold transition-all duration-300 ${
+                                        isLogin ? 'bg-gradient-to-r from-primary-600 to-accent-600 text-white' : 'text-gray-400 hover:text-white'
+                                    }`}
+                                >
+                                    Sign In
+                                </button>
+                                <button
+                                    onClick={() => setIsLogin(false)}
+                                    className={`flex-1 px-6 py-4 text-sm font-semibold transition-all duration-300 ${
+                                        !isLogin ? 'bg-gradient-to-r from-primary-600 to-accent-600 text-white' : 'text-gray-400 hover:text-white'
+                                    }`}
+                                >
+                                    Sign Up
+                                </button>
+                            </div>
+
+                            <div className="p-8">
+                                <form onSubmit={handleSubmit} className="space-y-6">
+                                    {!isLogin && (
+                                        <input
+                                            type="text"
+                                            name="name"
+                                            value={formData.name}
+                                            onChange={handleInputChange}
+                                            placeholder="Full Name"
+                                            required={!isLogin}
+                                            className="w-full px-4 py-4 bg-secondary-800/70 border border-primary-600/30 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-white placeholder-gray-400 backdrop-blur-sm transition-all duration-300"
+                                        />
+                                    )}
+
+                                    <input
+                                        type="email"
+                                        name="email"
+                                        value={formData.email}
+                                        onChange={handleInputChange}
+                                        placeholder="Email Address"
+                                        required
+                                        className="w-full px-4 py-4 bg-secondary-800/70 border border-primary-600/30 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-white placeholder-gray-400 backdrop-blur-sm transition-all duration-300"
+                                    />
+
+                                    {!isLogin && (
+                                        <input
+                                            type="tel"
+                                            name="phone"
+                                            value={formData.phone}
+                                            onChange={handleInputChange}
+                                            placeholder="Phone Number"
+                                            required={!isLogin}
+                                            className="w-full px-4 py-4 bg-secondary-800/70 border border-primary-600/30 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-white placeholder-gray-400 backdrop-blur-sm transition-all duration-300"
+                                        />
+                                    )}
+
+                                    <div className="relative">
+                                        <input
+                                            type={showPassword ? 'text' : 'password'}
+                                            name="password"
+                                            value={formData.password}
+                                            onChange={handleInputChange}
+                                            placeholder="Password"
+                                            required
+                                            className="w-full px-4 py-4 pr-12 bg-secondary-800/70 border border-primary-600/30 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-white placeholder-gray-400 backdrop-blur-sm transition-all duration-300"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white transition-colors duration-200"
+                                        >
+                                            {showPassword ? (
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                                                </svg>
+                                            ) : (
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.543 7-1.274 4.057-5.064 7-9.543 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                </svg>
+                                            )}
+                                        </button>
+                                    </div>
+
+                                    {!isLogin && (
+                                        <div className="relative">
+                                            <input
+                                                type={showPassword ? 'text' : 'password'}
+                                                name="confirmPassword"
+                                                value={formData.confirmPassword}
+                                                onChange={handleInputChange}
+                                                placeholder="Confirm Password"
+                                                required={!isLogin}
+                                                className="w-full px-4 py-4 pr-12 bg-secondary-800/70 border border-primary-600/30 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-white placeholder-gray-400 backdrop-blur-sm transition-all duration-300"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowPassword(!showPassword)}
+                                                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-white transition-colors duration-200"
+                                            >
+                                                {showPassword ? (
+                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                                                    </svg>
+                                                ) : (
+                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.543 7-1.274 4.057-5.064 7-9.543 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                    </svg>
+                                                )}
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    <motion.button
+                                        type="submit"
+                                        disabled={isLoading}
+                                        className={`w-full px-6 py-4 bg-gradient-to-r ${config.gradient} text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 ${
+                                            isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02]'
+                                        }`}
+                                        whileTap={{ scale: 0.98 }}
+                                    >
+                                        {isLoading ? 'Processing...' : (isLogin ? 'Sign In' : 'Create Account')}
+                                    </motion.button>
+                                </form>
+                            </div>
+                        </motion.div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Render the app using React 18's createRoot API
+        const root = createRoot(document.getElementById('root'));
+        root.render(<LandingPage />);
+    </script>
+</body>
+</html>

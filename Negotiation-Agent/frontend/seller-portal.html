@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seller Portal - NegotiBot AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind Config -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        },
+                        secondary: {
+                            50: '#f8fafc',
+                            100: '#f1f5f9',
+                            200: '#e2e8f0',
+                            300: '#cbd5e1',
+                            400: '#94a3b8',
+                            500: '#64748b',
+                            600: '#475569',
+                            700: '#334155',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                        },
+                        accent: {
+                            50: '#ecfeff',
+                            100: '#cffafe',
+                            200: '#a5f3fc',
+                            300: '#67e8f9',
+                            400: '#22d3ee',
+                            500: '#06b6d4',
+                            600: '#0891b2',
+                            700: '#0e7490',
+                            800: '#155e75',
+                            900: '#164e63',
+                        },
+                        success: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            200: '#bbf7d0',
+                            300: '#86efac',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            800: '#166534',
+                            900: '#14532d',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    animation: {
+                        'gradient-x': 'gradient-x 15s ease infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        'gradient-x': {
+                            '0%, 100%': {
+                                'background-size': '200% 200%',
+                                'background-position': 'left center'
+                            },
+                            '50%': {
+                                'background-size': '200% 200%',
+                                'background-position': 'right center'
+                            },
+                        },
+                        'float': {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-20px)' },
+                        },
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        
+        html, body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        
+        #root {
+            min-height: 100vh;
+            width: 100%;
+        }
+        
+        .glass-effect {
+            backdrop-filter: blur(16px) saturate(180%);
+            background-color: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        
+        .glass-dark {
+            backdrop-filter: blur(20px) saturate(180%);
+            background-color: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(100, 116, 139, 0.2);
+        }
+        
+        .gradient-text {
+            background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 50%, #22c55e 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .bg-gradient-animated {
+            background: linear-gradient(-45deg, #0ea5e9, #06b6d4, #22c55e, #0284c7);
+            background-size: 400% 400%;
+            animation: gradient-x 15s ease infinite;
+        }
+        
+        .professional-card {
+            background: linear-gradient(135deg, rgba(14, 165, 233, 0.1) 0%, rgba(6, 182, 212, 0.05) 100%);
+            border: 1px solid rgba(14, 165, 233, 0.2);
+        }
+        
+        .neo-card {
+            background: linear-gradient(145deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        .sidebar-gradient {
+            background: linear-gradient(180deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+        }
+        
+        .chat-gradient {
+            background: linear-gradient(135deg, rgba(248, 250, 252, 0.05) 0%, rgba(241, 245, 249, 0.1) 100%);
+        }
+        
+        .btn-gradient {
+            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+            box-shadow: 0 4px 15px rgba(14, 165, 233, 0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-gradient:hover {
+            background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+            box-shadow: 0 8px 25px rgba(14, 165, 233, 0.4);
+            transform: translateY(-2px);
+        }
+        
+        .metric-card {
+            background: linear-gradient(135deg, rgba(6, 182, 212, 0.1) 0%, rgba(34, 211, 238, 0.05) 100%);
+            border: 1px solid rgba(6, 182, 212, 0.2);
+            backdrop-filter: blur(8px);
+        }
+        
+        /* Glass Morphism Effects */
+        .glass-card {
+            backdrop-filter: blur(20px) saturate(180%);
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+        }
+
+        .glass-header {
+            backdrop-filter: blur(20px) saturate(180%);
+            background: rgba(0, 0, 0, 0.3);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Modern Button Styles */
+        .btn-gradient {
+            background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
+            border: none;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-gradient:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(14, 165, 233, 0.4);
+        }
+
+        .btn-gradient::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .btn-gradient:hover::before {
+            left: 100%;
+        }
+
+        /* Chat Interface Styling */
+        .chat-container {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        /* Floating Animation */
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .float-animation {
+            animation: float 6s ease-in-out infinite;
+        }
+
+        /* Glow Effects */
+        .glow-text {
+            text-shadow: 0 0 10px rgba(14, 165, 233, 0.5);
+        }
+
+        .status-indicator {
+            position: relative;
+            display: inline-block;
+        }
+
+        .status-indicator::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-connected::after {
+            background: rgba(34, 197, 94, 0.4);
+        }
+
+        .status-disconnected::after {
+            background: rgba(239, 68, 68, 0.4);
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Input Styling */
+        .modern-input {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            color: white;
+            transition: all 0.3s ease;
+        }
+
+        .modern-input:focus {
+            border-color: #0ea5e9;
+            box-shadow: 0 0 20px rgba(14, 165, 233, 0.3);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .modern-input::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        /* Message Bubbles */
+        .message-bubble-seller {
+            background: linear-gradient(135deg, #0ea5e9, #06b6d4);
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .message-bubble-buyer {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            color: white;
+        }
+
+        .message-bubble-system {
+            background: rgba(59, 130, 246, 0.2);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            color: #60a5fa;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        @keyframes shimmer {
+            0% { background-position: -200px 0; }
+            100% { background-position: calc(200px + 100%) 0; }
+        }
+
+        @keyframes gradient-x {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+        
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-secondary-900 via-secondary-800 to-primary-900 min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // API Service
+        const API_BASE = '';
+
+        const apiService = {
+            register: async (userData) => {
+                const response = await fetch(`${API_BASE}/api/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(userData)
+                });
+                return response.json();
+            },
+            
+            login: async (credentials) => {
+                console.log('Login request payload:', credentials);
+                const response = await fetch(`${API_BASE}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(credentials)
+                });
+                
+                const result = await response.json();
+                console.log('Login response:', result);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${JSON.stringify(result)}`);
+                }
+                
+                return result;
+            },
+            
+            logout: async (sessionId) => {
+                const response = await fetch(`${API_BASE}/api/auth/logout`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: sessionId })
+                });
+                return response.json();
+            },
+            
+            getProfile: async (token) => {
+                const response = await fetch(`${API_BASE}/api/auth/profile`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                return response.json();
+            },
+            
+            updateProfile: async (token, profileData) => {
+                const response = await fetch(`${API_BASE}/api/auth/profile`, {
+                    method: 'PUT',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}` 
+                    },
+                    body: JSON.stringify(profileData)
+                });
+                return response.json();
+            }
+        };
+
+        // Session Chat Interface Component
+        const SessionChatInterface = () => {
+            const [sessionId, setSessionId] = useState('');
+            const [connected, setConnected] = useState(false);
+            const [messages, setMessages] = useState([]);
+            const [currentMessage, setCurrentMessage] = useState('');
+            const [ws, setWs] = useState(null);
+            const [connectionStatus, setConnectionStatus] = useState('disconnected');
+            const [sessionDetails, setSessionDetails] = useState(null);
+            const [loadingDetails, setLoadingDetails] = useState(false);
+
+            const loadSessionDetails = async (sessionId) => {
+                setLoadingDetails(true);
+                try {
+                    const response = await fetch(`/api/session/${sessionId}/details`);
+                    if (response.ok) {
+                        const details = await response.json();
+                        setSessionDetails(details);
+                        console.log('Session details loaded:', details);
+                    } else {
+                        console.error('Failed to load session details');
+                        setSessionDetails(null);
+                    }
+                } catch (error) {
+                    console.error('Error loading session details:', error);
+                    setSessionDetails(null);
+                } finally {
+                    setLoadingDetails(false);
+                }
+            };
+
+            const connectToSession = () => {
+                if (!sessionId.trim()) {
+                    alert('Please enter a valid session ID');
+                    return;
+                }
+
+                try {
+                    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                    const wsUrl = `${protocol}//${window.location.host}/ws/seller/${sessionId}`;
+                    console.log('Connecting to WebSocket:', wsUrl);
+                    const websocket = new WebSocket(wsUrl);
+                    
+                    websocket.onopen = () => {
+                        setConnected(true);
+                        setConnectionStatus('connected');
+                        setWs(websocket);
+                        setMessages(prev => [...prev, {
+                            type: 'system',
+                            content: `Connected to session ${sessionId}`,
+                            timestamp: new Date().toLocaleTimeString()
+                        }]);
+                        loadSessionDetails(sessionId);
+                    };
+
+                    websocket.onmessage = (event) => {
+                        const data = JSON.parse(event.data);
+                        setMessages(prev => [...prev, {
+                            type: data.type || 'buyer',
+                            sender: data.sender || 'Buyer',
+                            content: data.message || data.content,
+                            timestamp: new Date().toLocaleTimeString()
+                        }]);
+                    };
+
+                    websocket.onclose = () => {
+                        setConnected(false);
+                        setConnectionStatus('disconnected');
+                        setMessages(prev => [...prev, {
+                            type: 'system',
+                            content: 'Disconnected from session',
+                            timestamp: new Date().toLocaleTimeString()
+                        }]);
+                    };
+
+                    websocket.onerror = (error) => {
+                        console.error('WebSocket error:', error);
+                        console.error('WebSocket URL was:', wsUrl);
+                        console.error('Session ID:', sessionId);
+                        setConnectionStatus('error');
+                        setMessages(prev => [...prev, {
+                            type: 'system',
+                            content: `Connection error. Check console for details. URL: ${wsUrl}`,
+                            timestamp: new Date().toLocaleTimeString()
+                        }]);
+                    };
+
+                } catch (error) {
+                    console.error('Failed to connect:', error);
+                    alert('Failed to connect to session. Please check the session ID.');
+                }
+            };
+
+            const disconnectFromSession = () => {
+                if (ws) {
+                    ws.close();
+                    setWs(null);
+                }
+                setConnected(false);
+                setConnectionStatus('disconnected');
+                setMessages([]);
+            };
+
+            const sendMessage = () => {
+                if (!currentMessage.trim() || !ws || !connected) return;
+
+                const messageData = {
+                    type: 'message',
+                    sender: 'seller',
+                    content: currentMessage,
+                    timestamp: new Date().toISOString()
+                };
+
+                ws.send(JSON.stringify(messageData));
+                setMessages(prev => [...prev, {
+                    type: 'seller',
+                    sender: 'You',
+                    content: currentMessage,
+                    timestamp: new Date().toLocaleTimeString()
+                }]);
+                setCurrentMessage('');
+            };
+
+            const handleKeyPress = (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            };
+
+            return (
+                <div className="space-y-4">
+                    {/* Connection Controls */}
+                    <div className="flex gap-4 mb-6">
+                        <div className="flex-1">
+                            <input
+                                type="text"
+                                placeholder="Enter Session ID (e.g., abc123-def456-ghi789)"
+                                value={sessionId}
+                                onChange={(e) => setSessionId(e.target.value)}
+                                className="w-full px-4 py-3 modern-input rounded-xl focus:outline-none"
+                                disabled={connected}
+                            />
+                        </div>
+                        {!connected ? (
+                            <button
+                                onClick={connectToSession}
+                                className="px-8 py-3 btn-gradient text-white rounded-xl font-semibold flex items-center gap-2 hover:scale-105 transition-transform"
+                            >
+                                <i className="fas fa-plug"></i>
+                                Connect
+                            </button>
+                        ) : (
+                            <button
+                                onClick={disconnectFromSession}
+                                className="px-8 py-3 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl font-semibold flex items-center gap-2 hover:scale-105 transition-transform"
+                            >
+                                <i className="fas fa-times"></i>
+                                Disconnect
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Connection Status */}
+                    <div className="flex items-center space-x-3 mb-6">
+                        <div className={`w-4 h-4 rounded-full status-indicator ${
+                            connectionStatus === 'connected' ? 'bg-green-500 status-connected' :
+                            connectionStatus === 'error' ? 'bg-red-500 status-disconnected' : 
+                            'bg-gray-400 status-disconnected'
+                        }`}></div>
+                        <span className="text-white font-medium">
+                            {connectionStatus === 'connected' ? '🟢 Connected' :
+                             connectionStatus === 'error' ? '🔴 Connection Error' : '⚪ Not Connected'}
+                        </span>
+                    </div>
+
+                    {/* Chat Messages */}
+                    {connected && (
+                        <div className="space-y-4">
+                            <div className="h-80 chat-container rounded-2xl p-6 overflow-y-auto">
+                                {messages.length === 0 ? (
+                                    <div className="text-center py-16">
+                                        <div className="float-animation">
+                                            <i className="fas fa-comments text-6xl text-purple-300 mb-4"></i>
+                                        </div>
+                                        <p className="text-purple-200 text-lg">No messages yet. Start the conversation!</p>
+                                    </div>
+                                ) : (
+                                    messages.map((msg, index) => (
+                                        <div key={index} className={`mb-4 ${
+                                            msg.type === 'seller' ? 'text-right' : 'text-left'
+                                        }`}>
+                                            <div className={`inline-block max-w-xs lg:max-w-md px-4 py-3 rounded-2xl text-sm ${
+                                                msg.type === 'seller' 
+                                                    ? 'message-bubble-seller' 
+                                                    : msg.type === 'system'
+                                                    ? 'message-bubble-system'
+                                                    : 'message-bubble-buyer'
+                                            }`}>
+                                                <div className="font-semibold text-xs mb-2 opacity-80">
+                                                    {msg.sender} {msg.timestamp && `• ${msg.timestamp}`}
+                                                </div>
+                                                <div className="leading-relaxed">{msg.content}</div>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+
+                            {/* Message Input */}
+                            <div className="flex gap-3">
+                                <input
+                                    type="text"
+                                    placeholder="Type your message..."
+                                    value={currentMessage}
+                                    onChange={(e) => setCurrentMessage(e.target.value)}
+                                    onKeyPress={handleKeyPress}
+                                    className="flex-1 px-4 py-3 modern-input rounded-xl focus:outline-none"
+                                />
+                                <button
+                                    onClick={sendMessage}
+                                    disabled={!currentMessage.trim()}
+                                    className="px-6 py-3 btn-gradient text-white rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 transition-transform"
+                                >
+                                    <i className="fas fa-paper-plane"></i>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // Login Form Component
+        const LoginForm = ({ onLoginSuccess, onSwitchToRegister }) => {
+            const [formData, setFormData] = useState({ username: '', password: '' });
+            const [isLoading, setIsLoading] = useState(false);
+            const [error, setError] = useState('');
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setIsLoading(true);
+                setError('');
+
+                try {
+                    const result = await apiService.login(formData);
+                    
+                    if (result.success) {
+                        localStorage.setItem('access_token', result.access_token);
+                        localStorage.setItem('session_id', result.session_id);
+                        localStorage.setItem('user', JSON.stringify(result.user));
+                        onLoginSuccess(result.user);
+                    } else {
+                        setError(result.detail || 'Login failed');
+                    }
+                } catch (err) {
+                    setError(err.message || 'Login failed');
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-secondary-900 via-secondary-800 to-primary-900 relative overflow-hidden flex items-center justify-center">
+                    {/* Background Effects */}
+                    <div className="absolute inset-0 bg-gradient-animated opacity-15"></div>
+                    <div className="absolute inset-0">
+                        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
+                        <div className="absolute top-3/4 right-1/4 w-96 h-96 bg-cyan-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse delay-1000"></div>
+                        <div className="absolute bottom-1/4 left-1/2 w-96 h-96 bg-green-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse delay-2000"></div>
+                    </div>
+
+                    <div className="relative z-10 max-w-md w-full mx-4">
+                        <div className="glass-card rounded-3xl shadow-2xl p-8">
+                            <div className="text-center mb-8">
+                                <div className="w-20 h-20 bg-gradient-to-r from-purple-600 to-blue-600 rounded-3xl mx-auto mb-6 flex items-center justify-center shadow-2xl float-animation">
+                                    <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                    </svg>
+                                </div>
+                                <h2 className="text-4xl font-bold text-white glow-text mb-3">Seller Login</h2>
+                                <p className="text-purple-200 text-lg">Access your seller dashboard</p>
+                            </div>
+
+                            <form onSubmit={handleSubmit} className="space-y-6">
+                                {error && (
+                                    <div className="glass-card border-red-500/30 rounded-2xl p-4">
+                                        <p className="text-red-300 text-sm font-medium">{error}</p>
+                                    </div>
+                                )}
+
+                                <div>
+                                    <label className="block text-purple-200 text-sm font-semibold mb-3">Username</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={formData.username}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
+                                        className="w-full px-4 py-4 modern-input rounded-2xl focus:outline-none text-white placeholder-purple-300"
+                                        placeholder="Enter your username"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-purple-200 text-sm font-semibold mb-3">Password</label>
+                                    <input
+                                        type="password"
+                                        required
+                                        value={formData.password}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                                        className="w-full px-4 py-4 modern-input rounded-2xl focus:outline-none text-white placeholder-purple-300"
+                                        placeholder="Enter your password"
+                                    />
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    disabled={isLoading}
+                                    className="w-full btn-gradient text-white font-bold py-4 px-6 rounded-2xl hover:scale-105 transition-all disabled:opacity-50 shadow-2xl"
+                                >
+                                    {isLoading ? (
+                                        <span className="flex items-center justify-center">
+                                            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Signing In...
+                                        </span>
+                                    ) : (
+                                        'Sign In'
+                                    )}
+                                </button>
+                            </form>
+
+                            <div className="mt-8 text-center">
+                                <p className="text-purple-200">
+                                    Don't have an account?{' '}
+                                    <button 
+                                        onClick={onSwitchToRegister}
+                                        className="text-blue-300 hover:text-blue-200 font-semibold underline decoration-2 underline-offset-2 transition-colors"
+                                    >
+                                        Register here
+                                    </button>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Registration Form Component  
+        const RegistrationForm = ({ onRegistrationSuccess, onSwitchToLogin }) => {
+            const [formData, setFormData] = useState({
+                username: '',
+                email: '',
+                full_name: '',
+                password: '',
+                role: 'seller'
+            });
+            const [isLoading, setIsLoading] = useState(false);
+            const [error, setError] = useState('');
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setIsLoading(true);
+                setError('');
+
+                try {
+                    const result = await apiService.register(formData);
+                    
+                    if (result.success) {
+                        onRegistrationSuccess();
+                    } else {
+                        setError(result.detail || 'Registration failed');
+                    }
+                } catch (err) {
+                    setError(err.message || 'Registration failed');
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-secondary-900 via-secondary-800 to-primary-900 relative overflow-hidden flex items-center justify-center">
+                    {/* Background Effects */}
+                    <div className="absolute inset-0 bg-gradient-animated opacity-15"></div>
+                    <div className="absolute inset-0">
+                        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
+                        <div className="absolute top-3/4 right-1/4 w-96 h-96 bg-cyan-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse delay-1000"></div>
+                        <div className="absolute bottom-1/4 left-1/2 w-96 h-96 bg-green-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse delay-2000"></div>
+                    </div>
+
+                    <div className="relative z-10 max-w-md w-full mx-4">
+                        <div className="glass-card rounded-3xl shadow-2xl p-8">
+                            <div className="text-center mb-8">
+                                <div className="w-20 h-20 bg-gradient-to-r from-purple-600 to-blue-600 rounded-3xl mx-auto mb-6 flex items-center justify-center shadow-2xl float-animation">
+                                    <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 7a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V7z" />
+                                    </svg>
+                                </div>
+                                <h2 className="text-4xl font-bold text-white glow-text mb-3">Create Account</h2>
+                                <p className="text-purple-200 text-lg">Join as a seller</p>
+                            </div>
+
+                            <form onSubmit={handleSubmit} className="space-y-4">
+                                {error && (
+                                    <div className="glass-card border-red-500/30 rounded-2xl p-4">
+                                        <p className="text-red-300 text-sm font-medium">{error}</p>
+                                    </div>
+                                )}
+
+                                <div>
+                                    <label className="block text-purple-200 text-sm font-semibold mb-2">Full Name</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={formData.full_name}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, full_name: e.target.value }))}
+                                        className="w-full px-4 py-3 modern-input rounded-2xl focus:outline-none text-white placeholder-purple-300"
+                                        placeholder="Your full name"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-purple-200 text-sm font-semibold mb-2">Username</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={formData.username}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
+                                        className="w-full px-4 py-3 modern-input rounded-2xl focus:outline-none text-white placeholder-purple-300"
+                                        placeholder="Choose a username"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-purple-200 text-sm font-semibold mb-2">Email</label>
+                                    <input
+                                        type="email"
+                                        required
+                                        value={formData.email}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                                        className="w-full px-4 py-3 modern-input rounded-2xl focus:outline-none text-white placeholder-purple-300"
+                                        placeholder="your@email.com"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-purple-200 text-sm font-semibold mb-2">Password</label>
+                                    <input
+                                        type="password"
+                                        required
+                                        value={formData.password}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                                        className="w-full px-4 py-3 modern-input rounded-2xl focus:outline-none text-white placeholder-purple-300"
+                                        placeholder="Create a password"
+                                    />
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    disabled={isLoading}
+                                    className="w-full btn-gradient text-white font-bold py-4 px-6 rounded-2xl hover:scale-105 transition-all disabled:opacity-50 shadow-2xl"
+                                >
+                                    {isLoading ? 'Creating Account...' : 'Create Account'}
+                                </button>
+                            </form>
+
+                            <div className="mt-8 text-center">
+                                <p className="text-purple-200">
+                                    Already have an account?{' '}
+                                    <button 
+                                        onClick={onSwitchToLogin}
+                                        className="text-blue-300 hover:text-blue-200 font-semibold underline decoration-2 underline-offset-2 transition-colors"
+                                    >
+                                        Sign in here
+                                    </button>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Simplified Dashboard Component - Only Chat with Buyers and Welcome Message
+        const SellerDashboard = ({ user, onLogout }) => {
+            const handleLogout = async () => {
+                try {
+                    const sessionId = localStorage.getItem('session_id');
+                    if (sessionId) {
+                        await apiService.logout(sessionId);
+                    }
+                    localStorage.removeItem('access_token');
+                    localStorage.removeItem('session_id');
+                    localStorage.removeItem('user');
+                    localStorage.removeItem('negotibot_token');
+                    localStorage.removeItem('negotibot_user');
+                    
+                    // Redirect to landing page
+                    window.location.href = 'http://localhost:8000/';
+                } catch (err) {
+                    console.error('Logout error:', err);
+                    // Force logout and redirect even if API call fails
+                    localStorage.clear();
+                    window.location.href = 'http://localhost:8000/';
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-secondary-900 via-secondary-800 to-primary-900 relative overflow-hidden">
+                    {/* Background Effects */}
+                    <div className="absolute inset-0 bg-gradient-animated opacity-15"></div>
+                    <div className="absolute inset-0">
+                        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
+                        <div className="absolute top-3/4 right-1/4 w-96 h-96 bg-cyan-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse delay-1000"></div>
+                        <div className="absolute bottom-1/4 left-1/2 w-96 h-96 bg-green-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse delay-2000"></div>
+                    </div>
+
+                    {/* Header */}
+                    <header className="glass-header relative z-10">
+                        <div className="max-w-7xl mx-auto px-6 lg:px-8">
+                            <div className="flex justify-between items-center h-20">
+                                <div className="flex items-center">
+                                    <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl flex items-center justify-center mr-4 shadow-2xl">
+                                        <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                        </svg>
+                                    </div>
+                                    <h1 className="text-2xl font-bold text-white glow-text">Seller Dashboard</h1>
+                                </div>
+                                <div className="flex items-center space-x-6">
+                                    <div className="text-white">
+                                        <span className="text-purple-300 text-sm">Welcome,</span>
+                                        <span className="font-semibold ml-1">{user.full_name}</span>
+                                    </div>
+                                    <button
+                                        onClick={handleLogout}
+                                        className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-6 py-3 rounded-xl font-semibold transition-all hover:scale-105 shadow-lg"
+                                    >
+                                        <i className="fas fa-sign-out-alt mr-2"></i>
+                                        Logout
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-8 py-12">
+                        <div className="space-y-12">
+                            {/* Chat with Buyers Section */}
+                            <div className="glass-card rounded-3xl p-8 shadow-2xl">
+                                <div className="flex items-center mb-6">
+                                    <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mr-4">
+                                        <i className="fas fa-comments text-white text-xl"></i>
+                                    </div>
+                                    <h3 className="text-2xl font-bold text-white">Chat with Buyers</h3>
+                                </div>
+                                <p className="text-purple-200 mb-8 text-lg leading-relaxed">
+                                    Enter a session ID to communicate directly with buyers negotiating for your products.
+                                </p>
+                                
+                                <SessionChatInterface />
+                            </div>
+
+                            {/* Welcome Section */}
+                            <div className="glass-card rounded-3xl p-8 shadow-2xl">
+                                <div className="flex items-center mb-6">
+                                    <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-blue-500 rounded-2xl flex items-center justify-center mr-4">
+                                        <i className="fas fa-star text-white text-xl"></i>
+                                    </div>
+                                    <h3 className="text-2xl font-bold text-white glow-text">Welcome to Your Seller Dashboard!</h3>
+                                </div>
+                                <p className="text-purple-200 mb-8 text-lg leading-relaxed">
+                                    This is your control center for managing your products and negotiations with NegotiBot AI.
+                                </p>
+                                <div className="glass-card rounded-2xl p-6 border-blue-500/20">
+                                    <div className="flex items-start">
+                                        <div className="flex-shrink-0 mr-4">
+                                            <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
+                                                <i className="fas fa-lightbulb text-blue-400 text-lg"></i>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <h4 className="text-lg font-semibold text-blue-300 mb-2">Getting Started</h4>
+                                            <p className="text-blue-200">
+                                                Use the session ID provided by buyers to chat and negotiate directly! 
+                                                Connect with your customers in real-time and close more deals with AI-powered assistance.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Main App Component
+        const SellerPortalApp = () => {
+            const [currentView, setCurrentView] = useState('login'); // 'login', 'register', 'dashboard'
+            const [currentUser, setCurrentUser] = useState(null);
+
+            useEffect(() => {
+                // Check if user is already logged in - check both possible key formats
+                let token = localStorage.getItem('access_token') || localStorage.getItem('negotibot_token');
+                let userData = localStorage.getItem('user') || localStorage.getItem('negotibot_user');
+                
+                if (token && userData) {
+                    try {
+                        const user = JSON.parse(userData);
+                        // If user is a seller, show dashboard directly
+                        if (user && user.role === 'seller') {
+                            setCurrentUser(user);
+                            setCurrentView('dashboard');
+                        }
+                    } catch (e) {
+                        localStorage.clear();
+                    }
+                }
+            }, []);
+
+            const handleLoginSuccess = (user) => {
+                setCurrentUser(user);
+                setCurrentView('dashboard');
+            };
+
+            const handleRegistrationSuccess = () => {
+                setCurrentView('login');
+                // Could show success message here
+            };
+
+            const handleLogout = () => {
+                setCurrentUser(null);
+                setCurrentView('login');
+            };
+
+            if (currentView === 'dashboard' && currentUser) {
+                return <SellerDashboard user={currentUser} onLogout={handleLogout} />;
+            }
+
+            if (currentView === 'register') {
+                return (
+                    <RegistrationForm
+                        onRegistrationSuccess={handleRegistrationSuccess}
+                        onSwitchToLogin={() => setCurrentView('login')}
+                    />
+                );
+            }
+
+            return (
+                <LoginForm
+                    onLoginSuccess={handleLoginSuccess}
+                    onSwitchToRegister={() => setCurrentView('register')}
+                />
+            );
+        };
+
+        // Render the app
+        ReactDOM.render(<SellerPortalApp />, document.getElementById('root'));
+    </script>
+</body>
+</html>
