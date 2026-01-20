@@ -37,6 +37,22 @@
 </p>
 
 ---
+## 🚀 Quickstart (Local Development)
+
+### Requirements
+- Python >= 3.12
+- pip
+- virtualenv
+
+### Setup
+
+```bash
+git clone https://github.com/getbindu/bindu
+cd bindu
+python3.12 -m venv venv
+source venv/bin/activate
+pip install .
+
 
 **Bindu** (read: _binduu_) is an operating layer for AI agents that provides identity, communication, and payment capabilities. It delivers a production-ready service with a convenient API to connect, authenticate, and orchestrate agents across distributed systems using open protocols: **A2A**, **AP2**, and **X402**.
 
