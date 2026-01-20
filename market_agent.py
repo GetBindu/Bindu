@@ -81,7 +81,7 @@ config = {
     "name": "market_analyst_agent",
     "description": "A verified node for real-time financial market analysis.",
     "deployment": {"url": "http://localhost:3773", "expose": True},
-    "skills": ["skills/market_skill.yaml"] 
+    "skills": ["skills/market-analysis"] 
 }
 
 if __name__ == "__main__":
