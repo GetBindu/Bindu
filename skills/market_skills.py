@@ -1,5 +1,5 @@
 import yfinance as yf
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 from datetime import datetime
 
 class MarketSkills:
@@ -26,47 +26,40 @@ class MarketSkills:
         "NETFLIX": "NFLX",
         "RELIANCE": "RELIANCE.NS",
         "TATA": "TATAMOTORS.NS",
-        "ZOMATO": "ZOMATO.NS"
+        "TATA ELXSI": "TATAELXSI.NS",
+        "TATAELXSI": "TATAELXSI.NS",
+        "INFOSYS": "INFY.NS",
+        "WIPRO": "WIPRO.NS",
+        "ZOMATO": "ZOMATO.NS",
+        "HDFC": "HDFCBANK.NS"
     }
 
     def find_ticker(self, query: str) -> str:
         """
         Attempts to resolve a company name to a stock ticker.
-        Strategies:
-        1. Check the local cache (COMMON_TICKERS).
-        2. Check if it looks like a ticker already (e.g. "INFY").
-        3. Use DuckDuckGo to search for it.
         """
         clean_query = query.strip().upper()
 
-        # Strategy 1: Fast Lookup
         if clean_query in self.COMMON_TICKERS:
             return self.COMMON_TICKERS[clean_query]
 
-        # Strategy 2: Is it already a ticker? (Heuristic: Short, no spaces)
+        # Check if it looks like a ticker already (e.g. "INFY")
         if len(clean_query) <= 5 and " " not in clean_query:
-             # We assume it's valid if it looks like one. Verification happens during fetch.
              return clean_query
 
-        # Strategy 3: Search the web
         print(f"Unknown symbol '{query}'. Identifying via DuckDuckGo...")
         
         try:
-            # We search for "ticker symbol for <name>" to get high-relevance results
             search_query = f"ticker symbol for {query}"
             results = DDGS().text(search_query, max_results=3)
+            print(f"DEBUG: Search Results for '{search_query}': {results}")
             
             for res in results:
                 href = res.get('href', '')
-                
-                # Check for trustworthy financial domains
                 if "finance.yahoo.com/quote/" in href:
-                    # Parse URL structure: .../quote/SYMBOL/...
                     return href.split("finance.yahoo.com/quote/")[1].split("/")[0].split("?")[0]
-                
                 if "marketwatch.com/investing/stock/" in href:
                      return href.split("marketwatch.com/investing/stock/")[1].split("?")[0].upper()
-
                 if "google.com/finance/quote/" in href:
                      return href.split("google.com/finance/quote/")[1].split(":")[0] 
 
@@ -80,14 +73,11 @@ class MarketSkills:
         except Exception as e:
             print(f"⚠️ Search warning: Could not resolve '{query}' via web. Error: {e}")
         
-        # If all else fails, return the original query. 
-        # yfinance might still be able to find it if we got lucky.
         return clean_query
 
     def get_financial_summary(self, user_query: str):
         """
         The main public method. 
-        Orchestrates the entire analysis pipeline.
         """
         # 1. Resolve to a unified ticker symbol
         ticker_symbol = self.find_ticker(user_query)
@@ -102,38 +92,49 @@ class MarketSkills:
         }
 
         # 2. Fetch Live Market Data
-        # We try 'fast_info' first as it's optimized for recent prices.
         try:
-            def safe_get(key, default=0.0):
-                 return stock.fast_info.get(key, default) if hasattr(stock, 'fast_info') else default
-
-            price = safe_get('last_price')
+            print(f"DEBUG: Fetching history for {ticker_symbol}...")
+            hist_recent = stock.history(period="5d")
+            print(f"DEBUG: History Shape: {hist_recent.shape}")
             
-            # If fast_info failed (value is 0), fall back to standard metadata
-            if price == 0.0:
-                 price = stock.info.get('currentPrice', stock.info.get('regularMarketPrice', 0.0))
+            # RETRY LOGIC: If empty, try appending .NS (common issue for Indian stocks)
+            if hist_recent.empty and "." not in ticker_symbol:
+                 print(f"DEBUG: Data empty. Applying '.NS' suffix and retrying...")
+                 ticker_symbol = f"{ticker_symbol}.NS"
+                 summary["symbol"] = ticker_symbol # Update summary symbol
+                 stock = yf.Ticker(ticker_symbol)
+                 hist_recent = stock.history(period="5d")
+                 print(f"DEBUG: Retry History Shape: {hist_recent.shape}")
             
-            prev_close = safe_get('previous_close')
-            if prev_close == 0.0:
-                prev_close = stock.info.get('previousClose', 1.0) # Avoid div by zero
+            if not hist_recent.empty:
+                current_price = hist_recent['Close'].iloc[-1]
+                if len(hist_recent) >= 2:
+                    prev_close = hist_recent['Close'].iloc[-2]
+                else:
+                    prev_close = stock.info.get('previousClose', current_price)
 
-            if prev_close and price:
-                change_pct = ((price - prev_close) / prev_close) * 100
+                change_pct = ((current_price - prev_close) / prev_close) * 100
+                currency = stock.info.get('currency', 'USD')
+            
             else:
-                change_pct = 0.0
-            
-            # Populate basic info
-            summary["price"] = round(price, 2)
+                 # Fallback to .info
+                 print("DEBUG: History failed. Using fast_info/info fallback.")
+                 current_price = stock.info.get('currentPrice', stock.info.get('regularMarketPrice', 0.0))
+                 prev_close = stock.info.get('previousClose', current_price)
+                 change_pct = 0.0
+                 currency = stock.info.get('currency', 'USD')
+
+            summary["price"] = round(current_price, 2)
             summary["change_percent"] = round(change_pct, 2)
-            summary["currency"] = stock.info.get('currency', 'USD')
+            summary["currency"] = currency
             
         except Exception as e:
-            # If we can't get a price, the ticker is likely invalid/delisted.
+            print(f"Error fetching data: {e}")
             return {"error": f"I couldn't find market data for '{ticker_symbol}'. It might be delisted or misspelled."}
 
         # 3. Fetch Fundamental Data (Deep Dive)
-        # Note: This network call is heavier.
         try:
+             # Force a refresh of info
             info = stock.info
             summary["fundamentals"] = {
                 "market_cap": self._format_large_number(info.get("marketCap")),
@@ -142,7 +143,7 @@ class MarketSkills:
                 "long_name": info.get("longName", ticker_symbol)
             }
         except:
-             summary["fundamentals"] = {} # Graceful degradation
+             summary["fundamentals"] = {}
 
         # 4. Technical Indicator (Simple Moving Average)
         try:
@@ -162,11 +163,25 @@ class MarketSkills:
         except:
             summary["technicals"] = {"trend": "Analysis failed"}
 
-        # 5. News Sentiment
+        # 5. News Sentiment (Powered by DuckDuckGo News)
         try:
-            news = stock.news[:3] if stock.news else []
-            summary["news"] = news
-        except:
+            # We search for the company name instead of ticker for better news relevance
+            news_query = f"{stock.info.get('longName', user_query)} stock news"
+            print(f"DEBUG: Fetching news for query: '{news_query}'")
+            # Use positional argument as validated by debug script
+            news_results = DDGS().news(news_query, max_results=3)
+            print(f"DEBUG: Raw News Results: {news_results}")
+            
+            clean_news = []
+            for item in news_results:
+                clean_news.append({
+                    "title": item.get('title'),
+                    "link": item.get('url'), # DDGS uses 'url', not 'link'
+                    "publisher": item.get('source')
+                })
+            summary["news"] = clean_news
+        except Exception as e:
+            print(f"Error fetching news: {e}")
             summary["news"] = []
 
         return summary
