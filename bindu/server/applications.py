@@ -178,7 +178,7 @@ class BinduApplication(Starlette):
             ["HEAD", "GET", "OPTIONS"],
             with_app=True,
         )
-        self._add_route("/", agent_run_endpoint, ["POST"], with_app=True)
+        self._add_route("/", agent_run_endpoint, ["GET", "POST"], with_app=True)
 
         # DID endpoints
         self._add_route(
