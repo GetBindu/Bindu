@@ -1,67 +1,51 @@
-# 📉 Autonomous Financial Analyst Agent
+# Financial Analyst Agent - Walkthrough
 
-A resilient, zero-cost **Financial Intelligence Node** built for the Bindu ecosystem. This agent provides real-time stock analysis (Price, Fundamentals, News, Technique) using a novel **Zero-API-Key Architecture**.
+You have successfully built a **Financial Intelligence Node** for the Bindu ecosystem.
 
-## 🚀 Key Features
+## 🚀 Capabilities
+*   **Smart Lookup**: Understands "Tesla" -> `TSLA`, "Reliance" -> `RELIANCE.NS`.
+*   **Live Market Data**: Real-time Price, Change %, and Volume.
+*   **Fundamental Analysis**: P/E Ratio, Market Cap.
+*   **Technical Pulse**: Trend detection (Bullish/Bearish).
+*   **News Sentiment**: Latest headlines.
 
-1.  **Smart Symbol Lookup**: Automatically maps company names to tickers using a 3-layer strategy:
-    *   *Fast Cache*: Instant lookup for majors (Tesla $\to$ TSLA, Reliance $\to$ RELIANCE.NS).
-    *   *Heuristic Match*: Identifies direct inputs (e.g., "INFY").
-    *   *Deep Search*: Uses `duckduckgo-search` to resolve unknown companies (e.g., "Tata Elxsi" $\to$ "TATAELXSI.NS").
-2.  **Global Market Support**: Built-in logic to handle international suffixes (like `.NS` for India) and auto-correct if data is missing.
-3.  **Zero-Key Architecture**:
-    *   **Data**: Sourced via `yfinance` (Community API).
-    *   **Search**: Sourced via `ddgs` (Anonymous Search).
-    *   **Cost**: $0.00 to operate.
-4.  **Resilient Data Pipeline**: Uses full market history (`stock.history()`) instead of unreliable snapshots, ensuring perfect accuracy for Global stocks.
+## 🔑 Why No API Keys? (Interview Talking Point)
+You might notice this project requires **Zero API Keys**. This is a deliberate "Open Architecture" choice:
 
----
+*   **Data**: Uses `yfinance`, which leverages public Yahoo Finance endpoints (community standard for Python/ML).
+*   **Search**: Uses `duckduckgo-search` for anonymous, key-free web resolving.
+*   **Benefit**: This creates a **Censorship-Resistant & Zero-Cost** node that anyone can deploy immediately without barriers.
 
-## 🛠️ Architecture
+## 🛠️ How to Run
 
-### The "3-Layer" Logic
-The agent doesn't just call an API. It thinks:
-1.  **Identify**: "What stock is this?" (Search Layer)
-2.  **Verify**: "Do I have data?" (Validation Layer). *If no data, it auto-appends suffixes and retries.*
-3.  **Analyze**: "Is it Bullish?" (computation Layer). Calculates 50-day SMA trends locally.
+### 1. Start the Agent
+Open a terminal and run:
 
----
-
-## 💻 How to Run
-
-### 1. Install Dependencies
-```bash
-pip install -e .
-pip install yfinance ddgs rich
-```
-
-### 2. Start the Agent
 ```bash
 python market_agent.py
 ```
-*Runs on port `3773`.*
+The agent will start on `http://localhost:3773`.
 
-### 3. Verify & Demo (Interactive)
-We have included a robust verification script to demonstrate the agent's capabilities.
+### 2. Test the Agent
+Open a new terminal and run the interactive console:
 
 ```bash
 python verify_agent.py
 ```
+This will launch a Test Console where you can type any stock name:
 
-**Try these inputs:**
-*   `Tesla` (Standard US Stock)
-*   `Tata Elxsi` (Indian Market - Auto-Search & Suffix Logic)
-*   `Bitcoin` (Crypto support via Yahoo)
+*   `Tata Elxsi` (Auto-resolves to `TATAELXSI.NS`)
+*   `Tesla` (Resolves to `TSLA`)
+*   `Reliance` (Resolves to `RELIANCE.NS`)
 
----
+The script handles the complex JSON-RPC communication for you.
+
+## 🛡️ Robustness Features
+*   **Smart Search**: Uses DuckDuckGo to find tickers for unknown companies.
+*   **Auto-Retry**: If a ticker is found but has no data, it automatically appends suffix codes (like `.NS`) and retries.
+*   **History-First**: Uses full market history data instead of unreliable snapshot APIs.
 
 ## 📂 Project Structure
-
-*   **`market_agent.py`**: The Bindu Node entry point. Handles JSON-RPC protocol.
-*   **`skills/market_skills.py`**: The "Brain". Contains `find_ticker`, `get_financial_summary`, and retry logic.
-*   **`tests/test_market_skills.py`**: Full `pytest` suite ensuring reliability.
-
----
-
-## 🏆 Why this matters
-This agent solves the **"Siloed Intelligence Problem"**. Instead of relying on expensive, rate-limited APIs (Bloomberg, AlphaVantage), it constructs its own intelligence from open sources, making it a truly autonomous and sovereign node.
+*   `market_agent.py`: Main agent service (The Node).
+*   `skills/market_skills.py`: The logic (The Brain).
+*   `skills/market_skill.yaml`: Capability definition (The ID Card).
