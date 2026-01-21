@@ -73,6 +73,9 @@ Built with a distributed architecture (Task Manager, scheduler, storage), Bindu 
 
 Before installing Bindu, ensure you have:
 
+> 💡 **Beginner tip:** If you are trying Bindu for the first time, follow the Quick Start section below before reading advanced setup steps.
+
+
 - **Python 3.12 or higher** - [Download here](https://www.python.org/downloads/)
 - **UV package manager** - [Installation guide](https://github.com/astral-sh/uv)
 
