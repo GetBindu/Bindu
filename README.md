@@ -90,10 +90,6 @@ uv --version
 
 <br/>
 
-### Notes for Windows users
-
-- The repository can be cloned using Git Bash or Command Prompt without issues.
-- Creating and activating the virtual environment on Windows requires using the `Scripts` folder:
 
 ## 📦 Installation
 <details>
@@ -1489,3 +1485,9 @@ Grateful to these projects:
   <a href="https://discord.gg/3w5zuYUuwt">💬 Join Discord</a> •
   <a href="https://docs.getbindu.com">🌻 Read the Docs</a>
 </p>
+
+
+### Notes for Windows users
+
+- The repository can be cloned using Git Bash or Command Prompt without issues.
+- Creating and activating the virtual environment on Windows requires using the `Scripts` folder:
