@@ -194,6 +194,52 @@ webhook_configs_table = Table(
     # Table comment
     comment="Webhook configurations for long-running task notifications",
 )
+# Agent Prompts Table
+# -----------------------------------------------------------------------------
+
+# Define prompt status enum
+prompt_status_enum = Enum(
+    "active",
+    "candidate",
+    "deprecated",
+    "rolled_back",
+    name="promptstatus",
+    create_type=True,
+)
+
+agent_prompts_table = Table(
+    "agent_prompts",
+    metadata,
+    # Primary key
+    Column("id", Integer, primary_key=True, autoincrement=True, nullable=False),
+    # Columns
+    Column("prompt_text", Text, nullable=False),
+    Column("status", prompt_status_enum, nullable=False),
+    Column("traffic", Numeric(precision=5, scale=4), nullable=False, server_default="0"),
+    Column("num_interactions", Integer, nullable=False, server_default="0"),
+    Column("average_feedback_score", Numeric(precision=3, scale=2), nullable=True, server_default=None),
+    # Constraints
+    CheckConstraint("traffic >= 0 AND traffic <= 1", name="chk_agent_prompts_traffic_range"),
+    CheckConstraint("average_feedback_score IS NULL OR (average_feedback_score >= 0 AND average_feedback_score <= 1)", name="chk_agent_prompts_feedback_range"),
+    # Table comment
+    comment="Prompts used by agents with constrained active/candidate counts",
+)
+
+# Create partial unique indexes for agent_prompts
+# These enforce only one active and only one candidate prompt
+Index(
+    "uq_agent_prompts_status_active",
+    agent_prompts_table.c.status,
+    unique=True,
+    postgresql_where=text("status = 'active'"),
+)
+
+Index(
+    "uq_agent_prompts_status_candidate",
+    agent_prompts_table.c.status,
+    unique=True,
+    postgresql_where=text("status = 'candidate'"),
+)
 
 # -----------------------------------------------------------------------------
 # Helper Functions
