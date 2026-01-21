@@ -90,6 +90,11 @@ uv --version
 
 <br/>
 
+### Notes for Windows users
+
+- The repository can be cloned using Git Bash or Command Prompt without issues.
+- Creating and activating the virtual environment on Windows requires using the `Scripts` folder:
+
 ## 📦 Installation
 <details>
 <summary><b>Windows users note (Git & GitHub Desktop)</b></summary>
@@ -1418,7 +1423,7 @@ Our dedicated moderators help maintain a welcoming and productive community:
 
 <br/>
 
-## �� Acknowledgements
+##    Acknowledgements
 
 Grateful to these projects:
 
