@@ -38,7 +38,7 @@ def generate_proto_code():
         print(f"🔨 Generating code from {proto_file.name}...")
 
         try:
-            result = subprocess.run(
+            subprocess.run(
                 [
                     sys.executable,
                     "-m",
