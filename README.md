@@ -1,7 +1,7 @@
 <div align="center" id="top">
   <a href="https://getbindu.com">
     <picture>
-      <img src="assets/bindu.png" alt="Bindu" width="300">
+      <img src="assets/bindu.png" alt="Bindu" width="100">
     </picture>
   </a>
 </div>
