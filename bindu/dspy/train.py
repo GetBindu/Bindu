@@ -29,10 +29,17 @@ from .config import (
 )
 from .dataset import build_golden_dataset, convert_to_dspy_examples
 from .extractor import ExtractionStrategy
+from .guard import ensure_system_stable
 from .models import PromptCandidate
 from .optimizer import optimize
 from .postgres import fetch_raw_task_data
 from .program import AgentProgram
+from .prompts import (
+    get_active_prompt,
+    insert_prompt,
+    update_prompt_traffic,
+    zero_out_all_except,
+)
 
 from dspy.teleprompt import SIMBA, GEPA
 
@@ -43,23 +50,26 @@ async def train_async(
     current_prompt_text: str,
     strategy: ExtractionStrategy = ExtractionStrategy.LAST_TURN,
     require_feedback: bool = True,
-) -> PromptCandidate:
+) -> None:
     """Train and optimize agent prompts using DSPy.
 
     This function orchestrates the complete training pipeline:
-    1. Configures DSPy with the default language model
-    2. Fetches raw task data with feedback from PostgreSQL
-    3. Builds golden dataset using the complete pipeline:
+    1. Ensures system is stable (no active experiments)
+    2. Configures DSPy with the default language model
+    3. Fetches raw task data with feedback from PostgreSQL
+    4. Builds golden dataset using the complete pipeline:
        - Normalize feedback
        - Extract interactions (with configurable strategy)
        - Filter by feedback quality
        - Validate and clean
        - Deduplicate
-    4. Converts dataset to DSPy Example format
-    5. Loads the agent program
-    6. Runs DSPy optimization with the provided optimizer
-    7. Extracts and scores optimized prompts
-    8. Returns top prompt candidates
+    5. Converts dataset to DSPy Example format
+    6. Loads the agent program
+    7. Runs DSPy optimization with the provided optimizer
+    8. Initializes A/B test:
+       - Inserts optimized prompt as candidate (10% traffic)
+       - Sets active prompt to 90% traffic
+       - Zeros out all other prompts
 
     Args:
         optimizer: DSPy optimizer instance to use for training (SIMBA or GEPA required).
@@ -68,10 +78,10 @@ async def train_async(
         require_feedback: Whether to require feedback for inclusion in dataset
 
     Returns:
-        A single PromptCandidate object containing the optimized prompt
+        None. The optimized prompt is inserted into the database as a candidate.
 
     Raises:
-        RuntimeError: If STORAGE__POSTGRES_URL environment variable is not set
+        RuntimeError: If an experiment is already active or STORAGE__POSTGRES_URL not set
         ConnectionError: If unable to connect to database
         ValueError: If golden dataset pipeline fails
 
@@ -80,18 +90,27 @@ async def train_async(
         >>> from bindu.dspy.extractor import ExtractionStrategy
         >>> import asyncio
         >>> optimizer = SIMBA()
-        >>> candidate = asyncio.run(train_async(
+        >>> await train_async(
         ...     optimizer=optimizer,
         ...     current_prompt_text="You are a helpful assistant.",
         ...     strategy=ExtractionStrategy.FULL_HISTORY
-        ... ))
-        >>> optimized_prompt = candidate.text
+        ... )
+        # Candidate prompt now in database with 10% traffic
         
     Note:
         This is an async function. When calling from async code, use await.
         For sync contexts, use the train() wrapper function instead.
+        
+        DSPy training only initializes experiments. It does NOT:
+        - Promote candidates to active
+        - Rollback prompts
+        - Adjust traffic beyond initial 90/10 split
     """
     logger.info("Starting DSPy training pipeline")
+
+    # Step 0: Ensure system is stable (no active experiments)
+    logger.info("Checking system stability")
+    await ensure_system_stable()
 
     # Step 1: Configure DSPy with default model
     logger.info(f"Configuring DSPy with model: {DEFAULT_DSPY_MODEL}")
@@ -169,27 +188,45 @@ async def train_async(
     if not instructions or not instructions.strip():
         raise RuntimeError("Optimizer did not produce valid instructions")
 
-    # Step 8: Extract optimized instructions
-    # SIMBA / GEPA store the optimized prompt directly on the predictor.
-    candidate = PromptCandidate(
+    # Step 8: Initialize A/B test with optimized prompt
+    # DSPy training creates the candidate and sets initial traffic split.
+    # It does NOT promote, rollback, or adjust traffic beyond this point.
+    
+    logger.info("Inserting optimized prompt as candidate with 10% traffic")
+    candidate_id = await insert_prompt(
         text=instructions,
-        metadata={
-            "optimizer": type(optimizer).__name__,
-            "strategy": strategy.value,
-            "dataset_size": len(dspy_examples),
-            },
-            )
-    logger.info(
-        "Prompt optimization completed successfully"
+        status="candidate",
+        traffic=0.10,
     )
-    return candidate
+    logger.info(f"Candidate prompt inserted (id={candidate_id})")
+    
+    # Get current active prompt and set it to 90% traffic
+    active_prompt = await get_active_prompt()
+    if active_prompt is None:
+        raise RuntimeError(
+            "No active prompt found. System requires an active prompt "
+            "before DSPy training can initialize A/B testing."
+        )
+    
+    active_id = active_prompt["id"]
+    logger.info(f"Setting active prompt (id={active_id}) to 90% traffic")
+    await update_prompt_traffic(active_id, 0.90)
+    
+    # Zero out traffic for all other prompts
+    logger.info("Zeroing out traffic for all other prompts")
+    await zero_out_all_except([active_id, candidate_id])
+    
+    logger.info(
+        f"A/B test initialized: active (id={active_id}) at 90%, "
+        f"candidate (id={candidate_id}) at 10%"
+    )
 
 def train(
     current_prompt_text: str,
     optimizer: Any = None,
     strategy: ExtractionStrategy = ExtractionStrategy.LAST_TURN,
     require_feedback: bool = True,
-) -> PromptCandidate:
+) -> None:
     """Synchronous wrapper for train_async().
 
     This function provides a synchronous interface to the async training pipeline.
@@ -202,13 +239,13 @@ def train(
         require_feedback: Whether to require feedback for inclusion in dataset
 
     Returns:
-        A single optimized PromptCandidate returned by train_async().
+        None. The optimized prompt is inserted into the database as a candidate.
 
     Raises:
         RuntimeError: If called from within an async event loop. Use train_async() instead.
     """
     try:
-        return asyncio.run(
+        asyncio.run(
             train_async(
                 optimizer=optimizer,
                 current_prompt_text=current_prompt_text,
