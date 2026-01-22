@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import RedirectResponse, Response
 
 from bindu.common.protocol.types import (
     InternalError,
@@ -36,6 +36,9 @@ async def agent_run_endpoint(app: BinduApplication, request: Request) -> Respons
         2.3. The task "failed".
     3. The server will send a "working" on the first chunk on `tasks/pushNotification/get`.
     """
+    if request.method == "GET":
+        return RedirectResponse(url="/docs")
+
     client_ip = get_client_ip(request)
     request_id = None
 

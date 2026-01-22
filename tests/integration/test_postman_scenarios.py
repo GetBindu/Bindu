@@ -52,7 +52,7 @@ def create_test_app(agent_response="Test response", did_extension=None):
 
 
 class TestPostmanScenarios:
-    """Test scenarios from pebbling.postman_collection.json."""
+    """Test scenarios from bindus.postman_collection.json."""
 
     def test_scenario_1_first_send_message(self):
         """Test: first send message - creates new task and context."""
