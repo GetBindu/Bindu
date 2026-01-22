@@ -157,7 +157,7 @@ async def train_async(
     logger.info("Converting to DSPy examples")
     dspy_examples = convert_to_dspy_examples(golden_dataset)
 
-    # Step 5: Load agent program
+    # Step 6: Load agent program
     logger.info("Initializing agent program")
     program = AgentProgram(current_prompt_text)
 
@@ -229,7 +229,6 @@ async def train_async(
     )
 
 def train(
-    current_prompt_text: str,
     optimizer: Any = None,
     strategy: BaseExtractionStrategy | None = None,
     require_feedback: bool = True,
