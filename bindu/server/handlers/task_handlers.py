@@ -124,6 +124,28 @@ class TaskHandlers:
 
         if hasattr(self.storage, "store_task_feedback"):
             await self.storage.store_task_feedback(task_id, feedback_data)
+        
+        # Update prompt metrics with feedback score
+        # Check if task has associated prompt_id in metadata
+        task_metadata = task.get("metadata", {})
+        prompt_id = task_metadata.get("prompt_id")
+        
+        if prompt_id is not None:
+            # Normalize rating to 0-1 scale (assuming rating is 1-5)
+            rating = request["params"]["rating"]
+            if isinstance(rating, (int, float)) and 1 <= rating <= 5:
+                normalized_score = (rating - 1) / 4  # Maps 1-5 to 0-1
+                
+                try:
+                    from bindu.dspy.prompt_metrics import update_prompt_metrics
+                    await update_prompt_metrics(prompt_id, normalized_score)
+                except Exception as e:
+                    # Log error but don't fail the feedback submission
+                    import logging
+                    logging.getLogger("bindu.server.handlers.task_handlers").warning(
+                        f"Failed to update prompt metrics for prompt {prompt_id}: {e}",
+                        exc_info=True,
+                    )
 
         return TaskFeedbackResponse(
             jsonrpc="2.0",
