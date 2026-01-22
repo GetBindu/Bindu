@@ -50,6 +50,9 @@ from bindu.server.workers.helpers import ResponseDetector, ResultProcessor
 from bindu.utils.logging import get_logger
 from bindu.utils.retry import retry_worker_operation
 from bindu.utils.worker_utils import ArtifactBuilder, MessageConverter, TaskStateManager
+from bindu.dspy.prompt_selector import select_prompt_with_canary
+from bindu.dspy.prompt_metrics import update_prompt_metrics
+from bindu.dspy.prompts import insert_prompt
 
 tracer = get_tracer("bindu.server.workers.manifest_worker")
 logger = get_logger("bindu.server.workers.manifest_worker")
@@ -137,16 +140,47 @@ class ManifestWorker(Worker):
 
         try:
             # Step 3: Execute manifest with system prompt (if enabled)
+            selected_prompt_id = None  # Track prompt ID for metrics
             if (
                 self.manifest.enable_system_message
                 and app_settings.agent.enable_structured_responses
             ):
-                # Inject structured response system prompt as first message
-                system_prompt = app_settings.agent.structured_response_system_prompt
+                # Fetch prompt from database using canary deployment strategy
+                selected_prompt = await select_prompt_with_canary()
+                
+                if selected_prompt:
+                    # Use database-selected prompt with canary pooling
+                    system_prompt = selected_prompt["prompt_text"]
+                    selected_prompt_id = selected_prompt["id"]
+                    logger.info(
+                        f"Using prompt {selected_prompt_id} (status={selected_prompt['status']}, "
+                        f"traffic={selected_prompt['traffic']:.2f})"
+                    )
+                else:
+                    # No prompts in database - create initial active prompt
+                    system_prompt = app_settings.agent.structured_response_system_prompt
+                    logger.warning("No prompts in database, creating initial active prompt")
+                    
+                    # Insert default prompt as active with 100% traffic
+                    selected_prompt_id = await insert_prompt(
+                        text=system_prompt,
+                        status="active",
+                        traffic=1.0,
+                    )
+                    logger.info(f"Created initial active prompt (id={selected_prompt_id}) with 100% traffic")
+                
                 if system_prompt:
                     # Create new list to avoid mutating original message_history
                     message_history = [{"role": "system", "content": system_prompt}] + (
                         message_history or []
+                    )
+                
+                # Store prompt_id in task metadata for tracking
+                if selected_prompt_id is not None:
+                    await self.storage.update_task(
+                        task["id"],
+                        state="working",
+                        metadata={"prompt_id": selected_prompt_id},
                     )
 
             # Step 3.1: Execute agent with tracing
@@ -225,6 +259,9 @@ class ManifestWorker(Worker):
                 await self._handle_terminal_state(
                     task, results, state, payment_context=payment_context
                 )
+                
+                # Note: num_interactions will be incremented when feedback is received
+                # We don't increment here to avoid double-counting
 
         except Exception as e:
             # Handle task failure with error message
