@@ -47,7 +47,6 @@ logger = get_logger("bindu.dspy.train")
 
 async def train_async(
     optimizer: Any,
-    current_prompt_text: str,
     strategy: BaseExtractionStrategy | None = None,
     require_feedback: bool = True,
 ) -> None:
@@ -55,24 +54,24 @@ async def train_async(
 
     This function orchestrates the complete training pipeline:
     1. Ensures system is stable (no active experiments)
-    2. Configures DSPy with the default language model
-    3. Fetches raw task data with feedback from PostgreSQL
-    4. Builds golden dataset using the complete pipeline:
+    2. Fetches current active prompt from database
+    3. Configures DSPy with the default language model
+    4. Fetches raw task data with feedback from PostgreSQL
+    5. Builds golden dataset using the complete pipeline:
        - Normalize feedback
        - Extract interactions (with configurable strategy)
        - Filter by feedback quality
        - Validate and clean
        - Deduplicate
-    5. Converts dataset to DSPy Example format
-    6. Loads the agent program
-    7. Runs DSPy optimization with the provided optimizer
-    8. Initializes A/B test:
+    6. Converts dataset to DSPy Example format
+    7. Loads the agent program with active prompt
+    8. Runs DSPy optimization with the provided optimizer
+    9. Initializes A/B test:
        - Inserts optimized prompt as candidate (10% traffic)
        - Sets active prompt to 90% traffic
        - Zeros out all other prompts
 
     Args:
-        current_prompt_text: Current prompt text to initialize and optimize.
         optimizer: DSPy optimizer instance to use for training.
             If None, uses BootstrapFewShot with default settings.
         strategy: Extraction strategy to use. Defaults to LastTurnStrategy.
@@ -89,7 +88,7 @@ async def train_async(
     Raises:
         RuntimeError: If an experiment is already active or STORAGE__POSTGRES_URL not set
         ConnectionError: If unable to connect to database
-        ValueError: If golden dataset pipeline fails
+        ValueError: If golden dataset pipeline fails or no active prompt found
 
     Example:
         >>> from dspy.teleprompt import MIPRO
@@ -119,12 +118,24 @@ async def train_async(
     logger.info("Checking system stability")
     await ensure_system_stable()
 
-    # Step 1: Configure DSPy with default model
+    # Step 1: Fetch current active prompt from database
+    logger.info("Fetching active prompt from database")
+    active_prompt = await get_active_prompt()
+    if active_prompt is None:
+        raise ValueError(
+            "No active prompt found in database. System requires an active prompt "
+            "before DSPy training can begin."
+        )
+    
+    current_prompt_text = active_prompt["prompt_text"]
+    logger.info(f"Using active prompt (id={active_prompt['id']}) as base for optimization")
+
+    # Step 2: Configure DSPy with default model
     logger.info(f"Configuring DSPy with model: {DEFAULT_DSPY_MODEL}")
     lm = dspy.LM(DEFAULT_DSPY_MODEL)
     dspy.configure(lm=lm)
 
-    # Step 2: Fetch raw task data from database (async operation)
+    # Step 3: Fetch raw task data from database (async operation)
     logger.info("Fetching raw task data from database")
     raw_tasks = await fetch_raw_task_data()
 
@@ -133,7 +144,7 @@ async def train_async(
 
     logger.info(f"Fetched {len(raw_tasks)} raw tasks")
 
-    # Step 3: Build golden dataset using complete pipeline
+    # Step 4: Build golden dataset using complete pipeline
     logger.info(
         f"Building golden dataset (strategy={strategy.name}, "
         f"require_feedback={require_feedback}, "
@@ -148,15 +159,15 @@ async def train_async(
 
     logger.info(f"Golden dataset prepared with {len(golden_dataset)} examples")
 
-    # Step 4: Convert to DSPy examples
+    # Step 5: Convert to DSPy examples
     logger.info("Converting to DSPy examples")
     dspy_examples = convert_to_dspy_examples(golden_dataset)
 
-    # Step 5: Load agent program
+    # Step 6: Load agent program
     logger.info("Initializing agent program")
     program = AgentProgram(current_prompt_text)
 
-    # Step 6: Validate optimizer and prompt requirements
+    # Step 7: Validate optimizer and prompt requirements
     # v1 only supports prompt-mutating optimizers (SIMBA / GEPA).
     # These optimizers require an existing prompt to refine.
     if optimizer is None:
@@ -195,7 +206,7 @@ async def train_async(
     if not instructions or not instructions.strip():
         raise RuntimeError("Optimizer did not produce valid instructions")
 
-    # Step 8: Initialize A/B test with optimized prompt
+    # Step 9: Initialize A/B test with optimized prompt
     # DSPy training creates the candidate and sets initial traffic split.
     # It does NOT promote, rollback, or adjust traffic beyond this point.
     
@@ -207,14 +218,7 @@ async def train_async(
     )
     logger.info(f"Candidate prompt inserted (id={candidate_id})")
     
-    # Get current active prompt and set it to 90% traffic
-    active_prompt = await get_active_prompt()
-    if active_prompt is None:
-        raise RuntimeError(
-            "No active prompt found. System requires an active prompt "
-            "before DSPy training can initialize A/B testing."
-        )
-    
+    # Set active prompt to 90% traffic (already fetched in Step 1)
     active_id = active_prompt["id"]
     logger.info(f"Setting active prompt (id={active_id}) to 90% traffic")
     await update_prompt_traffic(active_id, 0.90)
@@ -229,7 +233,6 @@ async def train_async(
     )
 
 def train(
-    current_prompt_text: str,
     optimizer: Any = None,
     strategy: BaseExtractionStrategy | None = None,
     require_feedback: bool = True,
@@ -240,7 +243,6 @@ def train(
     For use in async contexts, call train_async() directly.
 
     Args:
-        current_prompt_text: Current prompt text to initialize the agent program.
         optimizer: DSPy optimizer instance (default: None)
         strategy: Extraction strategy (LAST_TURN or FULL_HISTORY)
         require_feedback: Whether to require feedback for inclusion in dataset
@@ -255,7 +257,6 @@ def train(
         asyncio.run(
             train_async(
                 optimizer=optimizer,
-                current_prompt_text=current_prompt_text,
                 strategy=strategy,
                 require_feedback=require_feedback,
             )
