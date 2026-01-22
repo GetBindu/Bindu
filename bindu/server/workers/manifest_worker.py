@@ -273,6 +273,9 @@ class ManifestWorker(Worker):
                 await self._handle_terminal_state(
                     task, results, state, payment_context=payment_context
                 )
+                
+                # Note: num_interactions will be incremented when feedback is received
+                # We don't increment here to avoid double-counting
 
         except Exception as e:
             # Handle task failure with error message
