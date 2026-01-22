@@ -28,7 +28,7 @@ from .config import (
     MIN_FEEDBACK_THRESHOLD,
 )
 from .dataset import build_golden_dataset, convert_to_dspy_examples
-from .extractor import ExtractionStrategy
+from .strategies import BaseExtractionStrategy, LastTurnStrategy
 from .guard import ensure_system_stable
 from .models import PromptCandidate
 from .optimizer import optimize
