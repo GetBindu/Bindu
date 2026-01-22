@@ -49,10 +49,11 @@ dependencies = [
     "openai>=2.9.0",
     "detect-secrets>=1.5.0",
     "sentry-sdk>=2.0.0",
-    "tenacity==8.5.0",
     "httpx>=0.27.0",
     "numpy>=1.24.0",
     "redis>=7.1.0",
+    "tenacity>=9.0.0",
+    "dspy>=2.5.0",
 ]
 
 [project.optional-dependencies]
