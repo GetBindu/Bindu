@@ -138,6 +138,13 @@ uv sync --dev
 ---
 
 <br/>
+## Minimal Local Example (No Cookiecutter)
+
+For users who want to quickly verify that the repository runs locally without setting up a production agent or using cookiecutter, a minimal example is provided:
+
+```bash
+python examples/minimal_local_example.py
+
 
 ## 🚀 Quick Start
 
