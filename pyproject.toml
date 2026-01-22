@@ -53,6 +53,7 @@ dependencies = [
     "httpx>=0.27.0",
     "numpy>=1.24.0",
     "redis>=7.1.0",
+    "cookiecutter>=2.6.0",
 ]
 
 [project.optional-dependencies]

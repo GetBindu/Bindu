@@ -198,3 +198,7 @@ examples/.pebbling/*
 bindu/_version.py
 bindu/penguin/.bindu/private.pem
 bindu/penguin/.bindu/public.pem
+
+# Local Bindu agent created via cookiecutter (do not commit)
+agentbindu/
+
