@@ -16,7 +16,7 @@ from uuid import UUID
 
 from bindu.utils.logging import get_logger
 
-from ..config import DEFAULT_N_TURNS
+from bindu.settings import app_settings
 from ..models import Interaction
 from .base import BaseExtractionStrategy, parse_turns
 
@@ -36,8 +36,8 @@ class LastNTurnsStrategy(BaseExtractionStrategy):
         n_turns: Number of turns to extract (default: 3, minimum: 1)
     """
 
-    def __init__(self, n_turns: int = DEFAULT_N_TURNS):
-        self.n_turns = max(1, n_turns)
+    def __init__(self, n_turns: int = None):
+        self.n_turns = max(1, n_turns or app_settings.dspy.default_n_turns)
 
     @property
     def name(self) -> str:
