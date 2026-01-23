@@ -10,6 +10,7 @@
 """Dataset preparation for DSPy training.
 
 This module implements the complete golden dataset pipeline:
+0. Fetch raw task data from PostgreSQL
 1. Normalize feedback from raw task data
 2. Extract interactions using configurable strategies
 3. Filter by feedback quality
@@ -23,19 +24,133 @@ training examples for DSPy prompt optimization.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
+from uuid import UUID
 
 import dspy
 
 from bindu.utils.logging import get_logger
 
 from bindu.settings import app_settings
+from bindu.server.storage.postgres_storage import PostgresStorage
 from .extractor import InteractionExtractor
 from .models import Interaction
-from .postgres import RawTaskData
 from .strategies import BaseExtractionStrategy, LastTurnStrategy
 
 logger = get_logger("bindu.dspy.dataset")
+
+
+# =============================================================================
+# Data Models
+# =============================================================================
+
+
+@dataclass
+class RawTaskData:
+    """Raw task data fetched from the database.
+
+    This represents the raw data before interaction extraction.
+
+    Attributes:
+        id: Task UUID
+        history: List of message dictionaries from the conversation
+        created_at: Timestamp when the task was created
+        feedback_data: Optional feedback dictionary (ratings, thumbs up/down)
+    """
+
+    id: UUID
+    history: list[dict[str, Any]]
+    created_at: Any
+    feedback_data: dict[str, Any] | None = None
+
+
+# =============================================================================
+# Data Models
+# =============================================================================
+
+
+@dataclass
+class RawTaskData:
+    """Raw task data fetched from the database.
+
+    This represents the raw data before interaction extraction.
+
+    Attributes:
+        id: Task UUID
+        history: List of message dictionaries from the conversation
+        created_at: Timestamp when the task was created
+        feedback_data: Optional feedback dictionary (ratings, thumbs up/down)
+    """
+
+    id: UUID
+    history: list[dict[str, Any]]
+    created_at: Any
+    feedback_data: dict[str, Any] | None = None
+
+
+# =============================================================================
+# Data Access Functions
+# =============================================================================
+
+
+async def fetch_raw_task_data(
+    limit: int | None = None,
+) -> list[RawTaskData]:
+    """Fetch raw task data with feedback from PostgreSQL.
+
+    This function reads task data from the database along with associated
+    feedback using a LEFT JOIN. It returns raw data that needs to be
+    processed by the extraction and filtering pipeline.
+
+    The function uses PostgresStorage for all database operations, ensuring
+    consistent connection management and error handling across the application.
+
+    Args:
+        limit: Maximum number of tasks to fetch (default: from settings)
+
+    Returns:
+        List of RawTaskData objects containing task history and feedback
+
+    Raises:
+        RuntimeError: If STORAGE__POSTGRES_URL environment variable is not set
+        ConnectionError: If unable to connect to database or query fails
+    """
+    if limit is None:
+        limit = app_settings.dspy.max_interactions_query_limit
+
+    logger.info(f"Fetching up to {limit} tasks from database")
+
+    # Create storage instance and connect
+    storage = PostgresStorage()
+
+    try:
+        await storage.connect()
+
+        # Fetch tasks with feedback using the specialized method
+        rows = await storage.fetch_tasks_with_feedback(limit=limit)
+
+        # Convert to RawTaskData objects
+        raw_tasks = [
+            RawTaskData(
+                id=row["id"],
+                history=row["history"],
+                created_at=row["created_at"],
+                feedback_data=row["feedback_data"],
+            )
+            for row in rows
+        ]
+
+        logger.info(f"Fetched {len(raw_tasks)} raw tasks from database")
+        return raw_tasks
+
+    except Exception as e:
+        logger.error(f"Failed to fetch raw task data from database: {e}")
+        raise ConnectionError(f"Failed to fetch raw task data: {e}") from e
+
+    finally:
+        # Always clean up the connection
+        await storage.disconnect()
 
 
 def normalize_feedback(feedback_data: dict[str, Any] | None) -> tuple[float | None, str | None]:
@@ -256,8 +371,8 @@ def validate_dataset_size(dataset: list[dict[str, Any]]) -> None:
     logger.info(f"Dataset size validation passed: {size} examples")
 
 
-def build_golden_dataset(
-    raw_tasks: list[RawTaskData],
+async def build_golden_dataset(
+    limit: int | None = None,
     strategy: BaseExtractionStrategy | None = None,
     require_feedback: bool = True,
     min_feedback_threshold: float = None,
@@ -265,6 +380,7 @@ def build_golden_dataset(
     """Build complete golden dataset from raw task data.
 
     This is the main pipeline function that orchestrates all steps:
+    0. Fetch raw task data from database
     1. Extract interactions from raw tasks
     2. Filter by feedback quality
     3. Validate and clean
@@ -273,7 +389,7 @@ def build_golden_dataset(
     6. Validate size
 
     Args:
-        raw_tasks: Raw task data from database
+        limit: Maximum number of tasks to fetch from database (default: from settings)
         strategy: Extraction strategy to use. Defaults to LastTurnStrategy.
         require_feedback: Whether to require feedback for inclusion
         min_feedback_threshold: Minimum feedback score threshold
@@ -283,12 +399,22 @@ def build_golden_dataset(
 
     Raises:
         ValueError: If dataset is too small or pipeline fails
+        ConnectionError: If unable to fetch data from database
     """
     if min_feedback_threshold is None:
         min_feedback_threshold = app_settings.dspy.min_feedback_threshold
     
     strategy = strategy or LastTurnStrategy()
     logger.info(f"Starting golden dataset pipeline with {strategy.name} strategy")
+
+    # Step 0: Fetch raw task data from database
+    logger.info("Fetching raw task data from database")
+    raw_tasks = await fetch_raw_task_data(limit=limit)
+    
+    if not raw_tasks:
+        raise ValueError("No tasks found in database")
+    
+    logger.info(f"Fetched {len(raw_tasks)} raw tasks")
 
     # Step 1: Extract interactions
     interactions = extract_interactions(raw_tasks, strategy=strategy)

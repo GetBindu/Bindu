@@ -5,19 +5,25 @@ This module provides offline prompt optimization for Bindu agents using [DSPy](h
 ## Overview
 
 ```
-PostgreSQL ─── fetch_raw_task_data() ───┐
-                                        │
-                                        ▼
                               ┌─────────────────┐
-                              │  Extraction     │
-                              │  Strategies     │
-                              │  (pure Python)  │
+                              │ Golden Dataset  │
+                              │    Pipeline     │
                               └────────┬────────┘
                                        │
                                        ▼
-                              ┌─────────────────┐
-                              │  Golden Dataset │
-                              │  Pipeline       │
+                     ┌─────────────────────────────┐
+                     │  Step 0: Fetch from DB      │
+                     │  (fetch_raw_task_data)      │
+                     └────────┬────────────────────┘
+                              │
+                              ▼
+                     ┌─────────────────────────────┐
+                     │  Step 1: Extract            │
+                     │  (Extraction Strategies)    │
+                     └────────┬────────────────────┘
+                              │
+                              ▼
+                     ┌─────────────────────────────┐
                               └────────┬────────┘
                                        │
                                        ▼
@@ -284,20 +290,33 @@ Golden Dataset (list[dict])
 
 ### Database Connection
 
-The module uses a singleton connection pool for efficiency:
+The module uses PostgresStorage for database access. Data fetching is now integrated
+into the golden dataset pipeline:
 
 ```python
-# Pool is created on first query, reused for subsequent calls
-from bindu.dspy.postgres import fetch_raw_task_data, dispose_engine
+# Build golden dataset (fetches data internally)
+from bindu.dspy.dataset import build_golden_dataset
 
-# Fetch data (creates pool if needed)
-raw_tasks = await fetch_raw_task_data(limit=1000)
-
-# Clean up when done (optional)
-await dispose_engine()
+# Build dataset with automatic data fetching
+golden_dataset = await build_golden_dataset(
+    limit=1000,  # Optional: max tasks to fetch
+    strategy=LastTurnStrategy(),
+    require_feedback=True,
+)
 ```
 
-Pool configuration (in `postgres.py`):
+If you need to fetch raw data separately for analysis:
+
+```python
+# Fetch training data from the database
+from bindu.dspy.dataset import fetch_raw_task_data
+
+# Fetch data (PostgresStorage handles connection management)
+raw_tasks = await fetch_raw_task_data(limit=1000)
+```
+
+Connection management is handled internally by PostgresStorage, with automatic
+cleanup after each fetch operation.
 - `POOL_SIZE = 1` - Single connection for sequential queries
 - `MAX_OVERFLOW = 1` - One extra if needed
 - `POOL_RECYCLE = 1800` - Recycle after 30 minutes
