@@ -29,13 +29,7 @@ import dspy
 
 from bindu.utils.logging import get_logger
 
-from .config import (
-    MAX_EXAMPLES,
-    MIN_EXAMPLES,
-    MIN_FEEDBACK_THRESHOLD,
-    MIN_INPUT_LENGTH,
-    MIN_OUTPUT_LENGTH,
-)
+from bindu.settings import app_settings
 from .extractor import InteractionExtractor
 from .models import Interaction
 from .postgres import RawTaskData
@@ -130,48 +124,6 @@ def extract_interactions(
     )
     return interactions
 
-
-# def filter_by_feedback_quality(
-#     interactions: list[Interaction],
-#     require_feedback: bool = True,
-#     min_threshold: float = MIN_FEEDBACK_THRESHOLD,
-# ) -> list[Interaction]:
-#     """Filter interactions by feedback quality.
-
-#     Rules:
-#     - If feedback exists: must be >= min_threshold
-#     - If no feedback: drop (if require_feedback=True) or keep (if False)
-
-#     Args:
-#         interactions: List of interactions to filter
-#         require_feedback: Whether to drop interactions without feedback
-#         min_threshold: Minimum feedback score threshold
-
-#     Returns:
-#         Filtered list of high-quality interactions
-#     """
-#     filtered: list[Interaction] = []
-
-#     for interaction in interactions:
-#         # Check if feedback exists
-#         if interaction.feedback_score is None:
-#             # Keep only if feedback is not required
-#             if not require_feedback:
-#                 filtered.append(interaction)
-#             # Skip to next interaction (don't check threshold)
-#             continue
-
-#         # Feedback exists - check if it meets threshold
-#         if interaction.feedback_score >= min_threshold:
-#             filtered.append(interaction)
-
-#     logger.info(
-#         f"Filtered {len(filtered)} high-quality interactions from {len(interactions)} total "
-#         f"(require_feedback={require_feedback}, threshold={min_threshold})"
-#     )
-#     return filtered
-
-
 def validate_and_clean_interactions(
     interactions: list[Interaction],
 ) -> list[Interaction]:
@@ -197,9 +149,9 @@ def validate_and_clean_interactions(
         agent_output = " ".join(interaction.agent_output.split())
 
         # Check minimum lengths
-        if len(user_input) < MIN_INPUT_LENGTH:
+        if len(user_input) < app_settings.dspy.min_input_length:
             continue
-        if len(agent_output) < MIN_OUTPUT_LENGTH:
+        if len(agent_output) < app_settings.dspy.min_output_length:
             continue
 
         # Check not identical
@@ -219,7 +171,7 @@ def validate_and_clean_interactions(
 
     logger.info(
         f"Validated {len(validated)} interactions from {len(interactions)} total "
-        f"(min_input={MIN_INPUT_LENGTH}, min_output={MIN_OUTPUT_LENGTH})"
+        f"(min_input={app_settings.dspy.min_input_length}, min_output={app_settings.dspy.min_output_length})"
     )
     return validated
 
@@ -290,14 +242,14 @@ def validate_dataset_size(dataset: list[dict[str, Any]]) -> None:
     """
     size = len(dataset)
 
-    if size < MIN_EXAMPLES:
+    if size < app_settings.dspy.min_examples:
         raise ValueError(
-            f"Dataset too small: {size} examples (minimum required: {MIN_EXAMPLES})"
+            f"Dataset too small: {size} examples (minimum required: {app_settings.dspy.min_examples})"
         )
 
-    if size > MAX_EXAMPLES:
+    if size > app_settings.dspy.max_examples:
         logger.warning(
-            f"Dataset size ({size}) exceeds maximum ({MAX_EXAMPLES}). "
+            f"Dataset size ({size}) exceeds maximum ({app_settings.dspy.max_examples}). "
             f"Consider sampling or adjusting query limit."
         )
 
@@ -308,7 +260,7 @@ def build_golden_dataset(
     raw_tasks: list[RawTaskData],
     strategy: BaseExtractionStrategy | None = None,
     require_feedback: bool = True,
-    min_feedback_threshold: float = MIN_FEEDBACK_THRESHOLD,
+    min_feedback_threshold: float = None,
 ) -> list[dict[str, Any]]:
     """Build complete golden dataset from raw task data.
 
@@ -332,6 +284,9 @@ def build_golden_dataset(
     Raises:
         ValueError: If dataset is too small or pipeline fails
     """
+    if min_feedback_threshold is None:
+        min_feedback_threshold = app_settings.dspy.min_feedback_threshold
+    
     strategy = strategy or LastTurnStrategy()
     logger.info(f"Starting golden dataset pipeline with {strategy.name} strategy")
 
