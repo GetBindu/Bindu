@@ -29,7 +29,6 @@ from .strategies import BaseExtractionStrategy, LastTurnStrategy
 from .guard import ensure_system_stable
 from .models import PromptCandidate
 from .optimizer import optimize
-from .postgres import fetch_raw_task_data
 from .program import AgentProgram
 from .prompts import (
     get_active_prompt,
@@ -53,17 +52,17 @@ async def train_async(
     1. Ensures system is stable (no active experiments)
     2. Fetches current active prompt from database
     3. Configures DSPy with the default language model
-    4. Fetches raw task data with feedback from PostgreSQL
-    5. Builds golden dataset using the complete pipeline:
+    4. Builds golden dataset using the complete pipeline:
+       - Fetch raw task data with feedback from PostgreSQL
        - Normalize feedback
        - Extract interactions (with configurable strategy)
        - Filter by feedback quality
        - Validate and clean
        - Deduplicate
-    6. Converts dataset to DSPy Example format
-    7. Loads the agent program with active prompt
-    8. Runs DSPy optimization with the provided optimizer
-    9. Initializes A/B test:
+    5. Converts dataset to DSPy Example format
+    6. Loads the agent program with active prompt
+    7. Runs DSPy optimization with the provided optimizer
+    8. Initializes A/B test:
        - Inserts optimized prompt as candidate (10% traffic)
        - Sets active prompt to 90% traffic
        - Zeros out all other prompts
@@ -132,23 +131,14 @@ async def train_async(
     lm = dspy.LM(app_settings.dspy.default_model)
     dspy.configure(lm=lm)
 
-    # Step 3: Fetch raw task data from database (async operation)
-    logger.info("Fetching raw task data from database")
-    raw_tasks = await fetch_raw_task_data()
-
-    if not raw_tasks:
-        raise ValueError("No tasks found in database")
-
-    logger.info(f"Fetched {len(raw_tasks)} raw tasks")
-
-    # Step 4: Build golden dataset using complete pipeline
+    # Step 3: Build golden dataset using complete pipeline (fetches data internally)
     logger.info(
         f"Building golden dataset (strategy={strategy.name}, "
         f"require_feedback={require_feedback}, "
         f"threshold={app_settings.dspy.min_feedback_threshold})"
     )
-    golden_dataset = build_golden_dataset(
-        raw_tasks=raw_tasks,
+    golden_dataset = await build_golden_dataset(
+        limit=None,  # Use default from settings
         strategy=strategy,
         require_feedback=require_feedback,
         min_feedback_threshold=app_settings.dspy.min_feedback_threshold,
