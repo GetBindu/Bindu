@@ -16,7 +16,7 @@ from uuid import UUID
 
 from bindu.utils.logging import get_logger
 
-from ..config import DEFAULT_STRIDE, DEFAULT_WINDOW_SIZE
+from bindu.settings import app_settings
 from ..models import Interaction
 from .base import BaseExtractionStrategy, parse_turns
 
@@ -62,12 +62,12 @@ class SlidingWindowStrategy(BaseExtractionStrategy):
 
     def __init__(
         self,
-        window_size: int = DEFAULT_WINDOW_SIZE,
-        stride: int = DEFAULT_STRIDE,
+        window_size: int = None,
+        stride: int = None,
         start_offset: int = 0,
     ):
-        self.window_size = max(1, window_size)
-        self.stride = max(1, stride)
+        self.window_size = max(1, window_size or app_settings.dspy.default_window_size)
+        self.stride = max(1, stride or app_settings.dspy.default_stride)
         self.start_offset = max(0, start_offset)
 
     @property

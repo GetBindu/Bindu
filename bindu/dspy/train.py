@@ -23,10 +23,7 @@ import dspy
 
 from bindu.utils.logging import get_logger
 
-from .config import (
-    DEFAULT_DSPY_MODEL,
-    MIN_FEEDBACK_THRESHOLD,
-)
+from bindu.settings import app_settings
 from .dataset import build_golden_dataset, convert_to_dspy_examples
 from .strategies import BaseExtractionStrategy, LastTurnStrategy
 from .guard import ensure_system_stable
@@ -131,8 +128,8 @@ async def train_async(
     logger.info(f"Using active prompt (id={active_prompt['id']}) as base for optimization")
 
     # Step 2: Configure DSPy with default model
-    logger.info(f"Configuring DSPy with model: {DEFAULT_DSPY_MODEL}")
-    lm = dspy.LM(DEFAULT_DSPY_MODEL)
+    logger.info(f"Configuring DSPy with model: {app_settings.dspy.default_model}")
+    lm = dspy.LM(app_settings.dspy.default_model)
     dspy.configure(lm=lm)
 
     # Step 3: Fetch raw task data from database (async operation)
@@ -148,13 +145,13 @@ async def train_async(
     logger.info(
         f"Building golden dataset (strategy={strategy.name}, "
         f"require_feedback={require_feedback}, "
-        f"threshold={MIN_FEEDBACK_THRESHOLD})"
+        f"threshold={app_settings.dspy.min_feedback_threshold})"
     )
     golden_dataset = build_golden_dataset(
         raw_tasks=raw_tasks,
         strategy=strategy,
         require_feedback=require_feedback,
-        min_feedback_threshold=MIN_FEEDBACK_THRESHOLD,
+        min_feedback_threshold=app_settings.dspy.min_feedback_threshold,
     )
 
     logger.info(f"Golden dataset prepared with {len(golden_dataset)} examples")
