@@ -153,7 +153,21 @@ uv add cookiecutter
 # Create your Bindu agent
 uvx cookiecutter https://github.com/getbindu/create-bindu-agent.git
 ```
+## 🪟 Quick Start (Windows – First-Time Users)
 
+This section documents the exact steps that worked on Windows to run Bindu locally.
+
+### Steps (PowerShell)
+
+```powershell
+git clone https://github.com/getbindu/Bindu.git
+cd Bindu
+pip install uv
+uv venv --python 3.12.9
+.venv\Scripts\activate
+uv sync --dev
+python examples/echo_agent.py
+```
 ## 🎥 Create Production Ready Agent in Minutes
 
 <div align="center">
