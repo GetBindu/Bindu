@@ -137,7 +137,7 @@ class TaskHandlers:
                 normalized_score = (rating - 1) / 4  # Maps 1-5 to 0-1
                 
                 try:
-                    from bindu.dspy.prompt_metrics import update_prompt_metrics
+                    from bindu.dspy.prompts import update_prompt_metrics
                     await update_prompt_metrics(prompt_id, normalized_score)
                 except Exception as e:
                     # Log error but don't fail the feedback submission
