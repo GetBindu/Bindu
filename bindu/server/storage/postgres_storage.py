@@ -55,6 +55,7 @@ from .helpers import (
 )
 from .helpers.db_operations import get_current_utc_timestamp
 from .schema import (
+    agent_prompts_table,
     contexts_table,
     task_feedback_table,
     tasks_table,
@@ -1052,3 +1053,272 @@ class PostgresStorage(Storage[ContextT]):
                 return {row.task_id: row.config for row in rows}
 
         return await self._retry_on_connection_error(_load_all)
+    # -------------------------------------------------------------------------
+    # Prompt Management Operations (for DSPy A/B testing)
+    # -------------------------------------------------------------------------
+
+    async def get_active_prompt(self) -> dict[str, Any] | None:
+        """Get the current active prompt.
+
+        Returns:
+            Dictionary containing prompt data (id, prompt_text, status, traffic)
+            or None if no active prompt exists
+        """
+        self._ensure_connected()
+
+        async def _get():
+            async with self._get_session_with_schema() as session:
+                stmt = select(agent_prompts_table).where(
+                    agent_prompts_table.c.status == "active"
+                )
+                result = await session.execute(stmt)
+                row = result.fetchone()
+
+                if row:
+                    return {
+                        "id": row.id,
+                        "prompt_text": row.prompt_text,
+                        "status": row.status,
+                        "traffic": float(row.traffic) if row.traffic is not None else 0.0,
+                        "num_interactions": row.num_interactions if row.num_interactions is not None else 0,
+                        "average_feedback_score": float(row.average_feedback_score) if row.average_feedback_score is not None else None,
+                    }
+
+                return None
+
+        return await self._retry_on_connection_error(_get)
+
+    async def get_candidate_prompt(self) -> dict[str, Any] | None:
+        """Get the current candidate prompt.
+
+        Returns:
+            Dictionary containing prompt data (id, prompt_text, status, traffic)
+            or None if no candidate prompt exists
+        """
+        self._ensure_connected()
+
+        async def _get():
+            async with self._get_session_with_schema() as session:
+                stmt = select(agent_prompts_table).where(
+                    agent_prompts_table.c.status == "candidate"
+                )
+                result = await session.execute(stmt)
+                row = result.fetchone()
+
+                if row:
+                    return {
+                        "id": row.id,
+                        "prompt_text": row.prompt_text,
+                        "status": row.status,
+                        "traffic": float(row.traffic) if row.traffic is not None else 0.0,
+                        "num_interactions": row.num_interactions if row.num_interactions is not None else 0,
+                        "average_feedback_score": float(row.average_feedback_score) if row.average_feedback_score is not None else None,
+                    }
+
+                return None
+
+        return await self._retry_on_connection_error(_get)
+
+    async def insert_prompt(self, text: str, status: str, traffic: float) -> int:
+        """Insert a new prompt into the database.
+
+        Args:
+            text: The prompt text content
+            status: The prompt status (active, candidate, deprecated, rolled_back)
+            traffic: Traffic allocation (0.0 to 1.0)
+
+        Returns:
+            The ID of the newly inserted prompt
+
+        Raises:
+            ValueError: If traffic is not in range [0, 1]
+        """
+        if not 0 <= traffic <= 1:
+            raise ValueError(f"Traffic must be between 0 and 1, got {traffic}")
+
+        self._ensure_connected()
+
+        async def _insert():
+            async with self._get_session_with_schema() as session:
+                async with session.begin():
+                    stmt = agent_prompts_table.insert().values(
+                        prompt_text=text,
+                        status=status,
+                        traffic=traffic,
+                        num_interactions=0,
+                        average_feedback_score=None,
+                    ).returning(agent_prompts_table.c.id)
+
+                    result = await session.execute(stmt)
+                    prompt_id = result.scalar_one()
+                    logger.info(f"Inserted prompt {prompt_id} with status '{status}' and traffic {traffic}")
+                    return prompt_id
+
+        return await self._retry_on_connection_error(_insert)
+
+    async def update_prompt_traffic(self, prompt_id: int, traffic: float) -> None:
+        """Update the traffic allocation for a specific prompt.
+
+        Args:
+            prompt_id: The ID of the prompt to update
+            traffic: New traffic allocation (0.0 to 1.0)
+
+        Raises:
+            ValueError: If traffic is not in range [0, 1]
+        """
+        if not 0 <= traffic <= 1:
+            raise ValueError(f"Traffic must be between 0 and 1, got {traffic}")
+
+        self._ensure_connected()
+
+        async def _update():
+            async with self._get_session_with_schema() as session:
+                async with session.begin():
+                    stmt = (
+                        update(agent_prompts_table)
+                        .where(agent_prompts_table.c.id == prompt_id)
+                        .values(traffic=traffic)
+                    )
+
+                    await session.execute(stmt)
+                    logger.info(f"Updated traffic for prompt {prompt_id} to {traffic}")
+
+        await self._retry_on_connection_error(_update)
+
+    async def update_prompt_status(self, prompt_id: int, status: str) -> None:
+        """Update the status of a specific prompt.
+
+        Args:
+            prompt_id: The ID of the prompt to update
+            status: New status (active, candidate, deprecated, rolled_back)
+        """
+        self._ensure_connected()
+
+        async def _update():
+            async with self._get_session_with_schema() as session:
+                async with session.begin():
+                    stmt = (
+                        update(agent_prompts_table)
+                        .where(agent_prompts_table.c.id == prompt_id)
+                        .values(status=status)
+                    )
+
+                    await session.execute(stmt)
+                    logger.info(f"Updated status for prompt {prompt_id} to '{status}'")
+
+        await self._retry_on_connection_error(_update)
+
+    async def zero_out_all_except(self, prompt_ids: list[int]) -> None:
+        """Set traffic to 0 for all prompts except those in the given list.
+
+        Args:
+            prompt_ids: List of prompt IDs to preserve (keep their traffic unchanged)
+        """
+        self._ensure_connected()
+
+        async def _zero():
+            async with self._get_session_with_schema() as session:
+                async with session.begin():
+                    stmt = (
+                        update(agent_prompts_table)
+                        .where(agent_prompts_table.c.id.notin_(prompt_ids))
+                        .values(traffic=0)
+                    )
+
+                    result = await session.execute(stmt)
+                    logger.info(
+                        f"Zeroed out traffic for {result.rowcount} prompts "
+                        f"(preserving IDs: {prompt_ids})"
+                    )
+
+        await self._retry_on_connection_error(_zero)
+
+    async def update_prompt_metrics(
+        self, prompt_id: int, normalized_feedback_score: float | None = None
+    ) -> None:
+        """Update prompt metrics: increment interactions and update average feedback.
+
+        Args:
+            prompt_id: ID of the prompt to update
+            normalized_feedback_score: Optional feedback score between 0 and 1.
+                If provided, updates average_feedback_score.
+                If None, only increments num_interactions.
+
+        The average feedback is calculated using the formula:
+            new_avg = ((old_avg * old_count) + new_feedback) / (old_count + 1)
+
+        Raises:
+            ValueError: If normalized_feedback_score is not in range [0, 1]
+        """
+        if normalized_feedback_score is not None and not (
+            0 <= normalized_feedback_score <= 1
+        ):
+            raise ValueError(
+                f"normalized_feedback_score must be between 0 and 1, got {normalized_feedback_score}"
+            )
+
+        self._ensure_connected()
+
+        async def _update_metrics():
+            async with self._get_session_with_schema() as session:
+                async with session.begin():
+                    # Fetch current prompt data
+                    stmt = select(agent_prompts_table).where(
+                        agent_prompts_table.c.id == prompt_id
+                    )
+                    result = await session.execute(stmt)
+                    row = result.fetchone()
+
+                    if not row:
+                        logger.warning(
+                            f"Prompt {prompt_id} not found, skipping metrics update"
+                        )
+                        return
+
+                    old_num_interactions = row.num_interactions or 0
+                    old_avg_feedback = row.average_feedback_score
+
+                    # Calculate new values
+                    new_num_interactions = old_num_interactions + 1
+
+                    if normalized_feedback_score is not None:
+                        # Update average feedback score
+                        if old_avg_feedback is None:
+                            # First feedback
+                            new_avg_feedback = normalized_feedback_score
+                        else:
+                            # Weighted average: ((old_avg * old_count) + new_feedback) / (old_count + 1)
+                            new_avg_feedback = (
+                                (float(old_avg_feedback) * old_num_interactions)
+                                + normalized_feedback_score
+                            ) / (old_num_interactions + 1)
+
+                        logger.info(
+                            f"Updating prompt {prompt_id}: num_interactions {old_num_interactions} -> {new_num_interactions}, "
+                            f"avg_feedback {old_avg_feedback} -> {new_avg_feedback:.3f}"
+                        )
+
+                        # Update both metrics
+                        stmt = (
+                            update(agent_prompts_table)
+                            .where(agent_prompts_table.c.id == prompt_id)
+                            .values(
+                                num_interactions=new_num_interactions,
+                                average_feedback_score=new_avg_feedback,
+                            )
+                        )
+                    else:
+                        # Only increment interactions
+                        logger.info(
+                            f"Updating prompt {prompt_id}: num_interactions {old_num_interactions} -> {new_num_interactions}"
+                        )
+
+                        stmt = (
+                            update(agent_prompts_table)
+                            .where(agent_prompts_table.c.id == prompt_id)
+                            .values(num_interactions=new_num_interactions)
+                        )
+
+                    await session.execute(stmt)
+
+        await self._retry_on_connection_error(_update_metrics)

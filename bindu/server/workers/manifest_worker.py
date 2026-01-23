@@ -51,7 +51,7 @@ from bindu.utils.logging import get_logger
 from bindu.utils.retry import retry_worker_operation
 from bindu.utils.worker_utils import ArtifactBuilder, MessageConverter, TaskStateManager
 from bindu.dspy.prompt_selector import select_prompt_with_canary
-from bindu.dspy.prompt_metrics import update_prompt_metrics
+from bindu.dspy.prompts import update_prompt_metrics
 from bindu.dspy.prompts import insert_prompt
 
 tracer = get_tracer("bindu.server.workers.manifest_worker")
