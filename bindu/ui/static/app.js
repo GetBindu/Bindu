@@ -1,5 +1,8 @@
 // Bindu Agent Chat Interface - Main Application Logic
 
+import { renderMarkdown } from "./utils/markdown.js";
+import { cleanToken } from "./utils/validators.js";
+
 // Global State
 let agentInfo = null;
 
@@ -101,19 +104,15 @@ async function handlePaymentRequired(originalRequest) {
 }
 
 function getPaymentHeaders() {
-    if (!paymentToken) return {};
-
-    // Ensure payment token is properly encoded
-    const cleanToken = paymentToken.trim();
-
-    // Check for non-ASCII characters
-    if (!/^[\x00-\x7F]*$/.test(cleanToken)) {
-        console.error('Payment token contains non-ASCII characters');
+    const token = cleanToken(paymentToken);
+    if (!token) {
+      if (paymentToken) {
+        console.error("Payment token invalid format");
         paymentToken = null;
-        return {};
+      }
+      return {};
     }
-
-    return { 'X-PAYMENT': cleanToken };
+    return { "X-PAYMENT": token };
 }
 
 // ============================================================================
@@ -121,21 +120,17 @@ function getPaymentHeaders() {
 // ============================================================================
 
 function getAuthHeaders() {
-    if (!authToken) return {};
-
-    // Ensure token is properly encoded (trim and validate ASCII)
-    const cleanToken = authToken.trim();
-
-    // Check for non-ASCII characters that would cause ISO-8859-1 errors
-    if (!/^[\x00-\x7F]*$/.test(cleanToken)) {
-        console.error('Auth token contains non-ASCII characters');
-        addMessage('⚠️ Invalid auth token format. Please re-enter your token.', 'status');
+    const token = cleanToken(authToken);
+    if (!token) {
+      // if authToken existed but invalid -> clear
+      if (authToken) {
+        addMessage("Invalid auth token format. Please re-enter your token.", "status");
         authToken = null;
-        localStorage.removeItem('bindu_auth_token');
-        return {};
+        localStorage.removeItem("bindu_auth_token");
+      }
+      return {};
     }
-
-    return { 'Authorization': `Bearer ${cleanToken}` };
+    return { Authorization: `Bearer ${token}` };
 }
 
 function openAuthSettings() {
@@ -1363,7 +1358,7 @@ function addMessage(content, sender, taskId = null, state = null) {
     }
 
     if (sender === 'agent') {
-        contentDiv.innerHTML = marked.parse(content);
+        contentDiv.innerHTML = renderMarkdown(content);
     } else {
         contentDiv.textContent = content;
     }
