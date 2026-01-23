@@ -36,7 +36,7 @@ from sqlalchemy.ext.asyncio import (
 from bindu.server.storage.schema import task_feedback_table, tasks_table
 from bindu.utils.logging import get_logger
 
-from .config import MAX_INTERACTIONS_QUERY_LIMIT
+from bindu.settings import app_settings
 
 logger = get_logger("bindu.dspy.postgres")
 
@@ -207,7 +207,7 @@ class RawTaskData:
 
 
 async def fetch_raw_task_data(
-    limit: int = MAX_INTERACTIONS_QUERY_LIMIT,
+    limit: int = None,
 ) -> list[RawTaskData]:
     """Fetch raw task data with feedback from PostgreSQL.
 
@@ -219,7 +219,7 @@ async def fetch_raw_task_data(
     call creates the pool, and subsequent calls reuse it.
 
     Args:
-        limit: Maximum number of tasks to fetch (default: 10000)
+        limit: Maximum number of tasks to fetch (default: from settings)
 
     Returns:
         List of RawTaskData objects containing task history and feedback
@@ -228,6 +228,9 @@ async def fetch_raw_task_data(
         RuntimeError: If STORAGE__POSTGRES_URL environment variable is not set
         ConnectionError: If unable to connect to database or query fails
     """
+    if limit is None:
+        limit = app_settings.dspy.max_interactions_query_limit
+    
     logger.info(f"Fetching up to {limit} tasks from database")
 
     try:

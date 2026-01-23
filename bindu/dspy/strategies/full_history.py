@@ -16,7 +16,7 @@ from uuid import UUID
 
 from bindu.utils.logging import get_logger
 
-from ..config import MAX_FULL_HISTORY_LENGTH
+from bindu.settings import app_settings
 from ..models import Interaction
 from .base import BaseExtractionStrategy
 
@@ -84,10 +84,10 @@ class FullHistoryStrategy(BaseExtractionStrategy):
         agent_output = "\n".join(formatted_lines)
 
         # Enforce max length
-        if len(agent_output) > MAX_FULL_HISTORY_LENGTH:
+        if len(agent_output) > app_settings.dspy.max_full_history_length:
             logger.debug(
                 f"Task {task_id}: Full history exceeds max length "
-                f"({len(agent_output)} > {MAX_FULL_HISTORY_LENGTH})"
+                f"({len(agent_output)} > {app_settings.dspy.max_full_history_length})"
             )
             return None
 
