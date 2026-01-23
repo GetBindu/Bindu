@@ -876,6 +876,63 @@ class PostgresStorage(Storage[ContextT]):
 
         return await self._retry_on_connection_error(_get)
 
+    async def fetch_tasks_with_feedback(
+        self, limit: int | None = None
+    ) -> list[dict[str, Any]]:
+        """Fetch tasks with their associated feedback using LEFT JOIN.
+
+        This method is optimized for DSPy training data extraction, providing
+        task history along with feedback in a single efficient query.
+
+        Args:
+            limit: Maximum number of tasks to fetch (defaults to None for all tasks)
+
+        Returns:
+            List of dictionaries containing:
+                - id: Task UUID
+                - history: List of message dictionaries
+                - created_at: Task creation timestamp
+                - feedback_data: Optional feedback dictionary (None if no feedback)
+        """
+        self._ensure_connected()
+
+        async def _fetch():
+            async with self._get_session_with_schema() as session:
+                # Query tasks with LEFT JOIN to feedback
+                stmt = (
+                    select(
+                        tasks_table.c.id,
+                        tasks_table.c.history,
+                        tasks_table.c.created_at,
+                        task_feedback_table.c.feedback_data,
+                    )
+                    .select_from(
+                        tasks_table.outerjoin(
+                            task_feedback_table,
+                            tasks_table.c.id == task_feedback_table.c.task_id,
+                        )
+                    )
+                    .order_by(tasks_table.c.created_at.desc())
+                )
+
+                if limit is not None:
+                    stmt = stmt.limit(limit)
+
+                result = await session.execute(stmt)
+                rows = result.fetchall()
+
+                return [
+                    {
+                        "id": row.id,
+                        "history": row.history or [],
+                        "created_at": row.created_at,
+                        "feedback_data": row.feedback_data,
+                    }
+                    for row in rows
+                ]
+
+        return await self._retry_on_connection_error(_fetch)
+
     # -------------------------------------------------------------------------
     # Webhook Persistence Operations (for long-running tasks)
     # -------------------------------------------------------------------------
