@@ -153,21 +153,7 @@ uv add cookiecutter
 # Create your Bindu agent
 uvx cookiecutter https://github.com/getbindu/create-bindu-agent.git
 ```
-## 🪟 Quick Start (Windows – First-Time Users)
 
-This section documents the exact steps that worked on Windows to run Bindu locally.
-
-### Steps (PowerShell)
-
-```powershell
-git clone https://github.com/getbindu/Bindu.git
-cd Bindu
-pip install uv
-uv venv --python 3.12.9
-.venv\Scripts\activate
-uv sync --dev
-python examples/echo_agent.py
-```
 ## 🎥 Create Production Ready Agent in Minutes
 
 <div align="center">
@@ -1085,6 +1071,8 @@ OLTP_VERBOSE_LOGGING=true
 Bindu supports **real-time webhook notifications** for long-running tasks, following the [A2A Protocol specification](https://a2a-protocol.org/latest/specification/). This enables clients to receive push notifications about task state changes and artifact generation without polling.
 
 ### Quick Start
+
+
 
 1. **Start webhook receiver:** `python examples/webhook_client_example.py`
 2. **Configure agent** in `examples/echo_agent_with_webhooks.py`:
