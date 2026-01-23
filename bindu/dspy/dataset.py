@@ -342,9 +342,9 @@ def validate_and_clean_interactions(
         agent_output = " ".join(interaction.agent_output.split())
 
         # Check minimum lengths
-        if len(user_input) < MIN_INPUT_LENGTH:
+        if len(user_input) < app_settings.dspy.min_input_length:
             continue
-        if len(agent_output) < MIN_OUTPUT_LENGTH:
+        if len(agent_output) < app_settings.dspy.min_output_length:
             continue
 
         # Check not identical
@@ -364,7 +364,7 @@ def validate_and_clean_interactions(
 
     logger.info(
         f"Validated {len(validated)} interactions from {len(interactions)} total "
-        f"(min_input={MIN_INPUT_LENGTH}, min_output={MIN_OUTPUT_LENGTH})"
+        f"(min_input={app_settings.dspy.min_input_length}, min_output={app_settings.dspy.min_output_length})"
     )
     return validated
 
