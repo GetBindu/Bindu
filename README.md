@@ -1485,3 +1485,12 @@ Grateful to these projects:
   <a href="https://discord.gg/3w5zuYUuwt">💬 Join Discord</a> •
   <a href="https://docs.getbindu.com">🌻 Read the Docs</a>
 </p>
+
+
+## Beginner Notes
+
+As a first-time contributor, I explored this repository and felt that
+a small note for beginners could help improve onboarding.
+
+This section is added to make it easier for new users to understand
+the project structure before diving deeper.
