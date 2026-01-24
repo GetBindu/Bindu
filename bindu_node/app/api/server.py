@@ -79,10 +79,18 @@ async def read_file_content(req: ReadFileRequest):
 # --- Static Frontend ---
 static_dir = os.path.join(settings.BASE_DIR, "bindu_node", "app", "static")
 if not os.path.exists(static_dir):
+    # Fallback/Safety: try relative to this file if BASE_DIR calculation is odd
+    static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "static"))
+
+if not os.path.exists(static_dir):
+    print(f"CRITICAL WARNING: Static directory not found at {static_dir}")
     os.makedirs(static_dir)
 
 app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
 
 @app.get("/")
 async def root():
-    return FileResponse(os.path.join(static_dir, "index.html"))
+    index_path = os.path.join(static_dir, "index.html")
+    if not os.path.exists(index_path):
+        return {"error": "index.html not found", "path": index_path} 
+    return FileResponse(index_path)

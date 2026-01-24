@@ -49,13 +49,22 @@
   <div class="container">
     <div class="sidebar">
       <div class="sidebar-header">Explorer</div>
+      <div class="sidebar-actions" style="padding: 10px; display: flex; gap: 5px; flex-wrap: wrap; border-bottom: 1px solid var(--border);">
+        <button class="btn" onclick="findTodos()" title="Find TODOs in Project"><i class="fa-solid fa-list-check"></i> TODOs</button>
+        <button class="btn" onclick="summarizeProject()" title="Summarize Project Structure"><i class="fa-solid fa-file-invoice"></i> Summary</button>
+      </div>
       <div id="tree" class="file-tree"><div style="padding: 20px; color: #8b949e;">Loading...</div></div>
     </div>
     
     <div class="content">
-      <div class="tabs">
-        <div class="tab active" onclick="switchTab('chat')"><i class="fa-solid fa-comments"></i> Chat</div>
-        <div class="tab" onclick="switchTab('code')"><i class="fa-solid fa-code"></i> Code</div>
+      <div class="tabs" style="display: flex; justify-content: space-between; align-items: center; padding-right: 10px;">
+        <div style="display:flex;">
+            <div class="tab active" onclick="switchTab('chat')"><i class="fa-solid fa-comments"></i> Chat</div>
+            <div class="tab" onclick="switchTab('code')"><i class="fa-solid fa-code"></i> Code</div>
+        </div>
+        <div id="code-actions" style="display:none; gap: 8px;">
+            <button class="btn small" onclick="explainCurrentFile()"><i class="fa-solid fa-wand-magic-sparkles"></i> Explain File</button>
+        </div>
       </div>
       
       <div id="chat-tab" class="tab-content active">
@@ -127,6 +136,7 @@
     
     async function openFile(path) {
       file = path;
+      document.getElementById('code-actions').style.display = 'flex';
       const res = await fetch(API + '/repo/read', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({path}) });
       const { content } = await res.json();
       const code = document.createElement('pre');
@@ -145,7 +155,62 @@
       document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
       document.getElementById(t + '-tab').classList.add('active');
-      event.target.classList.add('active');
+      // Fix: ensure correct tab highlighting
+      document.querySelectorAll('.tab').forEach(el => {
+         if(el.innerHTML.includes(t=='chat'?'Chat':'Code')) el.classList.add('active');
+      });
+    }
+
+    async function findTodos() {
+        switchTab('chat');
+        addMsg("Scanning project for TODOs...", 'agent');
+        try {
+            const res = await fetch(API + '/repo/find-todos', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({paths: [""]}) // scan root
+            });
+            const data = await res.json();
+            let text = "### TODOs Found:\n";
+            if (data.result.message) text += data.result.message;
+            else {
+                for (const [file, info] of Object.entries(data.result)) {
+                    text += `**${file}**\n`;
+                    info.todos.forEach(t => text += `- Line ${t.line}: ${t.text}\n`);
+                }
+            }
+            addMsg(text, 'agent');
+        } catch (e) { addMsg("Error finding TODOs: " + e, 'agent'); }
+    }
+
+    async function summarizeProject() {
+        switchTab('chat');
+        addMsg("Generating project summary (this may take a moment)...", 'agent');
+        try {
+            // Simple approach: summarize top level useful text files
+            const res = await fetch(API + '/repo/summarize', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({paths: ["bindu_node/app/api/server.py", "bindu_node/app/services/repo_service.py", "CONTRIBUTING.md"]}) 
+            });
+            const data = await res.json();
+            addMsg("### Project Summary\n" + data.summary, 'agent');
+        } catch (e) { addMsg("Error summarizing: " + e, 'agent'); }
+    }
+
+    async function explainCurrentFile() {
+        if (!file) return;
+        switchTab('chat');
+        addMsg(`Explaining file: ${file}...`, 'agent');
+        try {
+            const res = await fetch(API + '/repo/explain', { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({path: file}) 
+            });
+            const data = await res.json();
+            addMsg(data.explanation, 'agent');
+        } catch (e) { addMsg("Error explaining file: " + e, 'agent'); }
     }
     
     async function send() {
@@ -172,6 +237,77 @@
       document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
     }
     
+    
+    // --- File Drag & Drop ---
+    const dropZone = document.body;
+
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      dropZone.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropZone.addEventListener(eventName, highlight, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropZone.addEventListener(eventName, unhighlight, false);
+    });
+
+    function highlight(e) {
+      dropZone.style.border = '2px dashed #238636';
+      dropZone.style.opacity = '0.9';
+    }
+
+    function unhighlight(e) {
+      dropZone.style.border = 'none';
+      dropZone.style.opacity = '1';
+    }
+
+    dropZone.addEventListener('drop', handleDrop, false);
+
+    function handleDrop(e) {
+      const dt = e.dataTransfer;
+      const files = dt.files;
+      handleFiles(files);
+    }
+
+    function handleFiles(files) {
+      ([...files]).forEach(uploadFile);
+    }
+
+    function uploadFile(file) {
+      // Read file content and send to chat for analysis
+      const reader = new FileReader();
+      reader.readAsText(file);
+      reader.onloadend = function() {
+        const content = reader.result;
+        switchTab('chat');
+        // Auto-send with analysis prompt
+        const prompt = `I've uploaded a file named '${file.name}'. Please analyze it.\n\nFile Content:\n\`\`\`\n${content}\n\`\`\``;
+        
+        // Add user message visually (truncated if too long)
+        const displayMsg = `Uploaded **${file.name}** for analysis.`;
+        addMsg(displayMsg, 'user');
+
+        // Send to API
+        addMsg("Analyzing uploaded file...", 'agent');
+        
+        fetch(API + '/chat', { 
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json'}, 
+            body: JSON.stringify({message: prompt, context: null}) 
+        })
+        .then(res => res.json())
+        .then(data => addMsg(data.response, 'agent'))
+        .catch(err => addMsg("Error analyzing file: " + err, 'agent'));
+      }
+    }
+
     init();
   </script>
 </body>

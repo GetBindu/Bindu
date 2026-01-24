@@ -13,7 +13,12 @@ class Settings(BaseModel):
     DEBUG: bool = False
     
     # Paths
-    BASE_DIR: str = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+    # Current file is in bindu_node/app/core/config.py
+    # We want BASE_DIR to be the repository root (bindu/)
+    # .. -> app/core -> app
+    # .. -> app -> bindu_node
+    # .. -> bindu_node -> bindu (root)
+    BASE_DIR: str = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
     
     # Azure OpenAI
     AZURE_GPT_ENDPOINT: str = os.getenv("AZURE_GPT_ENDPOINT", "")

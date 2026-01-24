@@ -5,9 +5,10 @@ try:
     from agno.agent import Agent
     from agno.models.azure import AzureOpenAI
     AGNO_AVAILABLE = True
-except ImportError as e:
-    logging.warning(f"Agno Import Error: {e}")
-    Agent = AzureOpenAI = None
+except ImportError:
+    from openai import AzureOpenAI as AzureOpenAIClient
+    Agent = None
+    AzureOpenAI = None
     AGNO_AVAILABLE = False
 
 from app.core.config import settings
@@ -18,29 +19,39 @@ logger = logging.getLogger("repo_service")
 class RepoService:
     def __init__(self):
         self.agent = None
+        self.client = None
         self._setup_agent()
 
     def _setup_agent(self):
-        if not AGNO_AVAILABLE:
-            return
-            
+        # Env setup for SDKs
         os.environ["AZURE_OPENAI_API_KEY"] = settings.AZURE_GPT_API_KEY
         os.environ["AZURE_OPENAI_ENDPOINT"] = settings.AZURE_GPT_ENDPOINT
-        os.environ["AZURE_OPENAI_API_VERSION"] = settings.AZURE_GPT_API_VERSION
-        
-        try:
-            self.agent = Agent(
-                name="Repo Helper",
-                instructions="You are a senior developer assistant. Summarize code, explain logic, and find bugs.",
-                model=AzureOpenAI(
-                    id=settings.GPT_DEPLOYMENT,
-                    api_key=settings.AZURE_GPT_API_KEY,
-                    azure_endpoint=settings.AZURE_GPT_ENDPOINT,
-                    api_version=settings.AZURE_GPT_API_VERSION,
+        os.environ["AZURE_OPENAI_API_VERSION"] = settings.AZURE_GPT_API_VERSION or "2023-05-15"
+
+        if AGNO_AVAILABLE:
+            try:
+                self.agent = Agent(
+                    name="Repo Helper",
+                    instructions="You are a senior developer assistant. Summarize code, explain logic, and find bugs.",
+                    model=AzureOpenAI(
+                        id=settings.GPT_DEPLOYMENT,
+                        api_key=settings.AZURE_GPT_API_KEY,
+                        azure_endpoint=settings.AZURE_GPT_ENDPOINT,
+                        api_version=settings.AZURE_GPT_API_VERSION,
+                    )
                 )
-            )
-        except Exception as e:
-            logger.error(f"Failed to init Repo Agent: {e}")
+            except Exception as e:
+                logger.error(f"Failed to init Repo Agent (Agno): {e}")
+        
+        if not self.agent:
+            try:
+                self.client = AzureOpenAIClient(
+                    azure_endpoint=settings.AZURE_GPT_ENDPOINT,
+                    api_key=settings.AZURE_GPT_API_KEY,
+                    api_version=settings.AZURE_GPT_API_VERSION or "2023-05-15"
+                )
+            except Exception as e:
+                logger.error(f"Failed to init Repo Agent (Fallback): {e}")
 
     def find_todos(self, paths: List[str]) -> dict:
         results = {}
@@ -52,34 +63,38 @@ class RepoService:
             try:
                 # relative path for display
                 rel = os.path.relpath(fpath, settings.BASE_DIR).replace("\\", "/")
-                # use safe_read_file logic or direct read since we used os.walk
+                # use safe_read_file logic
                 text = safe_read_file(settings.BASE_DIR, rel) 
                 todos = find_todos_in_text(text)
                 if todos:
                     results[rel] = {"todos": todos}
             except Exception:
-                pass # Skip binary or unreadable files
+                pass # Skip binary
 
         for p in paths:
-            abs_p = os.path.abspath(os.path.join(settings.BASE_DIR, p))
+            # Handle root scan
+            if p == "" or p == ".":
+                abs_p = settings.BASE_DIR
+            else:
+                abs_p = os.path.abspath(os.path.join(settings.BASE_DIR, p))
+            
             if os.path.isdir(abs_p):
-                # Walk directory
                 for root, _, files in os.walk(abs_p):
+                    # Skip common junk
+                    if any(x in root for x in ['.git', '__pycache__', 'node_modules', 'venv', 'env']):
+                        continue
                     for file in files:
                         if file.endswith(('.py', '.js', '.html', '.css', '.md')):
                             scan_file(os.path.join(root, file))
             else:
-                # specific file
                 scan_file(abs_p)
                 
         if not results:
-            return {"message": "No TODOs found in the specified paths."}
+            return {"message": "No TODOs found."}
         return results
 
     def summarize_files(self, paths: List[str], max_chars: int = 3000) -> str:
-        if not self.agent:
-            return "Repo Agent not available (agno missing)."
-            
+        # Build context
         sb = []
         total = 0
         for p in paths:
@@ -95,22 +110,60 @@ class RepoService:
                 break
         
         prompt = "Summarize these files (Purpose, Classes, Issues):\n\n" + "\n".join(sb)
-        try:
-            resp = self.agent.run(prompt)
-            return str(resp.content) if hasattr(resp, 'content') else str(resp)
-        except Exception as e:
-            return f"Agent Error: {e}"
+
+        # Run AI
+        ids = settings.GPT_DEPLOYMENT or "gpt-4o"
+        
+        if self.agent:
+            try:
+                resp = self.agent.run(prompt)
+                return str(resp.content) if hasattr(resp, 'content') else str(resp)
+            except Exception as e:
+                logger.error(f"Agno summarization failed: {e}")
+        
+        if self.client:
+            try:
+                response = self.client.chat.completions.create(
+                    model=ids,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                return response.choices[0].message.content
+            except Exception as e:
+                return f"Error during summarization (Fallback): {e}"
+
+        return "AI Agent not available."
 
     def explain_code(self, path: str, start: Optional[int], end: Optional[int]) -> str:
-        if not self.agent:
-            return "Repo Agent not available."
         try:
             snippet = safe_read_file(settings.BASE_DIR, path, start, end)
-            prompt = f"Explain this code snippet:\n\n{snippet}"
-            resp = self.agent.run(prompt)
-            return str(resp.content) if hasattr(resp, 'content') else str(resp)
         except Exception as e:
-            return f"Error: {e}"
+            return f"Error reading file for explanation: {e}"
+
+        prompt = f"Explain this code snippet:\n\n{snippet}"
+
+        # 1. Try Agno
+        if self.agent:
+            try:
+                resp = self.agent.run(prompt)
+                return str(resp.content) if hasattr(resp, 'content') else str(resp)
+            except Exception as e:
+                logger.error(f"Agno explain failed: {e}")
+
+        # 2. Fallback Client
+        if self.client:
+           try:
+                response = self.client.chat.completions.create(
+                    model=settings.GPT_DEPLOYMENT or "gpt-4o",
+                    messages=[
+                        {"role": "system", "content": "You are a code explainer."},
+                        {"role": "user", "content": prompt}
+                    ]
+                )
+                return response.choices[0].message.content
+           except Exception as e:
+                return f"Error explaining (Fallback): {e}"
+        
+        return "AI Agent not available."
 
     def get_file_tree(self, path: str = "") -> List[dict]:
         """
