@@ -113,6 +113,26 @@ GitHub Desktop allows you to clone, manage branches, commit changes, and open pu
 uv add bindu
 
 # For development (if contributing to Bindu)
+
+### Debug Notes (Local Investigation)
+
+While working on `bindu/server/endpoints/skills.py`, multiple issues were
+identified during local validation and refactoring attempts:
+
+- `from __future__ import annotations` was not placed at the top of the file,
+  causing a `SyntaxError` during compilation
+- Duplicate definitions of `skills_list_endpoint` were introduced during
+  refactoring
+- Several blocks had incorrect indentation, leading to invalid syntax
+- Server configuration errors were incorrectly mapped to
+  `SkillNotFoundError` instead of `InternalError (500)`
+
+These issues were identified using `python -m compileall` during local
+experimentation. No production code changes are included in this commit;
+this section documents findings to help future refactoring efforts.
+
+
+
 # Create and activate virtual environment
 uv venv --python 3.12.9
 source .venv/bin/activate  # On macOS/Linux
