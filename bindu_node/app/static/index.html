@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bindu Node</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+  <style>
+    :root { --bg: #0d1117; --card: #161b22; --border: #30363d; --accent: #238636; --text: #c9d1d9; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; height: 100vh; display: flex; flex-direction: column; }
+    header { background: #010409; border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; }
+    .brand { font-weight: 600; font-size: 1.1rem; display: flex; align-items: center; gap: 8px; }
+    .status { font-size: 0.75rem; padding: 4px 8px; border-radius: 12px; background: #1f6feb; color: white; }
+    .container { display: flex; flex: 1; overflow: hidden; }
+    .sidebar { width: 250px; background: var(--card); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+    .sidebar-header { padding: 10px; font-size: 0.8em; color: #8b949e; }
+    .file-tree { flex: 1; overflow-y: auto; padding: 10px 0; }
+    .tree-item { padding: 4px 15px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+    .tree-item:hover { background: #21262d; }
+    .content { flex: 1; display: flex; flex-direction: column; }
+    .tabs { display: flex; background: var(--card); border-bottom: 1px solid var(--border); }
+    .tab { padding: 10px 20px; cursor: pointer; border-right: 1px solid var(--border); font-size: 0.9em; color: #8b949e; }
+    .tab.active { background: var(--bg); color: #58a6ff; border-top: 2px solid #58a6ff; }
+    .tab-content { flex: 1; overflow: hidden; display: none; padding: 20px; flex-direction: column; }
+    .tab-content.active { display: flex; }
+    .chat-messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; }
+    .msg { display: flex; gap: 15px; max-width: 80%; }
+    .msg.user { align-self: flex-end; }
+    .msg-avatar { width: 32px; height: 32px; border-radius: 50%; background: #238636; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .msg-bubble { background: var(--card); border: 1px solid var(--border); padding: 12px 16px; border-radius: 8px; }
+    .chat-input { padding: 15px; border-top: 1px solid var(--border); background: #010409; }
+    textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); color: white; padding: 10px; border-radius: 6px; resize: none; height: 60px; }
+    .btn { background: var(--card); border: 1px solid var(--border); color: white; padding: 8px 14px; border-radius: 4px; cursor: pointer; font-size: 0.85em; }
+    .btn.primary { background: #238636; border-color: #238636; }
+    pre { margin: 0; flex: 1; overflow-y: auto; background: black !important; border-radius: 6px; border: 1px solid var(--border); }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand"><i class="fa-solid fa-network-wired"></i> Bindu Node</div>
+    <div id="status" class="status">🔴 Connecting...</div>
+  </header>
+  
+  <div class="container">
+    <div class="sidebar">
+      <div class="sidebar-header">Explorer</div>
+      <div id="tree" class="file-tree"><div style="padding: 20px; color: #8b949e;">Loading...</div></div>
+    </div>
+    
+    <div class="content">
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab('chat')"><i class="fa-solid fa-comments"></i> Chat</div>
+        <div class="tab" onclick="switchTab('code')"><i class="fa-solid fa-code"></i> Code</div>
+      </div>
+      
+      <div id="chat-tab" class="tab-content active">
+        <div id="messages" class="chat-messages"></div>
+        <div class="chat-input">
+          <textarea id="input" placeholder="Ask about your code..."></textarea>
+          <button class="btn primary" onclick="send()" style="margin-top: 8px;"><i class="fa-solid fa-paper-plane"></i> Send</button>
+        </div>
+      </div>
+      
+      <div id="code-tab" class="tab-content">
+        <div style="color: #8b949e; text-align: center; margin-top: 50px;">Select a file to view</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = '/api';
+    let file = null;
+    
+    async function init() {
+      await health();
+      await tree();
+      document.getElementById('input').addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+      });
+    }
+    
+    async function health() {
+      try {
+        const res = await fetch(API + '/health');
+        const data = await res.json();
+        document.getElementById('status').innerHTML = `🟢 Online: ${data.agent}`;
+      } catch { document.getElementById('status').innerHTML = '🔴 Offline'; }
+    }
+    
+    async function tree() {
+      try {
+        const res = await fetch(API + '/repo/tree');
+        const { tree } = await res.json();
+        document.getElementById('tree').innerHTML = '';
+        render(tree, document.getElementById('tree'));
+      } catch (e) { console.log(e); }
+    }
+    
+    function render(nodes, cont) {
+      if (!nodes) return;
+      nodes.forEach(n => {
+        const el = document.createElement('div');
+        if (n.type === 'folder') {
+          const title = document.createElement('div');
+          title.className = 'tree-item';
+          title.innerHTML = `<i class="fa-folder"></i> ${n.name}`;
+          el.appendChild(title);
+          const sub = document.createElement('div');
+          sub.style.marginLeft = '15px';
+          sub.style.display = 'none';
+          title.onclick = () => sub.style.display = sub.style.display ? '' : 'none';
+          render(n.children, sub);
+          el.appendChild(sub);
+        } else {
+          el.className = 'tree-item';
+          el.innerHTML = `<i class="fa-file"></i> ${n.name}`;
+          el.onclick = () => openFile(n.path);
+        }
+        cont.appendChild(el);
+      });
+    }
+    
+    async function openFile(path) {
+      file = path;
+      const res = await fetch(API + '/repo/read', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({path}) });
+      const { content } = await res.json();
+      const code = document.createElement('pre');
+      const c = document.createElement('code');
+      c.textContent = content;
+      c.className = 'language-python';
+      code.appendChild(c);
+      const tab = document.getElementById('code-tab');
+      tab.innerHTML = '';
+      tab.appendChild(code);
+      hljs.highlightAll();
+      switchTab('code');
+    }
+    
+    function switchTab(t) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+      document.getElementById(t + '-tab').classList.add('active');
+      event.target.classList.add('active');
+    }
+    
+    async function send() {
+      const msg = document.getElementById('input').value.trim();
+      if (!msg) return;
+      document.getElementById('input').value = '';
+      addMsg(msg, 'user');
+      const res = await fetch(API + '/chat', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({message: msg, context: file ? await getFileContent(file) : null}) });
+      const { response } = await res.json();
+      addMsg(response, 'agent');
+    }
+    
+    async function getFileContent(path) {
+      const res = await fetch(API + '/repo/read', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({path}) });
+      const { content } = await res.json();
+      return content;
+    }
+    
+    function addMsg(text, role) {
+      const div = document.createElement('div');
+      div.className = 'msg ' + role;
+      div.innerHTML = `<div class="msg-avatar"><i class="fa-solid fa-${role === 'user' ? 'user' : 'robot'}"></i></div><div class="msg-bubble">${marked.parse(text)}</div>`;
+      document.getElementById('messages').appendChild(div);
+      document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+    }
+    
+    init();
+  </script>
+</body>
+</html>
