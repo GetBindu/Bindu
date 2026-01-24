@@ -30,4 +30,5 @@ config = {
     "skills": [],
 }
 
-bindufy(config, handler)
+if __name__ == "__main__":
+    bindufy(config, handler)
