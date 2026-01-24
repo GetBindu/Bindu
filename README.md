@@ -134,6 +134,31 @@ uv sync --dev
 | `Microsoft Visual C++ required` | Download [Visual C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) |
 | `ModuleNotFoundError` | Activate venv and run `uv sync --dev` |
 
+
+### 🪟 Windows + uv + Python 3.13 Notes
+
+When using **Python 3.13** with `uv` on Windows, issues may occur if `uv' selects or mixes incompatible Python interpreters during environment creation or dependency resolution.
+
+In this case, failures were caused by an **environment mismatch**
+(not missing system dependencies or C/C++ build tools).
+
+**Observed behavior:**
+- `uv sync` failed due to Python version incompatibility with certain dependencies
+- Errors referenced unavailable wheels for the active Python interpreter
+- Switching between multiple Python installations caused confusion about
+  which environment was actually active
+
+**What worked in practice:**
+- Removing the existing virtual environment
+- Recreating a clean `.venv` using a single Python interpreter
+- Activating the environment explicitly before running `uv sync`
+
+```powershell
+uv venv
+.\.venv\Scripts\Activate.ps1
+uv sync --dev
+
+
 </details>
 
 ---
