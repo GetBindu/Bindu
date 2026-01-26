@@ -214,6 +214,17 @@ bindufy(config, handler)
 Your agent is now live at `http://localhost:3773` and ready to communicate with other agents.
 
 ---
+### Beginner: Zero-Config Local Agent (Recommended for First-Time Users)
+
+If you want to try Bindu without setting up Postgres, Redis, or any cloud services,
+this zero-config example is the fastest way to get started.
+
+It runs entirely locally using in-memory storage and scheduler.
+
+```bash
+python examples/beginner_zero_config_agent.py
+```
+
 
 ### Option 3: Minimal Echo Agent (Testing)
 
