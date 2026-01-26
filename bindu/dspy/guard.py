@@ -23,7 +23,7 @@ from .prompts import get_candidate_prompt
 logger = get_logger("bindu.dspy.guard")
 
 
-async def ensure_system_stable(agent_id: str | None = None) -> None:
+async def ensure_system_stable(agent_id: str | None = None, did: str | None = None) -> None:
     """Ensure system is stable before starting DSPy training.
     
     Checks if there's already an active candidate prompt being tested.
@@ -36,8 +36,8 @@ async def ensure_system_stable(agent_id: str | None = None) -> None:
     Raises:
         RuntimeError: If a candidate prompt already exists (experiment active)
     """
-    # Check if there's already a candidate prompt
-    candidate = await get_candidate_prompt()
+    # Check if there's already a candidate prompt with DID isolation
+    candidate = await get_candidate_prompt(did=did)
     
     if candidate is not None:
         logger.error(

@@ -115,9 +115,9 @@ async def train_async(
     strategy = strategy or LastTurnStrategy()
     logger.info(f"Starting DSPy training pipeline with {strategy.name} strategy (DID: {did or 'public'})")
 
-    # Step 0: Ensure system is stable (no active experiments)
+    # Step 0: Ensure system is stable (no active experiments) with DID isolation
     logger.info("Checking system stability")
-    await ensure_system_stable()
+    await ensure_system_stable(did=did)
 
     # Step 1: Fetch current active prompt from storage
     logger.info("Fetching active prompt from storage")
@@ -221,7 +221,7 @@ async def train_async(
 
     # Zero out traffic for all other prompts
     logger.info("Zeroing out traffic for all other prompts")
-    await zero_out_all_except([active_id, candidate_id])
+    await zero_out_all_except([active_id, candidate_id], did=did)
     
     logger.info(
         f"A/B test initialized: active (id={active_id}) at {active_traffic:.0%}, "
