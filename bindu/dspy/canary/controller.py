@@ -170,7 +170,7 @@ async def _check_stabilization(
         await update_prompt_status(active["id"], "deprecated", storage=storage, did=did)
 
 
-async def run_canary_controller(did: str | None = None) -> None:
+async def run_canary_controller(storage: Storage | None = None, did: str | None = None) -> None:
     """Main canary controller logic.
 
     Compares active and candidate prompts and adjusts traffic based on metrics.
