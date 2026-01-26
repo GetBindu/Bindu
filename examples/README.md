@@ -26,6 +26,8 @@ These examples demonstrate the fundamental concepts of Bindu.
 | `echo_agent.py` | A minimal agent that repeats what you say. | Basics of `bindufy` |
 | `echo_simple_agent.py` | An even simpler version of the echo agent. | Minimal config |
 | `summarizer_agent.py` | An agent that summarizes text (requires OpenAI key). | Integration with LLMs |
+| `pr_review_agent.py` | Reviews git diffs and flags common issues like TODOs and hardcoded secrets. | Developer tooling, structured output |
+
 
 ### 2. Framework Integrations
 Bindu works seamlessly with other agent frameworks.
