@@ -498,6 +498,10 @@ class Task(TypedDict):
     """The history of the task."""
 
     metadata: NotRequired[dict[str, Any]]
+    """Additional metadata for the task."""
+
+    prompt_id: NotRequired[int]
+    """ID of the system prompt from agent_prompts table used for this task."""
     """The metadata of the task."""
 
 
