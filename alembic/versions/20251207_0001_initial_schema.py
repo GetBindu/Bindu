@@ -32,6 +32,7 @@ def upgrade() -> None:
             "id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False
         ),
         sa.Column("context_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("prompt_id", sa.Integer(), nullable=True),
         sa.Column("kind", sa.String(50), nullable=False, server_default="task"),
         sa.Column("state", sa.String(50), nullable=False),
         sa.Column("state_timestamp", sa.TIMESTAMP(timezone=True), nullable=False),
@@ -139,10 +140,7 @@ def upgrade() -> None:
         sa.Column("prompt_text", sa.Text(), nullable=False),
         sa.Column("status", prompt_status_enum, nullable=False),
         sa.Column("traffic", sa.Numeric(precision=5, scale=4), nullable=False, server_default="0"),
-        sa.Column("num_interactions", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column("average_feedback_score", sa.Numeric(precision=3, scale=2), nullable=True, server_default=None),
         sa.CheckConstraint("traffic >= 0 AND traffic <= 1", name="chk_agent_prompts_traffic_range"),
-        sa.CheckConstraint("average_feedback_score IS NULL OR (average_feedback_score >= 0 AND average_feedback_score <= 1)", name="chk_agent_prompts_feedback_range"),
         comment="Prompts used by agents with constrained active/candidate counts",
     )
 
@@ -163,10 +161,21 @@ def upgrade() -> None:
         postgresql_where=sa.text("status = 'candidate'"),
     )
 
+    # Create foreign key from tasks to agent_prompts
+    op.create_foreign_key(
+        "fk_tasks_prompt_id",
+        "tasks",
+        "agent_prompts",
+        ["prompt_id"],
+        ["id"],
+        ondelete="SET NULL",
+    )
+
     # Create indexes for performance
 
     # Tasks indexes
     op.create_index("idx_tasks_context_id", "tasks", ["context_id"])
+    op.create_index("idx_tasks_prompt_id", "tasks", ["prompt_id"])
     op.create_index("idx_tasks_state", "tasks", ["state"])
     op.create_index(
         "idx_tasks_created_at",
@@ -269,12 +278,16 @@ def downgrade() -> None:
     op.drop_index("idx_contexts_updated_at", table_name="contexts")
     op.drop_index("idx_contexts_created_at", table_name="contexts")
 
+    # Drop foreign key constraint
+    op.drop_constraint("fk_tasks_prompt_id", "tasks", type_="foreignkey")
+
     op.drop_index("idx_tasks_artifacts_gin", table_name="tasks")
     op.drop_index("idx_tasks_metadata_gin", table_name="tasks")
     op.drop_index("idx_tasks_history_gin", table_name="tasks")
     op.drop_index("idx_tasks_updated_at", table_name="tasks")
     op.drop_index("idx_tasks_created_at", table_name="tasks")
     op.drop_index("idx_tasks_state", table_name="tasks")
+    op.drop_index("idx_tasks_prompt_id", table_name="tasks")
     op.drop_index("idx_tasks_context_id", table_name="tasks")
 
     # Drop agent_prompts indexes and table
