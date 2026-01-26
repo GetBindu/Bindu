@@ -1112,11 +1112,12 @@ class PostgresStorage(Storage[ContextT]):
     # -------------------------------------------------------------------------
 
     async def get_active_prompt(self) -> dict[str, Any] | None:
-        """Get the current active prompt.
+        """Get the current active prompt with calculated metrics.
 
         Returns:
-            Dictionary containing prompt data (id, prompt_text, status, traffic)
-            or None if no active prompt exists
+            Dictionary containing prompt data (id, prompt_text, status, traffic,
+            num_interactions, average_feedback_score) or None if no active prompt exists.
+            num_interactions and average_feedback_score are calculated on-demand from tasks table.
         """
         self._ensure_connected()
 
@@ -1129,13 +1130,16 @@ class PostgresStorage(Storage[ContextT]):
                 row = result.fetchone()
 
                 if row:
+                    # Calculate metrics on-demand
+                    metrics = await self._calculate_prompt_metrics(row.id, session)
+                    
                     return {
                         "id": row.id,
                         "prompt_text": row.prompt_text,
                         "status": row.status,
                         "traffic": float(row.traffic) if row.traffic is not None else 0.0,
-                        "num_interactions": row.num_interactions if row.num_interactions is not None else 0,
-                        "average_feedback_score": float(row.average_feedback_score) if row.average_feedback_score is not None else None,
+                        "num_interactions": metrics["num_interactions"],
+                        "average_feedback_score": metrics["average_feedback_score"],
                     }
 
                 return None
@@ -1143,11 +1147,12 @@ class PostgresStorage(Storage[ContextT]):
         return await self._retry_on_connection_error(_get)
 
     async def get_candidate_prompt(self) -> dict[str, Any] | None:
-        """Get the current candidate prompt.
+        """Get the current candidate prompt with calculated metrics.
 
         Returns:
-            Dictionary containing prompt data (id, prompt_text, status, traffic)
-            or None if no candidate prompt exists
+            Dictionary containing prompt data (id, prompt_text, status, traffic,
+            num_interactions, average_feedback_score) or None if no candidate prompt exists.
+            num_interactions and average_feedback_score are calculated on-demand from tasks table.
         """
         self._ensure_connected()
 
@@ -1160,13 +1165,16 @@ class PostgresStorage(Storage[ContextT]):
                 row = result.fetchone()
 
                 if row:
+                    # Calculate metrics on-demand
+                    metrics = await self._calculate_prompt_metrics(row.id, session)
+                    
                     return {
                         "id": row.id,
                         "prompt_text": row.prompt_text,
                         "status": row.status,
                         "traffic": float(row.traffic) if row.traffic is not None else 0.0,
-                        "num_interactions": row.num_interactions if row.num_interactions is not None else 0,
-                        "average_feedback_score": float(row.average_feedback_score) if row.average_feedback_score is not None else None,
+                        "num_interactions": metrics["num_interactions"],
+                        "average_feedback_score": metrics["average_feedback_score"],
                     }
 
                 return None
@@ -1287,92 +1295,56 @@ class PostgresStorage(Storage[ContextT]):
 
         await self._retry_on_connection_error(_zero)
 
-    async def update_prompt_metrics(
-        self, prompt_id: int, normalized_feedback_score: float | None = None
-    ) -> None:
-        """Update prompt metrics: increment interactions and update average feedback.
+    async def _calculate_prompt_metrics(
+        self, prompt_id: int, session=None
+    ) -> dict[str, Any]:
+        """Calculate prompt metrics on-demand by querying tasks with this prompt_id.
 
         Args:
-            prompt_id: ID of the prompt to update
-            normalized_feedback_score: Optional feedback score between 0 and 1.
-                If provided, updates average_feedback_score.
-                If None, only increments num_interactions.
+            prompt_id: ID of the prompt to calculate metrics for
+            session: Optional existing session to reuse
 
-        The average feedback is calculated using the formula:
-            new_avg = ((old_avg * old_count) + new_feedback) / (old_count + 1)
-
-        Raises:
-            ValueError: If normalized_feedback_score is not in range [0, 1]
+        Returns:
+            Dictionary with:
+                - num_interactions: Total number of tasks that used this prompt
+                - average_feedback_score: Average normalized feedback score (0-1) or None
         """
-        if normalized_feedback_score is not None and not (
-            0 <= normalized_feedback_score <= 1
-        ):
-            raise ValueError(
-                f"normalized_feedback_score must be between 0 and 1, got {normalized_feedback_score}"
-            )
-
-        self._ensure_connected()
-
-        async def _update_metrics():
-            async with self._get_session_with_schema() as session:
-                async with session.begin():
-                    # Fetch current prompt data
-                    stmt = select(agent_prompts_table).where(
-                        agent_prompts_table.c.id == prompt_id
+        # Helper to execute the query
+        async def _calc(session):
+            # Join tasks with task_feedback to get feedback scores
+            # Count total tasks and calculate average feedback score
+            stmt = (
+                select(
+                    func.count(tasks_table.c.id).label("num_interactions"),
+                    func.avg(
+                        cast(
+                            func.jsonb_extract_path_text(
+                                task_feedback_table.c.feedback_data, "rating"
+                            ),
+                            sa.Numeric
+                        ) / 5.0  # Normalize 1-5 rating to 0-1
+                    ).label("average_feedback_score")
+                )
+                .select_from(
+                    tasks_table.outerjoin(
+                        task_feedback_table,
+                        tasks_table.c.id == task_feedback_table.c.task_id
                     )
-                    result = await session.execute(stmt)
-                    row = result.fetchone()
-
-                    if not row:
-                        logger.warning(
-                            f"Prompt {prompt_id} not found, skipping metrics update"
-                        )
-                        return
-
-                    old_num_interactions = row.num_interactions or 0
-                    old_avg_feedback = row.average_feedback_score
-
-                    # Calculate new values
-                    new_num_interactions = old_num_interactions + 1
-
-                    if normalized_feedback_score is not None:
-                        # Update average feedback score
-                        if old_avg_feedback is None:
-                            # First feedback
-                            new_avg_feedback = normalized_feedback_score
-                        else:
-                            # Weighted average: ((old_avg * old_count) + new_feedback) / (old_count + 1)
-                            new_avg_feedback = (
-                                (float(old_avg_feedback) * old_num_interactions)
-                                + normalized_feedback_score
-                            ) / (old_num_interactions + 1)
-
-                        logger.info(
-                            f"Updating prompt {prompt_id}: num_interactions {old_num_interactions} -> {new_num_interactions}, "
-                            f"avg_feedback {old_avg_feedback} -> {new_avg_feedback:.3f}"
-                        )
-
-                        # Update both metrics
-                        stmt = (
-                            update(agent_prompts_table)
-                            .where(agent_prompts_table.c.id == prompt_id)
-                            .values(
-                                num_interactions=new_num_interactions,
-                                average_feedback_score=new_avg_feedback,
-                            )
-                        )
-                    else:
-                        # Only increment interactions
-                        logger.info(
-                            f"Updating prompt {prompt_id}: num_interactions {old_num_interactions} -> {new_num_interactions}"
-                        )
-
-                        stmt = (
-                            update(agent_prompts_table)
-                            .where(agent_prompts_table.c.id == prompt_id)
-                            .values(num_interactions=new_num_interactions)
-                        )
-
-                    await session.execute(stmt)
-
-        await self._retry_on_connection_error(_update_metrics)
+                )
+                .where(tasks_table.c.prompt_id == prompt_id)
+            )
+            
+            result = await session.execute(stmt)
+            row = result.fetchone()
+            
+            return {
+                "num_interactions": row.num_interactions or 0,
+                "average_feedback_score": float(row.average_feedback_score) if row.average_feedback_score is not None else None,
+            }
+        
+        # Use provided session or create a new one
+        if session:
+            return await _calc(session)
+        else:
+            async with self._get_session_with_schema() as new_session:
+                return await _calc(new_session)
