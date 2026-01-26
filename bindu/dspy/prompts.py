@@ -111,24 +111,3 @@ async def zero_out_all_except(prompt_ids: list[int]) -> None:
     """
     storage = await _get_storage()
     await storage.zero_out_all_except(prompt_ids)
-
-
-async def update_prompt_metrics(
-    prompt_id: int, normalized_feedback_score: float | None = None
-) -> None:
-    """Update prompt metrics: increment interactions and update average feedback.
-
-    Args:
-        prompt_id: ID of the prompt to update
-        normalized_feedback_score: Optional feedback score between 0 and 1.
-            If provided, updates average_feedback_score.
-            If None, only increments num_interactions.
-
-    The average feedback is calculated using the formula:
-        new_avg = ((old_avg * old_count) + new_feedback) / (old_count + 1)
-
-    Raises:
-        ValueError: If normalized_feedback_score is not in range [0, 1]
-    """
-    storage = await _get_storage()
-    await storage.update_prompt_metrics(prompt_id, normalized_feedback_score)
