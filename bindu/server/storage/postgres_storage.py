@@ -25,11 +25,12 @@ Features:
 
 from __future__ import annotations as _annotations
 
+from contextlib import asynccontextmanager
 from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
-from sqlalchemy import delete, func, select, update, cast
+from sqlalchemy import delete, func, select, text, update, cast
 from sqlalchemy.dialects.postgresql import insert, JSONB, JSON
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from typing_extensions import TypeVar
@@ -220,18 +221,37 @@ class PostgresStorage(Storage[ContextT]):
                 "PostgreSQL engine not initialized. Call connect() first."
             )
 
-    def _get_session_with_schema(self):
-        """Create a session factory that will set search_path on connection.
+    @asynccontextmanager
+    async def _get_session_with_schema(self):
+        """Create a session and set search_path for the DID's schema.
 
         This ensures all queries within the session use the DID's schema
-        without needing to qualify table names.
+        without needing to qualify table names. The search_path is set
+        per-connection to avoid issues with connection pooling and reuse.
 
         Returns:
             AsyncSession context manager
         """
-        # Return the session factory directly - search_path will be set
-        # at the connection level via event listeners or within transactions
-        return self._session_factory()
+        try:
+            async with self._session_factory() as session:
+                # Set search_path for this session if we have a schema
+                if self.schema_name:
+                    sanitized_schema = sanitize_identifier(self.schema_name)
+                    # Execute SET statement - this will auto-begin a transaction
+                    await session.execute(
+                        text(f'SET search_path TO "{sanitized_schema}"')
+                    )
+                    # Commit the transaction from the SET command
+                    # This leaves the session clean for the caller to begin their own transaction
+                    await session.commit()
+                yield session
+        except Exception as e:
+            logger.error(
+                f"Database session error: {type(e).__name__}: {e}",
+                exc_info=True,
+                extra={"schema": self.schema_name if hasattr(self, 'schema_name') else None}
+            )
+            raise
 
     async def _retry_on_connection_error(self, func, *args, **kwargs):
         """Retry function on connection errors using Tenacity.
