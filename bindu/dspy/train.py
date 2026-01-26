@@ -45,6 +45,7 @@ async def train_async(
     optimizer: Any,
     strategy: BaseExtractionStrategy | None = None,
     require_feedback: bool = True,
+    did: str | None = None,
 ) -> None:
     """Train and optimize agent prompts using DSPy.
 
@@ -78,6 +79,7 @@ async def train_async(
             - FirstNTurnsStrategy(n_turns=3)
             - ContextWindowStrategy(n_turns=3, system_prompt="...")
         require_feedback: Whether to require feedback for inclusion in dataset
+        did: Decentralized Identifier for schema isolation (required for multi-tenancy)
     Returns:
         None. The optimized prompt is inserted into the database as a candidate.
 
@@ -108,15 +110,15 @@ async def train_async(
         - Adjust traffic beyond initial 90/10 split
     """
     strategy = strategy or LastTurnStrategy()
-    logger.info(f"Starting DSPy training pipeline with {strategy.name} strategy")
+    logger.info(f"Starting DSPy training pipeline with {strategy.name} strategy (DID: {did or 'public'})")
 
-    # Step 0: Ensure system is stable (no active experiments)
+    # Step 0: Ensure system is stable (no active experiments) with DID isolation
     logger.info("Checking system stability")
-    await ensure_system_stable()
+    await ensure_system_stable(did=did)
 
-    # Step 1: Fetch current active prompt from database
+    # Step 1: Fetch current active prompt from database with DID isolation
     logger.info("Fetching active prompt from database")
-    active_prompt = await get_active_prompt()
+    active_prompt = await get_active_prompt(did=did)
     if active_prompt is None:
         raise ValueError(
             "No active prompt found in database. System requires an active prompt "
@@ -142,6 +144,7 @@ async def train_async(
         strategy=strategy,
         require_feedback=require_feedback,
         min_feedback_threshold=app_settings.dspy.min_feedback_threshold,
+        did=did,
     )
 
     logger.info(f"Golden dataset prepared with {len(golden_dataset)} examples")
@@ -202,17 +205,18 @@ async def train_async(
         text=instructions,
         status="candidate",
         traffic=0.10,
+        did=did,
     )
     logger.info(f"Candidate prompt inserted (id={candidate_id})")
     
     # Set active prompt to 90% traffic (already fetched in Step 1)
     active_id = active_prompt["id"]
     logger.info(f"Setting active prompt (id={active_id}) to 90% traffic")
-    await update_prompt_traffic(active_id, 0.90)
+    await update_prompt_traffic(active_id, 0.90, did=did)
     
     # Zero out traffic for all other prompts
     logger.info("Zeroing out traffic for all other prompts")
-    await zero_out_all_except([active_id, candidate_id])
+    await zero_out_all_except([active_id, candidate_id], did=did)
     
     logger.info(
         f"A/B test initialized: active (id={active_id}) at 90%, "
@@ -223,6 +227,7 @@ def train(
     optimizer: Any = None,
     strategy: BaseExtractionStrategy | None = None,
     require_feedback: bool = True,
+    did: str | None = None,
 ) -> None:
     """Synchronous wrapper for train_async().
 
@@ -233,6 +238,7 @@ def train(
         optimizer: DSPy optimizer instance (default: None)
         strategy: Extraction strategy (LAST_TURN or FULL_HISTORY)
         require_feedback: Whether to require feedback for inclusion in dataset
+        did: Decentralized Identifier for schema isolation (required for multi-tenancy)
 
     Returns:
         None. The optimized prompt is inserted into the database as a candidate.
@@ -246,6 +252,7 @@ def train(
                 optimizer=optimizer,
                 strategy=strategy,
                 require_feedback=require_feedback,
+                did=did,
             )
         )
     except RuntimeError as e:

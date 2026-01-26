@@ -96,6 +96,7 @@ class RawTaskData:
 
 async def fetch_raw_task_data(
     limit: int | None = None,
+    did: str | None = None,
 ) -> list[RawTaskData]:
     """Fetch raw task data with feedback from PostgreSQL.
 
@@ -108,6 +109,7 @@ async def fetch_raw_task_data(
 
     Args:
         limit: Maximum number of tasks to fetch (default: from settings)
+        did: Decentralized Identifier for schema isolation (required for multi-tenancy)
 
     Returns:
         List of RawTaskData objects containing task history and feedback
@@ -119,10 +121,10 @@ async def fetch_raw_task_data(
     if limit is None:
         limit = app_settings.dspy.max_interactions_query_limit
 
-    logger.info(f"Fetching up to {limit} tasks from database")
+    logger.info(f"Fetching up to {limit} tasks from database (DID: {did or 'public'})")
 
-    # Create storage instance and connect
-    storage = PostgresStorage()
+    # Create storage instance with DID for schema isolation
+    storage = PostgresStorage(did=did)
 
     try:
         await storage.connect()

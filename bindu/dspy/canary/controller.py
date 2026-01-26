@@ -88,12 +88,13 @@ def compare_metrics(
         return None
 
 
-async def promote_step(active: dict, candidate: dict) -> None:
+async def promote_step(active: dict, candidate: dict, did: str | None = None) -> None:
     """Promote candidate by increasing its traffic by 0.1 and decreasing active's.
 
     Args:
         active: Active prompt data with id and current traffic
         candidate: Candidate prompt data with id and current traffic
+        did: Decentralized Identifier for schema isolation
     """
     new_candidate_traffic = min(1.0, candidate["traffic"] + TRAFFIC_STEP)
     new_active_traffic = max(0.0, active["traffic"] - TRAFFIC_STEP)
@@ -104,19 +105,20 @@ async def promote_step(active: dict, candidate: dict) -> None:
         f"{new_active_traffic:.1f}"
     )
 
-    await update_prompt_traffic(candidate["id"], new_candidate_traffic)
-    await update_prompt_traffic(active["id"], new_active_traffic)
+    await update_prompt_traffic(candidate["id"], new_candidate_traffic, did=did)
+    await update_prompt_traffic(active["id"], new_active_traffic, did=did)
 
     # Check for stabilization
-    await _check_stabilization(active, candidate, new_active_traffic, new_candidate_traffic)
+    await _check_stabilization(active, candidate, new_active_traffic, new_candidate_traffic, did=did)
 
 
-async def rollback_step(active: dict, candidate: dict) -> None:
+async def rollback_step(active: dict, candidate: dict, did: str | None = None) -> None:
     """Rollback candidate by decreasing its traffic by 0.1 and increasing active's.
 
     Args:
         active: Active prompt data with id and current traffic
         candidate: Candidate prompt data with id and current traffic
+        did: Decentralized Identifier for schema isolation
     """
     new_candidate_traffic = max(0.0, candidate["traffic"] - TRAFFIC_STEP)
     new_active_traffic = min(1.0, active["traffic"] + TRAFFIC_STEP)
@@ -127,15 +129,15 @@ async def rollback_step(active: dict, candidate: dict) -> None:
         f"{new_active_traffic:.1f}"
     )
 
-    await update_prompt_traffic(candidate["id"], new_candidate_traffic)
-    await update_prompt_traffic(active["id"], new_active_traffic)
+    await update_prompt_traffic(candidate["id"], new_candidate_traffic, did=did)
+    await update_prompt_traffic(active["id"], new_active_traffic, did=did)
 
     # Check for stabilization
-    await _check_stabilization(active, candidate, new_active_traffic, new_candidate_traffic)
+    await _check_stabilization(active, candidate, new_active_traffic, new_candidate_traffic, did=did)
 
 
 async def _check_stabilization(
-    active: dict, candidate: dict, active_traffic: float, candidate_traffic: float
+    active: dict, candidate: dict, active_traffic: float, candidate_traffic: float, did: str | None = None
 ) -> None:
     """Check if the system has stabilized and update statuses accordingly.
 
@@ -144,6 +146,7 @@ async def _check_stabilization(
         candidate: Candidate prompt data
         active_traffic: New active traffic value
         candidate_traffic: New candidate traffic value
+        did: Decentralized Identifier for schema isolation
     """
     # Stabilization: one prompt at 1.0, the other at 0.0
     if active_traffic == 1.0 and candidate_traffic == 0.0:
@@ -152,7 +155,7 @@ async def _check_stabilization(
             f"System stabilized: active won, setting candidate {candidate['id']} "
             f"to rolled_back"
         )
-        await update_prompt_status(candidate["id"], "rolled_back")
+        await update_prompt_status(candidate["id"], "rolled_back", did=did)
 
     elif candidate_traffic == 1.0 and active_traffic == 0.0:
         # Candidate won, promote to active and deprecate old active
@@ -160,18 +163,21 @@ async def _check_stabilization(
             f"System stabilized: candidate won, promoting candidate {candidate['id']} "
             f"to active and deprecating old active {active['id']}"
         )
-        await update_prompt_status(candidate["id"], "active")
-        await update_prompt_status(active["id"], "deprecated")
+        await update_prompt_status(candidate["id"], "active", did=did)
+        await update_prompt_status(active["id"], "deprecated", did=did)
 
 
-async def run_canary_controller() -> None:
+async def run_canary_controller(did: str | None = None) -> None:
     """Main canary controller logic.
 
     Compares active and candidate prompts and adjusts traffic based on metrics.
     If no candidate exists, the system is considered stable.
+    
+    Args:
+        did: Decentralized Identifier for schema isolation
     """
-    active = await get_active_prompt()
-    candidate = await get_candidate_prompt()
+    active = await get_active_prompt(did=did)
+    candidate = await get_candidate_prompt(did=did)
 
     if not candidate:
         logger.info("No candidate prompt - system stable")
@@ -185,8 +191,8 @@ async def run_canary_controller() -> None:
     winner = compare_metrics(active, candidate)
 
     if winner == "candidate":
-        await promote_step(active, candidate)
+        await promote_step(active, candidate, did=did)
     elif winner == "active":
-        await rollback_step(active, candidate)
+        await rollback_step(active, candidate, did=did)
     else:
         logger.info("No clear winner - maintaining current traffic distribution")
