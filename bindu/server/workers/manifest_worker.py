@@ -146,9 +146,8 @@ class ManifestWorker(Worker):
             ):
                 # If DSPy is enabled for this manifest, fetch prompts from DB with DID isolation.
                 if getattr(self.manifest, "enable_dspy", False):
-                    # Extract DID from manifest for schema isolation
-                    manifest_did = self.manifest.did_extension.did if self.manifest.did_extension else None
-                    selected_prompt = await select_prompt_with_canary(did=manifest_did)
+                    # Use worker's storage instance (already configured with DID)
+                    selected_prompt = await select_prompt_with_canary(storage=self.storage)
 
                     if selected_prompt:
                         # Use database-selected prompt with canary pooling
@@ -163,12 +162,12 @@ class ManifestWorker(Worker):
                         system_prompt = app_settings.agent.structured_response_system_prompt
                         logger.warning("No prompts in database, creating initial active prompt")
 
-                        # Insert default prompt as active with 100% traffic with DID isolation
+                        # Insert default prompt as active with 100% traffic using worker's storage
                         selected_prompt_id = await insert_prompt(
                             text=system_prompt,
                             status="active",
                             traffic=1.0,
-                            did=manifest_did,
+                            storage=self.storage,
                         )
                         logger.info(f"Created initial active prompt (id={selected_prompt_id}) with 100% traffic")
 
