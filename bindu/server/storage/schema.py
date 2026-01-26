@@ -54,6 +54,12 @@ tasks_table = Table(
         ForeignKey("contexts.id", ondelete="CASCADE"),
         nullable=False,
     ),
+    Column(
+        "prompt_id",
+        Integer,
+        ForeignKey("agent_prompts.id", ondelete="SET NULL"),
+        nullable=True,
+    ),
     # Task metadata
     Column("kind", String(50), nullable=False, default="task"),
     Column("state", String(50), nullable=False),
@@ -78,6 +84,7 @@ tasks_table = Table(
     ),
     # Indexes
     Index("idx_tasks_context_id", "context_id"),
+    Index("idx_tasks_prompt_id", "prompt_id"),
     Index("idx_tasks_state", "state"),
     Index("idx_tasks_created_at", "created_at"),
     Index("idx_tasks_updated_at", "updated_at"),
@@ -213,11 +220,8 @@ agent_prompts_table = Table(
     Column("prompt_text", Text, nullable=False),
     Column("status", prompt_status_enum, nullable=False),
     Column("traffic", Numeric(precision=5, scale=4), nullable=False, server_default="0"),
-    Column("num_interactions", Integer, nullable=False, server_default="0"),
-    Column("average_feedback_score", Numeric(precision=3, scale=2), nullable=True, server_default=None),
     # Constraints
     CheckConstraint("traffic >= 0 AND traffic <= 1", name="chk_agent_prompts_traffic_range"),
-    CheckConstraint("average_feedback_score IS NULL OR (average_feedback_score >= 0 AND average_feedback_score <= 1)", name="chk_agent_prompts_feedback_range"),
     # Table comment
     comment="Prompts used by agents with constrained active/candidate counts",
 )

@@ -51,7 +51,6 @@ from bindu.utils.logging import get_logger
 from bindu.utils.retry import retry_worker_operation
 from bindu.utils.worker_utils import ArtifactBuilder, MessageConverter, TaskStateManager
 from bindu.dspy.prompt_selector import select_prompt_with_canary
-from bindu.dspy.prompts import update_prompt_metrics
 from bindu.dspy.prompts import insert_prompt
 
 tracer = get_tracer("bindu.server.workers.manifest_worker")
@@ -175,12 +174,12 @@ class ManifestWorker(Worker):
                         message_history or []
                     )
                 
-                # Store prompt_id in task metadata for tracking
+                # Store prompt_id in task for tracking
                 if selected_prompt_id is not None:
                     await self.storage.update_task(
                         task["id"],
                         state="working",
-                        metadata={"prompt_id": selected_prompt_id},
+                        prompt_id=selected_prompt_id,
                     )
 
             # Step 3.1: Execute agent with tracing
@@ -259,9 +258,6 @@ class ManifestWorker(Worker):
                 await self._handle_terminal_state(
                     task, results, state, payment_context=payment_context
                 )
-                
-                # Note: num_interactions will be incremented when feedback is received
-                # We don't increment here to avoid double-counting
 
         except Exception as e:
             # Handle task failure with error message
