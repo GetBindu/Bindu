@@ -25,7 +25,7 @@ from bindu.utils.logging import get_logger
 logger = get_logger("bindu.dspy.prompt_selector")
 
 
-async def select_prompt_with_canary(did: str | None = None) -> dict[str, Any] | None:
+async def select_prompt_with_canary(storage: Storage | None = None, did: str | None = None) -> dict[str, Any] | None:
     """Select a prompt using weighted random selection based on traffic allocation.
 
     This function implements canary deployment by:
@@ -34,7 +34,8 @@ async def select_prompt_with_canary(did: str | None = None) -> dict[str, Any] | 
     3. Returning the selected prompt with its metadata
 
     Args:
-        did: Decentralized Identifier for schema isolation
+        storage: Optional existing storage instance to reuse
+        did: Decentralized Identifier for schema isolation (only used if storage is None)
 
     Returns:
         Selected prompt dict with keys: id, prompt_text, status, traffic,
@@ -42,7 +43,7 @@ async def select_prompt_with_canary(did: str | None = None) -> dict[str, Any] | 
         Returns None if no prompts are available
 
     Example:
-        >>> prompt = await select_prompt_with_canary(did="did:bindu:alice:agent1")
+        >>> prompt = await select_prompt_with_canary(storage=storage)
         >>> if prompt:
         ...     system_message = prompt["prompt_text"]
         ...     logger.info(f"Using prompt {prompt['id']} with status {prompt['status']}")
