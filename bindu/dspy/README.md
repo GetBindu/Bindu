@@ -765,4 +765,71 @@ We ❤️ contributions! Please see the main project's [CONTRIBUTING.md](../../C
 
 ---
 
+## Test Plan for DSPy Runtime (Continuous/Online Path)
+
+The following test cases cover the critical components of the DSPy runtime that handle prompt selection from the database and related functionality. These tests focus on the **continuous/online path** (prompt routing and database operations) and exclude canary controller and training components.
+
+### 1. Prompt Management (prompts.py)
+- ✅ **get_active_prompt**: Test fetching active prompt from database
+- ✅ **get_active_prompt**: Test when no active prompt exists
+- ✅ **get_candidate_prompt**: Test fetching candidate prompt from database
+- ✅ **get_candidate_prompt**: Test when no candidate prompt exists
+- ✅ **insert_prompt**: Test inserting new prompt with valid data
+- ✅ **insert_prompt**: Test validation of traffic parameter (0-1 range)
+- ✅ **update_prompt_traffic**: Test updating traffic allocation
+- ✅ **update_prompt_status**: Test updating prompt status (active, candidate, deprecated, rolled_back)
+- ✅ **zero_out_all_except**: Test zeroing traffic for non-specified prompts
+- ✅ **Storage reuse**: Test that provided storage instance is reused and not disconnected
+- ✅ **Storage creation**: Test that new storage is created and disconnected when not provided
+
+### 2. Prompt Selection (prompt_selector.py)
+- ✅ **select_prompt_with_canary**: Test weighted random selection with both prompts
+- ✅ **select_prompt_with_canary**: Test selection when only active exists
+- ✅ **select_prompt_with_canary**: Test selection when only candidate exists  
+- ✅ **select_prompt_with_canary**: Test when no prompts exist (returns None)
+- ✅ **select_prompt_with_canary**: Test when both have 0 traffic (defaults to active)
+- ✅ **select_prompt_with_canary**: Test traffic weighting distribution (90/10 split verification)
+- ✅ **select_prompt_with_canary**: Test DID isolation (different schemas)
+
+### 3. System Stability Guard (guard.py)
+- ✅ **ensure_system_stable**: Test when no candidate exists (stable system)
+- ✅ **ensure_system_stable**: Test when candidate exists (blocks training)
+- ✅ **ensure_system_stable**: Test error message includes candidate ID
+- ✅ **ensure_system_stable**: Test with DID isolation
+
+### 4. Dataset Pipeline (dataset.py)
+- ✅ **fetch_raw_task_data**: Test fetching tasks from database
+- ✅ **fetch_raw_task_data**: Test limit parameter
+- ✅ **fetch_raw_task_data**: Test with DID isolation
+- ✅ **normalize_feedback**: Test rating (1-5) normalization
+- ✅ **normalize_feedback**: Test thumbs_up (true/false) normalization  
+- ✅ **normalize_feedback**: Test missing/invalid feedback
+- ✅ **normalize_feedback**: Test thumbs_up string formats ("true", "false", "yes", "no")
+- ✅ **extract_interactions**: Test extraction with LastTurnStrategy
+- ✅ **extract_interactions**: Test extraction with multiple strategies
+- ✅ **validate_and_clean_interactions**: Test minimum length filtering
+- ✅ **validate_and_clean_interactions**: Test whitespace cleaning
+- ✅ **validate_and_clean_interactions**: Test identical input/output filtering
+- ✅ **deduplicate_interactions**: Test deduplication based on input/output
+- ✅ **build_golden_dataset**: Test complete pipeline integration
+- ✅ **convert_to_dspy_examples**: Test conversion to DSPy Example format
+
+### 5. Interaction Extraction (extractor.py)
+- ✅ **clean_messages**: Test removal of empty messages
+- ✅ **clean_messages**: Test removal of messages without content
+- ✅ **clean_messages**: Test whitespace trimming
+- ✅ **InteractionExtractor.extract**: Test with LastTurnStrategy
+- ✅ **InteractionExtractor.extract**: Test with invalid/empty history
+- ✅ **InteractionExtractor.extract_all**: Test single interaction extraction
+- ✅ **InteractionExtractor.extract_all**: Test multiple interactions (e.g., SlidingWindowStrategy)
+
+### Test Coverage Strategy
+- **Focus**: Critical path components that execute on every request
+- **Scope**: Database operations, prompt selection, data extraction, validation
+- **Exclusions**: Training pipeline, canary controller (covered separately)
+- **Approach**: Unit tests with mocked storage, integration tests with real database
+- **Files**: Organize into 3-4 test files based on functional grouping
+
+---
+
 **Built with ❤️ by the Bindu team** 🌻
