@@ -977,6 +977,33 @@ config = {
 
 Bindu collects user feedback on task executions to enable continuous improvement through DSPy optimization. By storing feedback with ratings and metadata, you can build golden datasets from real interactions and use DSPy to automatically optimize your agent's prompts and behavior.
 
+### 🎯 Enabling DSPy
+
+To use DSPy prompt optimization and canary deployment, add `enable_dspy: True` to your agent config:
+
+```python
+config = {
+    "author": "your.email@example.com",
+    "name": "my_agent",
+    "description": "An agent with DSPy optimization",
+    "deployment": {"url": "http://localhost:3773", "expose": True},
+    "enable_dspy": True,  # ← Enable DSPy for this agent
+}
+```
+
+**What happens when DSPy is enabled:**
+- ✅ System prompts are loaded from the database (not from your code)
+- ✅ Automatic A/B testing with canary deployment (traffic routing)
+- ✅ Prompts can be optimized using real user feedback
+- ✅ Gradual rollout of improved prompts with traffic allocation
+
+**When DSPy is disabled (default):**
+- System prompts come from your agent's `main.py` file or config
+- No database operations for prompt selection
+- Static, version-controlled prompts
+
+> **Note:** DSPy must be enabled for live traffic routing and canary deployment. See [examples/echo_agent_with_dspy.py](examples/echo_agent_with_dspy.py) for a complete example.
+
 ### Submitting Feedback
 
 Provide feedback on any task using the `tasks/feedback` method:
@@ -1005,8 +1032,9 @@ curl --location 'http://localhost:3773/' \
 Feedback is stored in the `task_feedback` table and can be used to:
 - Filter high-quality task interactions for training data
 - Identify patterns in successful vs. unsuccessful completions
-- Optimize agent instructions and few-shot examples with DSPy
-- We are working on the DsPY - will release soon.
+- Optimize agent instructions and few-shot examples with DSPy (requires `enable_dspy: True`)
+
+> 📚 For detailed DSPy integration docs, see [bindu/dspy/README.md](bindu/dspy/README.md)
 
 ---
 
