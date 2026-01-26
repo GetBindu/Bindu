@@ -182,6 +182,7 @@ class AgentManifest:
     kind: Literal["agent", "team", "workflow"]
     num_history_sessions: int
     enable_system_message: bool = True
+    enable_dspy: bool = False
     enable_context_based_history: bool = False
     extra_data: dict[str, Any] = field(default_factory=dict)
 
