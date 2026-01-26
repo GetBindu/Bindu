@@ -51,8 +51,11 @@ class Prompt(UserString):
         return self.data
 
 
-async def get_active_prompt() -> dict[str, Any] | None:
+async def get_active_prompt(did: str | None = None) -> dict[str, Any] | None:
     """Get the current active prompt.
+    
+    Args:
+        did: Decentralized Identifier for schema isolation
     
     Returns:
         Dictionary containing prompt data (id, prompt_text, status, traffic)
@@ -61,8 +64,11 @@ async def get_active_prompt() -> dict[str, Any] | None:
     return await _storage.get_active_prompt()
 
 
-async def get_candidate_prompt() -> dict[str, Any] | None:
+async def get_candidate_prompt(did: str | None = None) -> dict[str, Any] | None:
     """Get the current candidate prompt.
+    
+    Args:
+        did: Decentralized Identifier for schema isolation
     
     Returns:
         Dictionary containing prompt data (id, prompt_text, status, traffic)
@@ -78,6 +84,7 @@ async def insert_prompt(text: str, status: str, traffic: float) -> str:
         text: The prompt text content
         status: The prompt status (active, candidate, deprecated, rolled_back)
         traffic: Traffic allocation (0.0 to 1.0)
+        did: Decentralized Identifier for schema isolation
         
     Returns:
         The ID of the newly inserted prompt (UUID string)
@@ -101,6 +108,7 @@ async def update_prompt_status(prompt_id: str, status: str) -> None:
     Args:
         prompt_id: The ID of the prompt to update
         status: New status (active, candidate, deprecated, rolled_back)
+        did: Decentralized Identifier for schema isolation
     """
     await _storage.update_prompt_status(prompt_id, status)
 
@@ -110,5 +118,6 @@ async def zero_out_all_except(prompt_ids: list[str]) -> None:
     
     Args:
         prompt_ids: List of prompt IDs to preserve (keep their traffic unchanged)
+        did: Decentralized Identifier for schema isolation
     """
     await _storage.zero_out_all_except(prompt_ids)
