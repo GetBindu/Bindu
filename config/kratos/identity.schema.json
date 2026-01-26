@@ -1,0 +1,213 @@
+{
+  "$id": "https://schemas.ory.sh/presets/kratos/identity.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Bindu Identity Schema",
+  "type": "object",
+  "properties": {
+    "traits": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email",
+          "title": "Email Address",
+          "ory.sh/kratos": {
+            "credentials": {
+              "password": {
+                "identifier": true
+              }
+            },
+            "verification": {
+              "via": "email"
+            },
+            "recovery": {
+              "via": "email"
+            }
+          },
+          "minLength": 3,
+          "maxLength": 254
+        },
+        "name": {
+          "type": "object",
+          "properties": {
+            "first": {
+              "type": "string",
+              "title": "First Name",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "last": {
+              "type": "string",
+              "title": "Last Name",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          },
+          "required": ["first", "last"],
+          "additionalProperties": false
+        },
+        "oauth_connections": {
+          "type": "object",
+          "title": "OAuth Connections",
+          "description": "External service OAuth tokens",
+          "patternProperties": {
+            "^(notion|google|github|slack|linear)$": {
+              "type": "object",
+              "properties": {
+                "access_token": {
+                  "type": "string",
+                  "title": "Access Token",
+                  "minLength": 10
+                },
+                "refresh_token": {
+                  "type": "string",
+                  "title": "Refresh Token",
+                  "minLength": 10
+                },
+                "token_type": {
+                  "type": "string",
+                  "title": "Token Type",
+                  "enum": ["Bearer", "bearer"]
+                },
+                "expires_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "title": "Expires At"
+                },
+                "scope": {
+                  "type": "string",
+                  "title": "Scope"
+                },
+                "provider_user_id": {
+                  "type": "string",
+                  "title": "Provider User ID"
+                },
+                "provider_user_email": {
+                  "type": "string",
+                  "format": "email",
+                  "title": "Provider User Email"
+                },
+                "connected_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "title": "Connected At"
+                },
+                "last_refreshed_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "title": "Last Refreshed At"
+                }
+              },
+              "required": ["access_token", "expires_at", "connected_at"],
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false,
+          "default": {}
+        },
+        "agent_preferences": {
+          "type": "object",
+          "title": "Agent Preferences",
+          "properties": {
+            "default_agent_id": {
+              "type": "string",
+              "title": "Default Agent ID",
+              "pattern": "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"
+            },
+            "theme": {
+              "type": "string",
+              "title": "UI Theme",
+              "enum": ["light", "dark", "auto"],
+              "default": "auto"
+            },
+            "notifications_enabled": {
+              "type": "boolean",
+              "title": "Notifications Enabled",
+              "default": true
+            },
+            "auto_refresh_tokens": {
+              "type": "boolean",
+              "title": "Auto Refresh OAuth Tokens",
+              "default": true
+            }
+          },
+          "additionalProperties": false,
+          "default": {}
+        }
+      },
+      "required": ["email", "name"],
+      "additionalProperties": false
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "public": {
+          "type": "object",
+          "properties": {
+            "created_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "updated_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "last_login_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "login_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "is_active": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          "additionalProperties": false
+        },
+        "admin": {
+          "type": "object",
+          "properties": {
+            "is_admin": {
+              "type": "boolean",
+              "default": false
+            },
+            "permissions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "mfa_enabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "mfa_methods": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["totp", "webauthn"]
+              },
+              "default": []
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": ["traits"],
+  "additionalProperties": false,
+  "ory.sh/kratos": {
+    "password": {
+      "identifier": true
+    },
+    "session": {
+      "aal": "aal1"
+    }
+  }
+}
