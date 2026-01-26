@@ -1163,8 +1163,6 @@ class PostgresStorage(Storage[ContextT]):
                         prompt_text=text,
                         status=status,
                         traffic=traffic,
-                        num_interactions=0,
-                        average_feedback_score=None,
                     ).returning(agent_prompts_table.c.id)
 
                     result = await session.execute(stmt)
