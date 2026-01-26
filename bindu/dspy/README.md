@@ -50,14 +50,7 @@ Leverages [DSPy](https://github.com/stanfordnlp/dspy)'s SIMBA optimizer to gener
 
 Traffic-based A/B testing with automatic promotion or rollback based on feedback metrics.
 
-### 📊 Continuous Metrics Tracking
-
-Real-time tracking of:
-- Interaction counts
-- Average feedback scores
-- Traffic distribution
-
-### 🔄 Multiple Extraction Strategies
+###  Multiple Extraction Strategies
 
 Flexible data extraction patterns for different use cases:
 - Last turn only
@@ -84,10 +77,6 @@ The DSPy integration consists of three main subsystems:
 │                                                             │
 │  2. Feedback Collector                                      │
 │     └── Store user feedback in PostgreSQL                  │
-│                                                             │
-│  3. Metrics Updater                                         │
-│     ├── Increment interaction count                        │
-│     └── Update average feedback score                      │
 └─────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────┐
@@ -112,10 +101,9 @@ The DSPy integration consists of three main subsystems:
 │                   PERSISTENT STORAGE                        │
 │                     (PostgreSQL)                            │
 ├─────────────────────────────────────────────────────────────┤
-│  • Task interactions & feedback                            │
-│  • Prompt versions with metadata                           │
-│  • Traffic allocation state                                │
-│  • Performance metrics                                      │
+│  • Tasks with prompt_id foreign keys                       │
+│  • User feedback linked to tasks                           │
+│  • Prompt versions and traffic allocation                  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -123,8 +111,6 @@ The DSPy integration consists of three main subsystems:
 
 ```
 Users Interact → Feedback Stored in DB
-       ↓
-Metrics Updated Continuously (per interaction)
        ↓
 (Every 24h) DSPy Generates New Candidate Prompt
        ↓
@@ -203,6 +189,8 @@ elif winner == "active":
     await rollback_step(active, candidate)  # -10% traffic
 ```
 
+Metrics (`num_interactions` and `average_feedback_score`) are calculated when the canary controller runs by aggregating all tasks with a given `prompt_id` and their associated feedback from the database.
+
 **Key Functions:**
 - `run_canary_controller()`: Main control loop
 - `compare_metrics()`: Determine winner based on feedback
@@ -213,12 +201,11 @@ elif winner == "active":
 
 Database interface for prompt CRUD operations:
 
-- `get_active_prompt()`: Fetch current active
-- `get_candidate_prompt()`: Fetch current candidate
+- `get_active_prompt()`: Fetch current active prompt
+- `get_candidate_prompt()`: Fetch current candidate prompt
 - `insert_prompt()`: Create new prompt
 - `update_prompt_traffic()`: Adjust traffic allocation
 - `update_prompt_status()`: Change status (active/candidate/deprecated/rolled_back)
-- `update_prompt_metrics()`: Increment interactions and feedback
 - `zero_out_all_except()`: Reset traffic for non-experiment prompts
 
 #### 6. **Interaction Extractor** ([extractor.py](./extractor.py))
@@ -421,16 +408,13 @@ if prompt:
     # Use prompt_id later for feedback tracking
 ```
 
-#### Updating Metrics
+#### Feedback Storage
+
+Feedback is stored in the `task_feedback` table and linked to tasks. Each task references the prompt used via a `prompt_id` foreign key.
 
 ```python
-from bindu.dspy.prompts import update_prompt_metrics
-
-# After receiving user feedback
-await update_prompt_metrics(
-    prompt_id=prompt_id,
-    normalized_feedback_score=0.8  # 4/5 stars → 0.8
-)
+# Feedback is stored against individual tasks
+# Tasks are linked to prompts via prompt_id
 ```
 
 ---
@@ -595,23 +579,8 @@ async def select_prompt_with_canary() -> dict[str, Any] | None
 - `prompt_text`: Actual prompt content
 - `status`: `active` or `candidate`
 - `traffic`: Current traffic allocation (0.0-1.0)
-- `num_interactions`: Total interactions
-- `average_feedback_score`: Average normalized feedback
-
-#### `update_prompt_metrics()`
-
-```python
-async def update_prompt_metrics(
-    prompt_id: int,
-    normalized_feedback_score: float | None = None
-) -> None
-```
-
-**Parameters:**
-- `prompt_id`: ID of the prompt
-- `normalized_feedback_score`: Feedback score in [0.0, 1.0] range
-
-Always increments `num_interactions`. Updates `average_feedback_score` if score provided.
+- `num_interactions`: Total tasks using this prompt
+- `average_feedback_score`: Average normalized feedback across all tasks
 
 ### Canary Controller Functions
 
