@@ -30,12 +30,16 @@ logger = get_logger("bindu.dspy.extractor")
 
 def clean_messages(history: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Clean messages by removing those with empty content.
+    
+    Handles both formats:
+    - Direct content: {"role": "user", "content": "text"}
+    - Parts array: {"role": "user", "parts": [{"kind": "text", "text": "..."}]}
 
     Args:
         history: Raw message history
 
     Returns:
-        Cleaned list of messages
+        Cleaned list of messages with normalized format
     """
     cleaned = []
     for msg in history:
@@ -43,10 +47,26 @@ def clean_messages(history: list[dict[str, Any]]) -> list[dict[str, Any]]:
             continue
 
         role = msg.get("role")
-        content = msg.get("content", "")
+        if not role:
+            continue
 
-        # Skip if no role or empty content
-        if not role or not content or not str(content).strip():
+        # Extract content from either direct field or parts array
+        content = msg.get("content", "")
+        
+        # If no direct content, try to extract from parts array
+        if not content:
+            parts = msg.get("parts", [])
+            if isinstance(parts, list):
+                text_parts = []
+                for part in parts:
+                    if isinstance(part, dict) and part.get("kind") == "text":
+                        text = part.get("text", "")
+                        if text:
+                            text_parts.append(str(text))
+                content = "\n".join(text_parts)
+
+        # Skip if no content after extraction
+        if not content or not str(content).strip():
             continue
 
         cleaned.append({"role": role, "content": str(content).strip()})
