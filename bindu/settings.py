@@ -905,6 +905,20 @@ class DSPySettings(BaseSettings):
     max_interactions_query_limit: int = 10000
     """Maximum number of interactions to fetch from database in a single query."""
 
+    # Canary Deployment Thresholds
+    min_canary_interactions_threshold: int = 2
+    """Minimum number of interactions required for candidate prompt before comparing metrics in canary deployment."""
+
+    canary_traffic_step: float = 0.2
+    """Traffic adjustment step size for canary deployment (e.g., 0.1 = 10% increments)."""
+
+    # Initial A/B Test Traffic Split
+    initial_candidate_traffic: float = 0.4
+    """Initial traffic allocation for new candidate prompts during A/B testing (e.g., 0.10 = 10%)."""
+
+    initial_active_traffic: float = 0.6
+    """Initial traffic allocation for active prompt when candidate is introduced (e.g., 0.90 = 90%)."""
+
 
 class SentrySettings(BaseSettings):
     """Sentry error tracking and performance monitoring configuration.
