@@ -32,6 +32,42 @@ from bindu.utils.logging import get_logger
 logger = get_logger("bindu.dspy.cli.train")
 
 
+def feedback_metric(example, prediction_dict, trace=None):
+    """Compute training metric using feedback scores.
+
+    This metric prioritizes explicit feedback scores when available,
+    and falls back to exact match comparison otherwise.
+
+    IMPORTANT: This function signature matches DSPy SIMBA's requirement:
+    metric: Callable[[dspy.Example, dict[str, Any]], float]
+
+    Args:
+        example: DSPy Example with input, output, and optional feedback
+        prediction_dict: Dictionary containing prediction outputs (has 'output' key)
+        trace: Optional trace for optimization (unused)
+
+    Returns:
+        Float score between 0.0 and 1.0
+    """
+    # Validate prediction has output
+    if not prediction_dict or 'output' not in prediction_dict:
+        return 0.0
+
+    actual_output = prediction_dict.get('output', '')
+    if not actual_output:
+        return 0.0
+
+    # Use explicit feedback score if available
+    if hasattr(example, 'feedback') and example.feedback:
+        feedback_score = example.feedback.get('score')
+        if feedback_score is not None:
+            return float(feedback_score)
+
+    # Fallback to exact match
+    expected = example.output if hasattr(example, 'output') else ""
+    return 1.0 if expected.strip() == actual_output.strip() else 0.0
+
+
 def parse_strategy(name: str) -> LastTurnStrategy | FullHistoryStrategy | LastNTurnsStrategy | FirstNTurnsStrategy:
     """Parse strategy name string into strategy instance.
     
@@ -101,13 +137,64 @@ def main() -> None:
         help="DID (Decentralized Identifier) for schema isolation. Example: did:bindu:author:agent:id",
     )
 
+    # SIMBA optimizer parameters
+    parser.add_argument(
+        "--bsize",
+        type=int,
+        default=32,
+        help="Mini-batch size for SIMBA optimizer (default: 32)",
+    )
+
+    parser.add_argument(
+        "--num-candidates",
+        type=int,
+        default=6,
+        help="Number of candidate programs to produce per iteration (default: 6)",
+    )
+
+    parser.add_argument(
+        "--max-steps",
+        type=int,
+        default=8,
+        help="Number of optimization steps to run (default: 8)",
+    )
+
+    parser.add_argument(
+        "--max-demos",
+        type=int,
+        default=4,
+        help="Maximum number of demonstrations per predictor (default: 4)",
+    )
+
+    parser.add_argument(
+        "--num-threads",
+        type=int,
+        default=None,
+        help="Number of threads for parallel execution (default: None = auto)",
+    )
+
     args = parser.parse_args()
 
-    # Metric is implicitly feedback-based inside dataset
+    # Create optimizer with feedback metric and parameters
     if args.optimizer == "simba":
-        optimizer = SIMBA()
+        optimizer = SIMBA(
+            metric=feedback_metric,
+            bsize=args.bsize,
+            num_candidates=args.num_candidates,
+            max_steps=args.max_steps,
+            max_demos=args.max_demos,
+            num_threads=args.num_threads,
+        )
     else:
-        optimizer = GEPA()
+        # GEPA also accepts similar parameters
+        optimizer = GEPA(
+            metric=feedback_metric,
+            bsize=args.bsize,
+            num_candidates=args.num_candidates,
+            max_steps=args.max_steps,
+            max_demos=args.max_demos,
+            num_threads=args.num_threads,
+        )
 
     strategy = parse_strategy(args.strategy)
 
