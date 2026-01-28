@@ -378,6 +378,7 @@ async def build_golden_dataset(
     strategy: BaseExtractionStrategy | None = None,
     require_feedback: bool = True,
     min_feedback_threshold: float = None,
+    did: str | None = None,
 ) -> list[dict[str, Any]]:
     """Build complete golden dataset from raw task data.
 
@@ -395,6 +396,7 @@ async def build_golden_dataset(
         strategy: Extraction strategy to use. Defaults to LastTurnStrategy.
         require_feedback: Whether to require feedback for inclusion
         min_feedback_threshold: Minimum feedback score threshold
+        did: Decentralized Identifier for schema isolation (required for multi-tenancy)
 
     Returns:
         Golden dataset ready for DSPy training
@@ -411,7 +413,7 @@ async def build_golden_dataset(
 
     # Step 0: Fetch raw task data from database
     logger.info("Fetching raw task data from database")
-    raw_tasks = await fetch_raw_task_data(limit=limit)
+    raw_tasks = await fetch_raw_task_data(limit=limit, did=did)
     
     if not raw_tasks:
         raise ValueError("No tasks found in database")
