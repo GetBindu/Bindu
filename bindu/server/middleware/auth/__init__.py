@@ -22,9 +22,11 @@ from __future__ import annotations as _annotations
 from .auth0 import Auth0Middleware
 from .base import AuthMiddleware
 from .cognito import CognitoMiddleware
+from .hydra import HydraMiddleware
 
 __all__ = [
     "AuthMiddleware",
     "Auth0Middleware",
     "CognitoMiddleware",
+    "HydraMiddleware",  # New default
 ]

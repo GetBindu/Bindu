@@ -1,0 +1,44 @@
+﻿serve:
+  public:
+    port: 4444
+    host: 0.0.0.0
+    cors:
+      enabled: true
+      allowed_origins:
+        - "http://localhost"
+        - "http://127.0.0.1"
+      allowed_methods:
+        - POST
+        - GET
+        - PUT
+        - PATCH
+        - DELETE
+        - OPTIONS
+      allowed_headers:
+        - Authorization
+        - Content-Type
+      exposed_headers:
+        - Content-Type
+      allow_credentials: true
+  admin:
+    port: 4445
+    host: 0.0.0.0
+
+dsn: postgres://postgres:postgres@postgres:5432/hydra?sslmode=disable
+
+urls:
+  self:
+    issuer: http://localhost:4444/
+  consent: http://localhost:3000/consent
+  login: http://localhost:3000/login
+  logout: http://localhost:3000/logout
+
+secrets:
+  system:
+    - you-must-change-this-secret-key--and-keep-it-secret
+  cookie:
+    - you-must-change-this-cookie-signature-key--and-keep-it-secret
+
+log:
+  level: debug
+  format: text

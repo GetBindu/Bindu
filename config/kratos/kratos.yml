@@ -1,0 +1,161 @@
+version: v1.2.0
+
+# Use PostgreSQL DSN - removed the commented memory DSN
+dsn: postgres://postgres:postgres@postgres:5432/kratos?sslmode=disable
+
+serve:
+  public:
+    base_url: http://localhost:4433/
+    cors:
+      enabled: true
+      allowed_origins:
+         - "http://localhost:3000"
+         - "http://localhost:3773"
+         - "http://127.0.0.1:3000"
+         - "http://127.0.0.1:3773"
+      allowed_methods:
+        - POST
+        - GET
+        - PUT
+        - PATCH
+        - DELETE
+        - OPTIONS
+      allowed_headers:
+        - Authorization
+        - Content-Type
+        - X-Requested-With
+      exposed_headers:
+        - Content-Type
+        - X-Requested-With
+      allow_credentials: true
+      debug: true
+  admin:
+    base_url: http://localhost:4434/
+
+selfservice:
+  default_browser_return_url: http://localhost:3000/
+  allowed_return_urls:
+    - http://localhost:3000/
+    - http://localhost:3773/
+
+  methods:
+    password:
+      enabled: true
+      config:
+        haveibeenpwned_enabled: false
+        min_password_length: 8
+        identifier_similarity_check_enabled: true
+        ignore_network_errors: true
+
+    totp:
+      enabled: true
+
+    webauthn:
+      enabled: true
+      config:
+        rp:
+          display_name: Bindu Authentication
+          id: localhost
+          origin: http://localhost:4433
+
+    lookup_secret:
+      enabled: true
+
+  flows:
+    error:
+      ui_url: http://localhost:3000/error
+
+    settings:
+      ui_url: http://localhost:3000/settings
+      privileged_session_max_age: 15m
+
+    recovery:
+      enabled: true
+      ui_url: http://localhost:3000/recovery
+      use: code
+      lifespan: 1h
+
+    verification:
+      enabled: true
+      ui_url: http://localhost:3000/verification
+      use: code
+      lifespan: 1h
+      after:
+        default_browser_return_url: http://localhost:3000/
+
+    logout:
+      after:
+        default_browser_return_url: http://localhost:3000/
+
+    login:
+      ui_url: http://localhost:3000/login
+      lifespan: 10m
+      after:
+        default_browser_return_url: http://localhost:3000/
+
+    registration:
+      ui_url: http://localhost:3000/register
+      lifespan: 10m
+      after:
+        password:
+          hooks:
+            - hook: session
+        default_browser_return_url: http://localhost:3000/
+
+log:
+  level: debug
+  format: text
+  leak_sensitive_values: true
+
+secrets:
+  cookie:
+    - you-must-change-this-cookie-signature-key--and-keep-it-secret
+  cipher:
+    -  "32-CHARACTERS-LONG-SECRET-KEY!!!"
+
+ciphers:
+  algorithm: xchacha20-poly1305
+
+hashers:
+  algorithm: bcrypt
+  bcrypt:
+    cost: 10
+
+identity:
+  default_schema_id: default
+  schemas:
+    - id: default
+      url: file:///etc/config/kratos/identity.simple.json
+
+courier:
+  smtp:
+    connection_uri: smtps://test:test@mailhog:1025/?skip_ssl_verify=true
+    from_address: no-reply@bindu.local
+    from_name: Bindu Authentication
+    headers:
+      X-Mailer: Ory Kratos
+
+# For development only
+dev: true
+
+session:
+  whoami:
+    required_aal: aal1
+  lifespan: 720h  # 30 days
+  cookie:
+    domain: localhost
+    path: /
+    same_site: Lax
+
+# tracing:
+#   enabled: false
+#   service_name: ory-kratos
+#   provider: jaeger
+#   jaeger:
+#     sampling:
+#       server_url: http://jaeger:5778/sampling
+#       max_operations: 0
+#     local_agent_address: jaeger:6831
+
+# OAuth2 provider configuration will be added in Phase 3
+# oauth2_providers: []
