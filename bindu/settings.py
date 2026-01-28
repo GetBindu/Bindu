@@ -862,15 +862,15 @@ class DSPySettings(BaseSettings):
     )
 
     # DSPy Model Configuration
-    default_model: str = "openai/gpt-4o-mini"
-    """Default language model for DSPy optimization."""
+    default_model: str = "openrouter/openai/gpt-4o-mini"
+    """Default language model for DSPy optimization. Use openrouter/ prefix to route through OpenRouter."""
 
     # Dataset Filtering Thresholds
     min_feedback_threshold: float = 0.8
     """Minimum normalized feedback score [0.0, 1.0] for interactions to be included in training dataset."""
 
     # Golden Dataset Constraints
-    min_examples: int = 8
+    min_examples: int = 2
     """Minimum number of examples required in golden dataset."""
 
     max_examples: int = 10000
