@@ -1,63 +1,41 @@
-# DSPy Integration
+# DSPy Integration for Bindu
 
-> **Self-improving AI agents through automated prompt optimization**
-
-The DSPy integration enables Bindu agents to automatically improve their system prompts using real user feedback through a safe, gradual, and reversible process.
+Bindu's DSPy integration provides automated prompt optimization and continuous improvement for AI agents through machine learning. The system collects real user interactions and feedback, then uses DSPy's optimization algorithms to automatically refine agent prompts over time.
 
 ## Table of Contents
 
 - [Overview](#overview)
-- [Key Features](#key-features)
 - [Architecture](#architecture)
-- [Components](#components)
-- [Getting Started](#getting-started)
-- [Usage](#usage)
-- [Advanced Configuration](#advanced-configuration)
-- [API Reference](#api-reference)
-- [Development](#development)
+- [Three Ways to Use DSPy](#three-ways-to-use-dspy)
+  - [1. Enable DSPy for Online Prompt Selection](#1-enable-dspy-for-online-prompt-selection)
+  - [2. Train New Prompts (Offline)](#2-train-new-prompts-offline)
+  - [3. Canary Deployment (Offline)](#3-canary-deployment-offline)
+- [Configuration Reference](#configuration-reference)
+- [Extraction Strategies](#extraction-strategies)
+- [CLI Reference](#cli-reference)
+- [Advanced Topics](#advanced-topics)
 
 ---
 
 ## Overview
 
-Traditional AI agents rely on static prompts that remain unchanged over time. The DSPy integration transforms Bindu agents into **self-improving systems** that evolve based on real-world performance:
+The DSPy integration addresses a core challenge in AI agent development: **prompt engineering is iterative and time-consuming**. Instead of manually tweaking prompts based on trial and error, DSPy enables data-driven optimization:
 
-```
-Traditional Agent:  LLM + hardcoded prompt → response
+1. **Collect** user feedback on agent responses
+2. **Build** golden datasets from high-quality interactions
+3. **Optimize** prompts using machine learning (DSPy optimizers)
+4. **Test** new prompts gradually via A/B testing (canary deployment)
+5. **Promote** or rollback based on real-world performance
 
-DSPy-Enhanced Agent: LLM + evolving prompt + feedback data → better responses over time
-```
+This creates a feedback loop where your agent continuously improves based on actual user interactions.
 
-### Core Principles
+### Key Features
 
-- ✅ **Safe**: Canary deployment with gradual rollout
-- ✅ **Measurable**: All decisions are metrics-driven
-- ✅ **Reversible**: Automatic rollback on performance degradation
-- ✅ **Offline**: No online learning or live mutations
-- ✅ **Production-Ready**: Battle-tested for multi-agent systems
-
----
-
-## Key Features
-
-### 🎯 Automatic Prompt Optimization
-
-Leverages [DSPy](https://github.com/stanfordnlp/dspy)'s SIMBA optimizer to generate improved prompts from high-quality interaction data.
-
-> **Note:** Currently only SIMBA optimizer is supported. Other optimizers (GEPA, MIPRO, etc.) are planned for future releases.
-
-### 🚀 Canary Deployment
-
-Traffic-based A/B testing with automatic promotion or rollback based on feedback metrics.
-
-###  Multiple Extraction Strategies
-
-Flexible data extraction patterns for different use cases:
-- Last turn only
-- Full conversation history
-- First/last N turns
-- Context window strategies
-- Similarity-based selection
+- **Automatic prompt optimization** using DSPy's SIMBA and GEPA optimizers
+- **Canary deployment** with gradual traffic shifting (A/B testing)
+- **Multi-strategy data extraction** (last turn, full history, context windows, etc.)
+- **DID-based multi-tenancy** for isolated prompt management per agent
+- **PostgreSQL-backed** prompt versioning and metrics tracking
 
 ---
 
@@ -72,7 +50,7 @@ The DSPy integration consists of three main subsystems:
 ├─────────────────────────────────────────────────────────────┤
 │  1. Prompt Router                                           │
 │     ├── Fetch active & candidate prompts                   │
-│     ├── Weighted random selection (90/10 split)            │
+│     ├── Weighted random selection (80/20 split)            │
 │     └── Return selected prompt                             │
 │                                                             │
 │  2. Feedback Collector                                      │
@@ -87,8 +65,8 @@ The DSPy integration consists of three main subsystems:
 │     ├── Check system stability                             │
 │     ├── Build golden dataset                               │
 │     ├── Run DSPy optimizer                                 │
-│     ├── Insert candidate prompt (10% traffic)              │
-│     └── Initialize A/B test (90/10 split)                  │
+│     ├── Insert candidate prompt (20% traffic)              │
+│     └── Initialize A/B test (80/20 split)                  │
 │                                                             │
 │  2. Canary Controller (Fast Path - Hourly)                 │
 │     ├── Compare active vs candidate metrics                │
@@ -109,548 +87,787 @@ The DSPy integration consists of three main subsystems:
 
 ### Data Flow
 
-```
-Users Interact → Feedback Stored in DB
-       ↓
-(Every 24h) DSPy Generates New Candidate Prompt
-       ↓
-(Every 1h) Canary Compares Active vs Candidate
-       ↓
-Promote (better) or Rollback (worse)
-       ↓
-System Stabilizes (100%/0% traffic)
-       ↓
-Ready for Next Training Cycle
-```
+1. **User Request** → Prompt Router selects prompt (weighted random) → Agent responds
+2. **User Feedback** → Stored in PostgreSQL with task link
+3. **Daily Training** → Build dataset from feedback → Optimize → Create candidate
+4. **Hourly Canary** → Compare metrics → Adjust traffic → Promote/rollback
 
 ---
 
-## Components
+## Three Ways to Use DSPy
 
-### Core Modules
+There are three distinct ways to interact with Bindu's DSPy system, each serving a different purpose:
 
-#### 1. **Training Orchestrator** ([train.py](./train.py))
+### 1. Enable DSPy for Online Prompt Selection
 
-Main entry point for prompt optimization. Coordinates the complete pipeline:
+**Purpose:** Use DSPy-optimized prompts during live agent execution with automatic A/B testing.
 
-- System stability checks
-- Active prompt retrieval
-- Golden dataset construction
-- DSPy optimizer execution
-- Candidate prompt initialization
-- A/B test setup (90/10 split)
+**When to use:** After you've trained and deployed candidate prompts, enable this to have your agent automatically use optimized prompts from the database instead of static config files.
 
-**Key Functions:**
-- `train_async()`: Async training pipeline
-- `train()`: Synchronous wrapper
+#### Configuration
 
-**Supported Optimizer:** SIMBA only (GEPA and others planned for future releases)
+Add to your agent config JSON:
 
-#### 2. **Dataset Builder** ([dataset.py](./dataset.py))
-
-Implements the golden dataset pipeline with 6 stages:
-
-```python
-Raw Tasks → Normalize Feedback → Extract Interactions 
-   → Filter by Quality → Validate → Deduplicate → Golden Dataset
+```json
+{
+  "author": "you@example.com",
+  "name": "My Agent",
+  "description": "An agent with DSPy optimization",
+  "version": "1.0.0",
+  "enable_dspy": true,
+  ...
+}
 ```
 
-**Key Functions:**
-- `fetch_raw_task_data()`: Retrieve tasks from PostgreSQL
-- `normalize_feedback()`: Convert ratings/thumbs to 0.0-1.0 scale
-- `extract_interactions()`: Apply extraction strategy
-- `build_golden_dataset()`: Complete pipeline orchestration
-- `convert_to_dspy_examples()`: Format for DSPy
+#### Required Environment Variables
 
-#### 3. **Prompt Router** ([prompt_selector.py](./prompt_selector.py))
-
-Weighted random selection for canary deployment:
-
-```python
-# Example: 90% active, 10% candidate
-prompt = await select_prompt_with_canary()
-# Returns prompt based on traffic weights
+```bash
+# PostgreSQL connection for prompt storage
+STORAGE_TYPE=postgres
+DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/bindu
 ```
 
-**Key Functions:**
-- `select_prompt_with_canary()`: Traffic-weighted selection
+#### How It Works
 
-#### 4. **Canary Controller** ([canary/controller.py](./canary/controller.py))
+When `enable_dspy: true` is set:
 
-Manages gradual rollout based on performance metrics:
+1. Agent startup checks for the `enable_dspy` flag in your manifest
+2. On each user request, the system calls `select_prompt_with_canary()`
+3. The prompt selector fetches `active` and `candidate` prompts from PostgreSQL
+4. Weighted random selection based on traffic allocation (e.g., 90% active, 10% candidate)
+5. Selected prompt replaces the system message in the agent's context
 
-```python
-# Compare metrics
-winner = compare_metrics(active, candidate)
-
-if winner == "candidate":
-    await promote_step(active, candidate)  # +10% traffic
-elif winner == "active":
-    await rollback_step(active, candidate)  # -10% traffic
+**Logs:**
+```
+🔧 DSPy Optimization: ✅ ENABLED - System prompts will be loaded from database with canary deployment
 ```
 
-Metrics (`num_interactions` and `average_feedback_score`) are calculated when the canary controller runs by aggregating all tasks with a given `prompt_id` and their associated feedback from the database.
+#### What It Does NOT Do
 
-**Key Functions:**
-- `run_canary_controller()`: Main control loop
-- `compare_metrics()`: Determine winner based on feedback
-- `promote_step()`: Increase candidate traffic by 10%
-- `rollback_step()`: Decrease candidate traffic by 10%
+- Does **not** train new prompts (use CLI `train` command)
+- Does **not** adjust traffic allocation (use CLI `canary` command)
+- Simply reads from database and selects prompts based on current traffic settings
 
-#### 5. **Prompt Manager** ([prompts.py](./prompts.py))
+---
 
-Database interface for prompt CRUD operations:
+### 2. Train New Prompts (Offline)
 
-- `get_active_prompt()`: Fetch current active prompt
-- `get_candidate_prompt()`: Fetch current candidate prompt
-- `insert_prompt()`: Create new prompt
-- `update_prompt_traffic()`: Adjust traffic allocation
-- `update_prompt_status()`: Change status (active/candidate/deprecated/rolled_back)
-- `zero_out_all_except()`: Reset traffic for non-experiment prompts
+**Purpose:** Generate optimized prompt candidates using DSPy machine learning algorithms.
 
-#### 6. **Interaction Extractor** ([extractor.py](./extractor.py))
+**When to use:** Periodically (e.g., daily) when you've accumulated enough user feedback and want to create improved prompts.
 
-Strategy-based extraction from conversation history:
+#### Configuration
 
-```python
-from bindu.dspy.strategies import LastTurnStrategy, FullHistoryStrategy
+Training is controlled entirely via environment variables and CLI arguments.
 
-# Clean and extract
-extractor = InteractionExtractor(strategy=LastTurnStrategy())
-interaction = extractor.extract(task_id, history, feedback_score, feedback_type)
+##### Required Environment Variables
+
+```bash
+# PostgreSQL connection (required)
+STORAGE_TYPE=postgres
+DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/bindu
+
+# OpenRouter API Key (required for DSPy training)
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+
+# DSPy Configuration
+DSPY__DEFAULT_MODEL=openrouter/openai/gpt-4o-mini
+DSPY__MIN_FEEDBACK_THRESHOLD=0.8
+
+# Dataset Constraints
+DSPY__MIN_EXAMPLES=2
+DSPY__MAX_EXAMPLES=10000
+DSPY__MIN_INPUT_LENGTH=10
+DSPY__MIN_OUTPUT_LENGTH=10
+
+# Initial A/B Test Traffic Split (after training)
+DSPY__INITIAL_CANDIDATE_TRAFFIC=0.4  # 40% to new candidate
+DSPY__INITIAL_ACTIVE_TRAFFIC=0.6     # 60% to current active
+
+# Note: DID is required and must be passed via --did CLI flag
 ```
 
-**Key Functions:**
-- `clean_messages()`: Remove empty/invalid messages
-- `InteractionExtractor.extract()`: Apply strategy to history
+##### Optional Environment Variables
 
-### Extraction Strategies
+```bash
+# Advanced dataset settings
+DSPY__MAX_FULL_HISTORY_LENGTH=10000
+DSPY__DEFAULT_N_TURNS=3
+DSPY__DEFAULT_WINDOW_SIZE=2
+DSPY__DEFAULT_STRIDE=1
 
-All strategies inherit from `BaseExtractionStrategy` ([strategies/base.py](./strategies/base.py)) and implement:
-
-```python
-class BaseExtractionStrategy(ABC):
-    @property
-    def name(self) -> str:
-        """Strategy identifier"""
-        
-    def extract(self, task_id, messages, feedback_score, feedback_type) -> Interaction | None:
-        """Extract interaction from cleaned messages"""
+# Optimization parameters
+DSPY__NUM_PROMPT_CANDIDATES=3
+DSPY__MAX_BOOTSTRAPPED_DEMOS=8
+DSPY__MAX_INTERACTIONS_QUERY_LIMIT=10000
 ```
 
-#### Available Strategies
-
-| Strategy | Module | Description | Use Case |
-|----------|--------|-------------|----------|
-| **LastTurnStrategy** | [last_turn.py](./strategies/last_turn.py) | Extracts only the final user-assistant exchange | Simple, focused training |
-| **FullHistoryStrategy** | [full_history.py](./strategies/full_history.py) | First user input + entire conversation as output | Multi-turn understanding |
-| **LastNTurnsStrategy** | [last_n_turns.py](./strategies/last_n_turns.py) | Last N conversation turns | Recent context focus |
-| **FirstNTurnsStrategy** | [first_n_turns.py](./strategies/first_n_turns.py) | First N conversation turns | Onboarding patterns |
-| **ContextWindowStrategy** | [context_window.py](./strategies/context_window.py) | Sliding window with system prompt | Contextual conversations |
-| **SimilarityStrategy** | [similarity.py](./strategies/similarity.py) | Semantic similarity-based selection | Topic-focused training |
-| **KeyTurnsStrategy** | [key_turns.py](./strategies/key_turns.py) | Extract turns with specific keywords | Feature-specific optimization |
-| **SlidingWindowStrategy** | [sliding_window.py](./strategies/sliding_window.py) | Multiple overlapping windows | Comprehensive coverage |
-| **SummaryContextStrategy** | [summary_context.py](./strategies/summary_context.py) | Summarized history as context | Long conversations |
-
-### Supporting Modules
-
-- **models.py**: Data models (`Interaction`, `PromptCandidate`)
-- **signature.py**: DSPy signature definition (`AgentSignature`)
-- **program.py**: DSPy program module (`AgentProgram`)
-- **optimizer.py**: Optimizer wrapper with compile delegation
-- **guard.py**: System stability checks (`ensure_system_stable`)
-
-### CLI Commands
-
-#### Training CLI ([cli/train.py](./cli/train.py))
+#### CLI Command
 
 ```bash
 python -m bindu.dspy.cli.train \
   --optimizer simba \
   --strategy last_turn \
-  --require-feedback
+  --require-feedback \
+  --did "did:bindu:author:sales-agent:0a174d468f2c40268f03159ca9b4eac2" \
+  --bsize 32 \
+  --num-candidates 6 \
+  --max-steps 8 \
+  --max-demos 4 \
+  --num-threads 4
 ```
 
-**Arguments:**
-- `--optimizer`: Optimizer to use (currently only `simba` is supported)
-- `--strategy`: Extraction strategy (e.g., `last_turn`, `full_history`, `last_n:3`)
-- `--require-feedback`: Only use interactions with feedback
+#### CLI Arguments
 
-#### Canary CLI ([cli/canary.py](./cli/canary.py))
+| Argument | Required | Description | Default |
+|----------|----------|-------------|---------|
+| `--optimizer` | Yes | Optimizer to use: `simba` or `gepa` | - |
+| `--did` | **Yes** | DID for schema isolation | - |
+| `--strategy` | No | Extraction strategy (see [Extraction Strategies](#extraction-strategies)) | `last_turn` |
+| `--require-feedback` | No | Only use interactions with user feedback | `false` |
+| `--bsize` | No | Mini-batch size for optimizer | `32` |
+| `--num-candidates` | No | Candidate programs per iteration | `6` |
+| `--max-steps` | No | Optimization steps to run | `8` |
+| `--max-demos` | No | Max demonstrations per predictor | `4` |
+| `--num-threads` | No | Threads for parallel execution | `auto` |
+
+#### What Happens During Training
+
+1. **System Stability Check**: Ensures no active A/B test is running (no candidate prompt exists)
+2. **Fetch Active Prompt**: Retrieves current production prompt from database
+3. **Configure DSPy**: Sets up DSPy with the model from `DSPY__DEFAULT_MODEL`
+4. **Build Golden Dataset**:
+   - Fetch tasks with feedback from PostgreSQL
+   - Normalize feedback scores to [0.0, 1.0]
+   - Extract interactions using chosen strategy
+   - Filter by `DSPY__MIN_FEEDBACK_THRESHOLD`
+   - Validate (min length, non-empty content)
+   - Deduplicate
+5. **Convert to DSPy Format**: Transform to `dspy.Example` objects
+6. **Optimize**: Run SIMBA/GEPA optimizer on dataset
+7. **Initialize A/B Test**:
+   - Insert optimized prompt as `candidate` with traffic from `DSPY__INITIAL_CANDIDATE_TRAFFIC`
+   - Update active prompt traffic to `DSPY__INITIAL_ACTIVE_TRAFFIC`
+   - Zero out all other prompts
+
+#### Output
+
+```
+INFO Starting DSPy training pipeline with last_turn strategy (DID: public)
+INFO Checking system stability
+INFO System stable check passed: no active candidate prompt
+INFO Fetching active prompt from database
+INFO Using active prompt (id=1) as base for optimization
+INFO Configuring DSPy with model: openrouter/openai/gpt-4o-mini
+INFO Building golden dataset (strategy=last_turn, require_feedback=True, threshold=0.8)
+INFO Golden dataset prepared with 150 examples
+INFO Converting to DSPy examples
+INFO Initializing agent program
+INFO Running prompt optimization using SIMBA
+INFO Extracting optimized instructions from predictor
+INFO Inserting optimized prompt as candidate with 40% traffic
+INFO Candidate prompt inserted (id=2)
+INFO Setting active prompt (id=1) to 60% traffic
+INFO Zeroing out traffic for all other prompts
+INFO A/B test initialized: active (id=1) at 60%, candidate (id=2) at 40%
+```
+
+---
+
+### 3. Canary Deployment (Offline)
+
+**Purpose:** Gradually shift traffic between active and candidate prompts based on performance metrics.
+
+**When to use:** Run periodically (e.g., hourly via cron) after training to monitor A/B test results and automatically promote/rollback candidates.
+
+#### Configuration
+
+Canary deployment is controlled via environment variables and CLI arguments.
+
+##### Required Environment Variables
 
 ```bash
-python -m bindu.dspy.cli.canary
+# PostgreSQL connection (required)
+STORAGE_TYPE=postgres
+DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/bindu
+
+# Canary Deployment Settings
+DSPY__MIN_CANARY_INTERACTIONS_THRESHOLD=2  # Min interactions before comparison
+DSPY__CANARY_TRAFFIC_STEP=0.2               # Traffic adjustment per run (20%)
+
+# Note: DID is required and must be passed via --did CLI flag
 ```
 
-Runs one iteration of the canary controller.
-
----
-
-## Getting Started
-
-### Prerequisites
-
-1. **PostgreSQL Database**
-   - DSPy requires PostgreSQL for storing interactions, feedback, and prompt versions
-   - Set `STORAGE__POSTGRES_URL` environment variable
-
-2. **DSPy Configuration**
-   - Default model configured in `app_settings.dspy.default_model`
-   - Min feedback threshold: `app_settings.dspy.min_feedback_threshold`
-   - Max query limit: `app_settings.dspy.max_interactions_query_limit`
-
-### Initial Setup
-
-#### 1. Enable PostgreSQL
-
-Ensure your agent has PostgreSQL enabled and the connection string set:
+#### CLI Command
 
 ```bash
-export STORAGE__POSTGRES_URL="postgresql://user:pass@localhost:5432/bindu"
+python -m bindu.dspy.cli.canary \
+  --did "did:bindu:author:sales-agent:0a174d468f2c40268f03159ca9b4eac2"
 ```
 
-#### 2. Bootstrap Initial Prompt
+#### CLI Arguments
 
-On first run, the system prompt from your agent's `main.py` is automatically saved to the database as:
-- `status = active`
-- `traffic = 100%`
+| Argument | Required | Description | Default |
+|----------|----------|-------------|---------|
+| `--did` | **Yes** | DID for schema isolation | - |
 
-After this, **all prompts are served from the database**, not from code.
+#### How Canary Works
 
-#### 3. Configure Cron Jobs
+The canary controller compares average feedback scores between `active` and `candidate` prompts:
 
-Set up two cron jobs for automated operation:
+1. **Fetch Prompts**: Get both `active` and `candidate` from database with metrics:
+   - `num_interactions`: Total interactions using this prompt
+   - `average_feedback_score`: Mean normalized feedback score [0.0, 1.0]
+   - `traffic`: Current traffic allocation [0.0, 1.0]
 
-**DSPy Training (Daily at 2 AM):**
-```cron
-0 2 * * * cd /srv/my_agent && uv run python -m bindu.dspy.cli.train --optimizer simba --require-feedback
+2. **Check Threshold**: If candidate has fewer than `DSPY__MIN_CANARY_INTERACTIONS_THRESHOLD` interactions, treat as tie (no action)
+
+3. **Compare Metrics**:
+   - **Candidate Wins** (higher avg score): Promote by `DSPY__CANARY_TRAFFIC_STEP`
+   - **Active Wins** (higher avg score): Rollback by `DSPY__CANARY_TRAFFIC_STEP`
+   - **Tie** (equal scores or missing data): No change
+
+4. **Stabilization**: When traffic reaches 0% or 100%:
+   - **Candidate at 100%**: Promote to `active`, deprecate old active
+   - **Candidate at 0%**: Mark as `rolled_back`
+
+#### Example Scenarios
+
+**Scenario 1: Candidate is Winning**
+```
+Active: avg_score=0.82, traffic=0.6
+Candidate: avg_score=0.91, traffic=0.4, interactions=5
+
+Action: Promote
+Result: Active traffic=0.4, Candidate traffic=0.6
 ```
 
-**Canary Controller (Hourly):**
-```cron
-0 * * * * cd /srv/my_agent && uv run python -m bindu.dspy.cli.canary
+**Scenario 2: Active is Winning**
+```
+Active: avg_score=0.89, traffic=0.4
+Candidate: avg_score=0.75, traffic=0.6, interactions=8
+
+Action: Rollback
+Result: Active traffic=0.6, Candidate traffic=0.4
+```
+
+**Scenario 3: Not Enough Data**
+```
+Active: avg_score=0.85, traffic=0.6
+Candidate: avg_score=0.88, traffic=0.4, interactions=1
+
+Action: No change (below threshold of 2 interactions)
+```
+
+**Scenario 4: Full Promotion**
+```
+Active: avg_score=0.80, traffic=0.0
+Candidate: avg_score=0.95, traffic=1.0, interactions=100
+
+Action: Stabilize
+Result: Candidate becomes new active, old active marked as deprecated
+```
+
+#### Output Logs
+
+```
+INFO Starting canary controller (DID: public)
+INFO Candidate is winning (score=0.910 vs active=0.820)
+INFO Promoting candidate: traffic 0.4 -> 0.6, active 0.6 -> 0.4
+INFO Canary controller storage connection closed
 ```
 
 ---
 
-## Usage
+## Configuration Reference
 
-### Basic Training Workflow
+### Environment Variables
 
-#### 1. **Manual Training Run**
+All DSPy settings use the `DSPY__` prefix:
+
+#### Core Settings
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `DSPY__DEFAULT_MODEL` | string | `openrouter/openai/gpt-4o-mini` | Model for DSPy optimization (use `openrouter/` prefix) |
+| `DSPY__MIN_FEEDBACK_THRESHOLD` | float | `0.8` | Min normalized feedback score [0.0-1.0] for training inclusion |
+
+#### Dataset Filtering
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `DSPY__MIN_EXAMPLES` | int | `2` | Minimum examples required in golden dataset |
+| `DSPY__MAX_EXAMPLES` | int | `10000` | Maximum examples allowed in golden dataset |
+| `DSPY__MIN_INPUT_LENGTH` | int | `10` | Minimum character length for user input |
+| `DSPY__MIN_OUTPUT_LENGTH` | int | `10` | Minimum character length for agent output |
+| `DSPY__MAX_FULL_HISTORY_LENGTH` | int | `10000` | Max characters for full history extraction |
+
+#### Strategy Defaults
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `DSPY__DEFAULT_N_TURNS` | int | `3` | Default turns for `last_n` and `first_n` strategies |
+| `DSPY__DEFAULT_WINDOW_SIZE` | int | `2` | Default window size for sliding window |
+| `DSPY__DEFAULT_STRIDE` | int | `1` | Default stride for sliding window (1 = overlapping) |
+
+#### Optimization Parameters
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `DSPY__NUM_PROMPT_CANDIDATES` | int | `3` | Number of optimized prompt candidates to generate |
+| `DSPY__MAX_BOOTSTRAPPED_DEMOS` | int | `8` | Max bootstrapped demonstrations for few-shot learning |
+| `DSPY__MAX_INTERACTIONS_QUERY_LIMIT` | int | `10000` | Max interactions to fetch from database per query |
+
+#### Canary Deployment
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `DSPY__MIN_CANARY_INTERACTIONS_THRESHOLD` | int | `2` | Min interactions before comparing candidate metrics |
+| `DSPY__CANARY_TRAFFIC_STEP` | float | `0.2` | Traffic adjustment per canary run (0.2 = 20%) |
+| `DSPY__INITIAL_CANDIDATE_TRAFFIC` | float | `0.4` | Initial traffic for new candidate after training (40%) |
+| `DSPY__INITIAL_ACTIVE_TRAFFIC` | float | `0.6` | Initial traffic for active when candidate created (60%) |
+
+### Agent Config (JSON)
+
+Add to your agent's configuration file:
+
+```json
+{
+  "enable_dspy": true
+}
+```
+
+This is the **only** agent-specific setting needed. All other DSPy configuration is environment-based.
+
+---
+
+## Extraction Strategies
+
+Extraction strategies determine how conversation history is transformed into training examples. Different strategies suit different use cases.
+
+### Available Strategies
+
+#### 1. `last_turn` (Default)
+
+Extracts only the final user-assistant exchange.
+
+**Use when:** Your agent is stateless or each interaction is independent.
 
 ```bash
-# Using SIMBA optimizer with last turn strategy
-uv run python -m bindu.dspy.cli.train \
-  --optimizer simba \
-  --strategy last_turn \
-  --require-feedback
+--strategy last_turn
 ```
 
-This will:
-1. Check system stability (no active experiments)
-2. Fetch current active prompt
-3. Build golden dataset from high-quality interactions
-4. Run SIMBA optimization
-5. Insert optimized prompt as candidate (10% traffic)
-6. Set active prompt to 90% traffic
-7. Initialize A/B test
+**Example:**
+```
+Input:  "What is 2+2?"
+Output: "4"
+```
 
-#### 2. **Manual Canary Run**
+---
+
+#### 2. `full_history`
+
+Extracts the complete conversation history.
+
+**Use when:** Context from entire conversation is critical for optimization.
 
 ```bash
-# Run one iteration of canary controller
-uv run python -m bindu.dspy.cli.canary
+--strategy full_history
 ```
 
-This will:
-1. Fetch active and candidate prompts
-2. Compare average feedback scores
-3. Adjust traffic (+/- 10%) based on performance
-4. Stabilize system when traffic reaches 0% or 100%
-
-### Programmatic Usage
-
-#### Training from Python
-
-```python
-import asyncio
-from dspy.teleprompt import SIMBA
-from bindu.dspy import train_async
-from bindu.dspy.strategies import ContextWindowStrategy
-
-# Configure strategy
-strategy = ContextWindowStrategy(n_turns=3, system_prompt="Be helpful and concise")
-
-# Configure optimizer (only SIMBA is currently supported)
-optimizer = SIMBA()
-
-# Run training
-await train_async(
-    optimizer=optimizer,
-    strategy=strategy,
-    require_feedback=True
-)
+**Example:**
+```
+Input:  "User: Hi\nAssistant: Hello!\nUser: What is 2+2?"
+Output: "User said hi, I greeted them, then they asked about 2+2. The answer is 4."
 ```
 
-#### Runtime Prompt Selection
+**Constraint:** Total history must be under `DSPY__MAX_FULL_HISTORY_LENGTH` characters.
 
-```python
-from bindu.dspy.prompt_selector import select_prompt_with_canary
+---
 
-# During agent request handling
-prompt = await select_prompt_with_canary()
+#### 3. `last_n:N`
 
-if prompt:
-    system_message = prompt["prompt_text"]
-    prompt_id = prompt["id"]
-    
-    # Use prompt_id later for feedback tracking
+Extracts the last N conversation turns.
+
+**Use when:** Recent context matters, but full history is too noisy.
+
+```bash
+--strategy last_n:3  # Last 3 turns
 ```
 
-#### Feedback Storage
-
-Feedback is stored in the `task_feedback` table and linked to tasks. Each task references the prompt used via a `prompt_id` foreign key.
-
-```python
-# Feedback is stored against individual tasks
-# Tasks are linked to prompts via prompt_id
+**Example (last_n:2):**
+```
+Input:  "User: What is the capital of France?\nAssistant: Paris.\nUser: What is its population?"
+Output: "Approximately 2.2 million people live in Paris."
 ```
 
 ---
 
-## Advanced Configuration
+#### 4. `first_n:N`
 
-### Custom Extraction Strategies
+Extracts the first N conversation turns.
 
-Create your own strategy by inheriting from `BaseExtractionStrategy`:
+**Use when:** Initial interactions set important context or instructions.
 
-```python
-from bindu.dspy.strategies import BaseExtractionStrategy
-from bindu.dspy.models import Interaction
-from typing import Any
-from uuid import UUID
-
-class CustomStrategy(BaseExtractionStrategy):
-    def __init__(self, custom_param: str):
-        self.custom_param = custom_param
-    
-    @property
-    def name(self) -> str:
-        return f"custom_{self.custom_param}"
-    
-    def extract(
-        self,
-        task_id: UUID,
-        messages: list[dict[str, Any]],
-        feedback_score: float | None = None,
-        feedback_type: str | None = None,
-    ) -> Interaction | None:
-        # Your extraction logic here
-        user_input = "..."
-        agent_output = "..."
-        
-        return Interaction(
-            id=task_id,
-            user_input=user_input,
-            agent_output=agent_output,
-            feedback_score=feedback_score,
-            feedback_type=feedback_type,
-        )
-```
-
-### Optimizer Configuration
-
-#### SIMBA Optimizer
-
-```python
-from dspy.teleprompt import SIMBA
-
-optimizer = SIMBA(
-    # SIMBA-specific configuration
-)
-
-await train_async(optimizer=optimizer, strategy=strategy)
-```
-
-> **Current Limitation:** Only the SIMBA optimizer is currently supported. SIMBA is a prompt-mutating optimizer that refines existing prompts rather than generating new ones from scratch.
->
-> **Planned Support:** Other DSPy optimizers (GEPA, MIPRO, etc.) are planned for future releases.
-
-### Canary Controller Tuning
-
-Adjust constants in [canary/controller.py](./canary/controller.py):
-
-```python
-# Minimum interactions before comparing metrics
-MIN_INTERACTIONS_THRESHOLD = 20  # Default: 20
-
-# Traffic adjustment step size
-TRAFFIC_STEP = 0.1  # Default: 10% per step
-```
-
-### Dataset Filtering
-
-Control dataset quality in your training call:
-
-```python
-await train_async(
-    optimizer=optimizer,
-    strategy=strategy,
-    require_feedback=True,  # Only interactions with feedback
-)
-```
-
-Or via settings:
-
-```python
-# Minimum feedback score for inclusion
-app_settings.dspy.min_feedback_threshold = 0.6  # Default: 0.0 (all)
-
-# Maximum interactions to fetch
-app_settings.dspy.max_interactions_query_limit = 10000  # Default: 10000
+```bash
+--strategy first_n:3  # First 3 turns
 ```
 
 ---
 
-## API Reference
+#### 5. `context_window`
 
-### Training Functions
+*Advanced strategy - requires code-level configuration (not available via CLI)*
 
-#### `train_async()`
+Extracts N turns with optional system prompt injection.
 
-```python
-async def train_async(
-    optimizer: Any,
-    strategy: BaseExtractionStrategy | None = None,
-    require_feedback: bool = True,
-) -> None
-```
-
-**Parameters:**
-- `optimizer`: DSPy optimizer instance. Currently only SIMBA is supported. Required.
-- `strategy`: Extraction strategy. Defaults to `LastTurnStrategy()`.
-- `require_feedback`: Whether to require feedback for dataset inclusion.
-
-**Raises:**
-- `RuntimeError`: If experiment is already active or POSTGRES_URL not set
-- `ValueError`: If no active prompt found or optimizer invalid (non-SIMBA)
-- `ConnectionError`: If database connection fails
-
-#### `train()`
-
-Synchronous wrapper for `train_async()`. Do not call from async contexts.
-
-### Dataset Functions
-
-#### `build_golden_dataset()`
-
-```python
-async def build_golden_dataset(
-    limit: int | None = None,
-    strategy: BaseExtractionStrategy | None = None,
-    require_feedback: bool = True,
-    min_feedback_threshold: float = 0.0,
-) -> list[Interaction]
-```
-
-**Returns:** List of high-quality `Interaction` objects ready for training.
-
-#### `convert_to_dspy_examples()`
-
-```python
-def convert_to_dspy_examples(
-    interactions: list[Interaction]
-) -> list[dspy.Example]
-```
-
-Converts `Interaction` objects to DSPy `Example` format.
-
-### Prompt Management Functions
-
-#### `select_prompt_with_canary()`
-
-```python
-async def select_prompt_with_canary() -> dict[str, Any] | None
-```
-
-**Returns:** Selected prompt dict with keys:
-- `id`: Prompt ID
-- `prompt_text`: Actual prompt content
-- `status`: `active` or `candidate`
-- `traffic`: Current traffic allocation (0.0-1.0)
-- `num_interactions`: Total tasks using this prompt
-- `average_feedback_score`: Average normalized feedback across all tasks
-
-### Canary Controller Functions
-
-#### `run_canary_controller()`
-
-```python
-async def run_canary_controller() -> None
-```
-
-Main canary control loop. Compares metrics and adjusts traffic.
-
-#### `compare_metrics()`
-
-```python
-def compare_metrics(
-    active: dict,
-    candidate: dict
-) -> Literal["active", "candidate", None]
-```
-
-**Returns:**
-- `"candidate"`: Candidate is winning
-- `"active"`: Active is winning
-- `None`: Tie or insufficient data
-
-### Guard Functions
-
-#### `ensure_system_stable()`
-
-```python
-async def ensure_system_stable(agent_id: str | None = None) -> None
-```
-
-**Raises:** `RuntimeError` if a candidate prompt already exists (experiment active).
+**Use when:** You need fine control over context window and system messages.
 
 ---
 
-## Development
+#### 6. `sliding_window`
 
-### Project Structure
+*Advanced strategy - requires code-level configuration*
+
+Creates multiple overlapping training examples from a single conversation.
+
+**Use when:** You want to maximize training data from long conversations.
+
+---
+
+## CLI Reference
+
+### Training CLI
+
+```bash
+python -m bindu.dspy.cli.train [OPTIONS]
+```
+
+#### Options
+
+| Option | Type | Required | Default | Description |
+|--------|------|----------|---------|-------------|
+| `--optimizer` | choice | **Yes** | - | Optimizer: `simba` or `gepa` |
+| `--did` | string | **Yes** | `null` | DID for multi-tenant isolation |
+| `--strategy` | string | No | `last_turn` | Extraction strategy (see above) |
+| `--require-feedback` | flag | No | `false` | Only use interactions with feedback |
+| `--bsize` | int | No | `32` | Mini-batch size for SIMBA/GEPA |
+| `--num-candidates` | int | No | `6` | Candidate programs per iteration |
+| `--max-steps` | int | No | `8` | Optimization steps to run |
+| `--max-demos` | int | No | `4` | Max demonstrations per predictor |
+| `--num-threads` | int | No | `auto` | Parallel execution threads |
+
+---
+
+### Canary CLI
+
+```bash
+python -m bindu.dspy.cli.canary [OPTIONS]
+```
+
+#### Options
+
+| Option | Type | Required | Default | Description |
+|--------|------|----------|---------|-------------|
+| `--did` | string | **Yes** | - | DID for multi-tenant isolation |
+
+---
+
+## Advanced Topics
+
+### Multi-Tenancy with DIDs
+
+Bindu supports multi-tenant prompt management using Decentralized Identifiers (DIDs). Each agent can have isolated prompts, feedback, and A/B tests.
+
+**DID Format:**
+```
+did:bindu:author:agent:id
+```
+
+**Example:**
+```
+did:bindu:john:sales-agent:production
+```
+
+**How to Use:**
+
+1. **Set DID in CLI (required):**
+   ```bash
+   --did "did:bindu:john:sales-agent:production"
+   ```
+
+2. **Schema Isolation:** Each DID gets its own PostgreSQL schema, ensuring complete data isolation
+
+---
+
+### Scheduling with Cron
+
+Recommended cron setup:
+
+```bash
+# Train daily at 2 AM (DID is required)
+0 2 * * * cd /path/to/bindu && python -m bindu.dspy.cli.train --optimizer simba --did "did:bindu:author:agent:v1" --require-feedback
+
+# Run canary hourly (DID is required)
+0 * * * * cd /path/to/bindu && python -m bindu.dspy.cli.canary --did "did:bindu:author:agent:v1"
+```
+
+For multi-agent setups:
+
+```bash
+# Agent 1
+0 2 * * * python -m bindu.dspy.cli.train --optimizer simba --did "did:bindu:acme:agent1:v1" --require-feedback
+0 * * * * python -m bindu.dspy.cli.canary --did "did:bindu:acme:agent1:v1"
+
+# Agent 2
+15 2 * * * python -m bindu.dspy.cli.train --optimizer gepa --did "did:bindu:acme:agent2:v1" --require-feedback
+15 * * * * python -m bindu.dspy.cli.canary --did "did:bindu:acme:agent2:v1"
+```
+
+---
+
+### Understanding Optimizers
+
+#### SIMBA (Similarity-Based Meta-Prompting with Adaptation)
+
+**Best for:** General-purpose prompt optimization with balanced exploration/exploitation.
+
+**Characteristics:**
+- Uses similarity-based selection of demonstrations
+- Adapts prompts based on feedback scores
+- Good for diverse datasets
+
+**When to use:**
+- You have varied user interactions
+- You want robust prompts that generalize well
+- Default choice for most cases
+
+---
+
+#### GEPA (Guided Exploration with Probabilistic Adaptation)
+
+**Best for:** More aggressive prompt optimization with probabilistic exploration.
+
+**Characteristics:**
+- Guided exploration of prompt space
+- Probabilistic adaptation based on metrics
+- Can find more creative prompt variations
+
+**When to use:**
+- You want to explore prompt variations more aggressively
+- You have well-defined success metrics (feedback scores)
+- You're willing to experiment beyond conservative changes
+
+---
+
+### Metrics and Feedback
+
+The system uses normalized feedback scores [0.0, 1.0]:
+
+| Feedback Type | Raw Value | Normalized |
+|---------------|-----------|------------|
+| 5-star rating | 1-5 | 0.0-1.0 |
+| Thumbs up/down | true/false | 1.0/0.0 |
+| Custom score | any | normalized to [0.0, 1.0] |
+
+**Golden Dataset Inclusion:**
+
+Only interactions with `normalized_score >= DSPY__MIN_FEEDBACK_THRESHOLD` are included in training.
+
+**Canary Comparison:**
+
+Average feedback score determines winner:
+- `avg(candidate) > avg(active)` → Promote
+- `avg(active) > avg(candidate)` → Rollback
+- Equal or insufficient data → No change
+
+---
+
+### Prompt States
+
+| State | Description | Traffic | Next State |
+|-------|-------------|---------|------------|
+| `active` | Current production prompt | Usually high (60-100%) | Can become `deprecated` |
+| `candidate` | New prompt being tested | Starts low (40%), can increase | Can become `active` or `rolled_back` |
+| `deprecated` | Old active after candidate promotion | 0% | Terminal state |
+| `rolled_back` | Failed candidate | 0% | Terminal state |
+
+**State Transitions:**
+
+```
+Training → candidate (40%) + active (60%)
+         ↓
+Canary runs (hourly)
+         ↓
+Candidate wins → active (100%) + deprecated (0%)
+OR
+Candidate loses → rolled_back (0%) + active (100%)
+```
+
+---
+
+### Troubleshooting
+
+#### "No active prompt found"
+
+**Cause:** Database has no `active` status prompt.
+
+**Solution:**
+```sql
+-- Insert an initial active prompt manually
+INSERT INTO prompts (prompt_text, status, traffic, created_at)
+VALUES ('You are a helpful AI assistant.', 'active', 1.0, NOW());
+```
+
+---
+
+#### "Experiment still active"
+
+**Cause:** A `candidate` prompt already exists when trying to train.
+
+**Solution:** Wait for canary to stabilize (promote or rollback), or manually resolve:
+
+```sql
+-- Check current state
+SELECT id, status, traffic FROM prompts WHERE status IN ('active', 'candidate');
+
+-- Option 1: Force rollback
+UPDATE prompts SET status='rolled_back', traffic=0.0 WHERE status='candidate';
+UPDATE prompts SET traffic=1.0 WHERE status='active';
+
+-- Option 2: Force promotion
+UPDATE prompts SET status='active', traffic=1.0 WHERE status='candidate';
+UPDATE prompts SET status='deprecated', traffic=0.0 WHERE status='active' AND id != <candidate_id>;
+```
+
+---
+
+#### "Golden dataset empty"
+
+**Cause:** No interactions meet `DSPY__MIN_FEEDBACK_THRESHOLD`.
+
+**Solutions:**
+1. Lower threshold: `DSPY__MIN_FEEDBACK_THRESHOLD=0.5`
+2. Disable feedback requirement: `--require-feedback` (omit flag)
+3. Collect more user feedback before training
+
+---
+
+### Module Structure
 
 ```
 bindu/dspy/
-├── __init__.py              # Package exports
-├── train.py                 # Training orchestrator
+├── __init__.py              # Public API (train)
+├── models.py                # Data models (Interaction, PromptCandidate)
 ├── dataset.py               # Golden dataset pipeline
-├── extractor.py             # Interaction extraction
-├── models.py                # Data models
-├── signature.py             # DSPy signature
-├── program.py               # DSPy program
-├── optimizer.py             # Optimizer wrapper
-├── prompts.py               # Prompt management
-├── prompt_selector.py       # Canary selection
-├── guard.py                 # Stability checks
-├── canary/
+├── extractor.py             # Interaction extraction orchestrator
+├── guard.py                 # Training safety checks
+├── optimizer.py             # DSPy optimizer wrapper
+├── program.py               # DSPy program definition
+├── prompts.py               # Prompt CRUD operations
+├── prompt_selector.py       # Canary-based prompt selection
+├── signature.py             # DSPy signature definitions
+├── train.py                 # Main training orchestrator
+│
+├── strategies/              # Extraction strategy implementations
 │   ├── __init__.py
-│   └── controller.py        # Canary controller
-├── cli/
-│   ├── train.py            # Training CLI
-│   └── canary.py           # Canary CLI
-└── strategies/
-    ├── __init__.py
-    ├── base.py             # Abstract base
-    ├── last_turn.py        # Last turn strategy
-    ├── full_history.py     # Full history strategy
-    ├── last_n_turns.py     # Last N turns
-    ├── first_n_turns.py    # First N turns
-    ├── context_window.py   # Context window
-    ├── similarity.py       # Similarity-based
-    ├── key_turns.py        # Keyword-based
-    ├── sliding_window.py   # Sliding window
-    └── summary_context.py  # Summary-based
+│   ├── base.py             # Abstract base class
+│   ├── last_turn.py        # Last turn extraction
+│   ├── full_history.py     # Full conversation extraction
+│   ├── last_n_turns.py     # Last N turns
+│   ├── first_n_turns.py    # First N turns
+│   ├── context_window.py   # Context window with system prompt
+│   ├── sliding_window.py   # Sliding window (multiple examples)
+│   └── ...
+│
+├── canary/                  # Canary deployment subsystem
+│   ├── __init__.py
+│   └── controller.py       # Canary logic (promote/rollback)
+│
+└── cli/                     # Command-line interfaces
+    ├── train.py            # Training CLI entry point
+    └── canary.py           # Canary CLI entry point
 ```
+
+---
+
+## Quick Start Guide
+
+### Step 1: Enable DSPy in Your Agent
+
+Edit your agent config:
+
+```json
+{
+  "name": "My Agent",
+  "enable_dspy": true,
+  ...
+}
+```
+
+Set environment variables:
+
+```bash
+export STORAGE_TYPE=postgres
+export DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/bindu
+export OPENROUTER_API_KEY=your_openrouter_api_key_here
+export DSPY__DEFAULT_MODEL=openrouter/openai/gpt-4o-mini
+```
+
+### Step 2: Insert Initial Active Prompt
+
+```sql
+INSERT INTO prompts (prompt_text, status, traffic, created_at)
+VALUES ('You are a helpful AI assistant.', 'active', 1.0, NOW());
+```
+
+### Step 3: Collect User Feedback
+
+Start your agent and have users interact with it. Collect feedback via your feedback mechanism.
+
+### Step 4: Train Optimized Prompts
+
+```bash
+python -m bindu.dspy.cli.train \
+  --optimizer simba \
+  --strategy last_turn \
+  --require-feedback \
+  --did "did:bindu:author:sales-agent:0a174d468f2c40268f03159ca9b4eac2" \
+  --bsize 32 \
+  --num-candidates 6 \
+  --max-steps 8 \
+  --max-demos 4 \
+  --num-threads 4
+```
+
+### Step 5: Run Canary (Automated)
+
+Set up hourly cron:
+
+```bash
+0 * * * * python -m bindu.dspy.cli.canary --did "did:bindu:author:sales-agent:0a174d468f2c40268f03159ca9b4eac2"
+```
+
+### Step 6: Monitor
+
+Watch logs for promotion/rollback events, check database for prompt states:
+
+```sql
+SELECT id, status, traffic, average_feedback_score, num_interactions
+FROM prompts
+ORDER BY created_at DESC;
+```
+
+---
+
+## Additional Resources
+
+- [DSPy Documentation](https://docs.getbindu.com/bindu/learn/dspy/overview)
+- [Bindu Main README](../../README.md)
+- [Task Feedback Documentation](../../README.md#task-feedback-and-dspy)
+
+---
+
+## Support
+
+Issues and questions: [GitHub Issues](https://github.com/getbindu/Bindu/issues/new/choose)
