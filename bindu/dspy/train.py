@@ -24,6 +24,7 @@ import dspy
 from bindu.utils.logging import get_logger
 
 from bindu.settings import app_settings
+from bindu.server.storage.postgres_storage import PostgresStorage
 from .dataset import build_golden_dataset, convert_to_dspy_examples
 from .strategies import BaseExtractionStrategy, LastTurnStrategy
 from .guard import ensure_system_stable
@@ -112,116 +113,129 @@ async def train_async(
     strategy = strategy or LastTurnStrategy()
     logger.info(f"Starting DSPy training pipeline with {strategy.name} strategy (DID: {did or 'public'})")
 
-    # Step 0: Ensure system is stable (no active experiments) with DID isolation
-    logger.info("Checking system stability")
-    await ensure_system_stable(did=did)
-
-    # Step 1: Fetch current active prompt from database with DID isolation
-    logger.info("Fetching active prompt from database")
-    active_prompt = await get_active_prompt(did=did)
-    if active_prompt is None:
-        raise ValueError(
-            "No active prompt found in database. System requires an active prompt "
-            "before DSPy training can begin."
-        )
+    # Create a single storage instance for the entire training pipeline
+    # This is more efficient than creating/destroying connections for each operation
+    storage = PostgresStorage(did=did)
+    await storage.connect()
     
-    current_prompt_text = active_prompt["prompt_text"]
-    logger.info(f"Using active prompt (id={active_prompt['id']}) as base for optimization")
+    try:
+        # Step 0: Ensure system is stable (no active experiments) with DID isolation
+        logger.info("Checking system stability")
+        await ensure_system_stable(storage=storage, did=did)
 
-    # Step 2: Configure DSPy with default model
-    logger.info(f"Configuring DSPy with model: {app_settings.dspy.default_model}")
-    lm = dspy.LM(app_settings.dspy.default_model)
-    dspy.configure(lm=lm)
+        # Step 1: Fetch current active prompt from database with DID isolation
+        logger.info("Fetching active prompt from database")
+        active_prompt = await get_active_prompt(storage=storage, did=did)
+        if active_prompt is None:
+            raise ValueError(
+                "No active prompt found in database. System requires an active prompt "
+                "before DSPy training can begin."
+            )
+        
+        current_prompt_text = active_prompt["prompt_text"]
+        logger.info(f"Using active prompt (id={active_prompt['id']}) as base for optimization")
 
-    # Step 3: Build golden dataset using complete pipeline (fetches data internally)
-    logger.info(
-        f"Building golden dataset (strategy={strategy.name}, "
-        f"require_feedback={require_feedback}, "
-        f"threshold={app_settings.dspy.min_feedback_threshold})"
-    )
-    golden_dataset = await build_golden_dataset(
-        limit=None,  # Use default from settings
-        strategy=strategy,
-        require_feedback=require_feedback,
-        min_feedback_threshold=app_settings.dspy.min_feedback_threshold,
-        did=did,
-    )
+        # Step 2: Configure DSPy with default model
+        logger.info(f"Configuring DSPy with model: {app_settings.dspy.default_model}")
+        lm = dspy.LM(app_settings.dspy.default_model)
+        dspy.configure(lm=lm)
 
-    logger.info(f"Golden dataset prepared with {len(golden_dataset)} examples")
-
-    # Step 5: Convert to DSPy examples
-    logger.info("Converting to DSPy examples")
-    dspy_examples = convert_to_dspy_examples(golden_dataset)
-
-    # Step 6: Load agent program
-    logger.info("Initializing agent program")
-    program = AgentProgram(current_prompt_text)
-
-    # Step 7: Validate optimizer and prompt requirements
-    # v1 only supports prompt-mutating optimizers (SIMBA / GEPA).
-    # These optimizers require an existing prompt to refine.
-    if optimizer is None:
-        raise ValueError(
-            "v1 requires an explicit prompt-optimizing optimizer "
-            "(SIMBA or GEPA)."
+        # Step 3: Build golden dataset using complete pipeline (fetches data internally)
+        # Note: build_golden_dataset creates its own storage connection for data fetching
+        logger.info(
+            f"Building golden dataset (strategy={strategy.name}, "
+            f"require_feedback={require_feedback}, "
+            f"threshold={app_settings.dspy.min_feedback_threshold})"
+        )
+        golden_dataset = await build_golden_dataset(
+            limit=None,  # Use default from settings
+            strategy=strategy,
+            require_feedback=require_feedback,
+            min_feedback_threshold=app_settings.dspy.min_feedback_threshold,
+            did=did,
         )
 
-    if not isinstance(optimizer, (SIMBA, GEPA)):
-        raise ValueError(
-            f"Optimizer {type(optimizer).__name__} does not support "
-            "prompt extraction in v1."
+        logger.info(f"Golden dataset prepared with {len(golden_dataset)} examples")
+
+        # Step 5: Convert to DSPy examples
+        logger.info("Converting to DSPy examples")
+        dspy_examples = convert_to_dspy_examples(golden_dataset)
+
+        # Step 6: Load agent program
+        logger.info("Initializing agent program")
+        program = AgentProgram(current_prompt_text)
+
+        # Step 7: Validate optimizer and prompt requirements
+        # v1 only supports prompt-mutating optimizers (SIMBA / GEPA).
+        # These optimizers require an existing prompt to refine.
+        if optimizer is None:
+            raise ValueError(
+                "v1 requires an explicit prompt-optimizing optimizer "
+                "(SIMBA or GEPA)."
+            )
+
+        if not isinstance(optimizer, (SIMBA, GEPA)):
+            raise ValueError(
+                f"Optimizer {type(optimizer).__name__} does not support "
+                "prompt extraction in v1."
+            )
+
+        if not current_prompt_text.strip():
+            raise ValueError(
+                "current_prompt_text must be provided for prompt optimization."
+            )
+
+        # Step 7: Run prompt optimization
+        # The optimizer mutates the program's instructions based on the dataset.
+        logger.info(
+            f"Running prompt optimization using {type(optimizer).__name__}"
+        )
+        optimized_program = optimize(
+            program=program,
+            dataset=dspy_examples,
+            optimizer=optimizer,
         )
 
-    if not current_prompt_text.strip():
-        raise ValueError(
-            "current_prompt_text must be provided for prompt optimization."
+        logger.info(
+            "Extracting optimized instructions from predictor"
         )
+        instructions = optimized_program.instructions
+        
+        if not instructions or not instructions.strip():
+            raise RuntimeError("Optimizer did not produce valid instructions")
 
-    # Step 7: Run prompt optimization
-    # The optimizer mutates the program's instructions based on the dataset.
-    logger.info(
-        f"Running prompt optimization using {type(optimizer).__name__}"
-    )
-    optimized_program = optimize(
-        program=program,
-        dataset=dspy_examples,
-        optimizer=optimizer,
-    )
-
-    logger.info(
-        "Extracting optimized instructions from predictor"
-    )
-    instructions = optimized_program.instructions
+        # Step 9: Initialize A/B test with optimized prompt
+        # DSPy training creates the candidate and sets initial traffic split.
+        # It does NOT promote, rollback, or adjust traffic beyond this point.
+        
+        logger.info("Inserting optimized prompt as candidate with 10% traffic")
+        candidate_id = await insert_prompt(
+            text=instructions,
+            status="candidate",
+            traffic=0.10,
+            storage=storage,
+            did=did,
+        )
+        logger.info(f"Candidate prompt inserted (id={candidate_id})")
+        
+        # Set active prompt to 90% traffic (already fetched in Step 1)
+        active_id = active_prompt["id"]
+        logger.info(f"Setting active prompt (id={active_id}) to 90% traffic")
+        await update_prompt_traffic(active_id, 0.90, storage=storage, did=did)
+        
+        # Zero out traffic for all other prompts
+        logger.info("Zeroing out traffic for all other prompts")
+        await zero_out_all_except([active_id, candidate_id], storage=storage, did=did)
+        
+        logger.info(
+            f"A/B test initialized: active (id={active_id}) at 90%, "
+            f"candidate (id={candidate_id}) at 10%"
+        )
     
-    if not instructions or not instructions.strip():
-        raise RuntimeError("Optimizer did not produce valid instructions")
-
-    # Step 9: Initialize A/B test with optimized prompt
-    # DSPy training creates the candidate and sets initial traffic split.
-    # It does NOT promote, rollback, or adjust traffic beyond this point.
-    
-    logger.info("Inserting optimized prompt as candidate with 10% traffic")
-    candidate_id = await insert_prompt(
-        text=instructions,
-        status="candidate",
-        traffic=0.10,
-        did=did,
-    )
-    logger.info(f"Candidate prompt inserted (id={candidate_id})")
-    
-    # Set active prompt to 90% traffic (already fetched in Step 1)
-    active_id = active_prompt["id"]
-    logger.info(f"Setting active prompt (id={active_id}) to 90% traffic")
-    await update_prompt_traffic(active_id, 0.90, did=did)
-    
-    # Zero out traffic for all other prompts
-    logger.info("Zeroing out traffic for all other prompts")
-    await zero_out_all_except([active_id, candidate_id], did=did)
-    
-    logger.info(
-        f"A/B test initialized: active (id={active_id}) at 90%, "
-        f"candidate (id={candidate_id}) at 10%"
-    )
+    finally:
+        # Always disconnect storage, even if an error occurred
+        await storage.disconnect()
+        logger.info("Training pipeline storage connection closed")
 
 def train(
     optimizer: Any = None,
