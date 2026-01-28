@@ -208,28 +208,30 @@ async def train_async(
         # DSPy training creates the candidate and sets initial traffic split.
         # It does NOT promote, rollback, or adjust traffic beyond this point.
         
-        logger.info("Inserting optimized prompt as candidate with 10% traffic")
+        candidate_traffic = app_settings.dspy.initial_candidate_traffic
+        logger.info(f"Inserting optimized prompt as candidate with {candidate_traffic:.0%} traffic")
         candidate_id = await insert_prompt(
             text=instructions,
             status="candidate",
-            traffic=0.10,
+            traffic=candidate_traffic,
             storage=storage,
             did=did,
         )
         logger.info(f"Candidate prompt inserted (id={candidate_id})")
         
-        # Set active prompt to 90% traffic (already fetched in Step 1)
+        # Set active prompt to configured traffic (already fetched in Step 1)
         active_id = active_prompt["id"]
-        logger.info(f"Setting active prompt (id={active_id}) to 90% traffic")
-        await update_prompt_traffic(active_id, 0.90, storage=storage, did=did)
+        active_traffic = app_settings.dspy.initial_active_traffic
+        logger.info(f"Setting active prompt (id={active_id}) to {active_traffic:.0%} traffic")
+        await update_prompt_traffic(active_id, active_traffic, storage=storage, did=did)
         
         # Zero out traffic for all other prompts
         logger.info("Zeroing out traffic for all other prompts")
         await zero_out_all_except([active_id, candidate_id], storage=storage, did=did)
         
         logger.info(
-            f"A/B test initialized: active (id={active_id}) at 90%, "
-            f"candidate (id={candidate_id}) at 10%"
+            f"A/B test initialized: active (id={active_id}) at {active_traffic:.0%}, "
+            f"candidate (id={candidate_id}) at {candidate_traffic:.0%}"
         )
     
     finally:

@@ -18,7 +18,9 @@ from __future__ import annotations
 
 from typing import Literal
 
+from bindu.settings import app_settings
 from bindu.server.storage.base import Storage
+from bindu.server.storage.postgres_storage import PostgresStorage
 from bindu.dspy.prompts import (
     get_active_prompt,
     get_candidate_prompt,
@@ -28,12 +30,6 @@ from bindu.dspy.prompts import (
 from bindu.utils.logging import get_logger
 
 logger = get_logger("bindu.dspy.canary.controller")
-
-# Minimum number of interactions required before comparing candidate metrics
-MIN_INTERACTIONS_THRESHOLD = 20
-
-# Traffic adjustment step (10%)
-TRAFFIC_STEP = 0.1
 
 
 def compare_metrics(
@@ -51,10 +47,11 @@ def compare_metrics(
     """
     # Check if candidate has enough interactions
     candidate_interactions = candidate.get("num_interactions", 0)
-    if candidate_interactions < MIN_INTERACTIONS_THRESHOLD:
+    min_threshold = app_settings.dspy.min_canary_interactions_threshold
+    if candidate_interactions < min_threshold:
         logger.info(
             f"Candidate has {candidate_interactions} interactions, "
-            f"needs {MIN_INTERACTIONS_THRESHOLD} - treating as tie"
+            f"needs {min_threshold} - treating as tie"
         )
         return None
 
@@ -89,17 +86,18 @@ def compare_metrics(
         return None
 
 
-async def promote_step(active: dict, candidate: dict, storage: Storage | None = None, did: str | None = None) -> None:
+async def promote_step(active: dict, candidate: dict, storage: Storage, did: str | None = None) -> None:
     """Promote candidate by increasing its traffic by 0.1 and decreasing active's.
 
     Args:
         active: Active prompt data with id and current traffic
         candidate: Candidate prompt data with id and current traffic
-        storage: Optional existing storage instance to reuse
-        did: Decentralized Identifier for schema isolation (only used if storage is None)
+        storage: Storage instance to use for database operations
+        did: Decentralized Identifier for schema isolation
     """
-    new_candidate_traffic = min(1.0, candidate["traffic"] + TRAFFIC_STEP)
-    new_active_traffic = max(0.0, active["traffic"] - TRAFFIC_STEP)
+    traffic_step = app_settings.dspy.canary_traffic_step
+    new_candidate_traffic = min(1.0, candidate["traffic"] + traffic_step)
+    new_active_traffic = max(0.0, active["traffic"] - traffic_step)
 
     logger.info(
         f"Promoting candidate: traffic {candidate['traffic']:.1f} -> "
@@ -114,17 +112,18 @@ async def promote_step(active: dict, candidate: dict, storage: Storage | None = 
     await _check_stabilization(active, candidate, new_active_traffic, new_candidate_traffic, storage=storage, did=did)
 
 
-async def rollback_step(active: dict, candidate: dict, storage: Storage | None = None, did: str | None = None) -> None:
+async def rollback_step(active: dict, candidate: dict, storage: Storage, did: str | None = None) -> None:
     """Rollback candidate by decreasing its traffic by 0.1 and increasing active's.
 
     Args:
         active: Active prompt data with id and current traffic
         candidate: Candidate prompt data with id and current traffic
-        storage: Optional existing storage instance to reuse
-        did: Decentralized Identifier for schema isolation (only used if storage is None)
+        storage: Storage instance to use for database operations
+        did: Decentralized Identifier for schema isolation
     """
-    new_candidate_traffic = max(0.0, candidate["traffic"] - TRAFFIC_STEP)
-    new_active_traffic = min(1.0, active["traffic"] + TRAFFIC_STEP)
+    traffic_step = app_settings.dspy.canary_traffic_step
+    new_candidate_traffic = max(0.0, candidate["traffic"] - traffic_step)
+    new_active_traffic = min(1.0, active["traffic"] + traffic_step)
 
     logger.info(
         f"Rolling back candidate: traffic {candidate['traffic']:.1f} -> "
@@ -140,7 +139,7 @@ async def rollback_step(active: dict, candidate: dict, storage: Storage | None =
 
 
 async def _check_stabilization(
-    active: dict, candidate: dict, active_traffic: float, candidate_traffic: float, storage: Storage | None = None, did: str | None = None
+    active: dict, candidate: dict, active_traffic: float, candidate_traffic: float, storage: Storage, did: str | None = None
 ) -> None:
     """Check if the system has stabilized and update statuses accordingly.
 
@@ -149,8 +148,8 @@ async def _check_stabilization(
         candidate: Candidate prompt data
         active_traffic: New active traffic value
         candidate_traffic: New candidate traffic value
-        storage: Optional existing storage instance to reuse
-        did: Decentralized Identifier for schema isolation (only used if storage is None)
+        storage: Storage instance to use for database operations
+        did: Decentralized Identifier for schema isolation
     """
     # Stabilization: one prompt at 1.0, the other at 0.0
     if active_traffic == 1.0 and candidate_traffic == 0.0:
@@ -171,33 +170,45 @@ async def _check_stabilization(
         await update_prompt_status(active["id"], "deprecated", storage=storage, did=did)
 
 
-async def run_canary_controller(storage: Storage | None = None, did: str | None = None) -> None:
+async def run_canary_controller(did: str | None = None) -> None:
     """Main canary controller logic.
 
     Compares active and candidate prompts and adjusts traffic based on metrics.
     If no candidate exists, the system is considered stable.
     
     Args:
-        storage: Optional existing storage instance to reuse
-        did: Decentralized Identifier for schema isolation (only used if storage is None)
+        did: Decentralized Identifier for schema isolation (required for multi-tenancy)
     """
-    active = await get_active_prompt(storage=storage, did=did)
-    candidate = await get_candidate_prompt(storage=storage, did=did)
+    logger.info(f"Starting canary controller (DID: {did or 'public'})")
+    
+    # Create a single storage instance for the entire canary controller run
+    # This is more efficient than creating/destroying connections for each operation
+    storage = PostgresStorage(did=did)
+    await storage.connect()
+    
+    try:
+        active = await get_active_prompt(storage=storage, did=did)
+        candidate = await get_candidate_prompt(storage=storage, did=did)
 
-    if not candidate:
-        logger.info("No candidate prompt - system stable")
-        return
+        if not candidate:
+            logger.info("No candidate prompt - system stable")
+            return
 
-    if not active:
-        logger.warning("No active prompt found - cannot run canary controller")
-        return
+        if not active:
+            logger.warning("No active prompt found - cannot run canary controller")
+            return
 
-    # Compare metrics to determine winner
-    winner = compare_metrics(active, candidate)
+        # Compare metrics to determine winner
+        winner = compare_metrics(active, candidate)
 
-    if winner == "candidate":
-        await promote_step(active, candidate, storage=storage, did=did)
-    elif winner == "active":
-        await rollback_step(active, candidate, storage=storage, did=did)
-    else:
-        logger.info("No clear winner - maintaining current traffic distribution")
+        if winner == "candidate":
+            await promote_step(active, candidate, storage=storage, did=did)
+        elif winner == "active":
+            await rollback_step(active, candidate, storage=storage, did=did)
+        else:
+            logger.info("No clear winner - maintaining current traffic distribution")
+    
+    finally:
+        # Always disconnect storage, even if an error occurred
+        await storage.disconnect()
+        logger.info("Canary controller storage connection closed")
