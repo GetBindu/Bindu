@@ -131,10 +131,17 @@ async def train_async(
     current_prompt_text = active_prompt["prompt_text"]
     logger.info(f"Using active prompt (id={active_prompt['id']}) as base for optimization")
 
-    # Step 2: Configure DSPy with default model
-    logger.info(f"Configuring DSPy with model: {app_settings.dspy.default_model}")
-    lm = dspy.LM(app_settings.dspy.default_model)
-    dspy.configure(lm=lm)
+        # Step 1: Fetch current active prompt from database with DID isolation
+        logger.info("Fetching active prompt from database")
+        active_prompt = await get_active_prompt(storage=storage, did=did)
+        if active_prompt is None:
+            raise ValueError(
+                "No active prompt found in database. System requires an active prompt "
+                "before DSPy training can begin."
+            )
+        
+        current_prompt_text = active_prompt["prompt_text"]
+        logger.info(f"Using active prompt (id={active_prompt['id']}) as base for optimization")
 
     # Step 3: Build golden dataset using complete pipeline (fetches data internally)
     # Note: build_golden_dataset creates its own storage connection for data fetching
@@ -151,35 +158,69 @@ async def train_async(
         did=did,
     )
 
-    logger.info(f"Golden dataset prepared with {len(golden_dataset)} examples")
-
-    # Step 5: Convert to DSPy examples
-    logger.info("Converting to DSPy examples")
-    dspy_examples = convert_to_dspy_examples(golden_dataset)
-
-    # Step 6: Load agent program
-    logger.info("Initializing agent program")
-    program = AgentProgram(current_prompt_text)
-
-    # Step 7: Validate optimizer and prompt requirements
-    # v1 only supports prompt-mutating optimizers (SIMBA / GEPA).
-    # These optimizers require an existing prompt to refine.
-    if optimizer is None:
-        raise ValueError(
-            "v1 requires an explicit prompt-optimizing optimizer "
-            "(SIMBA or GEPA)."
+        # Step 3: Build golden dataset using complete pipeline (fetches data internally)
+        # Note: build_golden_dataset creates its own storage connection for data fetching
+        logger.info(
+            f"Building golden dataset (strategy={strategy.name}, "
+            f"require_feedback={require_feedback}, "
+            f"threshold={app_settings.dspy.min_feedback_threshold})"
+        )
+        golden_dataset = await build_golden_dataset(
+            limit=None,  # Use default from settings
+            strategy=strategy,
+            require_feedback=require_feedback,
+            min_feedback_threshold=app_settings.dspy.min_feedback_threshold,
+            did=did,
         )
 
-    if not isinstance(optimizer, (SIMBA, GEPA)):
-        raise ValueError(
-            f"Optimizer {type(optimizer).__name__} does not support "
-            "prompt extraction in v1."
+        logger.info(f"Golden dataset prepared with {len(golden_dataset)} examples")
+
+        # Step 5: Convert to DSPy examples
+        logger.info("Converting to DSPy examples")
+        dspy_examples = convert_to_dspy_examples(golden_dataset)
+
+        # Step 6: Load agent program
+        logger.info("Initializing agent program")
+        program = AgentProgram(current_prompt_text)
+
+        # Step 7: Validate optimizer and prompt requirements
+        # v1 only supports prompt-mutating optimizers (SIMBA / GEPA).
+        # These optimizers require an existing prompt to refine.
+        if optimizer is None:
+            raise ValueError(
+                "v1 requires an explicit prompt-optimizing optimizer "
+                "(SIMBA or GEPA)."
+            )
+
+        if not isinstance(optimizer, (SIMBA, GEPA)):
+            raise ValueError(
+                f"Optimizer {type(optimizer).__name__} does not support "
+                "prompt extraction in v1."
+            )
+
+        if not current_prompt_text.strip():
+            raise ValueError(
+                "current_prompt_text must be provided for prompt optimization."
+            )
+
+        # Step 7: Run prompt optimization
+        # The optimizer mutates the program's instructions based on the dataset.
+        logger.info(
+            f"Running prompt optimization using {type(optimizer).__name__}"
+        )
+        optimized_program = optimize(
+            program=program,
+            dataset=dspy_examples,
+            optimizer=optimizer,
         )
 
-    if not current_prompt_text.strip():
-        raise ValueError(
-            "current_prompt_text must be provided for prompt optimization."
+        logger.info(
+            "Extracting optimized instructions from predictor"
         )
+        instructions = optimized_program.instructions
+        
+        if not instructions or not instructions.strip():
+            raise RuntimeError("Optimizer did not produce valid instructions")
 
     # Step 7: Run prompt optimization
     # The optimizer mutates the program's instructions based on the dataset.
