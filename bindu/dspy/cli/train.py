@@ -94,6 +94,13 @@ def main() -> None:
         help="Only use interactions with feedback",
     )
 
+    parser.add_argument(
+        "--did",
+        type=str,
+        default=None,
+        help="DID (Decentralized Identifier) for schema isolation. Example: did:bindu:author:agent:id",
+    )
+
     args = parser.parse_args()
 
     # Metric is implicitly feedback-based inside dataset
@@ -108,6 +115,7 @@ def main() -> None:
         optimizer=optimizer,
         strategy=strategy,
         require_feedback=args.require_feedback,
+        did=args.did,
     )
 
 
