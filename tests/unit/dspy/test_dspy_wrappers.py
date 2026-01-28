@@ -55,20 +55,15 @@ class TestAgentProgram:
         """Test program forward pass."""
         import dspy
         
-        # Configure a dummy LM for testing
-        with patch("dspy.settings.DEFAULT_CONFIG") as mock_config:
-            mock_lm = MagicMock()
-            mock_config.lm = mock_lm
+        program = AgentProgram(current_prompt_text="Test prompt")
+        
+        with patch.object(program, "predictor", MagicMock()) as mock_predictor:
+            mock_predictor.return_value = MagicMock(output="Generated response")
             
-            program = AgentProgram(current_prompt_text="Test prompt")
+            result = program.forward(input="Test input")
             
-            with patch.object(program, "predictor", MagicMock()) as mock_predictor:
-                mock_predictor.return_value = MagicMock(output="Generated response")
-                
-                result = program.forward(input="Test input")
-                
-                # Verify predictor was called
-                assert mock_predictor.called
+            # Verify predictor was called
+            assert mock_predictor.called
     
     def test_program_is_dspy_module(self):
         """Test program is a DSPy Module."""
@@ -163,6 +158,7 @@ class TestFeedbackMetric:
         
         example = MagicMock()
         example.output = "Expected output"
+        example.feedback = None  # Explicitly set to None to prevent MagicMock auto-creation
         
         prediction_dict = {"output": "Different output"}
         
