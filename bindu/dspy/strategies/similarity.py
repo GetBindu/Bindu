@@ -131,8 +131,10 @@ def weighted_similarity(text1: str, text2: str, corpus: list[str] | None = None)
     # Calculate IDF for each term
     def idf(term: str) -> float:
         df = doc_freq.get(term, 0)
+        # If term doesn't appear in corpus, use minimum df of 1
+        # This gives rare/unseen terms high weight (as they should have)
         if df == 0:
-            return 0.0
+            df = 1
         return math.log(num_docs / df) + 1.0  # Add 1 to avoid zero weights
 
     # Create weighted vectors
