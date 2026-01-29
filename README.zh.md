@@ -11,6 +11,18 @@
 </p>
 
 <p align="center">
+  <a href="README.md">🇬🇧 English</a> •
+  <a href="README.de.md">🇩🇪 Deutsch</a> •
+  <a href="README.es.md">🇪🇸 Español</a> •
+  <a href="README.fr.md">🇫🇷 Français</a> •
+  <a href="README.hi.md">🇮🇳 हिंदी</a> •
+  <a href="README.bn.md">🇮🇳 বাংলা</a> •
+  <a href="README.zh.md">🇨🇳 中文</a> •
+  <a href="README.nl.md">🇳🇱 Nederlands</a> •
+  <a href="README.ta.md">🇮🇳 தமிழ்</a>
+</p>
+
+<p align="center">
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
   <a href="https://hits.sh/github.com/Saptha-me/Bindu.svg"><img src="https://hits.sh/github.com/Saptha-me/Bindu.svg" alt="Hits"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="Python Version"></a>
@@ -675,40 +687,49 @@ score = (
 
 <br/>
 
-## Task Feedback 和 DSPy
+## [DSPy 集成](https://docs.getbindu.com/bindu/learn/dspy/overview)
 
-Bindu 在任务执行时收集用户反馈，以通过 DSPy 优化实现持续改进。通过存储带有评分和元数据的反馈，您可以从真实交互中构建黄金数据集，并使用 DSPy 自动优化代理的提示和行为。
+> 通过机器学习实现自动 prompt 优化和持续改进
 
-### 提交反馈
+Bindu 的 DSPy 集成为 AI 代理提供自动 prompt 优化和 A/B 测试。与手动调整 prompt 相比，DSPy 使用机器学习根据真实用户交互和反馈优化 prompt，创建持续改进循环。
 
-使用 `tasks/feedback` 方法为任何任务提供反馈：
+可选 - 需要 PostgreSQL 存储，通过代理配置启用。
 
-```bash
-curl --location 'http://localhost:3773/' \
---header 'Content-Type: application/json' \
---header 'Authorization: Bearer <your-token>' \
---data '{
-    "jsonrpc": "2.0",
-    "method": "tasks/feedback",
-    "params": {
-        "taskId": "550e8400-e29b-41d4-a716-446655440200",
-        "feedback": "做得很好！响应非常有帮助且准确。",
-        "rating": 5,
-        "metadata": {
-            "category": "quality",
-            "source": "user",
-            "helpful": true
-        }
-    },
-    "id": "550e8400-e29b-41d4-a716-446655440024"
-}'
+### ⚙️ 配置
+
+<details>
+<summary><b>查看配置示例</b> (点击展开)</summary>
+
+在代理配置中启用 DSPy：
+
+```python
+config = {
+    "author": "your.email@example.com",
+    "name": "research_agent",
+    "description": "具有持续改进的研究助手",
+    "deployment": {"url": "http://localhost:3773", "expose": True},
+    "enable_dspy": True,  # ← 启用 DSPy 优化
+}
 ```
 
-反馈存储在 `task_feedback` 表中，可用于：
-- 过滤高质量的任务交互以用于训练数据
-- 识别成功与失败完成中的模式
-- 使用 DSPy 优化代理指令和少样本示例
-- 我们正在开发 DsPY——即将发布。
+通过环境变量配置：
+
+```bash
+# 必需：PostgreSQL 连接
+STORAGE_TYPE=postgres
+DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/bindu
+
+# 用于训练的 OpenRouter API 密钥
+OPENROUTER_API_KEY=your_openrouter_api_key
+
+# 查看 examples/.env.example 获取完整配置
+```
+
+</details>
+
+启用后，系统 prompt 从数据库加载并进行自动 A/B 测试，允许根据用户反馈逐步推出优化的 prompt。
+
+> 📚 有关完整的 DSPy 文档、训练和金丝雀部署，请参阅 [bindu/dspy/README.md](bindu/dspy/README.md)
 
 ---
 
