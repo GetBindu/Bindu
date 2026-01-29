@@ -77,6 +77,22 @@ Before installing Bindu, ensure you have:
 - **UV package manager** - [Installation guide](https://github.com/astral-sh/uv)
 - **Note**: You will need an OPENROUTER_API_KEY (or OpenAI key) set in your environment variables to run the agent successfully.
 
+### 🔑 No OpenAI Credits? Use Free OpenRouter Models (Recommended)
+
+Bindu supports OpenRouter out of the box, giving you access to multiple free and paid LLM providers using a single API key.
+
+This is the easiest way to run Bindu without OpenAI billing.
+
+**Steps:**
+
+1. Get a free API key from: https://openrouter.ai
+2. Set your environment variable:
+
+   **PowerShell (Windows):**
+   ```powershell
+   $env:OPENROUTER_API_KEY="your_key_here"
+
+
 ### Verify Your Setup
 
 ```bash

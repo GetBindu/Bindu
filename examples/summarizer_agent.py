@@ -6,13 +6,18 @@ Useful as a practical example of using Bindu for text transformation.
 from bindu.penguin.bindufy import bindufy
 from agno.agent import Agent
 from agno.models.openai import OpenAIChat
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 # Define summarizer agent
 agent = Agent(
     instructions="You are a summarization assistant. Summarize the input text in 2-3 sentences.",
-    model=OpenAIChat(id="gpt-4o"),
+    model=OpenAIChat(id="gpt-4o-mini")
 )
+
+
 
 
 def handler(messages):
