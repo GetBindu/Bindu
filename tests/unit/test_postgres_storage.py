@@ -13,7 +13,8 @@ from datetime import datetime, timezone
 from uuid import uuid4
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from bindu.server.storage.postgres_storage import PostgresStorage, _serialize_for_jsonb
+from bindu.server.storage.postgres_storage import PostgresStorage
+from bindu.server.storage.helpers import serialize_for_jsonb as _serialize_for_jsonb
 from tests.utils import create_test_message
 
 
@@ -65,9 +66,10 @@ class TestPostgresStorageInit:
 
     def test_init_default_values(self):
         """Test initialization with default values."""
-        storage = PostgresStorage()
+        storage = PostgresStorage(database_url="localhost:5432/testdb")
         assert storage._engine is None
         assert storage._session_factory is None
+        assert storage.database_url is not None
         assert "postgresql+asyncpg://" in storage.database_url
 
     def test_init_custom_url(self):
@@ -76,6 +78,7 @@ class TestPostgresStorageInit:
             "postgresql://user:pass@localhost:5432/testdb"  # pragma: allowlist secret
         )
         storage = PostgresStorage(database_url=custom_url)
+        assert storage.database_url is not None
         assert "postgresql+asyncpg://" in storage.database_url
         assert "user:pass@localhost:5432/testdb" in storage.database_url
 
@@ -174,7 +177,7 @@ class TestPostgresStorageTaskOperations:
         """Test load_task with invalid task_id type."""
         storage = PostgresStorage()
 
-        with pytest.raises(TypeError, match="task_id must be UUID"):
+        with pytest.raises(TypeError, match="task_id must be a valid UUID string"):
             await storage.load_task("not-a-uuid")  # type: ignore
 
     @pytest.mark.asyncio
@@ -192,7 +195,7 @@ class TestPostgresStorageTaskOperations:
         storage = PostgresStorage()
         message = create_test_message()
 
-        with pytest.raises(TypeError, match="context_id must be UUID"):
+        with pytest.raises(TypeError, match="context_id must be a valid UUID string"):
             await storage.submit_task("not-a-uuid", message)  # type: ignore
 
     @pytest.mark.asyncio
@@ -277,10 +280,12 @@ class TestPostgresStorageEdgeCases:
         """Test various URL format conversions."""
         # Plain URL without scheme
         storage1 = PostgresStorage(database_url="localhost:5432/db")
+        assert storage1.database_url is not None
         assert storage1.database_url.startswith("postgresql+asyncpg://")
 
         # URL with postgresql:// scheme
         storage2 = PostgresStorage(database_url="postgresql://localhost:5432/db")
+        assert storage2.database_url is not None
         assert storage2.database_url.startswith("postgresql+asyncpg://")
         assert "postgresql://postgresql+asyncpg://" not in storage2.database_url
 

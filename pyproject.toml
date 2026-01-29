@@ -36,7 +36,7 @@ dependencies = [
     "pyjwt[crypto]>=2.8.0",
     "requests>=2.31.0",
     "pyperclip>=1.11.0",
-    "x402>=0.2.1",
+    "x402==0.2.1",
     "web3>=7.13.0",
     "eth-account>=0.13.7",
     "cdp-sdk>=0.21.0",
@@ -48,9 +48,13 @@ dependencies = [
     "ddgs>=9.9.3",
     "openai>=2.9.0",
     "detect-secrets>=1.5.0",
-    "redis[hiredis]>=5.0.0",
     "sentry-sdk>=2.0.0",
+    "httpx>=0.27.0",
+    "numpy>=1.24.0",
+    "redis>=7.1.0",
+    "cookiecutter>=2.6.0",
     "tenacity>=9.0.0",
+    "dspy>=2.5.0",
 ]
 
 [project.optional-dependencies]

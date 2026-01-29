@@ -34,7 +34,7 @@ except ImportError:
 logger = get_logger("bindu.server.storage.factory")
 
 
-async def create_storage() -> Storage:
+async def create_storage(did: str | None = None) -> Storage:
     """Create storage backend based on configuration.
 
     Reads the storage backend type from app_settings.storage.backend and
@@ -43,6 +43,9 @@ async def create_storage() -> Storage:
     Supported backends:
     - "memory": InMemoryStorage (default, non-persistent)
     - "postgres": PostgresStorage (persistent)
+
+    Args:
+        did: Optional DID for schema-based multi-tenancy (PostgreSQL only)
 
     Returns:
         Storage instance ready to use
@@ -54,6 +57,9 @@ async def create_storage() -> Storage:
     Example:
         >>> storage = await create_storage()
         >>> task = await storage.load_task(task_id)
+        >>>
+        >>> # With DID for schema isolation
+        >>> storage = await create_storage(did="did:bindu:alice:agent1:abc123")
     """
     backend = app_settings.storage.backend.lower()
 
@@ -70,6 +76,13 @@ async def create_storage() -> Storage:
                 "Install with: pip install sqlalchemy[asyncio] asyncpg"
             )
 
+        # Validate postgres_url is provided
+        if not app_settings.storage.postgres_url:
+            raise ValueError(
+                "PostgreSQL storage requires a database URL. "
+                "Please provide it via DATABASE_URL environment variable or config."
+            )
+
         logger.info("Using PostgreSQL storage with SQLAlchemy (persistent)")
         storage = PostgresStorage(
             database_url=app_settings.storage.postgres_url,
@@ -77,21 +90,11 @@ async def create_storage() -> Storage:
             pool_max=app_settings.storage.postgres_pool_max,
             timeout=app_settings.storage.postgres_timeout,
             command_timeout=app_settings.storage.postgres_command_timeout,
+            did=did,
         )
 
         # Connect to database
         await storage.connect()
-
-        # Run migrations if enabled
-        if app_settings.storage.run_migrations_on_startup:
-            logger.info("Running database migrations...")
-            try:
-                await run_migrations()
-                logger.info("Database migrations completed successfully")
-            except Exception as e:
-                logger.error(f"Failed to run migrations: {e}")
-                # Don't fail startup, just log the error
-                # Migrations can be run manually if needed
 
         return storage
 
@@ -99,38 +102,6 @@ async def create_storage() -> Storage:
         raise ValueError(
             f"Unknown storage backend: {backend}. Supported backends: memory, postgres"
         )
-
-
-async def run_migrations() -> None:
-    """Run database migrations using Alembic.
-
-    This function runs Alembic migrations programmatically.
-    It's called automatically on startup if run_migrations_on_startup is True.
-
-    Raises:
-        Exception: If migrations fail
-    """
-    try:
-        from alembic import command  # type: ignore[import-untyped]
-        from alembic.config import Config  # type: ignore[import-untyped]
-
-        # Create Alembic config
-        alembic_cfg = Config("alembic.ini")
-
-        # Override database URL from settings
-        alembic_cfg.set_main_option("sqlalchemy.url", app_settings.storage.postgres_url)
-
-        # Run migrations to head
-        command.upgrade(alembic_cfg, "head")
-
-    except ImportError:
-        logger.warning(
-            "Alembic not installed. Skipping automatic migrations. "
-            "Run 'pip install alembic' or 'alembic upgrade head' manually."
-        )
-    except Exception as e:
-        logger.error(f"Migration error: {e}")
-        raise
 
 
 async def close_storage(storage: Storage) -> None:

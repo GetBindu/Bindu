@@ -6,6 +6,8 @@ __pycache__/
 # C extensions
 *.so
 
+dev/
+
 # Distribution / packaging
 .Python
 build/
@@ -196,3 +198,7 @@ examples/.pebbling/*
 
 # Auto-generated version file (generated during build)
 bindu/_version.py
+bindu/penguin/.bindu/private.pem
+bindu/penguin/.bindu/public.pem
+
+dev/*

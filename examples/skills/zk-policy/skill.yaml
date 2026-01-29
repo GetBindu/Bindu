@@ -1,0 +1,35 @@
+id: zk-policy-v1
+name: zk-policy-verification
+version: 0.1.0
+author: baljots1000@gmail.com
+description: |
+  Validates message content against safety policies and generates a
+  Zero-Knowledge Proof (mock) of compliance without revealing the underlying rules.
+
+tags:
+  - security
+  - privacy
+  - zk-proof
+  - policy
+
+input_modes:
+  - text/plain
+
+output_modes:
+  - application/json
+
+capabilities_detail:
+  compliance_check:
+    supported: true
+    methods:
+      - keyword_scanning
+      - pii_redaction
+    verification: "zk-snark-mock"
+
+assessment:
+  keywords:
+    - audit
+    - verify
+    - security
+    - policy
+    - compliance

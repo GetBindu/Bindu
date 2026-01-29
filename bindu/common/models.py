@@ -98,6 +98,7 @@ class TelemetryConfig:
     enabled: bool = False
     endpoint: str | None = None
     service_name: str | None = None
+    headers: dict[str, str] | None = None
     verbose_logging: bool = False
     service_version: str = "1.0.0"
     deployment_environment: str = "production"
@@ -180,8 +181,22 @@ class AgentManifest:
     kind: Literal["agent", "team", "workflow"]
     num_history_sessions: int
     enable_system_message: bool = True
+    enable_dspy: bool = False
     enable_context_based_history: bool = False
     extra_data: dict[str, Any] = field(default_factory=dict)
+
+    # Global Webhook Configuration (for long-running tasks)
+    global_webhook_url: str | None = None
+    """Default webhook URL for all tasks when no task-specific webhook is registered.
+
+    Used as a fallback for long-running tasks that need notifications across
+    server restarts or when a task doesn't provide its own webhook configuration.
+    """
+    global_webhook_token: str | None = None
+    """Authentication token for the global webhook URL.
+
+    Sent as Bearer token in Authorization header when calling the global webhook.
+    """
 
     # Observability
     debug_mode: bool = False
@@ -193,6 +208,9 @@ class AgentManifest:
 
     # Optional Metadata
     documentation_url: str | None = None
+
+    # Negotiation
+    negotiation: dict[str, Any] | None = None
 
     # Runtime Execution (injected by framework)
     run: Callable[..., Any] | None = field(default=None, init=False)
@@ -223,6 +241,7 @@ class AgentManifest:
             telemetry=self.telemetry,
             default_input_modes=["text/plain", "application/json"],
             default_output_modes=["text/plain", "application/json"],
+            negotiation=self.negotiation,
         )
 
     def __repr__(self) -> str:

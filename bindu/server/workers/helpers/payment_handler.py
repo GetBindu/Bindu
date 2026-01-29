@@ -48,7 +48,14 @@ class PaymentHandler:
             if hasattr(PaymentPayload, "model_validate"):
                 return PaymentPayload.model_validate(data)  # type: ignore
             return PaymentPayload(**data)
-        except Exception:
+        except Exception as e:
+            logger.warning(
+                "Failed to parse payment payload",
+                error=str(e),
+                error_type=type(e).__name__,
+                data_type=type(data).__name__,
+                has_scheme=bool(isinstance(data, dict) and "scheme" in data),
+            )
             return None
 
     @staticmethod
@@ -67,7 +74,14 @@ class PaymentHandler:
             if hasattr(PaymentRequirements, "model_validate"):
                 return PaymentRequirements.model_validate(data)  # type: ignore
             return PaymentRequirements(**data)
-        except Exception:
+        except Exception as e:
+            logger.warning(
+                "Failed to parse payment requirements",
+                error=str(e),
+                error_type=type(e).__name__,
+                data_type=type(data).__name__,
+                has_accepts=bool(isinstance(data, dict) and "accepts" in data),
+            )
             return None
 
     @staticmethod

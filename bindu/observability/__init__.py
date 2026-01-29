@@ -56,6 +56,12 @@ Set environment variables to control trace export:
 # Export to Phoenix (local observability UI)
 export OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:6006/v1/traces"
 
+# Export to Langfuse (self-hosted or cloud)
+export OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:3000/api/public/otel/v1/traces"
+# or for Langfuse Cloud:
+export OTEL_EXPORTER_OTLP_ENDPOINT="https://cloud.langfuse.com/api/public/otel/v1/traces"
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer YOUR_SECRET_KEY"
+
 # Export to Arize (production monitoring)
 export OTEL_EXPORTER_OTLP_ENDPOINT="https://otlp.arize.com/v1"
 export OTEL_EXPORTER_OTLP_HEADERS="space_key=YOUR_KEY,api_key=YOUR_API_KEY"

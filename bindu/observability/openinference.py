@@ -170,6 +170,7 @@ class _LoggingSpanExporter:
         self._endpoint = endpoint
         self._span_count = 0
         self._verbose = verbose
+        self._error_logged = False
 
     def export(self, spans: Any) -> Any:
         """Export spans and log the operation."""
@@ -185,14 +186,43 @@ class _LoggingSpanExporter:
                     endpoint=self._endpoint,
                     total_exported=self._span_count,
                 )
+                self._error_logged = False
             else:
-                logger.error(
-                    f"Failed to export {len(spans)} span(s) to OTLP endpoint",
-                    endpoint=self._endpoint,
-                    reason=result.name,
-                )
+                if not self._error_logged:
+                    self._log_export_error(result)
+                    self._error_logged = True
 
         return result
+
+    def _log_export_error(self, result: Any) -> None:
+        """Log export error with helpful guidance."""
+        error_msg = f"Failed to export spans to OTLP endpoint: {self._endpoint}"
+
+        if "langfuse" in self._endpoint.lower():
+            logger.error(
+                error_msg,
+                reason=result.name,
+                hint="Langfuse requires endpoint: <base-url>/api/public/otel/v1/traces",
+                example="http://localhost:3000/api/public/otel/v1/traces or https://cloud.langfuse.com/api/public/otel/v1/traces",
+            )
+        elif "phoenix" in self._endpoint.lower() or ":6006" in self._endpoint:
+            logger.error(
+                error_msg,
+                reason=result.name,
+                hint="Phoenix requires endpoint: http://localhost:6006/v1/traces",
+            )
+        elif "arize" in self._endpoint.lower():
+            logger.error(
+                error_msg,
+                reason=result.name,
+                hint="Arize requires endpoint: https://otlp.arize.com/v1 with proper headers",
+            )
+        else:
+            logger.error(
+                error_msg,
+                reason=result.name,
+                hint="Verify endpoint URL includes the full OTLP path (e.g., /v1/traces)",
+            )
 
     def shutdown(self) -> Any:
         """Shutdown the underlying exporter."""
@@ -206,6 +236,7 @@ class _LoggingSpanExporter:
 def _setup_tracer_provider(
     oltp_endpoint: str | list[str] | None = None,
     oltp_service_name: str | None = None,
+    oltp_headers: dict[str, str] | None = None,
     verbose_logging: bool = False,
     service_version: str = "1.0.0",
     deployment_environment: str = "production",
@@ -219,6 +250,7 @@ def _setup_tracer_provider(
     Args:
         oltp_endpoint: OTLP endpoint URL
         oltp_service_name: Service name for traces
+        oltp_headers: HTTP headers for OTLP endpoint (e.g., authentication)
         verbose_logging: Enable verbose telemetry logging
         service_version: Service version for traces
         deployment_environment: Deployment environment
@@ -266,7 +298,7 @@ def _setup_tracer_provider(
         # Create a processor for each endpoint
         for endpoint in endpoints:
             # Create OTLP exporter with logging wrapper
-            otlp_exporter = OTLPSpanExporter(endpoint=endpoint)
+            otlp_exporter = OTLPSpanExporter(endpoint=endpoint, headers=oltp_headers)
             logging_exporter = _LoggingSpanExporter(
                 otlp_exporter, endpoint, verbose_logging
             )
@@ -304,6 +336,7 @@ def _setup_tracer_provider(
 def setup(
     oltp_endpoint: str | list[str] | None = None,
     oltp_service_name: str | None = None,
+    oltp_headers: dict[str, str] | None = None,
     verbose_logging: bool = False,
     service_version: str = "1.0.0",
     deployment_environment: str = "production",
@@ -323,6 +356,7 @@ def setup(
             - Single string: "http://localhost:4318/v1/traces"
             - List of strings: ["http://localhost:4318/v1/traces", "http://localhost:6006/v1/traces"]
         oltp_service_name: Service name for identifying traces
+        oltp_headers: HTTP headers for authentication (e.g., {"Authorization": "Bearer token"})
         verbose_logging: Enable verbose telemetry logging
         service_version: Service version for traces
         deployment_environment: Deployment environment
@@ -335,6 +369,7 @@ def setup(
     tracer_provider = _setup_tracer_provider(
         oltp_endpoint=oltp_endpoint,
         oltp_service_name=oltp_service_name,
+        oltp_headers=oltp_headers,
         verbose_logging=verbose_logging,
         service_version=service_version,
         deployment_environment=deployment_environment,

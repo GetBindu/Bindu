@@ -74,10 +74,10 @@ async def create_scheduler(config: SchedulerConfig | None = None) -> Scheduler:
             config = SchedulerConfig(
                 type="redis",
                 redis_url=scheduler_settings.redis_url,
-                redis_host=scheduler_settings.redis_host,
-                redis_port=scheduler_settings.redis_port,
+                redis_host=scheduler_settings.redis_host or "localhost",
+                redis_port=scheduler_settings.redis_port or 6379,
                 redis_password=scheduler_settings.redis_password,
-                redis_db=scheduler_settings.redis_db,
+                redis_db=scheduler_settings.redis_db or 0,
                 queue_name=scheduler_settings.queue_name,
                 max_connections=scheduler_settings.max_connections,
                 retry_on_timeout=scheduler_settings.retry_on_timeout,
@@ -102,12 +102,22 @@ async def create_scheduler(config: SchedulerConfig | None = None) -> Scheduler:
 
         logger.info("Using Redis scheduler (distributed, multi-process)")
 
-        # Build Redis URL if not provided
+        # Validate redis_url is provided
         redis_url = config.redis_url
         if not redis_url:
-            # Construct URL from individual components
-            auth = f":{config.redis_password}@" if config.redis_password else ""
-            redis_url = f"redis://{auth}{config.redis_host}:{config.redis_port}/{config.redis_db}"
+            # Try to construct URL from individual components if provided
+            if (
+                config.redis_host
+                and config.redis_port is not None
+                and config.redis_db is not None
+            ):
+                auth = f":{config.redis_password}@" if config.redis_password else ""
+                redis_url = f"redis://{auth}{config.redis_host}:{config.redis_port}/{config.redis_db}"
+            else:
+                raise ValueError(
+                    "Redis scheduler requires a Redis URL. "
+                    "Please provide it via REDIS_URL environment variable or config."
+                )
 
         scheduler = RedisScheduler(
             redis_url=redis_url,

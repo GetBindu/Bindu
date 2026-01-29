@@ -1,0 +1,197 @@
+Release: Prometheus Metrics & Monitoring Infrastructure
+========================================================
+
+Version: 2026.3.5 (Commit: 625c0f0)
+Date: January 22, 2026
+Author: Raahul Dutta
+
+OVERVIEW
+--------
+Major new feature: Comprehensive Prometheus metrics endpoint for production
+monitoring and observability. Enables real-time tracking of HTTP requests,
+task execution, errors, and system performance.
+
+BREAKING CHANGES
+----------------
+None - All changes are additive and backward compatible.
+
+NEW FEATURES
+------------
+📊 Prometheus Metrics Endpoint (/metrics)
+  - Full Prometheus text format support for scraping
+  - Automatic metrics collection via middleware
+  - Thread-safe metrics aggregation
+  - Zero external dependencies (pure Python implementation)
+
+📈 HTTP Request Metrics
+  - Request counters by method, endpoint, and status code
+  - Request latency histogram (buckets: 0.1s, 0.5s, 1.0s, +Inf)
+  - Request/response body size tracking
+  - Concurrent requests gauge (in-flight monitoring)
+
+⏱️ Task Performance Metrics
+  - Task duration histogram (buckets: 1s, 5s, 10s, 30s, 60s, +Inf)
+  - Active tasks gauge per agent
+  - Completed tasks counter by status (success, failed, canceled)
+  - Agent-specific task tracking
+
+🚨 Error Tracking
+  - Error counters by agent and error type
+  - Support for timeout, validation, and execution errors
+  - Extensible error categorization
+
+IMPROVEMENTS
+------------
+🏗️ Clean Architecture
+  - No circular dependencies (removed TYPE_CHECKING pattern)
+  - Clear separation of concerns:
+    * metrics.py - Core metrics collection
+    * middleware/metrics.py - HTTP request tracking
+    * endpoints/metrics.py - Prometheus endpoint + agent metrics
+  - Proper dependency flow without circular imports
+
+🔧 Middleware Integration
+  - MetricsMiddleware automatically tracks all HTTP requests
+  - Positioned last in middleware stack to capture complete request lifecycle
+  - Automatic request/response size calculation
+  - In-flight request tracking with proper cleanup
+
+📖 Documentation
+  - Complete monitoring guide (docs/monitoring.md)
+  - Prometheus configuration example (examples/prometheus.yml)
+  - Grafana dashboard recommendations
+  - Example PromQL queries for common use cases
+
+METRICS EXPOSED
+---------------
+Counter Metrics:
+  - http_requests_total{method, endpoint, status}
+  - agent_tasks_completed_total{agent_id, status}
+  - agent_errors_total{agent_id, error_type}
+
+Histogram Metrics:
+  - http_request_duration_seconds (0.1s, 0.5s, 1.0s, +Inf)
+  - task_duration_seconds (1s, 5s, 10s, 30s, 60s, +Inf)
+
+Gauge Metrics:
+  - agent_tasks_active{agent_id}
+  - http_requests_in_flight
+
+Summary Metrics:
+  - http_request_size_bytes
+  - http_response_size_bytes
+
+TECHNICAL DETAILS
+-----------------
+Files Changed: 9 files
+  - Added: 6 files (metrics module, middleware, endpoint, tests, docs)
+  - Modified: 3 files (applications.py, __init__ files, examples)
+  - Total: +591 insertions, -24 deletions
+
+New Modules:
+  - bindu/server/metrics.py (284 lines)
+  - bindu/server/middleware/metrics.py (90 lines)
+  - bindu/server/endpoints/metrics.py (74 lines)
+  - tests/unit/test_metrics.py (106 lines)
+  - docs/monitoring.md (comprehensive guide)
+  - examples/prometheus.yml (configuration template)
+
+Dependencies:
+  - None (uses standard library only)
+
+TESTING
+-------
+✅ 6 new unit tests covering:
+  - HTTP request recording and counters
+  - Histogram bucket calculations
+  - Agent task metrics
+  - Thread-safe concurrent operations
+  - Prometheus text format generation
+✅ All 527 tests passing
+✅ No breaking changes to existing functionality
+
+USAGE EXAMPLES
+--------------
+Access Metrics Endpoint:
+  curl http://localhost:3773/metrics
+
+Configure Prometheus (prometheus.yml):
+  scrape_configs:
+    - job_name: 'bindu-agent'
+      static_configs:
+        - targets: ['localhost:3773']
+      metrics_path: '/metrics'
+
+Example PromQL Queries:
+  # Request rate
+  rate(http_requests_total[5m])
+
+  # 95th percentile latency
+  histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))
+
+  # Error rate
+  rate(agent_errors_total[5m])
+
+  # Average task duration
+  rate(task_duration_seconds_sum[5m]) / rate(task_duration_seconds_count[5m])
+
+INTEGRATION
+-----------
+Prometheus Setup:
+  1. Install Prometheus: brew install prometheus
+  2. Configure scraping (see examples/prometheus.yml)
+  3. Start Prometheus: prometheus --config.file=prometheus.yml
+  4. Access UI: http://localhost:9090
+
+Grafana Dashboard:
+  1. Add Prometheus as data source
+  2. Create panels with PromQL queries
+  3. Recommended panels:
+     - Request Rate (line graph)
+     - Error Rate (line graph)
+     - Latency Heatmap (histogram)
+     - Active Tasks (gauge)
+     - Task Completion (stacked area)
+
+MIGRATION GUIDE
+---------------
+For existing deployments:
+1. No action required - metrics are automatically enabled
+2. Access metrics at /metrics endpoint
+3. Configure Prometheus to scrape your agent
+4. Optional: Set up Grafana dashboards for visualization
+
+The metrics endpoint is production-ready and can be used immediately
+without any configuration changes.
+
+COMMIT DETAILS
+--------------
+Commit: 625c0f02aa37bbce7be1144d6fb06f8029ec0801
+Message: feat: add Prometheus metrics endpoint and middleware for monitoring
+
+Changes:
+  - Add metrics_endpoint to endpoints module and register at /metrics route
+  - Implement MetricsMiddleware to capture request metrics
+  - Position metrics middleware last in stack to capture all requests
+  - Add logging for metrics middleware initialization
+  - Update examples formatting and premium advisor code style
+  - Create comprehensive monitoring documentation
+  - Add Prometheus configuration examples
+  - Implement thread-safe metrics collection
+  - Add unit tests for all metrics functionality
+
+USAGE WITH GIT
+--------------
+# Create an annotated tag
+git tag -a 2026.3.5 625c0f0 -F release-notes/2026.3.5.txt
+
+# Create a GitHub release
+gh release create 2026.3.5 \
+  --notes-file release-notes/2026.3.5.txt \
+  --title "2026.3.5: Prometheus Metrics & Monitoring"
+
+# View this release
+git show 2026.3.5
+
+# Push tag to remote
+git push origin 2026.3.5

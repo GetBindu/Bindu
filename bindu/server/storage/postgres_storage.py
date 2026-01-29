@@ -25,44 +25,48 @@ Features:
 
 from __future__ import annotations as _annotations
 
-from datetime import datetime, timezone
+from contextlib import asynccontextmanager
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import delete, func, select, update, cast
+import sqlalchemy as sa
+from sqlalchemy import delete, func, select, text, update, cast
 from sqlalchemy.dialects.postgresql import insert, JSONB, JSON
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from typing_extensions import TypeVar
 
-from bindu.common.protocol.types import Artifact, Message, Task, TaskState, TaskStatus
+from bindu.common.protocol.types import (
+    Artifact,
+    Message,
+    PushNotificationConfig,
+    Task,
+    TaskState,
+    TaskStatus,
+)
 from bindu.settings import app_settings
 from bindu.utils.logging import get_logger
 
 from .base import Storage
-from .schema import tasks_table, contexts_table, task_feedback_table
+from .helpers import (
+    mask_database_url,
+    normalize_message_uuids,
+    normalize_uuid,
+    sanitize_identifier,
+    serialize_for_jsonb,
+    validate_uuid_type,
+)
+from .helpers.db_operations import get_current_utc_timestamp
+from .schema import (
+    agent_prompts_table,
+    contexts_table,
+    task_feedback_table,
+    tasks_table,
+    webhook_configs_table,
+)
 
 logger = get_logger("bindu.server.storage.postgres_storage")
 
 ContextT = TypeVar("ContextT", default=Any)
-
-
-def _serialize_for_jsonb(obj: Any) -> Any:
-    """Recursively convert UUID objects to strings for JSONB serialization.
-
-    Args:
-        obj: Object to serialize (dict, list, or primitive)
-
-    Returns:
-        Object with all UUIDs converted to strings
-    """
-    if isinstance(obj, UUID):
-        return str(obj)
-    elif isinstance(obj, dict):
-        return {k: _serialize_for_jsonb(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [_serialize_for_jsonb(item) for item in obj]
-    else:
-        return obj
 
 
 class PostgresStorage(Storage[ContextT]):
@@ -88,6 +92,7 @@ class PostgresStorage(Storage[ContextT]):
         pool_max: int | None = None,
         timeout: int | None = None,
         command_timeout: int | None = None,
+        did: str | None = None,
     ):
         """Initialize PostgreSQL storage with SQLAlchemy.
 
@@ -97,15 +102,21 @@ class PostgresStorage(Storage[ContextT]):
             pool_max: Maximum pool size (defaults to settings)
             timeout: Connection timeout in seconds (defaults to settings)
             command_timeout: Command timeout in seconds (defaults to settings)
+            did: Decentralized Identifier for schema-based multi-tenancy isolation.
+                If provided, all operations will be scoped to this DID's schema.
+                If None, uses the 'public' schema (legacy behavior).
         """
-        # Convert postgresql:// to postgresql+asyncpg://
+        # Use database URL from settings or parameter
         db_url = database_url or app_settings.storage.postgres_url
-        if db_url.startswith("postgresql://"):
-            db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
-        elif not db_url.startswith("postgresql+asyncpg://"):
-            db_url = f"postgresql+asyncpg://{db_url}"
 
-        self.database_url = db_url
+        # Ensure asyncpg driver is specified
+        if db_url is not None:
+            if db_url.startswith("postgresql://"):
+                db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+            elif not db_url.startswith("postgresql+asyncpg://"):
+                db_url = f"postgresql+asyncpg://{db_url}"
+
+        self.database_url: str | None = db_url
         self.pool_min = pool_min or app_settings.storage.postgres_pool_min
         self.pool_max = pool_max or app_settings.storage.postgres_pool_max
         self.timeout = timeout or app_settings.storage.postgres_timeout
@@ -115,30 +126,17 @@ class PostgresStorage(Storage[ContextT]):
 
         self._engine = None
         self._session_factory = None
+        self.did = did
+        self.schema_name: str | None = None
 
-    @staticmethod
-    def _mask_password(url: str) -> str:
-        """Mask password in database URL for safe logging.
+        # If DID is provided, compute the schema name
+        if did:
+            from bindu.utils.schema_manager import sanitize_did_for_schema
 
-        Args:
-            url: Database URL (e.g., postgresql+asyncpg://user:password@host:port/db)  # pragma: allowlist secret
-
-        Returns:
-            URL with password masked (e.g., postgresql+asyncpg://user:***@host:port/db)  # pragma: allowlist secret
-        """
-        try:
-            # Handle URLs like postgresql+asyncpg://user:password@host:port/db  # pragma: allowlist secret
-            if "://" in url and "@" in url:
-                scheme, rest = url.split("://", 1)
-                if "@" in rest:
-                    auth, host_part = rest.rsplit("@", 1)
-                    if ":" in auth:
-                        user, _ = auth.split(":", 1)
-                        return f"{scheme}://{user}:***@{host_part}"
-            return url
-        except Exception:
-            # If parsing fails, return as-is (better than crashing)
-            return url
+            self.schema_name = sanitize_did_for_schema(did)
+            logger.info(
+                f"PostgresStorage configured for DID '{did}' using schema '{self.schema_name}'"
+            )
 
     async def connect(self) -> None:
         """Initialize SQLAlchemy engine and session factory.
@@ -147,8 +145,7 @@ class PostgresStorage(Storage[ContextT]):
             ConnectionError: If unable to connect to database
         """
         try:
-            # Mask password in URL for logging
-            masked_url = self._mask_password(self.database_url)
+            masked_url = mask_database_url(self.database_url)
             logger.info("Connecting to PostgreSQL database with SQLAlchemy...")
 
             # Create async engine
@@ -161,6 +158,18 @@ class PostgresStorage(Storage[ContextT]):
                 echo=False,  # Set to True for SQL query logging
             )
 
+            # Set up event listener to set search_path for DID schema
+            if self.schema_name:
+                from sqlalchemy import event
+
+                sanitized_schema = sanitize_identifier(self.schema_name)
+
+                @event.listens_for(self._engine.sync_engine, "connect")
+                def set_search_path(dbapi_conn, connection_record):
+                    cursor = dbapi_conn.cursor()
+                    cursor.execute(f'SET search_path TO "{sanitized_schema}"')
+                    cursor.close()
+
             # Create session factory
             self._session_factory = async_sessionmaker(
                 self._engine,
@@ -168,12 +177,25 @@ class PostgresStorage(Storage[ContextT]):
                 expire_on_commit=False,
             )
 
-            # Test connection
-            async with self._engine.begin() as conn:
-                await conn.execute(select(1))
+            # If DID is provided, initialize the schema (this also tests the connection)
+            if self.did and self.schema_name:
+                from bindu.utils.schema_manager import initialize_did_schema
+
+                logger.info(
+                    f"Initializing schema '{self.schema_name}' for DID '{self.did}'..."
+                )
+                await initialize_did_schema(
+                    self._engine, self.schema_name, create_tables=True
+                )
+                logger.info(f"Schema '{self.schema_name}' initialized successfully")
+            else:
+                # Test connection if no DID schema initialization
+                async with self._engine.begin() as conn:
+                    await conn.execute(select(1))
 
             logger.info(
                 f"PostgreSQL storage connected to {masked_url} (pool_size={self.pool_max})"
+                + (f" using schema '{self.schema_name}'" if self.schema_name else "")
             )
 
         except Exception as e:
@@ -198,6 +220,38 @@ class PostgresStorage(Storage[ContextT]):
             raise RuntimeError(
                 "PostgreSQL engine not initialized. Call connect() first."
             )
+
+    @asynccontextmanager
+    async def _get_session_with_schema(self):
+        """Create a session and set search_path for the DID's schema.
+
+        This ensures all queries within the session use the DID's schema
+        without needing to qualify table names. The search_path is set
+        per-connection to avoid issues with connection pooling and reuse.
+
+        Returns:
+            AsyncSession context manager
+        """
+        try:
+            async with self._session_factory() as session:
+                # Set search_path for this session if we have a schema
+                if self.schema_name:
+                    sanitized_schema = sanitize_identifier(self.schema_name)
+                    # Execute SET statement - this will auto-begin a transaction
+                    await session.execute(
+                        text(f'SET search_path TO "{sanitized_schema}"')
+                    )
+                    # Commit the transaction from the SET command
+                    # This leaves the session clean for the caller to begin their own transaction
+                    await session.commit()
+                yield session
+        except Exception as e:
+            logger.error(
+                f"Database session error: {type(e).__name__}: {e}",
+                exc_info=True,
+                extra={"schema": self.schema_name if hasattr(self, 'schema_name') else None}
+            )
+            raise
 
     async def _retry_on_connection_error(self, func, *args, **kwargs):
         """Retry function on connection errors using Tenacity.
@@ -237,7 +291,7 @@ class PostgresStorage(Storage[ContextT]):
         Returns:
             Task TypedDict from protocol
         """
-        return Task(
+        task = Task(
             id=row.id,
             context_id=row.context_id,
             kind=row.kind,
@@ -248,6 +302,10 @@ class PostgresStorage(Storage[ContextT]):
             artifacts=row.artifacts or [],
             metadata=row.metadata or {},
         )
+        # Add prompt_id if present
+        if hasattr(row, 'prompt_id') and row.prompt_id is not None:
+            task["prompt_id"] = row.prompt_id
+        return task
 
     # -------------------------------------------------------------------------
     # Task Operations
@@ -268,13 +326,12 @@ class PostgresStorage(Storage[ContextT]):
         Raises:
             TypeError: If task_id is not UUID
         """
-        if not isinstance(task_id, UUID):
-            raise TypeError(f"task_id must be UUID, got {type(task_id).__name__}")
+        task_id = validate_uuid_type(task_id, "task_id")
 
         self._ensure_connected()
 
         async def _load():
-            async with self._session_factory() as session:
+            async with self._get_session_with_schema() as session:
                 stmt = select(tasks_table).where(tasks_table.c.id == task_id)
                 result = await session.execute(stmt)
                 row = result.first()
@@ -311,55 +368,16 @@ class PostgresStorage(Storage[ContextT]):
             TypeError: If IDs are invalid types
             ValueError: If attempting to continue a terminal task
         """
-        if not isinstance(context_id, UUID):
-            raise TypeError(f"context_id must be UUID, got {type(context_id).__name__}")
-
-        # Parse and normalize task ID
-        task_id_raw = message.get("task_id")
-        task_id: UUID
-
-        if isinstance(task_id_raw, str):
-            task_id = UUID(task_id_raw)
-        elif isinstance(task_id_raw, UUID):
-            task_id = task_id_raw
-        else:
-            raise TypeError(
-                f"task_id must be UUID or str, got {type(task_id_raw).__name__}"
-            )
-
-        # Normalize message fields
-        message["task_id"] = task_id
-        message["context_id"] = context_id
-
-        message_id_raw = message.get("message_id")
-        if isinstance(message_id_raw, str):
-            message["message_id"] = UUID(message_id_raw)
-        elif message_id_raw is not None and not isinstance(message_id_raw, UUID):
-            raise TypeError(
-                f"message_id must be UUID or str, got {type(message_id_raw).__name__}"
-            )
-
-        # Normalize reference_task_ids
-        ref_ids_key = "reference_task_ids"
-        if ref_ids_key in message:
-            ref_ids = message[ref_ids_key]
-            if ref_ids is not None:
-                normalized_refs = []
-                for ref_id in ref_ids:
-                    if isinstance(ref_id, str):
-                        normalized_refs.append(UUID(ref_id))
-                    elif isinstance(ref_id, UUID):
-                        normalized_refs.append(ref_id)
-                    else:
-                        raise TypeError(
-                            f"reference_task_id must be UUID or str, got {type(ref_id).__name__}"
-                        )
-                message["reference_task_ids"] = normalized_refs
+        context_id = validate_uuid_type(context_id, "context_id")
+        task_id = normalize_uuid(message.get("task_id"), "task_id")
+        message = normalize_message_uuids(
+            message, task_id=task_id, context_id=context_id
+        )
 
         self._ensure_connected()
 
         async def _submit():
-            async with self._session_factory() as session:
+            async with self._get_session_with_schema() as session:
                 async with session.begin():
                     # Check if task exists
                     stmt = select(tasks_table).where(tasks_table.c.id == task_id)
@@ -376,14 +394,11 @@ class PostgresStorage(Storage[ContextT]):
                                 f"Create a new task with referenceTaskIds to continue the conversation."
                             )
 
-                        # Append message to history
                         logger.info(
                             f"Continuing existing task {task_id} from state '{current_state}'"
                         )
 
-                        # Update using JSONB concatenation
-                        # Serialize message to convert UUIDs to strings
-                        serialized_message = _serialize_for_jsonb(message)
+                        serialized_message = serialize_for_jsonb(message)
                         stmt = (
                             update(tasks_table)
                             .where(tasks_table.c.id == task_id)
@@ -393,8 +408,8 @@ class PostgresStorage(Storage[ContextT]):
                                     cast([serialized_message], JSONB),
                                 ),
                                 state="submitted",
-                                state_timestamp=datetime.now(timezone.utc),
-                                updated_at=datetime.now(timezone.utc),
+                                state_timestamp=get_current_utc_timestamp(),
+                                updated_at=get_current_utc_timestamp(),
                             )
                             .returning(tasks_table)
                         )
@@ -412,10 +427,8 @@ class PostgresStorage(Storage[ContextT]):
                     stmt = stmt.on_conflict_do_nothing(index_elements=["id"])
                     await session.execute(stmt)
 
-                    # Create new task
-                    # Serialize message to convert UUIDs to strings
-                    serialized_message = _serialize_for_jsonb(message)
-                    now = datetime.now(timezone.utc)
+                    serialized_message = serialize_for_jsonb(message)
+                    now = get_current_utc_timestamp()
                     stmt = (
                         insert(tasks_table)
                         .values(
@@ -444,6 +457,7 @@ class PostgresStorage(Storage[ContextT]):
         new_artifacts: list[Artifact] | None = None,
         new_messages: list[Message] | None = None,
         metadata: dict[str, Any] | None = None,
+        prompt_id: int | None = None,
     ) -> Task:
         """Update task state and append new content using SQLAlchemy.
 
@@ -453,6 +467,7 @@ class PostgresStorage(Storage[ContextT]):
             new_artifacts: Optional artifacts to append
             new_messages: Optional messages to append to history
             metadata: Optional metadata to update/merge
+            prompt_id: Optional prompt ID to associate with this task
 
         Returns:
             Updated task object
@@ -461,13 +476,12 @@ class PostgresStorage(Storage[ContextT]):
             TypeError: If task_id is not UUID
             KeyError: If task not found
         """
-        if not isinstance(task_id, UUID):
-            raise TypeError(f"task_id must be UUID, got {type(task_id).__name__}")
+        task_id = validate_uuid_type(task_id, "task_id")
 
         self._ensure_connected()
 
         async def _update():
-            async with self._session_factory() as session:
+            async with self._get_session_with_schema() as session:
                 async with session.begin():
                     # Check if task exists
                     stmt = select(tasks_table).where(tasks_table.c.id == task_id)
@@ -477,40 +491,39 @@ class PostgresStorage(Storage[ContextT]):
                     if task_row is None:
                         raise KeyError(f"Task {task_id} not found")
 
-                    # Build update values
-                    now = datetime.now(timezone.utc)
+                    now = get_current_utc_timestamp()
                     update_values = {
                         "state": state,
                         "state_timestamp": now,
                         "updated_at": now,
                     }
 
-                    # Update metadata (merge with existing)
+                    if prompt_id is not None:
+                        update_values["prompt_id"] = prompt_id
+
                     if metadata:
-                        serialized_metadata = _serialize_for_jsonb(metadata)
+                        serialized_metadata = serialize_for_jsonb(metadata)
                         update_values["metadata"] = func.jsonb_concat(
                             tasks_table.c.metadata, cast(serialized_metadata, JSONB)
                         )
 
-                    # Append artifacts
                     if new_artifacts:
-                        serialized_artifacts = _serialize_for_jsonb(new_artifacts)
+                        serialized_artifacts = serialize_for_jsonb(new_artifacts)
                         update_values["artifacts"] = func.jsonb_concat(
                             tasks_table.c.artifacts, cast(serialized_artifacts, JSONB)
                         )
 
-                    # Append messages
                     if new_messages:
-                        # Add task_id and context_id to messages
                         for message in new_messages:
                             if not isinstance(message, dict):
                                 raise TypeError(
                                     f"Message must be dict, got {type(message).__name__}"
                                 )
-                            message["task_id"] = task_id
-                            message["context_id"] = task_row.context_id
+                            normalize_message_uuids(
+                                message, task_id=task_id, context_id=task_row.context_id
+                            )
 
-                        serialized_messages = _serialize_for_jsonb(new_messages)
+                        serialized_messages = serialize_for_jsonb(new_messages)
                         update_values["history"] = func.jsonb_concat(
                             tasks_table.c.history, cast(serialized_messages, JSONB)
                         )
@@ -541,7 +554,7 @@ class PostgresStorage(Storage[ContextT]):
         self._ensure_connected()
 
         async def _list():
-            async with self._session_factory() as session:
+            async with self._get_session_with_schema() as session:
                 stmt = select(tasks_table).order_by(tasks_table.c.created_at.desc())
 
                 if length is not None:
@@ -569,13 +582,12 @@ class PostgresStorage(Storage[ContextT]):
         Raises:
             TypeError: If context_id is not UUID
         """
-        if not isinstance(context_id, UUID):
-            raise TypeError(f"context_id must be UUID, got {type(context_id).__name__}")
+        context_id = validate_uuid_type(context_id, "context_id")
 
         self._ensure_connected()
 
         async def _list():
-            async with self._session_factory() as session:
+            async with self._get_session_with_schema() as session:
                 stmt = (
                     select(tasks_table)
                     .where(tasks_table.c.context_id == context_id)
@@ -608,13 +620,12 @@ class PostgresStorage(Storage[ContextT]):
         Raises:
             TypeError: If context_id is not UUID
         """
-        if not isinstance(context_id, UUID):
-            raise TypeError(f"context_id must be UUID, got {type(context_id).__name__}")
+        context_id = validate_uuid_type(context_id, "context_id")
 
         self._ensure_connected()
 
         async def _load():
-            async with self._session_factory() as session:
+            async with self._get_session_with_schema() as session:
                 stmt = select(contexts_table).where(contexts_table.c.id == context_id)
                 result = await session.execute(stmt)
                 row = result.first()
@@ -633,17 +644,14 @@ class PostgresStorage(Storage[ContextT]):
         Raises:
             TypeError: If context_id is not UUID
         """
-        if not isinstance(context_id, UUID):
-            raise TypeError(f"context_id must be UUID, got {type(context_id).__name__}")
+        context_id = validate_uuid_type(context_id, "context_id")
 
         self._ensure_connected()
 
         async def _update():
-            async with self._session_factory() as session:
+            async with self._get_session_with_schema() as session:
                 async with session.begin():
-                    # Upsert context
-                    # Serialize context data to convert UUIDs to strings
-                    serialized_context = _serialize_for_jsonb(
+                    serialized_context = serialize_for_jsonb(
                         context if isinstance(context, dict) else {}
                     )
                     stmt = insert(contexts_table).values(
@@ -655,7 +663,7 @@ class PostgresStorage(Storage[ContextT]):
                         index_elements=["id"],
                         set_={
                             "context_data": serialized_context,
-                            "updated_at": datetime.now(timezone.utc),
+                            "updated_at": get_current_utc_timestamp(),
                         },
                     )
                     await session.execute(stmt)
@@ -674,8 +682,7 @@ class PostgresStorage(Storage[ContextT]):
         Raises:
             TypeError: If context_id is not UUID or messages is not a list
         """
-        if not isinstance(context_id, UUID):
-            raise TypeError(f"context_id must be UUID, got {type(context_id).__name__}")
+        context_id = validate_uuid_type(context_id, "context_id")
 
         if not isinstance(messages, list):
             raise TypeError(f"messages must be list, got {type(messages).__name__}")
@@ -683,7 +690,7 @@ class PostgresStorage(Storage[ContextT]):
         self._ensure_connected()
 
         async def _append():
-            async with self._session_factory() as session:
+            async with self._get_session_with_schema() as session:
                 async with session.begin():
                     # Ensure context exists
                     stmt = insert(contexts_table).values(
@@ -694,9 +701,7 @@ class PostgresStorage(Storage[ContextT]):
                     stmt = stmt.on_conflict_do_nothing(index_elements=["id"])
                     await session.execute(stmt)
 
-                    # Append messages
-                    # Serialize messages to convert UUIDs to strings
-                    serialized_messages = _serialize_for_jsonb(messages)
+                    serialized_messages = serialize_for_jsonb(messages)
                     stmt = (
                         update(contexts_table)
                         .where(contexts_table.c.id == context_id)
@@ -705,7 +710,7 @@ class PostgresStorage(Storage[ContextT]):
                                 contexts_table.c.message_history,
                                 cast(serialized_messages, JSONB),
                             ),
-                            updated_at=datetime.now(timezone.utc),
+                            updated_at=get_current_utc_timestamp(),
                         )
                     )
                     await session.execute(stmt)
@@ -724,7 +729,7 @@ class PostgresStorage(Storage[ContextT]):
         self._ensure_connected()
 
         async def _list():
-            async with self._session_factory() as session:
+            async with self._get_session_with_schema() as session:
                 # Query contexts with task counts
                 stmt = (
                     select(
@@ -777,13 +782,12 @@ class PostgresStorage(Storage[ContextT]):
 
         Warning: This is a destructive operation.
         """
-        if not isinstance(context_id, UUID):
-            raise TypeError(f"context_id must be UUID, got {type(context_id).__name__}")
+        context_id = validate_uuid_type(context_id, "context_id")
 
         self._ensure_connected()
 
         async def _clear():
-            async with self._session_factory() as session:
+            async with self._get_session_with_schema() as session:
                 async with session.begin():
                     # Check if context exists
                     stmt = select(contexts_table).where(
@@ -822,12 +826,15 @@ class PostgresStorage(Storage[ContextT]):
         self._ensure_connected()
 
         async def _clear():
-            async with self._session_factory() as session:
+            async with self._get_session_with_schema() as session:
                 async with session.begin():
+                    await session.execute(delete(webhook_configs_table))
                     await session.execute(delete(task_feedback_table))
                     await session.execute(delete(tasks_table))
                     await session.execute(delete(contexts_table))
-                    logger.info("Cleared all tasks, contexts, and feedback")
+                    logger.info(
+                        "Cleared all tasks, contexts, feedback, and webhook configs"
+                    )
 
         await self._retry_on_connection_error(_clear)
 
@@ -847,8 +854,7 @@ class PostgresStorage(Storage[ContextT]):
         Raises:
             TypeError: If task_id is not UUID or feedback_data is not dict
         """
-        if not isinstance(task_id, UUID):
-            raise TypeError(f"task_id must be UUID, got {type(task_id).__name__}")
+        task_id = validate_uuid_type(task_id, "task_id")
 
         if not isinstance(feedback_data, dict):
             raise TypeError(
@@ -858,10 +864,9 @@ class PostgresStorage(Storage[ContextT]):
         self._ensure_connected()
 
         async def _store():
-            async with self._session_factory() as session:
+            async with self._get_session_with_schema() as session:
                 async with session.begin():
-                    # Serialize feedback data to convert UUIDs to strings
-                    serialized_feedback = _serialize_for_jsonb(feedback_data)
+                    serialized_feedback = serialize_for_jsonb(feedback_data)
                     stmt = insert(task_feedback_table).values(
                         task_id=task_id, feedback_data=serialized_feedback
                     )
@@ -881,13 +886,12 @@ class PostgresStorage(Storage[ContextT]):
         Raises:
             TypeError: If task_id is not UUID
         """
-        if not isinstance(task_id, UUID):
-            raise TypeError(f"task_id must be UUID, got {type(task_id).__name__}")
+        task_id = validate_uuid_type(task_id, "task_id")
 
         self._ensure_connected()
 
         async def _get():
-            async with self._session_factory() as session:
+            async with self._get_session_with_schema() as session:
                 stmt = (
                     select(task_feedback_table)
                     .where(task_feedback_table.c.task_id == task_id)
@@ -902,3 +906,419 @@ class PostgresStorage(Storage[ContextT]):
                 return [row.feedback_data for row in rows]
 
         return await self._retry_on_connection_error(_get)
+
+    async def fetch_tasks_with_feedback(
+        self, limit: int | None = None
+    ) -> list[dict[str, Any]]:
+        """Fetch tasks with their associated feedback using LEFT JOIN.
+
+        This method is optimized for DSPy training data extraction, providing
+        task history along with feedback in a single efficient query.
+
+        Args:
+            limit: Maximum number of tasks to fetch (defaults to None for all tasks)
+
+        Returns:
+            List of dictionaries containing:
+                - id: Task UUID
+                - history: List of message dictionaries
+                - created_at: Task creation timestamp
+                - feedback_data: Optional feedback dictionary (None if no feedback)
+        """
+        self._ensure_connected()
+
+        async def _fetch():
+            async with self._get_session_with_schema() as session:
+                # Query tasks with LEFT JOIN to feedback
+                stmt = (
+                    select(
+                        tasks_table.c.id,
+                        tasks_table.c.history,
+                        tasks_table.c.created_at,
+                        task_feedback_table.c.feedback_data,
+                    )
+                    .select_from(
+                        tasks_table.outerjoin(
+                            task_feedback_table,
+                            tasks_table.c.id == task_feedback_table.c.task_id,
+                        )
+                    )
+                    .order_by(tasks_table.c.created_at.desc())
+                )
+
+                if limit is not None:
+                    stmt = stmt.limit(limit)
+
+                result = await session.execute(stmt)
+                rows = result.fetchall()
+
+                return [
+                    {
+                        "id": row.id,
+                        "history": row.history or [],
+                        "created_at": row.created_at,
+                        "feedback_data": row.feedback_data,
+                    }
+                    for row in rows
+                ]
+
+        return await self._retry_on_connection_error(_fetch)
+
+    # -------------------------------------------------------------------------
+    # Webhook Persistence Operations (for long-running tasks)
+    # -------------------------------------------------------------------------
+
+    async def save_webhook_config(
+        self, task_id: UUID, config: PushNotificationConfig
+    ) -> None:
+        """Save a webhook configuration for a task using SQLAlchemy.
+
+        Uses upsert to handle both insert and update scenarios.
+
+        Args:
+            task_id: Task to associate the webhook config with
+            config: Push notification configuration to persist
+
+        Raises:
+            TypeError: If task_id is not UUID
+        """
+        task_id = validate_uuid_type(task_id, "task_id")
+
+        self._ensure_connected()
+
+        async def _save():
+            async with self._get_session_with_schema() as session:
+                async with session.begin():
+                    serialized_config = serialize_for_jsonb(config)
+                    stmt = insert(webhook_configs_table).values(
+                        task_id=task_id,
+                        config=serialized_config,
+                    )
+                    stmt = stmt.on_conflict_do_update(
+                        index_elements=["task_id"],
+                        set_={
+                            "config": serialized_config,
+                            "updated_at": get_current_utc_timestamp(),
+                        },
+                    )
+                    await session.execute(stmt)
+                    logger.debug(f"Saved webhook config for task {task_id}")
+
+        await self._retry_on_connection_error(_save)
+
+    async def load_webhook_config(self, task_id: UUID) -> PushNotificationConfig | None:
+        """Load a webhook configuration for a task using SQLAlchemy.
+
+        Args:
+            task_id: Task to load the webhook config for
+
+        Returns:
+            The webhook configuration if found, None otherwise
+
+        Raises:
+            TypeError: If task_id is not UUID
+        """
+        task_id = validate_uuid_type(task_id, "task_id")
+
+        self._ensure_connected()
+
+        async def _load():
+            async with self._get_session_with_schema() as session:
+                stmt = select(webhook_configs_table).where(
+                    webhook_configs_table.c.task_id == task_id
+                )
+                result = await session.execute(stmt)
+                row = result.first()
+
+                if row is None:
+                    return None
+
+                return row.config
+
+        return await self._retry_on_connection_error(_load)
+
+    async def delete_webhook_config(self, task_id: UUID) -> None:
+        """Delete a webhook configuration for a task using SQLAlchemy.
+
+        Args:
+            task_id: Task to delete the webhook config for
+
+        Raises:
+            TypeError: If task_id is not UUID
+
+        Note: Does not raise if the config doesn't exist.
+        """
+        task_id = validate_uuid_type(task_id, "task_id")
+
+        self._ensure_connected()
+
+        async def _delete():
+            async with self._get_session_with_schema() as session:
+                async with session.begin():
+                    stmt = delete(webhook_configs_table).where(
+                        webhook_configs_table.c.task_id == task_id
+                    )
+                    result = await session.execute(stmt)
+                    if result.rowcount > 0:
+                        logger.debug(f"Deleted webhook config for task {task_id}")
+
+        await self._retry_on_connection_error(_delete)
+
+    async def load_all_webhook_configs(self) -> dict[UUID, PushNotificationConfig]:
+        """Load all stored webhook configurations using SQLAlchemy.
+
+        Used during initialization to restore webhook state after restart.
+
+        Returns:
+            Dictionary mapping task IDs to their webhook configurations
+        """
+        self._ensure_connected()
+
+        async def _load_all():
+            async with self._get_session_with_schema() as session:
+                stmt = select(webhook_configs_table)
+                result = await session.execute(stmt)
+                rows = result.fetchall()
+
+                return {row.task_id: row.config for row in rows}
+
+        return await self._retry_on_connection_error(_load_all)
+    # -------------------------------------------------------------------------
+    # Prompt Management Operations (for DSPy A/B testing)
+    # -------------------------------------------------------------------------
+
+    async def get_active_prompt(self) -> dict[str, Any] | None:
+        """Get the current active prompt with calculated metrics.
+
+        Returns:
+            Dictionary containing prompt data (id, prompt_text, status, traffic,
+            num_interactions, average_feedback_score) or None if no active prompt exists.
+            num_interactions and average_feedback_score are calculated on-demand from tasks table.
+        """
+        self._ensure_connected()
+
+        async def _get():
+            async with self._get_session_with_schema() as session:
+                stmt = select(agent_prompts_table).where(
+                    agent_prompts_table.c.status == "active"
+                )
+                result = await session.execute(stmt)
+                row = result.fetchone()
+
+                if row:
+                    # Calculate metrics on-demand
+                    metrics = await self._calculate_prompt_metrics(row.id, session)
+                    
+                    return {
+                        "id": row.id,
+                        "prompt_text": row.prompt_text,
+                        "status": row.status,
+                        "traffic": float(row.traffic) if row.traffic is not None else 0.0,
+                        "num_interactions": metrics["num_interactions"],
+                        "average_feedback_score": metrics["average_feedback_score"],
+                    }
+
+                return None
+
+        return await self._retry_on_connection_error(_get)
+
+    async def get_candidate_prompt(self) -> dict[str, Any] | None:
+        """Get the current candidate prompt with calculated metrics.
+
+        Returns:
+            Dictionary containing prompt data (id, prompt_text, status, traffic,
+            num_interactions, average_feedback_score) or None if no candidate prompt exists.
+            num_interactions and average_feedback_score are calculated on-demand from tasks table.
+        """
+        self._ensure_connected()
+
+        async def _get():
+            async with self._get_session_with_schema() as session:
+                stmt = select(agent_prompts_table).where(
+                    agent_prompts_table.c.status == "candidate"
+                )
+                result = await session.execute(stmt)
+                row = result.fetchone()
+
+                if row:
+                    # Calculate metrics on-demand
+                    metrics = await self._calculate_prompt_metrics(row.id, session)
+                    
+                    return {
+                        "id": row.id,
+                        "prompt_text": row.prompt_text,
+                        "status": row.status,
+                        "traffic": float(row.traffic) if row.traffic is not None else 0.0,
+                        "num_interactions": metrics["num_interactions"],
+                        "average_feedback_score": metrics["average_feedback_score"],
+                    }
+
+                return None
+
+        return await self._retry_on_connection_error(_get)
+
+    async def insert_prompt(self, text: str, status: str, traffic: float) -> int:
+        """Insert a new prompt into the database.
+
+        Args:
+            text: The prompt text content
+            status: The prompt status (active, candidate, deprecated, rolled_back)
+            traffic: Traffic allocation (0.0 to 1.0)
+
+        Returns:
+            The ID of the newly inserted prompt
+
+        Raises:
+            ValueError: If traffic is not in range [0, 1]
+        """
+        if not 0 <= traffic <= 1:
+            raise ValueError(f"Traffic must be between 0 and 1, got {traffic}")
+
+        self._ensure_connected()
+
+        async def _insert():
+            async with self._get_session_with_schema() as session:
+                async with session.begin():
+                    stmt = agent_prompts_table.insert().values(
+                        prompt_text=text,
+                        status=status,
+                        traffic=traffic,
+                    ).returning(agent_prompts_table.c.id)
+
+                    result = await session.execute(stmt)
+                    prompt_id = result.scalar_one()
+                    logger.info(f"Inserted prompt {prompt_id} with status '{status}' and traffic {traffic}")
+                    return prompt_id
+
+        return await self._retry_on_connection_error(_insert)
+
+    async def update_prompt_traffic(self, prompt_id: int, traffic: float) -> None:
+        """Update the traffic allocation for a specific prompt.
+
+        Args:
+            prompt_id: The ID of the prompt to update
+            traffic: New traffic allocation (0.0 to 1.0)
+
+        Raises:
+            ValueError: If traffic is not in range [0, 1]
+        """
+        if not 0 <= traffic <= 1:
+            raise ValueError(f"Traffic must be between 0 and 1, got {traffic}")
+
+        self._ensure_connected()
+
+        async def _update():
+            async with self._get_session_with_schema() as session:
+                async with session.begin():
+                    stmt = (
+                        update(agent_prompts_table)
+                        .where(agent_prompts_table.c.id == prompt_id)
+                        .values(traffic=traffic)
+                    )
+
+                    await session.execute(stmt)
+                    logger.info(f"Updated traffic for prompt {prompt_id} to {traffic}")
+
+        await self._retry_on_connection_error(_update)
+
+    async def update_prompt_status(self, prompt_id: int, status: str) -> None:
+        """Update the status of a specific prompt.
+
+        Args:
+            prompt_id: The ID of the prompt to update
+            status: New status (active, candidate, deprecated, rolled_back)
+        """
+        self._ensure_connected()
+
+        async def _update():
+            async with self._get_session_with_schema() as session:
+                async with session.begin():
+                    stmt = (
+                        update(agent_prompts_table)
+                        .where(agent_prompts_table.c.id == prompt_id)
+                        .values(status=status)
+                    )
+
+                    await session.execute(stmt)
+                    logger.info(f"Updated status for prompt {prompt_id} to '{status}'")
+
+        await self._retry_on_connection_error(_update)
+
+    async def zero_out_all_except(self, prompt_ids: list[int]) -> None:
+        """Set traffic to 0 for all prompts except those in the given list.
+
+        Args:
+            prompt_ids: List of prompt IDs to preserve (keep their traffic unchanged)
+        """
+        self._ensure_connected()
+
+        async def _zero():
+            async with self._get_session_with_schema() as session:
+                async with session.begin():
+                    stmt = (
+                        update(agent_prompts_table)
+                        .where(agent_prompts_table.c.id.notin_(prompt_ids))
+                        .values(traffic=0)
+                    )
+
+                    result = await session.execute(stmt)
+                    logger.info(
+                        f"Zeroed out traffic for {result.rowcount} prompts "
+                        f"(preserving IDs: {prompt_ids})"
+                    )
+
+        await self._retry_on_connection_error(_zero)
+
+    async def _calculate_prompt_metrics(
+        self, prompt_id: int, session=None
+    ) -> dict[str, Any]:
+        """Calculate prompt metrics on-demand by querying tasks with this prompt_id.
+
+        Args:
+            prompt_id: ID of the prompt to calculate metrics for
+            session: Optional existing session to reuse
+
+        Returns:
+            Dictionary with:
+                - num_interactions: Total number of tasks that used this prompt
+                - average_feedback_score: Average normalized feedback score (0-1) or None
+        """
+        # Helper to execute the query
+        async def _calc(session):
+            # Join tasks with task_feedback to get feedback scores
+            # Count total tasks and calculate average feedback score
+            stmt = (
+                select(
+                    func.count(tasks_table.c.id).label("num_interactions"),
+                    func.avg(
+                        cast(
+                            func.jsonb_extract_path_text(
+                                task_feedback_table.c.feedback_data, "rating"
+                            ),
+                            sa.Numeric
+                        ) / 5.0  # Normalize 1-5 rating to 0-1
+                    ).label("average_feedback_score")
+                )
+                .select_from(
+                    tasks_table.outerjoin(
+                        task_feedback_table,
+                        tasks_table.c.id == task_feedback_table.c.task_id
+                    )
+                )
+                .where(tasks_table.c.prompt_id == prompt_id)
+            )
+            
+            result = await session.execute(stmt)
+            row = result.fetchone()
+            
+            return {
+                "num_interactions": row.num_interactions or 0,
+                "average_feedback_score": float(row.average_feedback_score) if row.average_feedback_score is not None else None,
+            }
+        
+        # Use provided session or create a new one
+        if session:
+            return await _calc(session)
+        else:
+            async with self._get_session_with_schema() as new_session:
+                return await _calc(new_session)

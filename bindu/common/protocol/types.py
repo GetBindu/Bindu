@@ -420,6 +420,13 @@ class TaskPushNotificationConfig(TypedDict):
     push_notification_config: Required[PushNotificationConfig]
     """The push notification configuration of the task push notification configuration."""
 
+    long_running: NotRequired[bool]
+    """Flag indicating task expects to run longer than typical request timeouts.
+
+    When True, the push_notification_config should be persisted for notifications
+    across server restarts. Defaults to False if not specified.
+    """
+
 
 # -----------------------------------------------------------------------------
 # Task
@@ -491,6 +498,10 @@ class Task(TypedDict):
     """The history of the task."""
 
     metadata: NotRequired[dict[str, Any]]
+    """Additional metadata for the task."""
+
+    prompt_id: NotRequired[int]
+    """ID of the system prompt from agent_prompts table used for this task."""
     """The metadata of the task."""
 
 
@@ -631,6 +642,13 @@ class MessageSendConfiguration(TypedDict):
 
     push_notification_config: NotRequired[PushNotificationConfig]
     """The push notification configuration."""
+
+    long_running: NotRequired[bool]
+    """Flag indicating task expects to run longer than typical request timeouts.
+
+    When True, the push_notification_config should be persisted for notifications
+    across server restarts. Defaults to False if not specified.
+    """
 
 
 @pydantic.with_config(ConfigDict(alias_generator=to_camel))
@@ -1800,6 +1818,24 @@ class Skill(TypedDict):
 
     Used for security and capability restriction.
     Example: ["Read", "Write", "Execute"]
+    """
+
+    assessment: NotRequired[dict[str, Any]]
+    """Assessment metadata for skill negotiation and matching.
+
+    Example:
+    {
+        "keywords": ["pdf", "extract", "document"],
+        "specializations": [
+            {"domain": "invoice_processing", "confidence_boost": 0.3}
+        ],
+        "anti_patterns": ["pdf editing", "create pdf"],
+        "complexity_indicators": {
+            "simple": ["single page", "extract text"],
+            "medium": ["multiple pages", "fill form"],
+            "complex": ["scanned document", "ocr"]
+        }
+    }
     """
 
 

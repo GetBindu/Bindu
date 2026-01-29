@@ -99,10 +99,14 @@ def create_manifest(
     oltp_endpoint: str | None = None,
     oltp_service_name: str | None = None,
     num_history_sessions: int = 10,
+    negotiation: dict[str, Any] | None = None,
     enable_system_message: bool = True,
     enable_context_based_history: bool = False,
     documentation_url: str | None = None,
     extra_metadata: dict[str, Any] | None = None,
+    global_webhook_url: str | None = None,
+    global_webhook_token: str | None = None,
+    enable_dspy: bool = False,
 ) -> AgentManifest:
     """Create a protocol-compliant AgentManifest from any Python function.
 
@@ -133,10 +137,13 @@ def create_manifest(
         monitoring: Enable monitoring and metrics collection (default: False).
         telemetry: Enable telemetry data collection (default: True).
         num_history_sessions: Number of conversation history sessions to maintain (default: 10).
+        negotiation: Negotiation configuration (optional).
         enable_system_message: Enable system message/prompt in agent execution (default: True).
         enable_context_based_history: Enable context-based history in agent execution (default: False).
         documentation_url: URL to agent documentation (optional).
         extra_metadata: Additional metadata dictionary to attach to the agent manifest (default: {}).
+        global_webhook_url: Default webhook URL for all tasks (optional).
+        global_webhook_token: Authentication token for global webhook (optional).
 
     Returns:
         AgentManifest: A protocol-compliant agent manifest with proper execution methods.
@@ -187,6 +194,7 @@ def create_manifest(
         kind=kind,
         num_history_sessions=num_history_sessions,
         enable_system_message=enable_system_message,
+        enable_dspy=enable_dspy,
         enable_context_based_history=enable_context_based_history,
         extra_data=extra_metadata or {},
         debug_mode=debug_mode,
@@ -196,6 +204,9 @@ def create_manifest(
         oltp_endpoint=oltp_endpoint,
         oltp_service_name=oltp_service_name,
         documentation_url=documentation_url,
+        negotiation=negotiation,
+        global_webhook_url=global_webhook_url,
+        global_webhook_token=global_webhook_token,
     )
 
     # Create execution method based on function type

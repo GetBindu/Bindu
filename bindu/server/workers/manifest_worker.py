@@ -50,6 +50,8 @@ from bindu.server.workers.helpers import ResponseDetector, ResultProcessor
 from bindu.utils.logging import get_logger
 from bindu.utils.retry import retry_worker_operation
 from bindu.utils.worker_utils import ArtifactBuilder, MessageConverter, TaskStateManager
+from bindu.dspy.prompt_selector import select_prompt_with_canary
+from bindu.dspy.prompts import insert_prompt
 
 tracer = get_tracer("bindu.server.workers.manifest_worker")
 logger = get_logger("bindu.server.workers.manifest_worker")
@@ -137,17 +139,63 @@ class ManifestWorker(Worker):
 
         try:
             # Step 3: Execute manifest with system prompt (if enabled)
+            selected_prompt_id = None  # Track prompt ID for metrics
             if (
                 self.manifest.enable_system_message
                 and app_settings.agent.enable_structured_responses
             ):
-                # Inject structured response system prompt as first message
-                system_prompt = app_settings.agent.structured_response_system_prompt
-                if system_prompt:
-                    # Create new list to avoid mutating original message_history
-                    message_history = [{"role": "system", "content": system_prompt}] + (
-                        message_history or []
-                    )
+                # If DSPy is enabled for this manifest, fetch prompts from DB with DID isolation.
+                if getattr(self.manifest, "enable_dspy", False):
+                    # Use worker's storage instance (already configured with DID)
+                    selected_prompt = await select_prompt_with_canary(storage=self.storage)
+
+                    if selected_prompt:
+                        # Use database-selected prompt with canary pooling
+                        system_prompt = selected_prompt["prompt_text"]
+                        selected_prompt_id = selected_prompt["id"]
+                        logger.info(
+                            f"Using prompt {selected_prompt_id} (status={selected_prompt['status']}, "
+                            f"traffic={selected_prompt['traffic']:.2f})"
+                        )
+                    else:
+                        # No prompts in database - create initial active prompt
+                        system_prompt = app_settings.agent.structured_response_system_prompt
+                        logger.warning("No prompts in database, creating initial active prompt")
+
+                        # Insert default prompt as active with 100% traffic using worker's storage
+                        selected_prompt_id = await insert_prompt(
+                            text=system_prompt,
+                            status="active",
+                            traffic=1.0,
+                            storage=self.storage,
+                        )
+                        logger.info(f"Created initial active prompt (id={selected_prompt_id}) with 100% traffic")
+
+                    if system_prompt:
+                        # Create new list to avoid mutating original message_history
+                        message_history = [{"role": "system", "content": system_prompt}] + (
+                            message_history or []
+                        )
+
+                    # Store prompt_id in task for tracking when using DB prompts
+                    if selected_prompt_id is not None:
+                        await self.storage.update_task(
+                            task["id"],
+                            state="working",
+                            prompt_id=selected_prompt_id,
+                        )
+                else:
+                    # DSPy disabled for this agent; use manifest-provided system prompt
+                    system_prompt = getattr(self.manifest, "system_prompt", None) or (
+                        (self.manifest.extra_data or {}).get("system_prompt")
+                    ) or app_settings.agent.structured_response_system_prompt
+
+                    logger.debug("DSPy disabled for agent; using manifest/system prompt")
+
+                    if system_prompt:
+                        message_history = [{"role": "system", "content": system_prompt}] + (
+                            message_history or []
+                        )
 
             # Step 3.1: Execute agent with tracing
             with tracer.start_as_current_span("agent.execute") as agent_span:
@@ -322,9 +370,13 @@ class ManifestWorker(Worker):
 
         if reference_task_ids:
             # Strategy 1: Explicit references (A2A refinement pattern)
+            from uuid import UUID
+
             referenced_messages: list[Message] = []
             for task_id in reference_task_ids:
-                ref_task = await self.storage.load_task(task_id)
+                # Ensure task_id is UUID object
+                task_id_uuid = UUID(task_id) if isinstance(task_id, str) else task_id
+                ref_task = await self.storage.load_task(task_id_uuid)
                 if ref_task and ref_task.get("history"):
                     referenced_messages.extend(ref_task["history"])
 
@@ -438,6 +490,11 @@ class ManifestWorker(Worker):
             )
             artifacts = self.build_artifacts(results)
 
+            # A2A Protocol: Send artifact notifications before updating storage
+            # This allows clients to receive artifact updates via webhook
+            for artifact in artifacts:
+                await self._notify_artifact(task["id"], task["context_id"], artifact)
+
             # Handle payment settlement if payment context is available
             if payment_context:
                 settlement_metadata = await self._settle_payment(payment_context)
@@ -546,6 +603,33 @@ class ManifestWorker(Worker):
                 app_settings.x402.meta_status_key: app_settings.x402.status_failed,
                 app_settings.x402.meta_error_key: str(e),
             }
+
+    async def _notify_artifact(
+        self, task_id: UUID, context_id: UUID, artifact: Artifact
+    ) -> None:
+        """Notify about artifact generation if push manager is available.
+
+        Args:
+            task_id: Task identifier
+            context_id: Context identifier
+            artifact: The artifact that was generated
+        """
+        if self.lifecycle_notifier:
+            try:
+                # Get push manager from lifecycle_notifier's bound instance
+                push_manager = getattr(self.lifecycle_notifier, "__self__", None)
+                if push_manager and hasattr(push_manager, "notify_artifact"):
+                    result = push_manager.notify_artifact(task_id, context_id, artifact)
+                    if hasattr(result, "__await__"):
+                        await result
+            except Exception as e:
+                # Log but don't disrupt task execution on notification errors
+                logger.warning(
+                    "Artifact notification failed",
+                    task_id=str(task_id),
+                    context_id=str(context_id),
+                    error=str(e),
+                )
 
     async def _notify_lifecycle(
         self, task_id: UUID, context_id: UUID, state: str, final: bool

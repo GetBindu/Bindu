@@ -56,7 +56,20 @@ def init_sentry() -> bool:
             integrations.append(
                 StarletteIntegration(
                     transaction_style="url",  # Group by URL pattern
-                    failed_request_status_codes=[500, 599],  # Only track 5xx as errors
+                    failed_request_status_codes={
+                        500,
+                        501,
+                        502,
+                        503,
+                        504,
+                        505,
+                        506,
+                        507,
+                        508,
+                        509,
+                        510,
+                        511,
+                    },  # Track 5xx as errors
                 )
             )
 
@@ -105,7 +118,6 @@ def init_sentry() -> bool:
             integrations=integrations,
             traces_sample_rate=app_settings.sentry.traces_sample_rate,
             profiles_sample_rate=app_settings.sentry.profiles_sample_rate,
-            enable_tracing=app_settings.sentry.enable_tracing,
             send_default_pii=app_settings.sentry.send_default_pii,
             max_breadcrumbs=app_settings.sentry.max_breadcrumbs,
             attach_stacktrace=app_settings.sentry.attach_stacktrace,

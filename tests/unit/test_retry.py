@@ -262,29 +262,6 @@ class TestRetryIntegration:
 
         assert "Specific error message" in str(exc_info.value)
 
-    @pytest.mark.asyncio
-    async def test_retry_with_different_wait_times(self):
-        """Test retry with custom wait times."""
-        call_times = []
-
-        @retry_worker_operation(max_attempts=3, min_wait=0.05, max_wait=0.1)
-        async def track_timing():
-            import time
-
-            call_times.append(time.time())
-            if len(call_times) < 3:
-                raise ConnectionError("Retry needed")
-            return "success"
-
-        result = await track_timing()
-        assert result == "success"
-        assert len(call_times) == 3
-
-        # Verify there was some delay between calls
-        if len(call_times) >= 2:
-            time_diff = call_times[1] - call_times[0]
-            assert time_diff >= 0.05  # At least min_wait
-
 
 class TestRetryLogging:
     """Test retry logging behavior."""

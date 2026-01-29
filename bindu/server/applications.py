@@ -162,10 +162,15 @@ class BinduApplication(Starlette):
             agent_card_endpoint,
             agent_run_endpoint,
             did_resolve_endpoint,
+            negotiation_endpoint,
             skill_detail_endpoint,
             skill_documentation_endpoint,
             skills_list_endpoint,
+            metrics_endpoint,
         )
+
+        # Add health endpoint import
+        from .endpoints.health import health_endpoint
 
         # Protocol endpoints
         self._add_route(
@@ -198,6 +203,19 @@ class BinduApplication(Starlette):
             "/agent/skills/{skill_id}/documentation",
             skill_documentation_endpoint,
             ["GET"],
+            with_app=True,
+        )
+        # Register health endpoint
+        self._add_route("/health", health_endpoint, ["GET"], with_app=True)
+
+        # Register metrics endpoint
+        self._add_route("/metrics", metrics_endpoint, ["GET"], with_app=True)
+
+        # Negotiation endpoint
+        self._add_route(
+            "/agent/negotiation",
+            negotiation_endpoint,
+            ["POST"],
             with_app=True,
         )
 
@@ -333,6 +351,7 @@ class BinduApplication(Starlette):
                 max_attempts=app_settings.retry.storage_max_attempts,
                 min_wait=app_settings.retry.storage_min_wait,
                 max_wait=app_settings.retry.storage_max_wait,
+                did=self.manifest.did_extension.did,
             )
             app._storage = storage
             logger.info(f"✅ Storage initialized: {type(storage).__name__}")
@@ -403,6 +422,14 @@ class BinduApplication(Starlette):
             if app._payment_session_manager:
                 await app._payment_session_manager.start_cleanup_task()
 
+            # Log DSPy status
+            if manifest:
+                enable_dspy = getattr(manifest, 'enable_dspy', False)
+                if enable_dspy:
+                    logger.info("🔧 DSPy Optimization: ✅ ENABLED - System prompts will be loaded from database with canary deployment")
+                else:
+                    logger.info("🔧 DSPy Optimization: ❌ DISABLED - Using static system prompts from agent configuration")
+
             # Start TaskManager
             if manifest:
                 logger.info("🔧 Starting TaskManager...")
@@ -439,6 +466,7 @@ class BinduApplication(Starlette):
             setup_observability(
                 oltp_endpoint=config.endpoint,
                 oltp_service_name=config.service_name,
+                oltp_headers=config.headers,
                 verbose_logging=config.verbose_logging,
                 service_version=config.service_version,
                 deployment_environment=config.deployment_environment,
@@ -552,6 +580,13 @@ class BinduApplication(Starlette):
             auth_middleware = self._create_auth_middleware()
             # Add auth middleware after X402 (if present)
             middleware_list.insert(1 if x402_ext else 0, auth_middleware)
+
+        # Add metrics middleware (should be last to capture all requests)
+        from .middleware import MetricsMiddleware
+
+        metrics_middleware = Middleware(MetricsMiddleware)
+        middleware_list.append(metrics_middleware)
+        logger.info("Metrics middleware enabled for Prometheus monitoring")
 
         return middleware_list
 

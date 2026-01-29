@@ -27,7 +27,7 @@ repos:
 
       - id: pytest
         name: pytest with coverage
-        entry: bash -c 'pytest -n auto --cov=bindu --cov-report= && coverage report --skip-covered --fail-under=70'
+        entry: bash -c 'uv run pytest -n auto --cov=bindu --cov-report= && coverage report --skip-covered --fail-under=70'
         language: system
         pass_filenames: false
         always_run: true

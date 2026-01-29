@@ -12,8 +12,6 @@ from unittest.mock import MagicMock, patch
 from bindu.penguin.bindufy import (
     _parse_deployment_url,
     _create_deployment_config,
-    _create_storage_config,
-    _create_scheduler_config,
     bindufy,
 )
 from bindu.common.models import (
@@ -153,89 +151,6 @@ class TestCreateDeploymentConfig:
         assert config.cors_origins == ["*"]
 
 
-class TestCreateStorageConfig:
-    """Test _create_storage_config function."""
-
-    def test_create_storage_config_memory(self):
-        """Test creating memory storage config."""
-        validated_config = {"storage": {"type": "memory"}}
-
-        config = _create_storage_config(validated_config)
-
-        assert config is not None
-        assert config.type == "memory"
-
-    def test_create_storage_config_postgres(self):
-        """Test creating PostgreSQL storage config."""
-        validated_config = {
-            "storage": {
-                "type": "postgres",
-                "database_url": "postgresql://localhost/testdb",
-            }
-        }
-
-        config = _create_storage_config(validated_config)
-
-        assert config is not None
-        assert config.type == "postgres"
-        assert config.database_url == "postgresql://localhost/testdb"
-
-    def test_create_storage_config_missing(self):
-        """Test creating storage config when not provided."""
-        validated_config = {}
-
-        config = _create_storage_config(validated_config)
-
-        assert config is None
-
-    def test_create_storage_config_missing_type(self):
-        """Test creating storage config with missing type."""
-        validated_config = {
-            "storage": {"database_url": "postgresql://localhost/testdb"}
-        }
-
-        config = _create_storage_config(validated_config)
-
-        assert config is None
-
-    def test_create_storage_config_empty_dict(self):
-        """Test creating storage config with empty dict."""
-        validated_config = {"storage": {}}
-
-        config = _create_storage_config(validated_config)
-
-        assert config is None
-
-
-class TestCreateSchedulerConfig:
-    """Test _create_scheduler_config function."""
-
-    def test_create_scheduler_config_memory(self):
-        """Test creating memory scheduler config."""
-        validated_config = {"scheduler": {"type": "memory"}}
-
-        config = _create_scheduler_config(validated_config)
-
-        assert config is not None
-        assert config.type == "memory"
-
-    def test_create_scheduler_config_missing(self):
-        """Test creating scheduler config when not provided."""
-        validated_config = {}
-
-        config = _create_scheduler_config(validated_config)
-
-        assert config is None
-
-    def test_create_scheduler_config_missing_type(self):
-        """Test creating scheduler config with missing type."""
-        validated_config = {"scheduler": {}}
-
-        config = _create_scheduler_config(validated_config)
-
-        assert config is None
-
-
 class TestBindufy:
     """Test bindufy decorator function."""
 
@@ -268,22 +183,27 @@ class TestBindufy:
                 "extra_metadata": {},
             }
 
-            with patch("bindu.penguin.bindufy.validate_agent_function"):
-                with patch("bindu.penguin.bindufy.DIDAgentExtension") as mock_did:
-                    mock_did_instance = MagicMock()
-                    mock_did.return_value = mock_did_instance
+            with patch(
+                "bindu.penguin.bindufy.load_config_from_env", side_effect=lambda c: c
+            ):
+                with patch("bindu.penguin.bindufy.validate_agent_function"):
+                    with patch("bindu.penguin.did_setup.DIDAgentExtension") as mock_did:
+                        mock_did_instance = MagicMock()
+                        mock_did.return_value = mock_did_instance
 
-                    with patch("bindu.penguin.bindufy.create_manifest") as mock_create:
-                        with patch("bindu.penguin.bindufy.uvicorn.run"):
-                            mock_manifest = MagicMock()
-                            mock_create.return_value = mock_manifest
+                        with patch(
+                            "bindu.penguin.bindufy.create_manifest"
+                        ) as mock_create:
+                            with patch("bindu.utils.server_runner.uvicorn.run"):
+                                mock_manifest = MagicMock()
+                                mock_create.return_value = mock_manifest
 
-                            manifest = bindufy(config, test_handler)
+                                manifest = bindufy(config, test_handler)
 
-                            assert manifest == mock_manifest
-                            mock_validator.validate_and_process.assert_called_once_with(
-                                config
-                            )
+                                assert manifest == mock_manifest
+                                mock_validator.validate_and_process.assert_called_once_with(
+                                    config
+                                )
 
     def test_bindufy_with_auth_enabled(self):
         """Test bindufy with authentication enabled."""
@@ -321,15 +241,13 @@ class TestBindufy:
             }
 
             with patch("bindu.penguin.bindufy.validate_agent_function"):
-                with patch("bindu.penguin.bindufy.DIDAgentExtension") as mock_did:
+                with patch("bindu.penguin.did_setup.DIDAgentExtension") as mock_did:
                     mock_did_instance = MagicMock()
                     mock_did.return_value = mock_did_instance
 
                     with patch("bindu.penguin.bindufy.create_manifest") as mock_create:
-                        with patch(
-                            "bindu.penguin.bindufy.app_settings"
-                        ) as mock_settings:
-                            with patch("bindu.penguin.bindufy.uvicorn.run"):
+                        with patch("bindu.utils.server_runner.uvicorn.run"):
+                            with patch("bindu.settings.app_settings") as mock_settings:
                                 mock_manifest = MagicMock()
                                 mock_create.return_value = mock_manifest
 
@@ -370,15 +288,13 @@ class TestBindufy:
             }
 
             with patch("bindu.penguin.bindufy.validate_agent_function"):
-                with patch("bindu.penguin.bindufy.DIDAgentExtension") as mock_did:
+                with patch("bindu.penguin.did_setup.DIDAgentExtension") as mock_did:
                     mock_did_instance = MagicMock()
                     mock_did.return_value = mock_did_instance
 
                     with patch("bindu.penguin.bindufy.create_manifest") as mock_create:
-                        with patch(
-                            "bindu.penguin.bindufy.app_settings"
-                        ) as mock_settings:
-                            with patch("bindu.penguin.bindufy.uvicorn.run"):
+                        with patch("bindu.utils.server_runner.uvicorn.run"):
+                            with patch("bindu.settings.app_settings") as mock_settings:
                                 mock_manifest = MagicMock()
                                 mock_create.return_value = mock_manifest
 
@@ -418,12 +334,12 @@ class TestBindufy:
             }
 
             with patch("bindu.penguin.bindufy.validate_agent_function"):
-                with patch("bindu.penguin.bindufy.DIDAgentExtension") as mock_did:
+                with patch("bindu.penguin.did_setup.DIDAgentExtension") as mock_did:
                     mock_did_instance = MagicMock()
                     mock_did.return_value = mock_did_instance
 
                     with patch("bindu.penguin.bindufy.create_manifest") as mock_create:
-                        with patch("bindu.penguin.bindufy.uvicorn.run"):
+                        with patch("bindu.utils.server_runner.uvicorn.run"):
                             mock_manifest = MagicMock()
                             mock_create.return_value = mock_manifest
 
@@ -463,12 +379,12 @@ class TestBindufy:
             }
 
             with patch("bindu.penguin.bindufy.validate_agent_function"):
-                with patch("bindu.penguin.bindufy.DIDAgentExtension") as mock_did:
+                with patch("bindu.penguin.did_setup.DIDAgentExtension") as mock_did:
                     mock_did_instance = MagicMock()
                     mock_did.return_value = mock_did_instance
 
                     with patch("bindu.penguin.bindufy.create_manifest") as mock_create:
-                        with patch("bindu.penguin.bindufy.uvicorn.run"):
+                        with patch("bindu.utils.server_runner.uvicorn.run"):
                             mock_manifest = MagicMock()
                             mock_create.return_value = mock_manifest
 
@@ -507,13 +423,13 @@ class TestBindufy:
             }
 
             with patch("bindu.penguin.bindufy.validate_agent_function"):
-                with patch("bindu.penguin.bindufy.DIDAgentExtension") as mock_did:
+                with patch("bindu.penguin.did_setup.DIDAgentExtension") as mock_did:
                     mock_did_instance = MagicMock()
                     mock_did.return_value = mock_did_instance
 
                     with patch("bindu.penguin.bindufy.create_manifest") as mock_create:
                         with patch("bindu.penguin.bindufy.uuid4") as mock_uuid:
-                            with patch("bindu.penguin.bindufy.uvicorn.run"):
+                            with patch("bindu.utils.server_runner.uvicorn.run"):
                                 mock_uuid.return_value.hex = "auto-generated-id"
                                 mock_manifest = MagicMock()
                                 mock_create.return_value = mock_manifest
@@ -555,12 +471,12 @@ class TestBindufy:
             with patch(
                 "bindu.penguin.bindufy.validate_agent_function"
             ) as mock_validate:
-                with patch("bindu.penguin.bindufy.DIDAgentExtension") as mock_did:
+                with patch("bindu.penguin.did_setup.DIDAgentExtension") as mock_did:
                     mock_did_instance = MagicMock()
                     mock_did.return_value = mock_did_instance
 
                     with patch("bindu.penguin.bindufy.create_manifest") as mock_create:
-                        with patch("bindu.penguin.bindufy.uvicorn.run"):
+                        with patch("bindu.utils.server_runner.uvicorn.run"):
                             mock_manifest = MagicMock()
                             mock_create.return_value = mock_manifest
 
