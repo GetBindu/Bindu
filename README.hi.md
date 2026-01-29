@@ -11,6 +11,18 @@
 </p>
 
 <p align="center">
+  <a href="README.md">🇬🇧 English</a> •
+  <a href="README.de.md">🇩🇪 Deutsch</a> •
+  <a href="README.es.md">🇪🇸 Español</a> •
+  <a href="README.fr.md">🇫🇷 Français</a> •
+  <a href="README.hi.md">🇮🇳 हिंदी</a> •
+  <a href="README.bn.md">🇮🇳 বাংলা</a> •
+  <a href="README.zh.md">🇨🇳 中文</a> •
+  <a href="README.nl.md">🇳🇱 Nederlands</a> •
+  <a href="README.ta.md">🇮🇳 தமிழ்</a>
+</p>
+
+<p align="center">
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
   <a href="https://hits.sh/github.com/getbindu/Bindu.svg"><img src="https://hits.sh/github.com/getbindu/Bindu.svg" alt="Hits"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="Python Version"></a>
@@ -675,40 +687,49 @@ score = (
 
 <br/>
 
-## Task Feedback और DSPy
+## [DSPy इंटीग्रेशन](https://docs.getbindu.com/bindu/learn/dspy/overview)
 
-Bindu DSPy optimization के माध्यम से निरंतर सुधार को सक्षम करने के लिए task executions पर user feedback एकत्र करता है। Ratings और metadata के साथ feedback स्टोर करके, आप वास्तविक interactions से golden datasets बना सकते हैं और अपने एजेंट के prompts और behavior को स्वचालित रूप से optimize करने के लिए DSPy का उपयोग कर सकते हैं।
+> मशीन लर्निंग के माध्यम से स्वचालित प्रॉम्प्ट ऑप्टिमाइज़ेशन और निरंतर सुधार
 
-### Feedback सबमिट करना
+Bindu का DSPy इंटीग्रेशन AI एजेंट्स के लिए स्वचालित प्रॉम्प्ट ऑप्टिमाइज़ेशन और A/B टेस्टिंग प्रदान करता है। मैन्युअल रूप से प्रॉम्प्ट्स को ट्वीक करने के बजाय, DSPy वास्तविक यूज़र इंटरैक्शन और फीडबैक के आधार पर प्रॉम्प्ट्स को ऑप्टिमाइज़ करने के लिए मशीन लर्निंग का उपयोग करता है, एक निरंतर सुधार लूप बनाता है।
 
-`tasks/feedback` method का उपयोग करके किसी भी task पर feedback प्रदान करें:
+वैकल्पिक - PostgreSQL स्टोरेज की आवश्यकता है और एजेंट कॉन्फ़िगरेशन के माध्यम से सक्षम किया जाता है।
 
-```bash
-curl --location 'http://localhost:3773/' \
---header 'Content-Type: application/json' \
---header 'Authorization: Bearer <your-token>' \
---data '{
-    "jsonrpc": "2.0",
-    "method": "tasks/feedback",
-    "params": {
-        "taskId": "550e8400-e29b-41d4-a716-446655440200",
-        "feedback": "बढ़िया काम! रिस्पॉन्स बहुत मददगार और सटीक था।",
-        "rating": 5,
-        "metadata": {
-            "category": "quality",
-            "source": "user",
-            "helpful": true
-        }
-    },
-    "id": "550e8400-e29b-41d4-a716-446655440024"
-}'
+### ⚙️ कॉन्फ़िगरेशन
+
+<details>
+<summary><b>कॉन्फ़िगरेशन उदाहरण देखें</b> (विस्तार करने के लिए क्लिक करें)</summary>
+
+अपने एजेंट कॉन्फ़िगरेशन में DSPy को सक्षम करें:
+
+```python
+config = {
+    "author": "your.email@example.com",
+    "name": "research_agent",
+    "description": "निरंतर सुधार के साथ एक रिसर्च असिस्टेंट",
+    "deployment": {"url": "http://localhost:3773", "expose": True},
+    "enable_dspy": True,  # ← DSPy ऑप्टिमाइज़ेशन सक्षम करें
+}
 ```
 
-Feedback `task_feedback` table में स्टोर किया जाता है और इसका उपयोग किया जा सकता है:
-- Training data के लिए उच्च-गुणवत्ता वाले task interactions को फ़िल्टर करने के लिए
-- सफल बनाम असफल completions में patterns की पहचान करने के लिए
-- DSPy के साथ एजेंट instructions और few-shot examples को optimize करने के लिए
-- हम DsPY पर काम कर रहे हैं - जल्द ही रिलीज़ करेंगे।
+एनवायरनमेंट वेरिएबल्स के माध्यम से कॉन्फ़िगर करें:
+
+```bash
+# आवश्यक: PostgreSQL कनेक्शन
+STORAGE_TYPE=postgres
+DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/bindu
+
+# ट्रेनिंग के लिए OpenRouter API key
+OPENROUTER_API_KEY=your_openrouter_api_key
+
+# पूर्ण कॉन्फ़िगरेशन के लिए examples/.env.example देखें
+```
+
+</details>
+
+जब सक्षम होता है, तो सिस्टम प्रॉम्प्ट्स स्वचालित A/B टेस्टिंग के साथ डेटाबेस से लोड किए जाते हैं, यूज़र फीडबैक के आधार पर ऑप्टिमाइज़्ड प्रॉम्प्ट्स की क्रमिक रोलआउट की अनुमति देते हैं।
+
+> 📚 पूर्ण DSPy डॉक्यूमेंटेशन, ट्रेनिंग और कैनरी डिप्लॉयमेंट के लिए, [bindu/dspy/README.md](bindu/dspy/README.md) देखें
 
 ---
 
