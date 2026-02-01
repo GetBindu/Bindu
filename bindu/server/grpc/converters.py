@@ -10,8 +10,9 @@ Note: This module requires generated protobuf code. Run:
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import importlib
 import json
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from google.protobuf import json_format, struct_pb2
@@ -21,6 +22,7 @@ from bindu.common.protocol.types import (
     Message,
     Part,
     PushNotificationConfig,
+    SecurityScheme,
     Task,
     TaskPushNotificationConfig,
     TaskStatus,
@@ -37,8 +39,9 @@ logger = get_logger("bindu.server.grpc.converters")
 # These will be imported after protobuf code is generated
 # from bindu.grpc import a2a_pb2
 
+a2a_pb2: Any | None
 try:
-    from bindu.grpc import a2a_pb2
+    a2a_pb2 = importlib.import_module("bindu.grpc.a2a_pb2")
 except ImportError:
     a2a_pb2 = None
     logger.warning("Protobuf code not generated. Run: python scripts/generate_proto.py")
@@ -63,14 +66,14 @@ def str_to_uuid(uuid_str: str | None) -> UUID | None:
         return None
 
 
-def _struct_to_dict(value: struct_pb2.Struct) -> dict[str, Any]:
+def _struct_to_dict(value: Any) -> dict[str, Any]:
     """Convert protobuf Struct to a Python dict."""
     return json_format.MessageToDict(value, preserving_proto_field_name=True)
 
 
-def _dict_to_struct(value: dict[str, Any]) -> struct_pb2.Struct:
+def _dict_to_struct(value: dict[str, Any]) -> Any:
     """Convert Python dict to protobuf Struct."""
-    struct = struct_pb2.Struct()
+    struct = struct_pb2.Struct()  # type: ignore[unresolved-attribute]
     json_format.ParseDict(value, struct)
     return struct
 
@@ -99,17 +102,22 @@ def push_notification_config_to_proto(config: PushNotificationConfig) -> Any:
 
 def proto_to_push_notification_config(proto_config: Any) -> PushNotificationConfig:
     """Convert protobuf PushNotificationConfig to Pydantic PushNotificationConfig."""
-    config: PushNotificationConfig = {
-        "id": str_to_uuid(proto_config.id) or UUID(int=0),
-        "url": proto_config.url,
-    }
+    config = cast(
+        PushNotificationConfig,
+        {
+            "id": str_to_uuid(proto_config.id) or UUID(int=0),
+            "url": proto_config.url,
+        },
+    )
 
     if proto_config.token:
         config["token"] = proto_config.token
 
     if proto_config.HasField("authentication"):
         if proto_config.authentication.fields:
-            config["authentication"] = _struct_to_dict(proto_config.authentication)
+            config["authentication"] = cast(
+                SecurityScheme, _struct_to_dict(proto_config.authentication)
+            )
 
     return config
 
@@ -137,12 +145,15 @@ def proto_to_task_push_notification_config(
     proto_config: Any,
 ) -> TaskPushNotificationConfig:
     """Convert protobuf TaskPushNotificationConfig to Pydantic TaskPushNotificationConfig."""
-    config: TaskPushNotificationConfig = {
-        "id": str_to_uuid(proto_config.id) or UUID(int=0),
-        "push_notification_config": proto_to_push_notification_config(
-            proto_config.push_notification_config
-        ),
-    }
+    config = cast(
+        TaskPushNotificationConfig,
+        {
+            "id": str_to_uuid(proto_config.id) or UUID(int=0),
+            "push_notification_config": proto_to_push_notification_config(
+                proto_config.push_notification_config
+            ),
+        },
+    )
 
     if proto_config.long_running:
         config["long_running"] = proto_config.long_running
@@ -210,10 +221,13 @@ def proto_to_part(proto_part: Any) -> Part:
     """
     if proto_part.HasField("text"):
         text_proto = proto_part.text
-        part: TextPart = {
-            "kind": "text",
-            "text": text_proto.text,
-        }
+        part = cast(
+            TextPart,
+            {
+                "kind": "text",
+                "text": text_proto.text,
+            },
+        )
         if text_proto.metadata:
             part["metadata"] = dict(text_proto.metadata)
         if text_proto.embeddings:
@@ -222,15 +236,18 @@ def proto_to_part(proto_part: Any) -> Part:
 
     elif proto_part.HasField("file"):
         file_proto = proto_part.file
-        part: FilePart = {
-            "kind": "file",
-            "text": "",  # FilePart extends TextPart
-            "file": {
-                "uri": file_proto.file_id,
-                "mimeType": file_proto.mime_type,
-                "name": file_proto.filename,
+        part = cast(
+            FilePart,
+            {
+                "kind": "file",
+                "text": "",  # FilePart extends TextPart
+                "file": {
+                    "uri": file_proto.file_id,
+                    "mimeType": file_proto.mime_type,
+                    "name": file_proto.filename,
+                },
             },
-        }
+        )
         if file_proto.metadata:
             part["metadata"] = dict(file_proto.metadata)
         return part
@@ -239,11 +256,14 @@ def proto_to_part(proto_part: Any) -> Part:
         data_proto = proto_part.data
         import json
 
-        part: DataPart = {
-            "kind": "data",
-            "text": "",  # DataPart extends TextPart
-            "data": json.loads(data_proto.data.decode("utf-8")),
-        }
+        part = cast(
+            DataPart,
+            {
+                "kind": "data",
+                "text": "",  # DataPart extends TextPart
+                "data": json.loads(data_proto.data.decode("utf-8")),
+            },
+        )
         if data_proto.metadata:
             part["metadata"] = dict(data_proto.metadata)
         return part
@@ -301,19 +321,28 @@ def proto_to_message(proto_msg: Any) -> Message:
     Returns:
         Pydantic Message
     """
-    msg: Message = {
-        "message_id": str_to_uuid(proto_msg.message_id) or UUID(int=0),
-        "context_id": str_to_uuid(proto_msg.context_id) or UUID(int=0),
-        "task_id": str_to_uuid(proto_msg.task_id) or UUID(int=0),
-        "kind": "message",
-        "parts": [proto_to_part(part) for part in proto_msg.parts],
-        "role": proto_msg.role or "user",
-    }
+    msg = cast(
+        Message,
+        {
+            "message_id": str_to_uuid(proto_msg.message_id) or UUID(int=0),
+            "context_id": str_to_uuid(proto_msg.context_id) or UUID(int=0),
+            "task_id": str_to_uuid(proto_msg.task_id) or UUID(int=0),
+            "kind": "message",
+            "parts": [proto_to_part(part) for part in proto_msg.parts],
+            "role": proto_msg.role or "user",
+        },
+    )
 
     if proto_msg.reference_task_ids:
-        msg["reference_task_ids"] = [
-            str_to_uuid(ref_id) for ref_id in proto_msg.reference_task_ids if ref_id
-        ]
+        reference_task_ids: list[UUID] = []
+        for ref_id in proto_msg.reference_task_ids:
+            if not ref_id:
+                continue
+            parsed_id = str_to_uuid(ref_id)
+            if parsed_id:
+                reference_task_ids.append(parsed_id)
+        if reference_task_ids:
+            msg["reference_task_ids"] = reference_task_ids
 
     if proto_msg.metadata:
         msg["metadata"] = dict(proto_msg.metadata)
@@ -359,10 +388,14 @@ def proto_to_task_status(proto_status: Any) -> TaskStatus:
     Returns:
         Pydantic TaskStatus
     """
-    status: TaskStatus = {
-        "state": proto_status.state or "unknown",
-        "timestamp": proto_status.timestamp or datetime.now(timezone.utc).isoformat(),
-    }
+    status = cast(
+        TaskStatus,
+        {
+            "state": proto_status.state or "unknown",
+            "timestamp": proto_status.timestamp
+            or datetime.now(timezone.utc).isoformat(),
+        },
+    )
 
     if proto_status.HasField("message"):
         status["message"] = proto_to_message(proto_status.message)
@@ -419,14 +452,19 @@ def proto_to_task(proto_task: Any) -> Task:
     Returns:
         Pydantic Task
     """
-    task: Task = {
-        "id": str_to_uuid(proto_task.id) or UUID(int=0),
-        "context_id": str_to_uuid(proto_task.context_id) or UUID(int=0),
-        "kind": proto_task.kind or "task",
-        "status": proto_to_task_status(proto_task.status),
-        "artifacts": [proto_to_artifact(artifact) for artifact in proto_task.artifacts],
-        "history": [proto_to_message(msg) for msg in proto_task.history],
-    }
+    task = cast(
+        Task,
+        {
+            "id": str_to_uuid(proto_task.id) or UUID(int=0),
+            "context_id": str_to_uuid(proto_task.context_id) or UUID(int=0),
+            "kind": proto_task.kind or "task",
+            "status": proto_to_task_status(proto_task.status),
+            "artifacts": [
+                proto_to_artifact(artifact) for artifact in proto_task.artifacts
+            ],
+            "history": [proto_to_message(msg) for msg in proto_task.history],
+        },
+    )
 
     if proto_task.metadata:
         task["metadata"] = dict(proto_task.metadata)
@@ -474,11 +512,14 @@ def proto_to_artifact(proto_artifact: Any) -> Artifact:
     Returns:
         Pydantic Artifact
     """
-    artifact: Artifact = {
-        "artifact_id": str_to_uuid(proto_artifact.artifact_id) or UUID(int=0),
-        "name": proto_artifact.name or "",
-        "parts": [proto_to_part(part) for part in proto_artifact.parts],
-    }
+    artifact = cast(
+        Artifact,
+        {
+            "artifact_id": str_to_uuid(proto_artifact.artifact_id) or UUID(int=0),
+            "name": proto_artifact.name or "",
+            "parts": [proto_to_part(part) for part in proto_artifact.parts],
+        },
+    )
 
     if proto_artifact.metadata:
         artifact["metadata"] = dict(proto_artifact.metadata)

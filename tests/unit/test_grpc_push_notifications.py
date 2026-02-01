@@ -8,7 +8,7 @@ import grpc
 import pytest
 from google.protobuf import struct_pb2
 
-from bindu.grpc import a2a_pb2
+from bindu.grpc import a2a_pb2  # type: ignore[possibly-unbound-import]
 from bindu.server.grpc.servicer import A2AServicer
 from bindu.server.scheduler.memory_scheduler import InMemoryScheduler
 from bindu.server.storage.memory_storage import InMemoryStorage
@@ -37,11 +37,9 @@ async def test_grpc_push_notification_success(task_manager_with_push):
     servicer = A2AServicer(task_manager_with_push)
 
     message = create_test_message()
-    await task_manager_with_push.storage.submit_task(
-        message["context_id"], message
-    )
+    await task_manager_with_push.storage.submit_task(message["context_id"], message)
 
-    auth_struct = struct_pb2.Struct()
+    auth_struct = getattr(struct_pb2, "Struct")()
     auth_struct.update(
         {
             "type": "apiKey",
@@ -70,7 +68,9 @@ async def test_grpc_push_notification_success(task_manager_with_push):
     assert set_response.id == str(message["task_id"])
     assert set_response.push_notification_config.url == "https://example.com/webhook"
 
-    get_request = a2a_pb2.GetTaskPushNotificationRequest(task_id=str(message["task_id"]))
+    get_request = a2a_pb2.GetTaskPushNotificationRequest(
+        task_id=str(message["task_id"])
+    )
     get_context = DummyContext()
     get_response = await servicer.GetTaskPushNotification(get_request, get_context)
     assert get_context.code is None
@@ -161,9 +161,7 @@ async def test_grpc_push_notification_config_mismatch(task_manager_with_push):
     servicer = A2AServicer(task_manager_with_push)
 
     message = create_test_message()
-    await task_manager_with_push.storage.submit_task(
-        message["context_id"], message
-    )
+    await task_manager_with_push.storage.submit_task(message["context_id"], message)
 
     push_config_id = uuid4()
     set_request = a2a_pb2.SetTaskPushNotificationRequest(

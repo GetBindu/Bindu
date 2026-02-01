@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import importlib
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional, cast
 
 import grpc
-from grpc import aio
+from grpc import aio as grpc_aio  # type: ignore[attr-defined]
 
 from bindu.server.applications import BinduApplication
 from bindu.settings import app_settings
@@ -61,7 +62,7 @@ class GrpcServer:
         self.tls_enabled = tls_enabled
         self.tls_cert_path = tls_cert_path
         self.tls_key_path = tls_key_path
-        self._server: Optional[aio.Server] = None
+        self._server: Optional[grpc_aio.Server] = None
 
     async def start(self) -> None:
         """Start the gRPC server without blocking."""
@@ -78,11 +79,9 @@ class GrpcServer:
                 )
             cert_bytes = Path(self.tls_cert_path).read_bytes()
             key_bytes = Path(self.tls_key_path).read_bytes()
-            server_credentials = grpc.ssl_server_credentials(
-                [(key_bytes, cert_bytes)]
-            )
+            server_credentials = grpc.ssl_server_credentials([(key_bytes, cert_bytes)])
 
-        interceptors: list[aio.ServerInterceptor] = []
+        interceptors: list[grpc_aio.ServerInterceptor] = []
         if app_settings.auth.enabled:
             from .auth import GrpcAuthInterceptor
 
@@ -90,13 +89,13 @@ class GrpcServer:
             logger.info("gRPC auth interceptor enabled")
 
         # Create gRPC server
-        self._server = aio.server(interceptors=interceptors or None)
+        self._server = grpc_aio.server(interceptors=interceptors or None)
 
         # Add servicer (requires generated protobuf code)
         try:
             from .servicer import A2AServicer
-            from bindu.grpc import a2a_pb2_grpc
 
+            a2a_pb2_grpc = cast(Any, importlib.import_module("bindu.grpc.a2a_pb2_grpc"))
             servicer = A2AServicer(self.app.task_manager)
             a2a_pb2_grpc.add_A2AServiceServicer_to_server(servicer, self._server)
             logger.info("A2AServicer registered successfully")

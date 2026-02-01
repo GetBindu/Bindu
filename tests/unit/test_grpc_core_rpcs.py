@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import json
+from typing import cast
 from uuid import uuid4
 
 import grpc
 import pytest
 
-from bindu.grpc import a2a_pb2
+from bindu.grpc import a2a_pb2  # type: ignore[possibly-unbound-import]
 from bindu.server.grpc.servicer import A2AServicer
 from bindu.server.scheduler.memory_scheduler import InMemoryScheduler
 from bindu.server.storage.memory_storage import InMemoryStorage
@@ -71,7 +72,9 @@ async def test_grpc_list_tasks_success():
                 await storage.submit_task(message["context_id"], message)
 
             context = DummyContext()
-            response = await servicer.ListTasks(a2a_pb2.ListTasksRequest(limit=2), context)
+            response = await servicer.ListTasks(
+                a2a_pb2.ListTasksRequest(limit=2), context
+            )
 
             assert context.code is None
             assert len(response.tasks) == 2
@@ -207,7 +210,7 @@ async def test_grpc_list_contexts_success():
 
 @pytest.mark.asyncio
 async def test_grpc_list_contexts_error():
-    servicer = A2AServicer(ErrorListContextsManager())
+    servicer = A2AServicer(cast(TaskManager, ErrorListContextsManager()))
     context = DummyContext()
     with pytest.raises(RuntimeError):
         await servicer.ListContexts(a2a_pb2.ListContextsRequest(), context)
@@ -266,7 +269,9 @@ async def test_grpc_stream_message_success():
             events = [event async for event in servicer.StreamMessage(request, context)]
 
             status_updates = [
-                event.status_update for event in events if event.HasField("status_update")
+                event.status_update
+                for event in events
+                if event.HasField("status_update")
             ]
             artifact_updates = [
                 event.artifact_update
@@ -297,7 +302,9 @@ async def test_grpc_stream_message_error():
             events = [event async for event in servicer.StreamMessage(request, context)]
 
             status_updates = [
-                event.status_update for event in events if event.HasField("status_update")
+                event.status_update
+                for event in events
+                if event.HasField("status_update")
             ]
             failed_updates = [
                 update

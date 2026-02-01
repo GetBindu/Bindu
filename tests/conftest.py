@@ -4,6 +4,8 @@
 import sys
 from types import ModuleType
 
+from google.protobuf import struct_pb2  # noqa: F401
+
 # --- OpenTelemetry trace stub ---
 ot_trace = ModuleType("opentelemetry.trace")
 

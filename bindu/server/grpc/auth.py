@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from typing import Any
 
 import grpc
-from grpc import aio
+from grpc import aio as grpc_aio  # type: ignore[attr-defined]
 
 from bindu.settings import AuthSettings
 from bindu.utils.auth_utils import JWTValidator, extract_bearer_token
@@ -15,9 +15,7 @@ from bindu.utils.logging import get_logger
 logger = get_logger("bindu.server.grpc.auth")
 
 
-def _metadata_value(
-    metadata: Iterable[tuple[str, Any]] | None, key: str
-) -> str | None:
+def _metadata_value(metadata: Iterable[tuple[str, Any]] | None, key: str) -> str | None:
     if not metadata:
         return None
     target = key.lower()
@@ -54,19 +52,22 @@ def _abort_handler(
         if False:
             yield None
 
-    if handler.request_streaming and handler.response_streaming:
+    request_streaming = bool(getattr(handler, "request_streaming", False))
+    response_streaming = bool(getattr(handler, "response_streaming", False))
+
+    if request_streaming and response_streaming:
         return grpc.stream_stream_rpc_method_handler(
             abort_stream_stream,
             request_deserializer=request_deserializer,
             response_serializer=response_serializer,
         )
-    if handler.request_streaming:
+    if request_streaming:
         return grpc.stream_unary_rpc_method_handler(
             abort_stream_unary,
             request_deserializer=request_deserializer,
             response_serializer=response_serializer,
         )
-    if handler.response_streaming:
+    if response_streaming:
         return grpc.unary_stream_rpc_method_handler(
             abort_unary_stream,
             request_deserializer=request_deserializer,
@@ -79,7 +80,7 @@ def _abort_handler(
     )
 
 
-class GrpcAuthInterceptor(aio.ServerInterceptor):
+class GrpcAuthInterceptor(grpc_aio.ServerInterceptor):
     """Server interceptor that enforces JWT auth via metadata."""
 
     def __init__(
@@ -87,10 +88,25 @@ class GrpcAuthInterceptor(aio.ServerInterceptor):
         auth_config: AuthSettings,
         validator: JWTValidator | None = None,
     ) -> None:
+        """Initialize the interceptor with auth settings and JWT validator.
+
+        Args:
+            auth_config: Authentication configuration for gRPC requests.
+            validator: Optional JWT validator override.
+        """
         self._auth_config = auth_config
         self._validator = validator or JWTValidator(auth_config)
 
     async def intercept_service(self, continuation, handler_call_details):
+        """Authorize gRPC calls and return an authenticated handler.
+
+        Args:
+            continuation: gRPC continuation that resolves the RPC handler.
+            handler_call_details: Call details including method and metadata.
+
+        Returns:
+            The RPC handler (or an aborting handler) for the call.
+        """
         handler = await continuation(handler_call_details)
         if handler is None:
             return None

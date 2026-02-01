@@ -414,9 +414,7 @@ class TestBinduApplicationLifespan:
                         mock_close.assert_called_once_with(mock_storage)
 
     @pytest.mark.asyncio
-    async def test_lifespan_skips_grpc_when_disabled(
-        self, mock_manifest, monkeypatch
-    ):
+    async def test_lifespan_skips_grpc_when_disabled(self, mock_manifest, monkeypatch):
         """Test gRPC server does not start when disabled."""
         if not hasattr(mock_manifest, "capabilities"):
             mock_manifest.capabilities = {}

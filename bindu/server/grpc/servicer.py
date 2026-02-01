@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import importlib
 import json
 import uuid
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, cast
 
 import grpc
 
@@ -48,9 +49,9 @@ except ImportError:
     logger.warning("Converters not available - protobuf code needs to be generated")
 
 # Import protobuf messages (will work once protobuf code is generated)
+a2a_pb2: Any
 try:
-    from bindu.grpc import a2a_pb2
-
+    a2a_pb2 = importlib.import_module("bindu.grpc.a2a_pb2")
     PROTOBUF_AVAILABLE = True
 except ImportError:
     a2a_pb2 = None
@@ -141,6 +142,8 @@ class A2AServicer:
             )
             raise NotImplementedError("gRPC support is in progress - see issue #67")
 
+        proto = cast(Any, a2a_pb2)
+
         try:
             # Convert protobuf request to Pydantic
             proto_message = request.message
@@ -154,7 +157,7 @@ class A2AServicer:
                     "message": pydantic_message,
                     "configuration": {},
                 },
-                "id": str(uuid.uuid4()),
+                "id": uuid.uuid4(),
             }
 
             # Handle configuration if present
@@ -175,7 +178,7 @@ class A2AServicer:
             )
 
             # Convert Pydantic response to protobuf
-            proto_response = a2a_pb2.MessageSendResponse()
+            proto_response = proto.MessageSendResponse()
             proto_response.task.CopyFrom(task_to_proto(response["result"]))
 
             logger.info(f"SendMessage completed: task_id={response['result']['id']}")
@@ -215,7 +218,7 @@ class A2AServicer:
                     "message": pydantic_message,
                     "configuration": {},
                 },
-                "id": str(uuid.uuid4()),
+                "id": uuid.uuid4(),
             }
 
             if request.HasField("configuration"):
@@ -266,13 +269,14 @@ class A2AServicer:
 
         try:
             # Build TaskQueryParams (JSON-RPC format)
+            task_id = str_to_uuid(request.task_id) or uuid.UUID(int=0)
             jsonrpc_request = {
                 "jsonrpc": "2.0",
                 "method": "tasks/get",
                 "params": TaskQueryParams(
-                    task_id=request.task_id,
+                    task_id=task_id,
                 ),
-                "id": str(uuid.uuid4()),
+                "id": uuid.uuid4(),
             }
 
             # Call TaskManager
@@ -298,22 +302,27 @@ class A2AServicer:
             context.set_details("gRPC support not fully initialized.")
             raise NotImplementedError("gRPC support is in progress - see issue #67")
 
+        proto = cast(Any, a2a_pb2)
+
         try:
             params: dict[str, Any] = {}
             if request.limit:
                 params["length"] = request.limit
 
-            jsonrpc_request: ListTasksRequest = {
-                "jsonrpc": "2.0",
-                "method": "tasks/list",
-                "params": params,
-                "id": str(uuid.uuid4()),
-            }
+            jsonrpc_request = cast(
+                ListTasksRequest,
+                {
+                    "jsonrpc": "2.0",
+                    "method": "tasks/list",
+                    "params": params,
+                    "id": uuid.uuid4(),
+                },
+            )
 
             response = await self.task_manager.list_tasks(jsonrpc_request)
             self._raise_on_jsonrpc_error(context, response)
 
-            proto_response = a2a_pb2.TaskListResponse()
+            proto_response = proto.TaskListResponse()
             tasks = response.get("result") or []
             for task in tasks:
                 proto_response.tasks.append(task_to_proto(task))
@@ -341,7 +350,7 @@ class A2AServicer:
                 "jsonrpc": "2.0",
                 "method": "tasks/cancel",
                 "params": TaskIdParams(task_id=task_id),
-                "id": str(uuid.uuid4()),
+                "id": uuid.uuid4(),
             }
 
             response = await self.task_manager.cancel_task(jsonrpc_request)
@@ -365,6 +374,8 @@ class A2AServicer:
             context.set_details("gRPC support not fully initialized.")
             raise NotImplementedError("gRPC support is in progress - see issue #67")
 
+        proto = cast(Any, a2a_pb2)
+
         try:
             task_id = str_to_uuid(request.task_id) or uuid.UUID(int=0)
             params: dict[str, Any] = {
@@ -380,14 +391,14 @@ class A2AServicer:
                 "jsonrpc": "2.0",
                 "method": "tasks/feedback",
                 "params": params,
-                "id": str(uuid.uuid4()),
+                "id": uuid.uuid4(),
             }
 
             response = await self.task_manager.task_feedback(jsonrpc_request)
             self._raise_on_jsonrpc_error(context, response)
 
             result = response.get("result") or {}
-            proto_response = a2a_pb2.TaskFeedbackResponse()
+            proto_response = proto.TaskFeedbackResponse()
             proto_response.success = True
             proto_response.message = str(result.get("message", "Feedback submitted"))
             return proto_response
@@ -408,22 +419,27 @@ class A2AServicer:
             context.set_details("gRPC support not fully initialized.")
             raise NotImplementedError("gRPC support is in progress - see issue #67")
 
+        proto = cast(Any, a2a_pb2)
+
         try:
             params: dict[str, Any] = {}
             if request.limit:
                 params["length"] = request.limit
 
-            jsonrpc_request: ListContextsRequest = {
-                "jsonrpc": "2.0",
-                "method": "contexts/list",
-                "params": params,
-                "id": str(uuid.uuid4()),
-            }
+            jsonrpc_request = cast(
+                ListContextsRequest,
+                {
+                    "jsonrpc": "2.0",
+                    "method": "contexts/list",
+                    "params": params,
+                    "id": uuid.uuid4(),
+                },
+            )
 
             response = await self.task_manager.list_contexts(jsonrpc_request)
             self._raise_on_jsonrpc_error(context, response)
 
-            proto_response = a2a_pb2.ContextListResponse()
+            proto_response = proto.ContextListResponse()
             contexts = response.get("result") or []
             for context_summary in contexts:
                 proto_response.contexts.append(
@@ -447,20 +463,22 @@ class A2AServicer:
             context.set_details("gRPC support not fully initialized.")
             raise NotImplementedError("gRPC support is in progress - see issue #67")
 
+        proto = cast(Any, a2a_pb2)
+
         try:
             context_id = str_to_uuid(request.context_id) or uuid.UUID(int=0)
             jsonrpc_request: ClearContextsRequest = {
                 "jsonrpc": "2.0",
                 "method": "contexts/clear",
                 "params": ContextIdParams(context_id=context_id),
-                "id": str(uuid.uuid4()),
+                "id": uuid.uuid4(),
             }
 
             response = await self.task_manager.clear_context(jsonrpc_request)
             self._raise_on_jsonrpc_error(context, response)
 
             result = response.get("result") or {}
-            proto_response = a2a_pb2.ContextClearResponse()
+            proto_response = proto.ContextClearResponse()
             proto_response.success = True
             proto_response.message = str(result.get("message", "Context cleared"))
             return proto_response
@@ -489,7 +507,7 @@ class A2AServicer:
                 "jsonrpc": "2.0",
                 "method": "tasks/pushNotification/set",
                 "params": pydantic_config,
-                "id": str(uuid.uuid4()),
+                "id": uuid.uuid4(),
             }
 
             response = await self.task_manager.set_task_push_notification(
@@ -524,7 +542,7 @@ class A2AServicer:
                 "jsonrpc": "2.0",
                 "method": "tasks/pushNotification/get",
                 "params": TaskIdParams(task_id=task_id),
-                "id": str(uuid.uuid4()),
+                "id": uuid.uuid4(),
             }
 
             response = await self.task_manager.get_task_push_notification(
@@ -553,6 +571,8 @@ class A2AServicer:
             context.set_details("gRPC support not fully initialized.")
             raise NotImplementedError("gRPC support is in progress - see issue #67")
 
+        proto = cast(Any, a2a_pb2)
+
         try:
             task_id = str_to_uuid(request.id) or uuid.UUID(int=0)
             jsonrpc_request: ListTaskPushNotificationConfigRequest = {
@@ -561,7 +581,7 @@ class A2AServicer:
                 "params": {
                     "id": task_id,
                 },
-                "id": str(uuid.uuid4()),
+                "id": uuid.uuid4(),
             }
 
             response = await self.task_manager.list_task_push_notifications(
@@ -569,7 +589,7 @@ class A2AServicer:
             )
             self._raise_on_jsonrpc_error(context, response)
 
-            proto_response = a2a_pb2.TaskPushNotificationListResponse()
+            proto_response = proto.TaskPushNotificationListResponse()
             proto_response.configs.append(
                 task_push_notification_config_to_proto(response["result"])
             )
@@ -593,6 +613,8 @@ class A2AServicer:
             context.set_details("gRPC support not fully initialized.")
             raise NotImplementedError("gRPC support is in progress - see issue #67")
 
+        proto = cast(Any, a2a_pb2)
+
         try:
             task_id = str_to_uuid(request.id) or uuid.UUID(int=0)
             config_id = str_to_uuid(request.push_notification_config_id) or uuid.UUID(
@@ -605,7 +627,7 @@ class A2AServicer:
                     "id": task_id,
                     "push_notification_config_id": config_id,
                 },
-                "id": str(uuid.uuid4()),
+                "id": uuid.uuid4(),
             }
 
             response = await self.task_manager.delete_task_push_notification(
@@ -613,7 +635,7 @@ class A2AServicer:
             )
             self._raise_on_jsonrpc_error(context, response)
 
-            proto_response = a2a_pb2.DeleteTaskPushNotificationResponse()
+            proto_response = proto.DeleteTaskPushNotificationResponse()
             proto_response.config.CopyFrom(
                 task_push_notification_config_to_proto(response["result"])
             )
@@ -643,15 +665,17 @@ class A2AServicer:
             context.set_details("gRPC support not fully initialized.")
             raise NotImplementedError("gRPC support is in progress - see issue #67")
 
+        proto = cast(Any, a2a_pb2)
+
         try:
             # Simple health check - verify TaskManager is running
             is_healthy = self.task_manager.is_running
 
-            proto_response = a2a_pb2.HealthCheckResponse()
+            proto_response = proto.HealthCheckResponse()
             proto_response.status = (
-                a2a_pb2.HealthCheckResponse.ServingStatus.SERVING
+                proto.HealthCheckResponse.ServingStatus.SERVING
                 if is_healthy
-                else a2a_pb2.HealthCheckResponse.ServingStatus.NOT_SERVING
+                else proto.HealthCheckResponse.ServingStatus.NOT_SERVING
             )
 
             logger.info(
