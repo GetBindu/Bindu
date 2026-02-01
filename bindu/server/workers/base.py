@@ -215,25 +215,117 @@ class Worker(ABC):
         ...
 
     # -------------------------------------------------------------------------
-    # Future Operations (Not Yet Implemented)
+    # Pause/Resume Operations
     # -------------------------------------------------------------------------
 
     async def _handle_pause(self, params: TaskIdParams) -> None:
         """Handle pause operation.
 
-        TODO: Implement task pause functionality
-        - Save current execution state
-        - Update task to 'suspended' state
-        - Release resources while preserving context
+        Pauses a task by transitioning it to 'suspended' state.
+        The task can be resumed later from where it was paused.
+
+        Valid Source States:
+        - working: Task is actively executing
+        - input-required: Task is waiting for user input
+        - auth-required: Task is waiting for authentication
+
+        Invalid Source States:
+        - submitted: Task hasn't started yet (no execution to pause)
+        - completed, failed, canceled: Terminal states (cannot be paused)
+        - suspended: Already paused
+        - resumed: Transient state during resumption
+
+        Args:
+            params: Task identification parameters containing task_id
+
+        Raises:
+            ValueError: If task not found or in invalid state for pausing
         """
-        raise NotImplementedError("Pause operation not yet implemented")
+        task = await self.storage.load_task(params["task_id"])
+        if task is None:
+            raise ValueError(f"Task {params['task_id']} not found")
+
+        current_state = task["status"]["state"]
+        pausable_states = {"working", "input-required", "auth-required"}
+
+        if current_state not in pausable_states:
+            raise ValueError(
+                f"Cannot pause task in state '{current_state}'. "
+                f"Task must be in one of: {pausable_states}"
+            )
+
+        # Add span event for state transition
+        from opentelemetry.trace import get_current_span
+
+        current_span = get_current_span()
+        if current_span.is_recording():
+            current_span.add_event(
+                "task.state_changed",
+                attributes={
+                    "from_state": current_state,
+                    "to_state": "suspended",
+                    "operation": "pause",
+                },
+            )
+
+        # Transition to suspended state
+        # Task context and history are preserved in storage
+        await self.storage.update_task(params["task_id"], state="suspended")
+        logger.info(f"Task {params['task_id']} paused from state '{current_state}'")
 
     async def _handle_resume(self, params: TaskIdParams) -> None:
         """Handle resume operation.
 
-        TODO: Implement task resume functionality
-        - Restore execution state
-        - Update task to 'resumed' state
-        - Continue from last checkpoint
+        Resumes a suspended task by transitioning it to 'resumed' state,
+        which will trigger re-execution from its last known state.
+
+        Valid Source State:
+        - suspended: Task was previously paused
+
+        Invalid Source States:
+        - working, input-required, auth-required: Already active
+        - completed, failed, canceled: Terminal states (cannot be resumed)
+        - submitted: Never started (use run_task instead)
+        - resumed: Already resumed
+
+        Args:
+            params: Task identification parameters containing task_id
+
+        Raises:
+            ValueError: If task not found or not in suspended state
+
+        Note:
+            After resuming, the worker should re-execute the task using run_task
+            with the preserved context and history. The 'resumed' state is transient
+            and will transition to 'working' upon re-execution.
         """
-        raise NotImplementedError("Resume operation not yet implemented")
+        task = await self.storage.load_task(params["task_id"])
+        if task is None:
+            raise ValueError(f"Task {params['task_id']} not found")
+
+        current_state = task["status"]["state"]
+
+        if current_state != "suspended":
+            raise ValueError(
+                f"Cannot resume task in state '{current_state}'. "
+                f"Task must be in 'suspended' state."
+            )
+
+        # Add span event for state transition
+        from opentelemetry.trace import get_current_span
+
+        current_span = get_current_span()
+        if current_span.is_recording():
+            current_span.add_event(
+                "task.state_changed",
+                attributes={
+                    "from_state": "suspended",
+                    "to_state": "resumed",
+                    "operation": "resume",
+                },
+            )
+
+        # Transition to resumed state
+        # The task will be re-executed by the worker with preserved context
+        await self.storage.update_task(params["task_id"], state="resumed")
+        logger.info(f"Task {params['task_id']} resumed and ready for re-execution")
