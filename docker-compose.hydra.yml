@@ -1,0 +1,112 @@
+﻿version: '3.8'
+
+services:
+  # Shared PostgreSQL database for Hydra and Kratos
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ory
+    volumes:
+       - postgres_data:/var/lib/postgresql/data
+       - ./config/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Hydra migrations service - runs automatically on startup
+  hydra-migrate:
+    image: oryd/hydra:v2.2.0
+    restart: on-failure
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DSN: postgres://postgres:postgres@postgres:5432/hydra?sslmode=disable
+    command: migrate sql -e --yes
+
+  # Hydra OAuth2 server
+  hydra:
+    image: oryd/hydra:v2.2.0
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      hydra-migrate:
+        condition: service_completed_successfully
+    environment:
+      DSN: postgres://postgres:postgres@postgres:5432/hydra?sslmode=disable
+      SECRETS_SYSTEM: "you-must-change-this-secret-key--and-keep-it-secret"
+      URLS_SELF_ISSUER: "http://localhost:4444/"  # Changed to service name
+      URLS_CONSENT: "http://localhost:3000/consent"
+      URLS_LOGIN: "http://localhost:3000/login"
+      SERVE_COOKIES_SAME_SITE_MODE: "Lax"
+      SERVE_COOKIES_SAME_SITE_LEGACY: "false"
+      LOG_LEVEL: "debug"
+      OAUTH2_EXPOSE_INTERNAL_ERRORS: "true"
+      OAUTH2_REFRESH_TOKEN_HOOKS_ENABLED: "true"
+    ports:
+      - "4444:4444"  # Public API
+      - "4445:4445"  # Admin API
+    command: serve all --dev
+    # volumes:
+    #   - ./config/hydra:/etc/config/hydra
+    healthcheck:
+      test: ["CMD", "hydra", "status", "--endpoint", "http://localhost:4445"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Kratos migrations service - runs automatically on startup
+  kratos-migrate:
+    image: oryd/kratos:v1.2.0
+    restart: on-failure
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DSN: postgres://postgres:postgres@postgres:5432/kratos?sslmode=disable
+    command: -c /etc/config/kratos/kratos.yml migrate sql -e --yes
+    volumes:
+      - ./config/kratos:/etc/config/kratos
+
+  # Kratos identity server
+  kratos:
+    image: oryd/kratos:v1.2.0
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kratos-migrate:
+        condition: service_completed_successfully
+    environment:
+      DSN: postgres://postgres:postgres@postgres:5432/kratos?sslmode=disable
+      LOG_LEVEL: "debug"
+    ports:
+      - "4433:4433"  # Public API
+      - "4434:4434"  # Admin API
+    command: serve -c /etc/config/kratos/kratos.yml --dev --watch-courier
+    volumes:
+      - ./config/kratos:/etc/config/kratos
+    healthcheck:
+      test: ["CMD", "kratos", "-c", "/etc/config/kratos/kratos.yml", "status", "--endpoint", "http://localhost:4434"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Optional: MailHog for email testing in development
+  mailhog:
+    image: mailhog/mailhog:latest
+    restart: unless-stopped
+    ports:
+      - "8025:8025"  # Web UI
+      - "1025:1025"  # SMTP server
+
+volumes:
+  postgres_data:
