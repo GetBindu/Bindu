@@ -91,6 +91,68 @@ class TaskHandlers:
 
         return CancelTaskResponse(jsonrpc="2.0", id=request["id"], result=task)
 
+    @trace_task_operation("pause_task")
+    async def pause_task(self, request: "PauseTaskRequest") -> "PauseTaskResponse":
+        """Pause a running task."""
+        from bindu.common.protocol.types import PauseTaskResponse, TaskNotFoundError
+        
+        task_id = request["params"]["task_id"]
+        task = await self.storage.load_task(task_id)
+
+        if task is None:
+            return self.error_response_creator(
+                PauseTaskResponse, request["id"], TaskNotFoundError, "Task not found"
+            )
+
+        # Check if task is in a pausable state
+        current_state = task["status"]["state"]
+
+        if current_state in app_settings.agent.terminal_states:
+            return self.error_response_creator(
+                PauseTaskResponse,
+                request["id"],
+                TaskNotCancelableError,
+                f"Task cannot be paused in '{current_state}' state. "
+                f"Tasks can only be paused while pending or running.",
+            )
+
+        # Pause the task
+        await self.scheduler.pause_task(request["params"])
+        task = await self.storage.load_task(task_id)
+
+        return PauseTaskResponse(jsonrpc="2.0", id=request["id"], result=task)
+
+    @trace_task_operation("resume_task")
+    async def resume_task(self, request: "ResumeTaskRequest") -> "ResumeTaskResponse":
+        """Resume a paused task."""
+        from bindu.common.protocol.types import ResumeTaskResponse, TaskNotFoundError
+        
+        task_id = request["params"]["task_id"]
+        task = await self.storage.load_task(task_id)
+
+        if task is None:
+            return self.error_response_creator(
+                ResumeTaskResponse, request["id"], TaskNotFoundError, "Task not found"
+            )
+
+        # Check if task is actually paused
+        current_state = task["status"]["state"]
+
+        if current_state != "paused":
+            return self.error_response_creator(
+                ResumeTaskResponse,
+                request["id"],
+                TaskNotCancelableError,
+                f"Task cannot be resumed from '{current_state}' state. "
+                f"Only paused tasks can be resumed.",
+            )
+
+        # Resume the task
+        await self.scheduler.resume_task(request["params"])
+        task = await self.storage.load_task(task_id)
+
+        return ResumeTaskResponse(jsonrpc="2.0", id=request["id"], result=task)
+
     @trace_task_operation("list_tasks", include_params=False)
     async def list_tasks(self, request: ListTasksRequest) -> ListTasksResponse:
         """List all tasks in storage."""
