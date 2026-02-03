@@ -123,6 +123,45 @@ class NetworkSettings(BaseSettings):
         return f"http://{self.default_host}:{self.default_port}"
 
 
+class GrpcSettings(BaseSettings):
+    """gRPC server configuration settings."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="GRPC__",
+        extra="allow",
+    )
+
+    enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("BINDU_GRPC_ENABLED", "GRPC_ENABLED"),
+    )
+    host: str = Field(
+        default="[::]",
+        validation_alias=AliasChoices("BINDU_GRPC_HOST", "GRPC_HOST"),
+    )
+    port: int = Field(
+        default=50051,
+        validation_alias=AliasChoices("BINDU_GRPC_PORT", "GRPC_PORT"),
+    )
+    max_workers: int = Field(
+        default=10,
+        validation_alias=AliasChoices("BINDU_GRPC_MAX_WORKERS", "GRPC_MAX_WORKERS"),
+    )
+    tls_enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("BINDU_GRPC_TLS_ENABLED", "GRPC_TLS_ENABLED"),
+    )
+    tls_cert_path: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("BINDU_GRPC_TLS_CERT_PATH", "GRPC_TLS_CERT_PATH"),
+    )
+    tls_key_path: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("BINDU_GRPC_TLS_KEY_PATH", "GRPC_TLS_KEY_PATH"),
+    )
+
+
 class DeploymentSettings(BaseSettings):
     """Deployment and server configuration settings."""
 
@@ -762,6 +801,7 @@ class Settings(BaseSettings):
     project: ProjectSettings = ProjectSettings()
     did: DIDSettings = DIDSettings()
     network: NetworkSettings = NetworkSettings()
+    grpc: GrpcSettings = GrpcSettings()
     deployment: DeploymentSettings = DeploymentSettings()
     logging: LoggingSettings = LoggingSettings()
     observability: ObservabilitySettings = ObservabilitySettings()

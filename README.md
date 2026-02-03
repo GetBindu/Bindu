@@ -995,6 +995,62 @@ Feedback is stored in the `task_feedback` table and can be used to:
 
 <br/>
 
+## gRPC
+Bindu can run a gRPC server alongside the JSON-RPC HTTP server.
+
+**To Enable gRPC**
+1. Generate protobufs (including .pyi stubs)
+`python scripts/generate_proto.py`
+
+2. Enable gRPC
+```bash
+export BINDU_GRPC_ENABLED=true
+export BINDU_GRPC_HOST=0.0.0.0
+export BINDU_GRPC_PORT=50051
+```
+
+3. Run your agent
+```python
+from bindu.penguin.bindufy import bindufy
+
+def handler(messages: str) -> str:
+    return "Hello from gRPC!"
+
+config = {
+    "author": "you@example.com",
+    "name": "grpc-demo",
+    "description": "grpc demo agent",
+    "deployment": {"url": "http://localhost:3773", "expose": True},
+    "storage": {"type": "memory"},
+    "scheduler": {"type": "memory"},
+}
+
+bindufy(config, handler, run_server=True)
+```
+
+4. Call gRPC
+```python
+import grpc
+from uuid import uuid4
+from bindu.grpc import a2a_pb2, a2a_pb2_grpc
+
+channel = grpc.insecure_channel("localhost:50051")
+stub = a2a_pb2_grpc.A2AServiceStub(channel)
+request = a2a_pb2.MessageSendRequest(
+    message=a2a_pb2.Message(
+        message_id=str(uuid4()),
+        context_id=str(uuid4()),
+        task_id=str(uuid4()),
+        parts=[a2a_pb2.Part(text=a2a_pb2.TextPart(text="hello"))],
+        role="user",
+        kind="message",
+    )
+)
+print(stub.SendMessage(request))
+```
+
+NOTE: If you see `struct.proto not loaded`, add `from google.protobuf import struct_pb2` before importing bindu.grpc
+
 ## OpenTelemetry
 
 Bindu integrates with **OpenTelemetry (OTEL)** to provide observability and tracing for your agents. Track agent execution, monitor performance, and debug issues using industry-standard observability platforms like **Arize** and **Langfuse**.

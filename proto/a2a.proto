@@ -1,0 +1,249 @@
+syntax = "proto3";
+
+import "google/protobuf/struct.proto";
+
+package bindu.a2a.v1;
+
+// A2A Protocol Buffer definitions for Bindu gRPC support
+// This file defines the gRPC service and message types for Agent-to-Agent communication
+
+// A2A Service - Main service for agent communication
+service A2AService {
+  // Message operations
+  rpc SendMessage(MessageSendRequest) returns (MessageSendResponse);
+  rpc StreamMessage(MessageSendRequest) returns (stream TaskEvent);
+
+  // Task operations
+  rpc GetTask(TaskQueryRequest) returns (Task);
+  rpc ListTasks(ListTasksRequest) returns (TaskListResponse);
+  rpc CancelTask(TaskIdRequest) returns (Task);
+  rpc TaskFeedback(TaskFeedbackRequest) returns (TaskFeedbackResponse);
+
+  // Context operations
+  rpc ListContexts(ListContextsRequest) returns (ContextListResponse);
+  rpc ClearContext(ContextIdRequest) returns (ContextClearResponse);
+
+  // Push notification operations
+  rpc SetTaskPushNotification(SetTaskPushNotificationRequest) returns (TaskPushNotificationConfig);
+  rpc GetTaskPushNotification(GetTaskPushNotificationRequest) returns (TaskPushNotificationConfig);
+  rpc ListTaskPushNotifications(ListTaskPushNotificationsRequest) returns (TaskPushNotificationListResponse);
+  rpc DeleteTaskPushNotification(DeleteTaskPushNotificationRequest) returns (DeleteTaskPushNotificationResponse);
+
+  // Health check
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+// Message types
+message Message {
+  string message_id = 1;
+  string context_id = 2;
+  string task_id = 3;
+  repeated string reference_task_ids = 4;
+  string kind = 5;
+  map<string, string> metadata = 6;
+  repeated Part parts = 7;
+  string role = 8;
+  repeated string extensions = 9;
+}
+
+message Part {
+  oneof part_type {
+    TextPart text = 1;
+    FilePart file = 2;
+    DataPart data = 3;
+  }
+}
+
+message TextPart {
+  string text = 1;
+  map<string, string> metadata = 2;
+  repeated double embeddings = 3;
+}
+
+message FilePart {
+  string file_id = 1;
+  string mime_type = 2;
+  string filename = 3;
+  map<string, string> metadata = 4;
+}
+
+message DataPart {
+  string mime_type = 1;
+  bytes data = 2;
+  map<string, string> metadata = 3;
+}
+
+// Task types
+message Task {
+  string id = 1;
+  string context_id = 2;
+  string kind = 3;
+  TaskStatus status = 4;
+  repeated Artifact artifacts = 5;
+  repeated Message history = 6;
+  map<string, string> metadata = 7;
+}
+
+message TaskStatus {
+  string state = 1;
+  string timestamp = 2;
+  Message message = 3;
+}
+
+message Artifact {
+  string artifact_id = 1;
+  string name = 2;
+  repeated Part parts = 3;
+  map<string, string> metadata = 4;
+}
+
+// Request/Response types
+message MessageSendRequest {
+  Message message = 1;
+  TaskConfiguration configuration = 2;
+}
+
+message MessageSendResponse {
+  Task task = 1;
+}
+
+message TaskQueryRequest {
+  string task_id = 1;
+}
+
+message ListTasksRequest {
+  string context_id = 1;
+  int32 limit = 2;
+  string cursor = 3;
+}
+
+message TaskListResponse {
+  repeated Task tasks = 1;
+  string next_cursor = 2;
+}
+
+message TaskIdRequest {
+  string task_id = 1;
+}
+
+message TaskFeedbackRequest {
+  string task_id = 1;
+  string feedback = 2;
+  int32 rating = 3;
+  map<string, string> metadata = 4;
+}
+
+message TaskFeedbackResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message ListContextsRequest {
+  int32 limit = 1;
+  string cursor = 2;
+}
+
+message ContextListResponse {
+  repeated Context contexts = 1;
+  string next_cursor = 2;
+}
+
+message Context {
+  string context_id = 1;
+  repeated Message messages = 2;
+  map<string, string> metadata = 3;
+}
+
+message ContextIdRequest {
+  string context_id = 1;
+}
+
+message ContextClearResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message TaskConfiguration {
+  repeated string accepted_output_modes = 1;
+  bool long_running = 2;
+  map<string, string> metadata = 3;
+}
+
+// Push notification types
+message PushNotificationConfig {
+  string id = 1;
+  string url = 2;
+  string token = 3;
+  google.protobuf.Struct authentication = 4;
+}
+
+message TaskPushNotificationConfig {
+  string id = 1;
+  PushNotificationConfig push_notification_config = 2;
+  bool long_running = 3;
+}
+
+// Push notification requests/responses
+message SetTaskPushNotificationRequest {
+  TaskPushNotificationConfig config = 1;
+}
+
+message GetTaskPushNotificationRequest {
+  string task_id = 1;
+}
+
+message ListTaskPushNotificationsRequest {
+  string id = 1;
+}
+
+message DeleteTaskPushNotificationRequest {
+  string id = 1;
+  string push_notification_config_id = 2;
+}
+
+message TaskPushNotificationListResponse {
+  repeated TaskPushNotificationConfig configs = 1;
+}
+
+message DeleteTaskPushNotificationResponse {
+  TaskPushNotificationConfig config = 1;
+}
+
+// Streaming events
+message TaskEvent {
+  oneof event {
+    TaskStatusUpdateEvent status_update = 1;
+    TaskArtifactUpdateEvent artifact_update = 2;
+  }
+}
+
+message TaskStatusUpdateEvent {
+  string task_id = 1;
+  string context_id = 2;
+  bool final = 3;
+  TaskStatus status = 4;
+  map<string, string> metadata = 5;
+}
+
+message TaskArtifactUpdateEvent {
+  string task_id = 1;
+  string context_id = 2;
+  Artifact artifact = 3;
+  bool append = 4;
+  bool last_chunk = 5;
+  map<string, string> metadata = 6;
+}
+
+// Health check
+message HealthCheckRequest {
+  string service = 1;
+}
+
+message HealthCheckResponse {
+  enum ServingStatus {
+    UNKNOWN = 0;
+    SERVING = 1;
+    NOT_SERVING = 2;
+  }
+  ServingStatus status = 1;
+}

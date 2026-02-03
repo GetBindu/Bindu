@@ -69,6 +69,13 @@ class BinduApplication(Starlette):
         auth_enabled: bool = False,
         telemetry_config: TelemetryConfig | None = None,
         sentry_config: SentryConfig | None = None,
+        grpc_enabled: bool | None = None,
+        grpc_host: str | None = None,
+        grpc_port: int | None = None,
+        grpc_max_workers: int | None = None,
+        grpc_tls_enabled: bool | None = None,
+        grpc_tls_cert_path: str | None = None,
+        grpc_tls_key_path: str | None = None,
     ):
         """Initialize Bindu application.
 
@@ -87,6 +94,13 @@ class BinduApplication(Starlette):
             auth_enabled: Enable Auth0 authentication middleware
             telemetry_config: Optional telemetry configuration (defaults to disabled)
             sentry_config: Optional Sentry configuration (defaults to disabled)
+            grpc_enabled: Override gRPC enabled setting
+            grpc_host: Override gRPC host setting
+            grpc_port: Override gRPC port setting
+            grpc_max_workers: Override gRPC worker setting
+            grpc_tls_enabled: Override gRPC TLS enabled setting
+            grpc_tls_cert_path: Override gRPC TLS cert path
+            grpc_tls_key_path: Override gRPC TLS key path
         """
         # Generate penguin_id if not provided
         if penguin_id is None:
@@ -97,6 +111,13 @@ class BinduApplication(Starlette):
         self._scheduler_config = scheduler_config
         self._telemetry_config = telemetry_config or TelemetryConfig()
         self._sentry_config = sentry_config or SentryConfig()
+        self._grpc_enabled_override = grpc_enabled
+        self._grpc_host_override = grpc_host
+        self._grpc_port_override = grpc_port
+        self._grpc_max_workers_override = grpc_max_workers
+        self._grpc_tls_enabled_override = grpc_tls_enabled
+        self._grpc_tls_cert_path_override = grpc_tls_cert_path
+        self._grpc_tls_key_path_override = grpc_tls_key_path
 
         # Create default lifespan if none provided
         if lifespan is None:
@@ -136,6 +157,7 @@ class BinduApplication(Starlette):
         self.task_manager: TaskManager | None = None
         self._storage: Storage | None = None
         self._scheduler: Scheduler | None = None
+        self._grpc_server = None
         self._agent_card_json_schema: bytes | None = None
         self._x402_ext = x402_ext
         self._payment_session_manager = None
@@ -431,7 +453,63 @@ class BinduApplication(Starlette):
                 async with task_manager:
                     app.task_manager = task_manager
                     logger.info("✅ TaskManager started")
+                    grpc_enabled = (
+                        self._grpc_enabled_override
+                        if self._grpc_enabled_override is not None
+                        else app_settings.grpc.enabled
+                    )
+                    grpc_host = (
+                        self._grpc_host_override
+                        if self._grpc_host_override is not None
+                        else app_settings.grpc.host
+                    )
+                    grpc_port = (
+                        self._grpc_port_override
+                        if self._grpc_port_override is not None
+                        else app_settings.grpc.port
+                    )
+                    grpc_max_workers = (
+                        self._grpc_max_workers_override
+                        if self._grpc_max_workers_override is not None
+                        else app_settings.grpc.max_workers
+                    )
+                    grpc_tls_enabled = (
+                        self._grpc_tls_enabled_override
+                        if self._grpc_tls_enabled_override is not None
+                        else app_settings.grpc.tls_enabled
+                    )
+                    grpc_tls_cert_path = (
+                        self._grpc_tls_cert_path_override
+                        if self._grpc_tls_cert_path_override is not None
+                        else app_settings.grpc.tls_cert_path
+                    )
+                    grpc_tls_key_path = (
+                        self._grpc_tls_key_path_override
+                        if self._grpc_tls_key_path_override is not None
+                        else app_settings.grpc.tls_key_path
+                    )
+
+                    grpc_server = None
+                    if grpc_enabled:
+                        from bindu.server.grpc import GrpcServer
+
+                        grpc_server = GrpcServer(
+                            app,
+                            port=grpc_port,
+                            host=grpc_host,
+                            max_workers=grpc_max_workers,
+                            tls_enabled=grpc_tls_enabled,
+                            tls_cert_path=grpc_tls_cert_path,
+                            tls_key_path=grpc_tls_key_path,
+                        )
+                        app._grpc_server = grpc_server
+                        await grpc_server.start()
+                        logger.info("✅ gRPC server started")
                     yield
+                    if grpc_server:
+                        await grpc_server.stop()
+                        app._grpc_server = None
+                        logger.info("🛑 gRPC server stopped")
                 logger.info("🛑 TaskManager stopped")
             else:
                 yield
