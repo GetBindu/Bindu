@@ -132,8 +132,14 @@ class BinduApiClient {
     }
 
     async getConversationTasks(conversationId) {
-        // For simple agents, return empty array
-        return [];
+        try {
+            // Get all tasks and filter by contextId
+            const tasks = await this.listTasks(1000, 0);
+            return tasks.filter(task => task.context_id === conversationId);
+        } catch (error) {
+            console.warn('Failed to get conversation tasks:', error);
+            return [];
+        }
     }
 
     async clearContext(contextId) {
@@ -147,7 +153,9 @@ class BinduApiClient {
             if (!response.ok) {
                 throw new ApiError(response.status, response.statusText);
             }
-            return await response.json();
+            const data = await response.json();
+            // Handle both formats: direct array or {skills: [...]}
+            return data.skills || data;
         } catch (error) {
             if (error instanceof ApiError) {
                 throw error;
@@ -158,12 +166,18 @@ class BinduApiClient {
 
     async getSkill(skillId) {
         try {
+            console.log(`📡 Fetching skill from: ${this.baseUrl}/agent/skills/${skillId}`);
             const response = await fetch(`${this.baseUrl}/agent/skills/${skillId}`);
+            console.log(`📡 Response status: ${response.status} ${response.statusText}`);
+            
             if (!response.ok) {
                 throw new ApiError(response.status, response.statusText);
             }
-            return await response.json();
+            const skill = await response.json();
+            console.log('📡 Skill data parsed:', skill);
+            return skill;
         } catch (error) {
+            console.error('📡 getSkill error:', error);
             if (error instanceof ApiError) {
                 throw error;
             }
@@ -173,12 +187,18 @@ class BinduApiClient {
 
     async getSkillDocumentation(skillId) {
         try {
+            console.log(`📚 Fetching documentation from: ${this.baseUrl}/agent/skills/${skillId}/documentation`);
             const response = await fetch(`${this.baseUrl}/agent/skills/${skillId}/documentation`);
+            console.log(`📚 Documentation response status: ${response.status} ${response.statusText}`);
+            
             if (!response.ok) {
                 throw new ApiError(response.status, response.statusText);
             }
-            return await response.text();
+            const documentation = await response.text();
+            console.log('📚 Documentation length:', documentation.length);
+            return documentation;
         } catch (error) {
+            console.error('📚 getSkillDocumentation error:', error);
             if (error instanceof ApiError) {
                 throw error;
             }
@@ -209,24 +229,6 @@ class BinduApiClient {
         return this.jsonrpc('tasks/list', { limit, offset });
     }
 
-    async submitTaskFeedback(taskId, feedback, rating, metadata = {}) {
-        return this.jsonrpc('tasks/feedback', {
-            taskId,
-            feedback,
-            rating,
-            metadata,
-        });
-    }
-
-    // Context operations
-    async listContexts(length = 50) {
-        return this.jsonrpc('contexts/list', { length });
-    }
-
-    async clearContext(contextId) {
-        return this.jsonrpc('contexts/clear', { contextId });
-    }
-
     // DID operations
     async resolveDID(did) {
         return this.jsonrpc('did/resolve', { did });
@@ -241,34 +243,7 @@ class BinduApiClient {
         return response.json();
     }
 
-    // Skills
-    async getSkills() {
-        const response = await fetch(`${this.baseUrl}/agent/skills`);
-        if (!response.ok) {
-            throw new ApiError(response.status, response.statusText);
-        }
-        return response.json();
-    }
-
-    async getSkill(skillId) {
-        const response = await fetch(`${this.baseUrl}/agent/skills/${skillId}`);
-        if (!response.ok) {
-            throw new ApiError(response.status, response.statusText);
-        }
-        return response.json();
-    }
-
-    async getSkillDocumentation(skillId) {
-        const response = await fetch(`${this.baseUrl}/agent/skills/${skillId}/documentation`);
-        if (!response.ok) {
-            throw new ApiError(response.status, response.statusText);
-        }
-        return response.text();
-    }
 }
-
-// Export the API client class
-window.BinduApiClient = BinduApiClient;
 
 // Error classes
 class ApiError extends Error {
@@ -280,17 +255,13 @@ class ApiError extends Error {
 }
 
 class JsonRpcError extends Error {
-    constructor(error) {
-        super(error.message);
+    constructor(code, message, data) {
+        super(message);
         this.name = 'JsonRpcError';
-        this.code = error.code;
-        this.data = error.data;
+        this.code = code;
+        this.data = data;
     }
 }
-
-// Export error classes
-window.ApiError = ApiError;
-window.JsonRpcError = JsonRpcError;
 
 // Task polling utility
 class TaskPoller {

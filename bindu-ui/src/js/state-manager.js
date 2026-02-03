@@ -27,7 +27,7 @@ class StateManager {
             
             // Settings
             settings: {
-                agentUrl: '/api',
+                agentUrl: 'http://localhost:3773',
                 authToken: null,
                 autoScroll: true,
             },
@@ -114,7 +114,30 @@ class StateManager {
         const messages = this.state.messages[conversationId] || [];
         messages.push(message);
         this.state.messages[conversationId] = messages;
+        
+        // Update conversation message count
+        const conversations = this.state.conversations;
+        const conversationIndex = conversations.findIndex(c => c.id === conversationId);
+        if (conversationIndex >= 0) {
+            conversations[conversationIndex].messageCount = messages.length;
+            conversations[conversationIndex].updatedAt = new Date().toISOString();
+            
+            // Update title from first user message if it's still "New Chat"
+            if (conversations[conversationIndex].title === 'New Chat' && message.role === 'user') {
+                if (message.parts && message.parts.length > 0) {
+                    const textPart = message.parts.find(p => p.kind === 'text');
+                    if (textPart) {
+                        const title = textPart.text.length > 50 
+                            ? textPart.text.substring(0, 50) + '...' 
+                            : textPart.text;
+                        conversations[conversationIndex].title = title;
+                    }
+                }
+            }
+        }
+        
         this.notify('messages', {}, this.state.messages);
+        this.notify('conversations', {}, this.state.conversations);
     }
 
     getMessages(conversationId) {
@@ -123,7 +146,27 @@ class StateManager {
 
     setMessages(conversationId, messages) {
         this.state.messages[conversationId] = messages;
+        
+        // Update conversation message count
+        const conversations = this.state.conversations;
+        const conversationIndex = conversations.findIndex(c => c.id === conversationId);
+        if (conversationIndex >= 0) {
+            conversations[conversationIndex].messageCount = messages.length;
+            conversations[conversationIndex].updatedAt = new Date().toISOString();
+        }
+        
         this.notify('messages', {}, this.state.messages);
+        this.notify('conversations', {}, this.state.conversations);
+    }
+
+    updateMessage(conversationId, messageId, updatedMessage) {
+        const messages = this.state.messages[conversationId] || [];
+        const index = messages.findIndex(msg => msg.messageId === messageId);
+        if (index !== -1) {
+            messages[index] = updatedMessage;
+            this.state.messages[conversationId] = messages;
+            this.notify('messages', {}, this.state.messages);
+        }
     }
 
     // Task management
@@ -242,12 +285,12 @@ class StateManager {
 
     updateConversationTitle(conversationId, title) {
         const conversations = [...this.state.conversations];
-        const conversation = conversations.find(c => c.id === conversationId);
-        
-        if (conversation) {
-            conversation.title = title;
-            conversation.updatedAt = new Date().toISOString();
-            this.set('conversations', conversations);
+        const index = conversations.findIndex(c => c.id === conversationId);
+        if (index >= 0) {
+            conversations[index].title = title;
+            conversations[index].updatedAt = new Date().toISOString();
+            this.state.conversations = conversations;
+            this.notify('conversations', {}, this.state.conversations);
         }
     }
 

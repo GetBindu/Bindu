@@ -81,7 +81,14 @@ class MessageComponent {
             message.parts.forEach(part => {
                 if (part.kind === 'text') {
                     if (message.role === 'agent') {
-                        content.innerHTML = marked.parse(part.text);
+                        // Check if marked is available, fallback to plain text
+                        if (typeof window.marked !== 'undefined' && window.marked.parse) {
+                            content.innerHTML = marked.parse(part.text);
+                        } else {
+                            // Fallback: escape HTML and use line breaks
+                            content.textContent = part.text;
+                            content.style.whiteSpace = 'pre-wrap';
+                        }
                     } else {
                         content.textContent = part.text;
                     }
@@ -101,9 +108,64 @@ class MessageComponent {
         meta.appendChild(timestamp);
         
         messageEl.appendChild(content);
-        messageEl.appendChild(meta);
+        
+        // Add feedback button INSIDE content for completed agent tasks (like old implementation)
+        if (message.role === 'agent' && message.status && message.status.toLowerCase() === 'completed' && message.taskId) {
+            const feedbackBtn = document.createElement('button');
+            feedbackBtn.className = 'feedback-btn-corner';
+            feedbackBtn.innerHTML = '👍 Feedback';
+            feedbackBtn.onclick = (e) => {
+                e.stopPropagation();
+                console.log('Feedback button clicked!', { taskId: message.taskId });
+                // Open feedback modal exactly like bindu\ui old implementation
+                if (window.binduUI) {
+                    console.log('Calling openFeedbackModal with taskId:', message.taskId);
+                    window.binduUI.openFeedbackModal(message.taskId);
+                } else {
+                    console.error('window.binduUI not available!');
+                }
+            };
+            content.appendChild(feedbackBtn);
+        }
+        
+        // Add click handler for agent messages to set reply target (like old implementation)
+        if (message.role === 'agent' && message.taskId) {
+            messageEl.style.cursor = 'pointer';
+            messageEl.addEventListener('click', (e) => {
+                // Don't trigger if clicking on feedback button
+                if (!e.target.closest('.feedback-btn-corner')) {
+                    // Set reply target like old implementation
+                    if (window.binduUI) {
+                        window.binduUI.setReplyTo(message.taskId);
+                    }
+                }
+            });
+        }
         
         return messageEl;
+    }
+    
+    static createFeedbackButtons(taskId) {
+        const feedbackEl = document.createElement('div');
+        feedbackEl.className = 'feedback-prompt';
+        feedbackEl.innerHTML = `
+            <p>Was this response helpful?</p>
+            <div class="feedback-buttons">
+                <button class="feedback-btn thumbs-up" onclick="window.binduUI.submitFeedback('${taskId}', 'helpful', 5)">👍</button>
+                <button class="feedback-btn thumbs-down" onclick="window.binduUI.submitFeedback('${taskId}', 'not helpful', 1)">👎</button>
+                <button class="feedback-btn detailed" onclick="window.binduUI.showDetailedFeedback('${taskId}')">💬</button>
+            </div>
+        `;
+        return feedbackEl;
+    }
+    
+    static createFeedbackSubmittedIndicator() {
+        const feedbackEl = document.createElement('div');
+        feedbackEl.className = 'feedback-submitted';
+        feedbackEl.innerHTML = `
+            <span class="feedback-indicator">✅ Feedback submitted</span>
+        `;
+        return feedbackEl;
     }
     
     static createStatusIndicator(status) {
@@ -170,7 +232,15 @@ class ConversationItem {
         
         const meta = document.createElement('div');
         meta.className = 'conversation-meta';
-        meta.textContent = `${conversation.messageCount || 0} messages • ${this.formatTime(conversation.updatedAt)}`;
+        
+        // Get actual message count from state manager
+        let messageCount = conversation.messageCount || 0;
+        if (window.stateManager) {
+            const messages = window.stateManager.getMessages(conversation.id) || [];
+            messageCount = messages.length;
+        }
+        
+        meta.textContent = `${messageCount} message${messageCount !== 1 ? 's' : ''} • ${this.formatTime(conversation.updatedAt)}`;
         
         const deleteBtn = document.createElement('button');
         deleteBtn.className = 'delete-conversation-btn';
@@ -216,9 +286,17 @@ class ConversationItem {
 
 // Modal utility
 class Modal {
-    static show(modalId) {
+    static show(modalId, content = null) {
         const modal = document.getElementById(modalId);
         if (modal) {
+            // If content is provided, update the modal body
+            if (content) {
+                const modalBody = modal.querySelector('.modal-body');
+                if (modalBody) {
+                    modalBody.innerHTML = content;
+                }
+            }
+            
             modal.classList.remove('hidden');
             document.body.style.overflow = 'hidden';
             

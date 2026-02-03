@@ -12,6 +12,11 @@
         <!-- Header -->
         <header class="header">
             <div class="header-left">
+                <button id="menu-toggle" class="menu-toggle" title="Toggle menu">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
                 <div class="logo">
                     <h1>Bindu 🌻</h1>
                 </div>
@@ -21,6 +26,13 @@
                 </div>
             </div>
             <div class="header-right">
+                <button id="info-btn" class="icon-btn" title="Agent Info" onclick="window.binduUI.showInfoModal()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                    </svg>
+                </button>
                 <button id="theme-toggle" class="icon-btn" title="Toggle theme">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="5"></circle>
@@ -64,19 +76,6 @@
 
             <!-- Chat Area -->
             <main class="chat-area">
-                <!-- Tab Navigation -->
-                <div class="tab-nav">
-                    <button class="tab-btn active" data-tab="chat" onclick="window.binduUI.switchTab('chat')">
-                        💬 Chat
-                    </button>
-                    <button class="tab-btn" data-tab="info" onclick="window.binduUI.switchTab('info')">
-                        ℹ️ Info
-                    </button>
-                    <button class="tab-btn" data-tab="skills" onclick="window.binduUI.switchTab('skills')">
-                        🔧 Skills
-                    </button>
-                </div>
-                
                 <div class="tab-content">
                     <!-- Chat Tab -->
                     <div class="tab-pane active" id="chat-tab">
@@ -126,23 +125,6 @@
                             </div>
                         </div>
                     </div>
-                    
-                    <!-- Info Tab -->
-                    <div class="tab-pane" id="info-tab">
-                        <div class="info-content">
-                            <h2>Agent Information</h2>
-                            <div id="agent-details">
-                                <div class="loading">Loading agent information...</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Skills Tab -->
-                    <div class="tab-pane" id="skills-tab">
-                        <div class="skills-content" id="skills-content">
-                            <div class="loading">Loading skills...</div>
-                        </div>
-                    </div>
                 </div>
             </main>
         </div>
@@ -177,6 +159,21 @@
             </div>
         </div>
 
+        <!-- Info Modal -->
+        <div id="info-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Agent Information</h3>
+                    <button class="modal-close" id="close-info">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="info-modal-content">
+                        <div class="loading">Loading agent information...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Loading Overlay -->
         <div id="loading-overlay" class="loading-overlay hidden">
             <div class="loading-spinner"></div>
@@ -188,7 +185,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h3>Skill Details</h3>
-                    <button class="modal-close" onclick="Modal.hide('skill-modal')">&times;</button>
+                    <button class="modal-close" onclick="if(window.Modal) Modal.hide('skill-modal')">&times;</button>
                 </div>
                 <div class="modal-body">
                     <!-- Content will be populated dynamically -->
@@ -200,11 +197,37 @@
         <div id="feedback-modal" class="modal">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h3>Provide Feedback</h3>
-                    <button class="modal-close" onclick="Modal.hide('feedback-modal')">&times;</button>
+                    <h3>Submit Task Feedback</h3>
+                    <span class="modal-close" onclick="window.binduUI.closeFeedbackModal()">&times;</span>
                 </div>
                 <div class="modal-body">
-                    <!-- Content will be populated dynamically -->
+                    <div class="form-group">
+                        <label>Task ID:</label>
+                        <div id="feedback-task-id" class="task-id-display"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="feedback-rating">Rating (1-5):</label>
+                        <select id="feedback-rating" class="form-control">
+                            <option value="5">⭐⭐⭐⭐⭐ Excellent</option>
+                            <option value="4">⭐⭐⭐⭐ Good</option>
+                            <option value="3">⭐⭐⭐ Average</option>
+                            <option value="2">⭐⭐ Poor</option>
+                            <option value="1">⭐ Very Poor</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="feedback-text">Feedback <span style="color: #999; font-weight: normal;">(optional)</span>:</label>
+                        <textarea
+                            id="feedback-text"
+                            class="form-control"
+                            rows="4"
+                            placeholder="Share your thoughts (optional)..."
+                        ></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" onclick="window.binduUI.closeFeedbackModal()">Cancel</button>
+                    <button class="btn-primary" onclick="window.binduUI.submitFeedback()">Submit Feedback</button>
                 </div>
             </div>
         </div>
@@ -212,6 +235,5 @@
 
     <!-- Scripts -->
     <script type="module" src="./js/main.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </body>
 </html>

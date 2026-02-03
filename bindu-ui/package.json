@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "docker:build": "docker build -t getbindu/bindu-ui:latest .",
-    "docker:run": "docker run --rm -p 5173:5173 -e AGENT_BASE_URL=http://localhost:3773 getbindu/bindu-ui:latest"
+    "docker:run": "docker run --rm -p 5173:8080 -e AGENT_BASE_URL=http://localhost:3773 getbindu/bindu-ui:latest"
   },
   "keywords": ["bindu", "ai", "agent", "chat", "ui"],
   "author": "Bindu Team",
