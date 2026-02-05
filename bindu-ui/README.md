@@ -47,7 +47,7 @@ npm run dev
 - **Agent Information**: View agent details, skills, DID identity, and capabilities
 - **Task Management**: Real-time task polling, cancellation, and status updates
 - **Feedback System**: Built-in feedback collection for completed tasks
-- **Skill Browser**: Interactive skill exploration with modal details
+- **Skill Browser**: Interactive skill exploration with formatted documentation display
 
 ### Advanced Features
 - **Authentication**: JWT token support with secure storage
@@ -254,7 +254,7 @@ This implementation fixes all critical issues from the original `/docs` endpoint
 ### New Capabilities
 - 🆕 **Payment Flow Integration** - x402 support
 - 🆕 **Advanced State Management** - Event-driven with persistence
-- 🆕 **Skill Documentation** - Full skill exploration
+- 🆕 **Enhanced Skill Documentation** - YAML parsing with beautiful formatting
 - 🆕 **Feedback System** - Built-in feedback collection
 - 🆕 **Theme System** - Dark/light mode switching
 - 🆕 **Containerized Deployment** - Zero setup required
