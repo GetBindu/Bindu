@@ -328,6 +328,14 @@ class BinduUI {
             Modal.hide('info-modal');
         });
 
+        // Cancel reply button
+        const cancelReplyBtn = document.getElementById('cancel-reply');
+        if (cancelReplyBtn) {
+            cancelReplyBtn.addEventListener('click', () => {
+                this.cancelReply();
+            });
+        }
+
         // Modal backdrop clicks
         document.querySelectorAll('.modal').forEach(modal => {
             modal.addEventListener('click', (e) => {
@@ -529,21 +537,12 @@ class BinduUI {
                     // Continue anyway
                 }
             } else {
-                // Create new conversation - ALWAYS ensure we have one
+                // Only create new conversation if absolutely no conversations exist
                 console.log('🆕 No conversations found, creating new one');
                 const newConversation = stateManager.createConversation();
                 stateManager.setActiveConversation(newConversation.id);
                 this.currentConversationId = newConversation.id;
                 console.log('✅ Created initial conversation:', newConversation.id);
-            }
-            
-            // Final check - ensure we always have a current conversation
-            if (!this.currentConversationId) {
-                console.log('🚨 Still no conversation, forcing creation');
-                const fallbackConversation = stateManager.createConversation();
-                stateManager.setActiveConversation(fallbackConversation.id);
-                this.currentConversationId = fallbackConversation.id;
-                console.log('🆕 Created fallback conversation:', fallbackConversation.id);
             }
             
             // Update UI after conversation is set
@@ -1218,9 +1217,13 @@ class BinduUI {
             messagesContainer.appendChild(messageEl);
         });
         
-        // Add typing indicator if needed
-        if (isTyping) {
+        // Add typing indicator if needed (only if no messages or last message is from user)
+        const lastMessage = messages[messages.length - 1];
+        const shouldShowTyping = isTyping && (!lastMessage || lastMessage.role === 'user');
+        
+        if (shouldShowTyping) {
             const typingIndicator = TypingIndicator.create();
+            typingIndicator.id = 'typing-indicator';
             messagesContainer.appendChild(typingIndicator);
         }
         
@@ -1383,6 +1386,9 @@ class BinduUI {
         input.value = '';
         const sendButton = document.getElementById('send-btn');
         sendButton.disabled = true;
+        
+        // Show sending state
+        this.setSendButtonSending(true);
 
         try {
             // Task ID logic based on A2A protocol:
@@ -1426,6 +1432,9 @@ class BinduUI {
                 isNonTerminalState,
                 referenceTaskIds
             });
+
+            // Show typing indicator immediately for better UX
+            this.showTypingIndicator();
 
             const requestBody = {
                 jsonrpc: '2.0',
@@ -1506,7 +1515,7 @@ class BinduUI {
                     }
 
                     const displayMessage = this.replyToTaskId
-                        ? `↩️ Replying to task ${this.replyToTaskId.substring(0, 8)}...\n\n${message}` 
+                        ? `↩️ Replying to previous message...\n\n${message}` 
                         : message;
                     this.addMessage(displayMessage, 'user', task.id);
 
@@ -1558,7 +1567,7 @@ class BinduUI {
             }
 
             const displayMessage = this.replyToTaskId
-                ? `↩️ Replying to task ${this.replyToTaskId.substring(0, 8)}...\n\n${message}` 
+                ? `↩️ Replying to previous message...\n\n${message}` 
                 : message;
             this.addMessage(displayMessage, 'user', task.id);
 
@@ -1572,9 +1581,10 @@ class BinduUI {
         } catch (error) {
             console.error('❌ Error sending message:', error);
             Toast.error('Failed to send message: ' + error.message);
-        } finally {
+            // Re-enable send button on error
             sendButton.disabled = false;
             this.eventInProgress = false;
+            this.setSendButtonSending(false);
         }
     }
 
@@ -1826,22 +1836,88 @@ class BinduUI {
         if (indicator) {
             const text = document.getElementById('reply-text');
             if (text) {
-                text.textContent = `💬 Replying to task: ${taskId.substring(0, 8)}...`;
+                text.textContent = `💬 Replying to previous message`;
             }
             indicator.classList.add('visible');
         }
         document.getElementById('message-input').focus();
     }
 
+    cancelReply() {
+        this.replyToTaskId = null;
+        const indicator = document.getElementById('reply-indicator');
+        if (indicator) {
+            indicator.classList.remove('visible');
+        }
+        document.getElementById('message-input').focus();
+    }
+
+    setSendButtonSending(isSending) {
+        const sendButton = document.getElementById('send-btn');
+        if (!sendButton) return;
+
+        if (isSending) {
+            // Change to loading/spinning icon
+            sendButton.innerHTML = `
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                    <style>
+                        @keyframes spin {
+                            to { transform: rotate(360deg); }
+                        }
+                        .spin {
+                            animation: spin 1s linear infinite;
+                            transform-origin: center;
+                        }
+                    </style>
+                    <path class="spin" d="M12 2v4c0 1.1.9 2 2 2h4c0-3.31-2.69-6-6-6zm0 16v4c3.31 0 6-2.69 6-6h-4c-1.1 0-2 .9-2 2zm-6-6H2c0 3.31 2.69 6 6 6v-4c-1.1 0-2-.9-2-2zm0-4c-1.1 0-2 .9-2 2h4c0-1.1.9-2 2-2V2c-3.31 0-6 2.69-6 6z"/>
+                </svg>
+            `;
+            sendButton.classList.add('sending');
+        } else {
+            // Reset to normal send icon
+            sendButton.innerHTML = `
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                </svg>
+            `;
+            sendButton.classList.remove('sending');
+        }
+    }
+
+    enableSendButton() {
+        const sendButton = document.getElementById('send-btn');
+        if (sendButton) {
+            sendButton.disabled = false;
+            this.eventInProgress = false;
+            this.setSendButtonSending(false);
+        }
+        this.updateSendButton();
+    }
+
     openFeedbackModal(taskId) {
         // Use Modal class for consistency
         const modal = document.getElementById('feedback-modal');
-        const taskIdSpan = document.getElementById('feedback-task-id');
+        const previewElement = document.getElementById('feedback-message-preview');
         const feedbackRating = document.getElementById('feedback-rating');
         const feedbackText = document.getElementById('feedback-text');
         
-        if (taskIdSpan) {
-            taskIdSpan.textContent = taskId;
+        // Find the user message that prompted this AI response
+        if (previewElement && this.currentConversationId) {
+            const messages = stateManager.getMessages(this.currentConversationId);
+            let userMessage = "Previous conversation";
+            
+            // Look for the most recent user message before an agent message with this taskId
+            for (let i = messages.length - 1; i >= 0; i--) {
+                const message = messages[i];
+                if (message.role === 'user') {
+                    // Get the first 50 characters of the user message
+                    const messageText = message.parts && message.parts[0] ? message.parts[0].text : message.text || '';
+                    userMessage = messageText.length > 50 ? messageText.substring(0, 50) + '...' : messageText;
+                    break;
+                }
+            }
+            
+            previewElement.textContent = `"${userMessage}"`;
         }
         
         // Reset form to default values like old UI
@@ -1853,7 +1929,7 @@ class BinduUI {
         }
         
         if (modal) {
-            modal.dataset.taskId = taskId;
+            modal.dataset.taskId = taskId;  // Store task ID internally for submission
             Modal.show('feedback-modal');  // Use Modal class
         }
     }
@@ -1929,6 +2005,8 @@ class BinduUI {
                 this.addMessage('⏱️ Timeout: Task did not complete', 'status');
                 this.currentTaskId = null;
                 this.currentTaskState = null;
+                // Re-enable send button on timeout
+                this.enableSendButton();
                 return;
             }
 
@@ -1948,6 +2026,9 @@ class BinduUI {
                         this.taskHistory.push(taskId);
                     }
                     console.log('Task status update:', task);
+                    
+                    // Re-enable send button when agent responds
+                    this.enableSendButton();
                     
                     if (state === 'completed') {
                         const responseText = this.extractResponse(task);
@@ -2026,6 +2107,11 @@ class BinduUI {
             // Add feedback state for persistence
             feedbackEnabled: role === 'agent' && status === 'completed'
         };
+
+        // Remove typing indicator when agent message is added
+        if (role === 'agent') {
+            this.removeTypingIndicator();
+        }
 
         // Add to state manager
         if (this.currentConversationId) {
@@ -2126,6 +2212,27 @@ class BinduUI {
         const messagesContainer = document.getElementById('chat-messages');
         if (stateManager.get('settings').autoScroll) {
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+    }
+
+    showTypingIndicator() {
+        const messagesContainer = document.getElementById('chat-messages');
+        if (!messagesContainer) return;
+        
+        // Remove any existing typing indicators
+        this.removeTypingIndicator();
+        
+        // Create and add new typing indicator
+        const typingIndicator = TypingIndicator.create();
+        typingIndicator.id = 'typing-indicator';
+        messagesContainer.appendChild(typingIndicator);
+        this.scrollToBottom();
+    }
+
+    removeTypingIndicator() {
+        const existingIndicator = document.getElementById('typing-indicator');
+        if (existingIndicator) {
+            existingIndicator.remove();
         }
     }
 
@@ -2255,10 +2362,31 @@ class BinduUI {
     }
 
     showDetailedFeedback(taskId) {
-        // Set task ID in the modal
-        const taskIdElement = document.getElementById('feedback-task-id');
-        if (taskIdElement) {
-            taskIdElement.textContent = taskId;
+        // Set task ID in the modal (stored internally, not displayed)
+        const modal = document.getElementById('feedback-modal');
+        const previewElement = document.getElementById('feedback-message-preview');
+        
+        if (modal) {
+            modal.dataset.taskId = taskId;
+        }
+        
+        // Find the user message that prompted this AI response
+        if (previewElement && this.currentConversationId) {
+            const messages = stateManager.getMessages(this.currentConversationId);
+            let userMessage = "Previous conversation";
+            
+            // Look for the most recent user message
+            for (let i = messages.length - 1; i >= 0; i--) {
+                const message = messages[i];
+                if (message.role === 'user') {
+                    // Get the first 50 characters of the user message
+                    const messageText = message.parts && message.parts[0] ? message.parts[0].text : message.text || '';
+                    userMessage = messageText.length > 50 ? messageText.substring(0, 50) + '...' : messageText;
+                    break;
+                }
+            }
+            
+            previewElement.textContent = `"${userMessage}"`;
         }
         
         // Reset form
@@ -2271,7 +2399,8 @@ class BinduUI {
     }
 
     async submitDetailedFeedbackFromModal() {
-        const taskId = document.getElementById('feedback-task-id').textContent;
+        const modal = document.getElementById('feedback-modal');
+        const taskId = modal.dataset.taskId;
         const rating = document.getElementById('feedback-rating').value;
         const feedbackText = document.getElementById('feedback-text').value;
         
@@ -2382,126 +2511,141 @@ class BinduUI {
             }
             
             infoModalContent.innerHTML = `
-                <div class="agent-card-display">
-                    <div class="agent-header">
-                        <h2>${agentCard.name || 'Unknown Agent'}</h2>
-                        <span class="version">v${agentCard.version || '1.0.0'}</span>
-                        <span class="agent-id">ID: ${agentCard.id || 'Unknown'}</span>
-                    </div>
-                    <div class="agent-description">
-                        <p>${agentCard.description || 'No description available'}</p>
+                <div class="agent-card-balanced">
+                    <!-- Agent Header -->
+                    <div class="agent-header-balanced">
+                        <div class="agent-avatar-balanced">
+                            <div class="avatar-circle-balanced">
+                                <span class="avatar-initial-balanced">${(agentCard.name || 'Agent').charAt(0).toUpperCase()}</span>
+                            </div>
+                            <div class="status-dot-balanced online"></div>
+                        </div>
+                        <div class="agent-info-balanced">
+                            <h1 class="agent-name-balanced">${agentCard.name || 'Unknown Agent'}</h1>
+                            <p class="agent-description-balanced">${agentCard.description || 'Advanced AI Assistant'}</p>
+                            <div class="agent-meta-balanced">
+                                <span class="version-pill-balanced">v${agentCard.version || '1.0.0'}</span>
+                                <span class="status-pill-balanced">Online</span>
+                                <span class="protocol-badge">Protocol: ${agentCard.protocolVersion || '2026.1.12'}</span>
+                            </div>
+                        </div>
                     </div>
                     
-                    <div class="agent-meta">
-                        <div class="meta-section">
-                            <h3>Author</h3>
-                            <div class="meta-item">
-                                <strong>Author:</strong> 
-                                <span>${this.extractAuthorFromAgentCard(agentCard) || 'Not available'}</span>
+                    <!-- Quick Stats -->
+                    <div class="stats-section-balanced">
+                        <div class="stat-card-balanced">
+                            <div class="stat-icon">🛠️</div>
+                            <div class="stat-info">
+                                <span class="stat-number-balanced">${skills ? skills.length : 0}</span>
+                                <span class="stat-label-balanced">Skills</span>
                             </div>
                         </div>
-                        
-                        <div class="meta-section">
-                            <h3>Version</h3>
-                            <div class="meta-item">
-                                <strong>Version:</strong> 
-                                <span>${agentCard.version || '1.0.0'}</span>
+                        <div class="stat-card-balanced">
+                            <div class="stat-icon">⚡</div>
+                            <div class="stat-info">
+                                <span class="stat-number-balanced">${agentCard.capabilities ? Object.keys(agentCard.capabilities).length : 0}</span>
+                                <span class="stat-label-balanced">Capabilities</span>
                             </div>
                         </div>
-                        
-                        <div class="meta-section">
-                            <h3>🔗 Connection</h3>
-                            <div class="meta-item">
-                                <strong>URL:</strong> 
-                                <code>${agentCard.url || 'http://localhost'}</code>
+                        <div class="stat-card-balanced">
+                            <div class="stat-icon">🔗</div>
+                            <div class="stat-info">
+                                <span class="stat-number-balanced">${agentDid ? 'DID' : 'None'}</span>
+                                <span class="stat-label-balanced">Identity</span>
                             </div>
-                            <div class="meta-item">
-                                <strong>Protocol:</strong> 
-                                <code>${agentCard.protocolVersion || '2026.1.12'}</code>
+                        </div>
+                    </div>
+                    
+                    <!-- Skills Section -->
+                    ${skills && skills.length > 0 ? `
+                        <div class="skills-section-balanced">
+                            <h3 class="section-title-balanced">Available Skills (${skills.length})</h3>
+                            <div class="skills-grid-balanced">
+                                ${skills.map(skill => `
+                                    <div class="skill-card-balanced" onclick="window.binduUI.showSkillDetails('${skill.id || 'unknown'}')">
+                                        <div class="skill-header-balanced">
+                                            <div class="skill-icon-balanced">🛠️</div>
+                                            <div class="skill-name-balanced">${skill.name || skill.id}</div>
+                                        </div>
+                                        <p class="skill-description-balanced">${skill.description || 'No description available'}</p>
+                                        <div class="skill-action-balanced">
+                                            <span>View Details →</span>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    <!-- Capabilities Section -->
+                    <div class="capabilities-section-balanced">
+                        <h3 class="section-title-balanced">Core Capabilities</h3>
+                        <div class="capabilities-grid-balanced">
+                            ${agentCard.capabilities ? Object.keys(agentCard.capabilities).map(cap => 
+                                `<div class="capability-card-balanced">
+                                    <div class="capability-icon-balanced">⚡</div>
+                                    <div class="capability-name-balanced">${cap}</div>
+                                </div>`
+                            ).join('') : '<div class="no-capabilities-balanced">No capabilities specified</div>'}
+                        </div>
+                    </div>
+                    
+                    <!-- Technical Details -->
+                    <div class="technical-section-balanced">
+                        <h3 class="section-title-balanced">Technical Information</h3>
+                        <div class="technical-grid-balanced">
+                            <div class="technical-item-balanced">
+                                <div class="tech-label-balanced">Agent ID</div>
+                                <div class="tech-value-balanced">
+                                    <code>${agentCard.id || 'Unknown'}</code>
+                                    <button class="copy-btn-balanced" onclick="navigator.clipboard.writeText('${agentCard.id || ''}')" title="Copy Agent ID">📋</button>
+                                </div>
+                            </div>
+                            <div class="technical-item-balanced">
+                                <div class="tech-label-balanced">Connection URL</div>
+                                <div class="tech-value-balanced">
+                                    <code>${agentCard.url || 'http://localhost'}</code>
+                                    <button class="copy-btn-balanced" onclick="navigator.clipboard.writeText('${agentCard.url || ''}')" title="Copy URL">📋</button>
+                                </div>
                             </div>
                             ${agentDid ? `
-                                <div class="meta-item">
-                                    <strong>DID:</strong> 
-                                    <code>${agentDid}</code>
-                                    <button class="copy-btn" onclick="navigator.clipboard.writeText('${agentDid}')" title="Copy DID">📋</button>
+                                <div class="technical-item-balanced">
+                                    <div class="tech-label-balanced">Decentralized ID</div>
+                                    <div class="tech-value-balanced">
+                                        <code>${agentDid}</code>
+                                        <button class="copy-btn-balanced" onclick="navigator.clipboard.writeText('${agentDid}')" title="Copy DID">📋</button>
+                                    </div>
+                                </div>
+                            ` : ''}
+                            ${this.extractPublicKeyFromAgentCard(agentCard, didDocument) ? `
+                                <div class="technical-item-balanced">
+                                    <div class="tech-label-balanced">Public Key</div>
+                                    <div class="tech-value-balanced">
+                                        <code class="public-key-balanced">${this.extractPublicKeyFromAgentCard(agentCard, didDocument).substring(0, 20)}...</code>
+                                        <button class="copy-btn-balanced" onclick="navigator.clipboard.writeText('${this.extractPublicKeyFromAgentCard(agentCard, didDocument)}')" title="Copy Public Key">📋</button>
+                                    </div>
                                 </div>
                             ` : ''}
                         </div>
-                        
-                        <div class="meta-section">
-                            <h3>Public Key</h3>
-                            <div class="meta-item">
-                                <strong>Public Key:</strong> 
-                                <code>${this.extractPublicKeyFromAgentCard(agentCard, didDocument) || 'Not available'}</code>
-                                ${this.extractPublicKeyFromAgentCard(agentCard, didDocument) ? `<button class="copy-btn" onclick="navigator.clipboard.writeText('${this.extractPublicKeyFromAgentCard(agentCard, didDocument)}')" title="Copy Public Key">📋</button>` : ''}
-                            </div>
-                        </div>
-                        
-                        <div class="meta-section">
-                            <h3>⚡ Capabilities</h3>
-                            <div class="capabilities-list">
-                                ${agentCard.capabilities ? Object.keys(agentCard.capabilities).map(cap => 
-                                    `<span class="capability-badge">${cap}</span>`
-                                ).join('') : '<span class="no-capabilities">None specified</span>'}
-                            </div>
-                        </div>
-                        
-                        ${skills && skills.length > 0 ? `
-                            <div class="meta-section">
-                                <h3>🛠️ Skills (${skills.length})</h3>
-                                <div class="skills-summary">
-                                    ${skills.slice(0, 3).map(skill => `
-                                        <div class="skill-summary clickable" onclick="window.binduUI.showSkillDetails('${skill.id || 'unknown'}')" style="cursor: pointer; transition: all 0.2s ease;">
-                                            <strong>${skill.name || skill.id}</strong>
-                                            <p>${(skill.description || '').substring(0, 100)}${skill.description && skill.description.length > 100 ? '...' : ''}</p>
-                                            <small style="color: var(--accent-color);">Click to view details →</small>
-                                        </div>
-                                    `).join('')}
-                                    ${skills.length > 3 ? `<p class="more-skills">... and ${skills.length - 3} more skills</p>` : ''}
+                    </div>
+                    
+                    <!-- Trust & Security -->
+                    <div class="trust-section-balanced">
+                        <h3 class="section-title-balanced">Trust & Security</h3>
+                        <div class="trust-badges-balanced">
+                            <div class="trust-badge-balanced ${agentCard.agent_trust?.verified ? 'verified' : 'unverified'}">
+                                <div class="trust-icon-balanced">${agentCard.agent_trust?.verified ? '✅' : '⚠️'}</div>
+                                <div class="trust-info-balanced">
+                                    <div class="trust-title-balanced">${agentCard.agent_trust?.verified ? 'Verified Agent' : 'Unverified Agent'}</div>
+                                    <div class="trust-desc-balanced">${agentCard.agent_trust?.verified ? 'This agent has been verified and is trusted' : 'This agent has not been verified'}</div>
                                 </div>
                             </div>
-                        ` : ''}
-                        
-                        ${didDocument ? `
-                            <div class="meta-section">
-                                <h3>🆔 DID Document</h3>
-                                <div class="did-document">
-                                    <details>
-                                        <summary>View DID Document</summary>
-                                        <pre><code>${JSON.stringify(didDocument, null, 2)}</code></pre>
-                                    </details>
+                            ${agentCard.agent_trust?.level ? `
+                                <div class="trust-level-balanced">
+                                    <div class="trust-label-balanced">Trust Level</div>
+                                    <div class="trust-value-balanced">${agentCard.agent_trust.level}</div>
                                 </div>
-                            </div>
-                        ` : ''}
-                        
-                        <div class="meta-section">
-                            <h3>� Agent Card (JSON)</h3>
-                            <div class="agent-card-json">
-                                <div class="json-panel-header">
-                                    <button class="copy-json-btn" onclick="navigator.clipboard.writeText('${JSON.stringify(agentCard, null, 2)}')">📋 Copy JSON</button>
-                                </div>
-                                <div class="json-content">
-                                    <pre><code>${JSON.stringify(agentCard, null, 2)}</code></pre>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="meta-section">
-                            <h3>�� Agent Trust</h3>
-                            <div class="trust-info">
-                                ${agentCard.agent_trust ? `
-                                    <div class="trust-item">
-                                        <strong>Trust Level:</strong> 
-                                        <span class="trust-level">${agentCard.agent_trust.level || 'Unknown'}</span>
-                                    </div>
-                                    ${agentCard.agent_trust.verified ? `
-                                        <div class="trust-item">
-                                            <strong>Verified:</strong> 
-                                            <span class="verified">✅ Yes</span>
-                                        </div>
-                                    ` : ''}
-                                ` : '<p>No trust information available</p>'}
-                            </div>
+                            ` : ''}
                         </div>
                     </div>
                 </div>
@@ -2511,93 +2655,210 @@ class BinduUI {
         }
     }
 
-    addSmoothAnimations() {
-        // Add smooth scroll behavior
-        document.documentElement.style.scrollBehavior = 'smooth';
+addSmoothAnimations() {
+    // Enhanced animations for better UX
+    const style = document.createElement('style');
+    style.textContent = `
+        /* Enhanced message animations */
+        .message {
+            animation: messageSlideIn 0.3s ease-out;
+            transition: all 0.2s ease;
+        }
         
-        // Add entrance animations
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes fadeIn {
-                from { opacity: 0; transform: translateY(10px); }
-                to { opacity: 1; transform: translateY(0); }
+        .message:hover {
+            transform: translateX(2px);
+        }
+        
+        .message.agent:hover::before {
+            content: "Click to reply";
+            position: absolute;
+            top: -25px;
+            right: 10px;
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            opacity: 0;
+            animation: fadeIn 0.2s ease-out forwards;
+            animation-delay: 0.5s;
+            white-space: nowrap;
+            border: 1px solid var(--border-secondary);
+            z-index: 10;
+        }
+        
+        @keyframes messageSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
             }
-            
-            @keyframes slideIn {
-                from { transform: translateX(-20px); opacity: 0; }
-                to { transform: translateX(0); opacity: 1; }
-            }
-            
-            @keyframes pulse {
-                0%, 100% { opacity: 1; }
-                50% { opacity: 0.5; }
-            }
-            
-            .fade-in {
-                animation: fadeIn 0.3s ease-out;
-            }
-            
-            .slide-in {
-                animation: slideIn 0.3s ease-out;
-            }
-            
-            .skeleton-loader {
-                padding: 1rem;
-            }
-            
-            .skeleton-message {
-                height: 60px;
-                background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-                background-size: 200% 100%;
-                animation: pulse 1.5s infinite;
-                border-radius: 8px;
-                margin-bottom: 1rem;
-            }
-            
-            .skeleton-short {
-                height: 30px;
-                width: 60%;
-            }
-            
-            .skill-card {
-                transition: transform 0.2s ease, box-shadow 0.2s ease;
-            }
-            
-            .skill-card:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            }
-            
-            .feedback-btn {
-                transition: all 0.2s ease;
-            }
-            
-            .feedback-btn:hover {
-                transform: scale(1.1);
-            }
-            
-            .star-btn {
-                transition: all 0.2s ease;
-                font-size: 1.5rem;
-                background: none;
-                border: none;
-                cursor: pointer;
-                opacity: 0.3;
-            }
-            
-            .star-btn.active {
+            to {
                 opacity: 1;
-                transform: scale(1.2);
+                transform: translateY(0);
             }
-            
-            .star-btn:hover {
-                opacity: 0.7;
-                transform: scale(1.1);
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        /* Enhanced button interactions */
+        .icon-btn {
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .icon-btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(99, 102, 241, 0.1);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.3s ease, height 0.3s ease;
+        }
+        
+        .icon-btn:hover::before {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .icon-btn:hover {
+            transform: scale(1.05);
+            background: var(--bg-secondary);
+        }
+        
+        .icon-btn:active {
+            transform: scale(0.95);
+        }
+        
+        /* Enhanced send button */
+        #send-btn {
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        #send-btn:not(:disabled):hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+        
+        #send-btn:not(:disabled):active {
+            transform: scale(0.95);
+        }
+        
+        #send-btn::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.4s ease, height 0.4s ease;
+        }
+        
+        #send-btn:not(:disabled):active::after {
+            width: 200%;
+            height: 200%;
+        }
+        
+        /* Enhanced input field */
+        #message-input {
+            transition: all 0.2s ease;
+        }
+        
+        #message-input:focus {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
+        }
+        
+        /* Enhanced conversation items */
+        .conversation-item {
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        
+        .conversation-item:hover {
+            transform: translateX(4px);
+            background: var(--bg-secondary);
+        }
+        
+        .conversation-item.active {
+            transform: translateX(8px);
+            background: linear-gradient(90deg, var(--bg-secondary), transparent);
+        }
+        
+        /* Enhanced modal animations */
+        .modal-content {
+            animation: modalSlideIn 0.3s ease-out;
+            transition: all 0.2s ease;
+        }
+        
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9) translateY(-20px);
             }
-            
-            [data-theme="dark"] .skeleton-message {
-                background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
             }
+        }
+        
+        .modal-close {
+            transition: all 0.2s ease;
+        }
+        
+        .modal-close:hover {
+            transform: scale(1.1) rotate(90deg);
+            background: var(--bg-secondary);
+            border-radius: 50%;
+        }
+        
+        /* Enhanced form controls */
+        .form-control {
+            transition: all 0.2s ease;
+        }
+        
+        .form-control:focus {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
+        }
+        
+        /* Enhanced feedback buttons */
+        .feedback-btn-corner {
+            transition: all 0.2s ease;
+        }
+        
+        .feedback-btn-corner:hover {
+            transform: scale(1.1) rotate(5deg);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+        
+        /* Enhanced typing indicator */
+        .typing-indicator {
+            animation: typingSlideIn 0.3s ease-out;
+        }
+        
+        @keyframes typingSlideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
         `;
         document.head.appendChild(style);
     }

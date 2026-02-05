@@ -134,9 +134,16 @@ class MessageComponent {
             messageEl.addEventListener('click', (e) => {
                 // Don't trigger if clicking on feedback button
                 if (!e.target.closest('.feedback-btn-corner')) {
-                    // Set reply target like old implementation
+                    // Toggle reply target
                     if (window.binduUI) {
-                        window.binduUI.setReplyTo(message.taskId);
+                        // Check if we're already replying to this message
+                        if (window.binduUI.replyToTaskId === message.taskId) {
+                            // If already replying, cancel the reply
+                            window.binduUI.cancelReply();
+                        } else {
+                            // Set new reply target
+                            window.binduUI.setReplyTo(message.taskId);
+                        }
                     }
                 }
             });
@@ -206,11 +213,18 @@ class TypingIndicator {
         const indicator = document.createElement('div');
         indicator.className = 'typing-indicator';
         
+        // Create simple dots container
+        const dotsContainer = document.createElement('div');
+        dotsContainer.className = 'typing-dots';
+        
+        // Create three simple dots
         for (let i = 0; i < 3; i++) {
             const dot = document.createElement('div');
             dot.className = 'typing-dot';
-            indicator.appendChild(dot);
+            dotsContainer.appendChild(dot);
         }
+        
+        indicator.appendChild(dotsContainer);
         
         return indicator;
     }

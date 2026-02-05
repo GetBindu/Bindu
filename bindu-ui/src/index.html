@@ -104,6 +104,10 @@
                             
                             <!-- Input Area -->
                             <div class="input-container">
+                                <div id="reply-indicator" class="reply-indicator">
+                                    <span id="reply-text">💬 Replying to previous message</span>
+                                    <button id="cancel-reply" class="cancel-reply-btn" title="Cancel reply">×</button>
+                                </div>
                                 <div class="input-wrapper">
                                     <textarea 
                                         id="message-input" 
@@ -112,9 +116,8 @@
                                         maxlength="4000"
                                     ></textarea>
                                     <button id="send-btn" class="send-btn" disabled>
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <line x1="22" y1="2" x2="11" y2="13"></line>
-                                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                                            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
                                         </svg>
                                     </button>
                                 </div>
@@ -197,13 +200,13 @@
         <div id="feedback-modal" class="modal">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h3>Submit Task Feedback</h3>
+                    <h3>Rate this Response</h3>
                     <span class="modal-close" onclick="window.binduUI.closeFeedbackModal()">&times;</span>
                 </div>
                 <div class="modal-body">
                     <div class="form-group">
-                        <label>Task ID:</label>
-                        <div id="feedback-task-id" class="task-id-display"></div>
+                        <label>For:</label>
+                        <div id="feedback-message-preview" class="message-preview-display"></div>
                     </div>
                     <div class="form-group">
                         <label for="feedback-rating">Rating (1-5):</label>
