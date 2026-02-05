@@ -5,12 +5,26 @@ forwards incoming HTTP requests to a local agent HTTP server (default
 `localhost:3773`). It sends responses back via the tunnel.
 
 Usage:
+  # Using config file (recommended):
+  python -m bindu.edge_client
+  
+  # Or with custom config file:
+  python -m bindu.edge_client --config /path/to/config.json
+  
+  # Or with CLI arguments:
   python -m bindu.edge_client --ws-url ws://34.0.0.30:8080/ws/tunnel_test123 \
       --token test-token-123 --local-port 3773
 
+Config file (edge.config.json in project root):
+  {
+    "ws_url": "ws://localhost:8001/ws/t_xxxxx",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "local_port": 3773
+  }
+
 Notes:
 - The user must register the tunnel on the control plane (associate
-  `tunnel_test123` with the agent) separately; instructions are in the
+  the tunnel with the agent) separately; instructions are in the
   README change.
 """
 from __future__ import annotations
@@ -21,8 +35,10 @@ import base64
 import gzip
 import json
 import logging
+import os
 import time
-from typing import Any, Dict
+from pathlib import Path
+from typing import Any, Dict, Optional
 
 import httpx
 import websockets
@@ -255,11 +271,62 @@ async def run_client(ws_url: str, token: str, local_port: int, reconnect: bool =
         backoff = min(backoff * 2, 60)
 
 
+def _find_project_root() -> Optional[Path]:
+    """Find the project root by looking for pyproject.toml or .git directory."""
+    current = Path.cwd()
+    
+    # Check current directory and parents
+    for parent in [current] + list(current.parents):
+        if (parent / "pyproject.toml").exists() or (parent / ".git").exists():
+            return parent
+    
+    return None
+
+
+def _load_config_file(config_path: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """Load configuration from JSON file.
+    
+    Priority order:
+    1. Explicitly provided config_path via --config
+    2. edge.config.json in project root
+    
+    Args:
+        config_path: Path to config file. If None, searches project root.
+    
+    Returns:
+        Dict with configuration or None if file not found
+    """
+    paths_to_try = []
+    
+    if config_path:
+        # Explicit config path provided
+        paths_to_try.append(Path(config_path))
+    else:
+        # Try project root only
+        project_root = _find_project_root()
+        if project_root:
+            paths_to_try.append(project_root / "edge.config.json")
+    
+    for path in paths_to_try:
+        if path.exists():
+            try:
+                with open(path, 'r') as f:
+                    config = json.load(f)
+                    log.info(f"Loaded configuration from {path}")
+                    return config
+            except Exception as e:
+                log.error(f"Failed to load config file {path}: {e}")
+                continue
+    
+    return None
+
+
 def _parse_args():
     p = argparse.ArgumentParser(description="Bindu Edge Tunnel Client")
-    p.add_argument("--ws-url", required=True, help="WebSocket tunnel URL")
-    p.add_argument("--token", required=True, help="Tunnel token (X-Tunnel-Token)")
-    p.add_argument("--local-port", type=int, default=3773, help="Local agent HTTP port")
+    p.add_argument("--config", help="Path to config file (default: edge.config.json in project root)")
+    p.add_argument("--ws-url", help="WebSocket tunnel URL")
+    p.add_argument("--token", help="Tunnel token (X-Tunnel-Token)")
+    p.add_argument("--local-port", type=int, help="Local agent HTTP port (default: 3773)")
     p.add_argument("--no-reconnect", action="store_true", help="Do not reconnect on disconnect")
     p.add_argument("--debug", action="store_true")
     return p.parse_args()
@@ -269,8 +336,28 @@ def main():
     args = _parse_args()
     level = logging.DEBUG if args.debug else logging.INFO
     logging.basicConfig(level=level, format="%(asctime)s %(levelname)s %(message)s")
+    
+    # Load config from file
+    config = _load_config_file(args.config)
+    
+    # Get values from CLI args or config file (CLI args take precedence)
+    ws_url = args.ws_url or (config.get("ws_url") if config else None)
+    token = args.token or (config.get("token") if config else None)
+    local_port = args.local_port or (config.get("local_port") if config else 3773)
+    
+    # Validate required parameters
+    if not ws_url:
+        log.error("WebSocket URL not provided. Use --ws-url or create edge.config.json in project root.")
+        return
+    
+    if not token:
+        log.error("Token not provided. Use --token or create edge.config.json in project root.")
+        return
+    
+    log.info(f"Starting edge client: ws_url={ws_url}, local_port={local_port}")
+    
     try:
-        asyncio.run(run_client(args.ws_url, args.token, args.local_port, reconnect=not args.no_reconnect))
+        asyncio.run(run_client(ws_url, token, local_port, reconnect=not args.no_reconnect))
     except KeyboardInterrupt:
         log.info("Interrupted, exiting")
 
