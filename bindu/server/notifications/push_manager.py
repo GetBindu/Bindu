@@ -48,7 +48,7 @@ from ...utils.notifications import NotificationDeliveryError, NotificationServic
 if TYPE_CHECKING:
     from bindu.server.storage.base import Storage
 
-logger = get_logger("pebbling.server.notifications.push_manager")
+logger = get_logger("bindu.server.notifications.push_manager")
 
 PUSH_NOT_SUPPORTED_MESSAGE = (
     "Push notifications are not supported by this server configuration. Please use polling to check task status. "

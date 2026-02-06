@@ -76,7 +76,7 @@ from .scheduler import Scheduler
 from .storage import Storage
 from .workers import ManifestWorker
 
-logger = get_logger("pebbling.server.task_manager")
+logger = get_logger("bindu.server.task_manager")
 
 
 @dataclass
