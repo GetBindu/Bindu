@@ -413,60 +413,48 @@ Output:
 
 <br/>
 
-## 🌐 Edge Client - Expose Your Local Agent to the Internet
+## 🌐 Edge Client — Expose Your Local Agent
 
-Make your locally running agent accessible on the internet **without deploying** - perfect for development, testing, and quick demos. The Bindu Edge Client creates a secure tunnel from your local machine to the internet using WebSocket connections.
+Expose your locally running agent to the internet **without deploying** it.
+The Edge Client creates a **temporary tunnel** to the Bindu Edge Gateway using a WebSocket connection.
 
-### 🎯 Use Cases
+---
 
-- **Quick Testing**: Share your local agent with others without deployment
-- **Development**: Test webhooks and integrations that require public URLs
-- **Demos**: Showcase your agent running on your local machine to clients
-- **Debugging**: Test your agent in a production-like environment
+### 🚀 Usage
 
-### 🚀 Quick Setup
+1. **Start your agent locally**
+   (default: `http://localhost:3773`)
 
-**Step 1: Create a Tunnel**
+2. **From your agent project root, run:**
 
-Visit [bindus.directory](https://bindus.directory) and:
-1. Log in to your account
-2. Navigate to the tunnels section
-3. Create a new tunnel
+   ```bash
+   uv run python -m bindu.edge_client
+   ```
 
-You'll receive:
-- **ws_url**: WebSocket URL for the tunnel connection
-- **token**: Authentication token for secure access
-- **public_url**: Your agent's public internet URL
+That’s it.
+A tunnel is created automatically and a **public URL** is printed in the terminal. You can use this URL to access your local agent from the internet.
 
-**Step 2: Configure Your Local Agent**
+**Note: This URL is temporary and works only while the Edge Client is running.
+When you stop or disconnect the client, the tunnel is destroyed and the URL becomes invalid.
+Starting the Edge Client again will create a new tunnel with a new public URL (the old one will not work).**
 
-Create an `edge.config.json` file in your project directory:
+---
 
-```json
-{
-  "ws_url": "your_ws_url",
-  "token": "your_tunnel_token",
-  "local_port": 3773
-}
-```
-
-> **Note:** `local_port` defaults to `3773` (Bindu's default port). Change this if your agent runs on a different port.
-
-**Step 3: Start the Edge Client**
-
-Make sure your agent is running locally, then start the edge client:
+### 🔧 Optional Flags
 
 ```bash
-uv run python -m bindu.edge_client
+uv run python -m bindu.edge_client [options]
 ```
 
-**That's it!** 🎉 Your agent is now accessible on the internet at the `public_url` provided during tunnel creation.
+* `--edge-url` – Edge gateway WebSocket URL
+  *(default: `wss://bindus.getbindu.com`)*
 
-### 🔒 Security
+* `--local-port` – Local agent port
+  *(default: `3773`)*
 
-- All connections are secured with token-based authentication
-- WebSocket connections use secure protocols
-- Only authorized requests are forwarded to your local agent
+* `--no-reconnect` – Disable auto-reconnect
+
+* `--debug` – Enable debug logs
 
 ---
 

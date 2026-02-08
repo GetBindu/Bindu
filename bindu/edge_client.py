@@ -3,11 +3,11 @@
 Connects to Bindu Edge Gateway and automatically establishes an ephemeral tunnel.
 
 Usage:
-  # Basic usage (by default connects to localhost:8000, forwards to localhost:3773):
+  # Basic usage (by default connects to bindus.getbindu.com, forwards to localhost:3773):
   uv run python -m bindu.edge_client
   
   # Custom edge server and local port:
-   uv run python -m bindu.edge_client --edge-url ws://localhost:8001 --local-port 3773
+   uv run python -m bindu.edge_client --edge-url wss://your-edge-server.com --local-port 8080
   
   # With debug logging:
   uv run python -m bindu.edge_client --debug
@@ -333,8 +333,8 @@ def _parse_args():
     )
     p.add_argument(
         "--edge-url",
-        default="ws://localhost:8000",
-        help="Edge gateway WebSocket URL (default: ws://localhost:8000)"
+        default="wss://bindus.getbindu.com",
+        help="Edge gateway WebSocket URL (default: wss://bindus.getbindu.com)"
     )
     p.add_argument(
         "--local-port",
