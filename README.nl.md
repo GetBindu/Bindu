@@ -372,6 +372,53 @@ Output:
 
 <br/>
 
+## 🌐 Edge Client — Stel je lokale Agent bloot
+
+Stel je lokaal draaiende agent bloot aan het internet **zonder deze te deployen**.
+De Edge Client creëert een **tijdelijke tunnel** naar de Bindu Edge Gateway via een WebSocket-verbinding.
+
+---
+
+### 🚀 Gebruik
+
+1. **Start je agent lokaal**
+   (standaard: `http://localhost:3773`)
+
+2. **Voer uit vanaf de hoofdmap van je agentproject:**
+
+   ```bash
+   uv run python -m bindu.edge_client
+   ```
+
+Dat is alles.
+Een tunnel wordt automatisch aangemaakt en een **openbare URL** wordt in de terminal afgedrukt. Je kunt deze URL gebruiken om vanaf het internet toegang te krijgen tot je lokale agent.
+
+**Opmerking: Deze URL is tijdelijk en werkt alleen zolang de Edge Client draait.
+Wanneer je de client stopt of verbreekt, wordt de tunnel vernietigd en wordt de URL ongeldig.
+Het opnieuw starten van de Edge Client zal een nieuwe tunnel met een nieuwe openbare URL creëren (de oude zal niet meer werken).**
+
+---
+
+### 🔧 Optionele flags
+
+```bash
+uv run python -m bindu.edge_client [opties]
+```
+
+* `--edge-url` – Edge Gateway WebSocket URL
+  *(standaard: `wss://bindus.getbindu.com`)*
+
+* `--local-port` – Lokale agentpoort
+  *(standaard: `3773`)*
+
+* `--no-reconnect` – Auto-reconnect uitschakelen
+
+* `--debug` – Debug logs inschakelen
+
+---
+
+<br/>
+
 ## [Postgres Storage](https://docs.getbindu.com/bindu/learn/storage/overview)
 
 Bindu gebruikt PostgreSQL als zijn persistente storage backend voor productie-implementaties. De storage layer is gebouwd met SQLAlchemy's async engine en gebruikt imperatieve mapping met protocol TypeDicts.

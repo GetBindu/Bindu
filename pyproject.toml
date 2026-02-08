@@ -57,6 +57,8 @@ dependencies = [
     "pyperclip==1.11.0",
     # Security
     "detect-secrets==1.5.0",
+    "httpx>=0.27.0",
+    "websockets>=11.0.3",
 ]
 
 [project.optional-dependencies]
