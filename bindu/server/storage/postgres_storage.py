@@ -25,10 +25,12 @@ Features:
 
 from __future__ import annotations as _annotations
 
+from contextlib import asynccontextmanager
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import delete, func, select, update, cast
+import sqlalchemy as sa
+from sqlalchemy import delete, func, select, text, update, cast
 from sqlalchemy.dialects.postgresql import insert, JSONB, JSON
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from typing_extensions import TypeVar
@@ -55,6 +57,7 @@ from .helpers import (
 )
 from .helpers.db_operations import get_current_utc_timestamp
 from .schema import (
+    agent_prompts_table,
     contexts_table,
     task_feedback_table,
     tasks_table,
@@ -218,18 +221,37 @@ class PostgresStorage(Storage[ContextT]):
                 "PostgreSQL engine not initialized. Call connect() first."
             )
 
-    def _get_session_with_schema(self):
-        """Create a session factory that will set search_path on connection.
+    @asynccontextmanager
+    async def _get_session_with_schema(self):
+        """Create a session and set search_path for the DID's schema.
 
         This ensures all queries within the session use the DID's schema
-        without needing to qualify table names.
+        without needing to qualify table names. The search_path is set
+        per-connection to avoid issues with connection pooling and reuse.
 
         Returns:
             AsyncSession context manager
         """
-        # Return the session factory directly - search_path will be set
-        # at the connection level via event listeners or within transactions
-        return self._session_factory()
+        try:
+            async with self._session_factory() as session:
+                # Set search_path for this session if we have a schema
+                if self.schema_name:
+                    sanitized_schema = sanitize_identifier(self.schema_name)
+                    # Execute SET statement - this will auto-begin a transaction
+                    await session.execute(
+                        text(f'SET search_path TO "{sanitized_schema}"')
+                    )
+                    # Commit the transaction from the SET command
+                    # This leaves the session clean for the caller to begin their own transaction
+                    await session.commit()
+                yield session
+        except Exception as e:
+            logger.error(
+                f"Database session error: {type(e).__name__}: {e}",
+                exc_info=True,
+                extra={"schema": self.schema_name if hasattr(self, 'schema_name') else None}
+            )
+            raise
 
     async def _retry_on_connection_error(self, func, *args, **kwargs):
         """Retry function on connection errors using Tenacity.
@@ -269,7 +291,7 @@ class PostgresStorage(Storage[ContextT]):
         Returns:
             Task TypedDict from protocol
         """
-        return Task(
+        task = Task(
             id=row.id,
             context_id=row.context_id,
             kind=row.kind,
@@ -280,6 +302,10 @@ class PostgresStorage(Storage[ContextT]):
             artifacts=row.artifacts or [],
             metadata=row.metadata or {},
         )
+        # Add prompt_id if present
+        if hasattr(row, 'prompt_id') and row.prompt_id is not None:
+            task["prompt_id"] = row.prompt_id
+        return task
 
     # -------------------------------------------------------------------------
     # Task Operations
@@ -431,6 +457,7 @@ class PostgresStorage(Storage[ContextT]):
         new_artifacts: list[Artifact] | None = None,
         new_messages: list[Message] | None = None,
         metadata: dict[str, Any] | None = None,
+        prompt_id: int | None = None,
     ) -> Task:
         """Update task state and append new content using SQLAlchemy.
 
@@ -440,6 +467,7 @@ class PostgresStorage(Storage[ContextT]):
             new_artifacts: Optional artifacts to append
             new_messages: Optional messages to append to history
             metadata: Optional metadata to update/merge
+            prompt_id: Optional prompt ID to associate with this task
 
         Returns:
             Updated task object
@@ -469,6 +497,9 @@ class PostgresStorage(Storage[ContextT]):
                         "state_timestamp": now,
                         "updated_at": now,
                     }
+
+                    if prompt_id is not None:
+                        update_values["prompt_id"] = prompt_id
 
                     if metadata:
                         serialized_metadata = serialize_for_jsonb(metadata)
@@ -876,6 +907,63 @@ class PostgresStorage(Storage[ContextT]):
 
         return await self._retry_on_connection_error(_get)
 
+    async def fetch_tasks_with_feedback(
+        self, limit: int | None = None
+    ) -> list[dict[str, Any]]:
+        """Fetch tasks with their associated feedback using LEFT JOIN.
+
+        This method is optimized for DSPy training data extraction, providing
+        task history along with feedback in a single efficient query.
+
+        Args:
+            limit: Maximum number of tasks to fetch (defaults to None for all tasks)
+
+        Returns:
+            List of dictionaries containing:
+                - id: Task UUID
+                - history: List of message dictionaries
+                - created_at: Task creation timestamp
+                - feedback_data: Optional feedback dictionary (None if no feedback)
+        """
+        self._ensure_connected()
+
+        async def _fetch():
+            async with self._get_session_with_schema() as session:
+                # Query tasks with LEFT JOIN to feedback
+                stmt = (
+                    select(
+                        tasks_table.c.id,
+                        tasks_table.c.history,
+                        tasks_table.c.created_at,
+                        task_feedback_table.c.feedback_data,
+                    )
+                    .select_from(
+                        tasks_table.outerjoin(
+                            task_feedback_table,
+                            tasks_table.c.id == task_feedback_table.c.task_id,
+                        )
+                    )
+                    .order_by(tasks_table.c.created_at.desc())
+                )
+
+                if limit is not None:
+                    stmt = stmt.limit(limit)
+
+                result = await session.execute(stmt)
+                rows = result.fetchall()
+
+                return [
+                    {
+                        "id": row.id,
+                        "history": row.history or [],
+                        "created_at": row.created_at,
+                        "feedback_data": row.feedback_data,
+                    }
+                    for row in rows
+                ]
+
+        return await self._retry_on_connection_error(_fetch)
+
     # -------------------------------------------------------------------------
     # Webhook Persistence Operations (for long-running tasks)
     # -------------------------------------------------------------------------
@@ -995,3 +1083,242 @@ class PostgresStorage(Storage[ContextT]):
                 return {row.task_id: row.config for row in rows}
 
         return await self._retry_on_connection_error(_load_all)
+    # -------------------------------------------------------------------------
+    # Prompt Management Operations (for DSPy A/B testing)
+    # -------------------------------------------------------------------------
+
+    async def get_active_prompt(self) -> dict[str, Any] | None:
+        """Get the current active prompt with calculated metrics.
+
+        Returns:
+            Dictionary containing prompt data (id, prompt_text, status, traffic,
+            num_interactions, average_feedback_score) or None if no active prompt exists.
+            num_interactions and average_feedback_score are calculated on-demand from tasks table.
+        """
+        self._ensure_connected()
+
+        async def _get():
+            async with self._get_session_with_schema() as session:
+                stmt = select(agent_prompts_table).where(
+                    agent_prompts_table.c.status == "active"
+                )
+                result = await session.execute(stmt)
+                row = result.fetchone()
+
+                if row:
+                    # Calculate metrics on-demand
+                    metrics = await self._calculate_prompt_metrics(row.id, session)
+                    
+                    return {
+                        "id": row.id,
+                        "prompt_text": row.prompt_text,
+                        "status": row.status,
+                        "traffic": float(row.traffic) if row.traffic is not None else 0.0,
+                        "num_interactions": metrics["num_interactions"],
+                        "average_feedback_score": metrics["average_feedback_score"],
+                    }
+
+                return None
+
+        return await self._retry_on_connection_error(_get)
+
+    async def get_candidate_prompt(self) -> dict[str, Any] | None:
+        """Get the current candidate prompt with calculated metrics.
+
+        Returns:
+            Dictionary containing prompt data (id, prompt_text, status, traffic,
+            num_interactions, average_feedback_score) or None if no candidate prompt exists.
+            num_interactions and average_feedback_score are calculated on-demand from tasks table.
+        """
+        self._ensure_connected()
+
+        async def _get():
+            async with self._get_session_with_schema() as session:
+                stmt = select(agent_prompts_table).where(
+                    agent_prompts_table.c.status == "candidate"
+                )
+                result = await session.execute(stmt)
+                row = result.fetchone()
+
+                if row:
+                    # Calculate metrics on-demand
+                    metrics = await self._calculate_prompt_metrics(row.id, session)
+                    
+                    return {
+                        "id": row.id,
+                        "prompt_text": row.prompt_text,
+                        "status": row.status,
+                        "traffic": float(row.traffic) if row.traffic is not None else 0.0,
+                        "num_interactions": metrics["num_interactions"],
+                        "average_feedback_score": metrics["average_feedback_score"],
+                    }
+
+                return None
+
+        return await self._retry_on_connection_error(_get)
+
+    async def insert_prompt(self, text: str, status: str, traffic: float) -> int:
+        """Insert a new prompt into the database.
+
+        Args:
+            text: The prompt text content
+            status: The prompt status (active, candidate, deprecated, rolled_back)
+            traffic: Traffic allocation (0.0 to 1.0)
+
+        Returns:
+            The ID of the newly inserted prompt
+
+        Raises:
+            ValueError: If traffic is not in range [0, 1]
+        """
+        if not 0 <= traffic <= 1:
+            raise ValueError(f"Traffic must be between 0 and 1, got {traffic}")
+
+        self._ensure_connected()
+
+        async def _insert():
+            async with self._get_session_with_schema() as session:
+                async with session.begin():
+                    stmt = agent_prompts_table.insert().values(
+                        prompt_text=text,
+                        status=status,
+                        traffic=traffic,
+                    ).returning(agent_prompts_table.c.id)
+
+                    result = await session.execute(stmt)
+                    prompt_id = result.scalar_one()
+                    logger.info(f"Inserted prompt {prompt_id} with status '{status}' and traffic {traffic}")
+                    return prompt_id
+
+        return await self._retry_on_connection_error(_insert)
+
+    async def update_prompt_traffic(self, prompt_id: int, traffic: float) -> None:
+        """Update the traffic allocation for a specific prompt.
+
+        Args:
+            prompt_id: The ID of the prompt to update
+            traffic: New traffic allocation (0.0 to 1.0)
+
+        Raises:
+            ValueError: If traffic is not in range [0, 1]
+        """
+        if not 0 <= traffic <= 1:
+            raise ValueError(f"Traffic must be between 0 and 1, got {traffic}")
+
+        self._ensure_connected()
+
+        async def _update():
+            async with self._get_session_with_schema() as session:
+                async with session.begin():
+                    stmt = (
+                        update(agent_prompts_table)
+                        .where(agent_prompts_table.c.id == prompt_id)
+                        .values(traffic=traffic)
+                    )
+
+                    await session.execute(stmt)
+                    logger.info(f"Updated traffic for prompt {prompt_id} to {traffic}")
+
+        await self._retry_on_connection_error(_update)
+
+    async def update_prompt_status(self, prompt_id: int, status: str) -> None:
+        """Update the status of a specific prompt.
+
+        Args:
+            prompt_id: The ID of the prompt to update
+            status: New status (active, candidate, deprecated, rolled_back)
+        """
+        self._ensure_connected()
+
+        async def _update():
+            async with self._get_session_with_schema() as session:
+                async with session.begin():
+                    stmt = (
+                        update(agent_prompts_table)
+                        .where(agent_prompts_table.c.id == prompt_id)
+                        .values(status=status)
+                    )
+
+                    await session.execute(stmt)
+                    logger.info(f"Updated status for prompt {prompt_id} to '{status}'")
+
+        await self._retry_on_connection_error(_update)
+
+    async def zero_out_all_except(self, prompt_ids: list[int]) -> None:
+        """Set traffic to 0 for all prompts except those in the given list.
+
+        Args:
+            prompt_ids: List of prompt IDs to preserve (keep their traffic unchanged)
+        """
+        self._ensure_connected()
+
+        async def _zero():
+            async with self._get_session_with_schema() as session:
+                async with session.begin():
+                    stmt = (
+                        update(agent_prompts_table)
+                        .where(agent_prompts_table.c.id.notin_(prompt_ids))
+                        .values(traffic=0)
+                    )
+
+                    result = await session.execute(stmt)
+                    logger.info(
+                        f"Zeroed out traffic for {result.rowcount} prompts "
+                        f"(preserving IDs: {prompt_ids})"
+                    )
+
+        await self._retry_on_connection_error(_zero)
+
+    async def _calculate_prompt_metrics(
+        self, prompt_id: int, session=None
+    ) -> dict[str, Any]:
+        """Calculate prompt metrics on-demand by querying tasks with this prompt_id.
+
+        Args:
+            prompt_id: ID of the prompt to calculate metrics for
+            session: Optional existing session to reuse
+
+        Returns:
+            Dictionary with:
+                - num_interactions: Total number of tasks that used this prompt
+                - average_feedback_score: Average normalized feedback score (0-1) or None
+        """
+        # Helper to execute the query
+        async def _calc(session):
+            # Join tasks with task_feedback to get feedback scores
+            # Count total tasks and calculate average feedback score
+            stmt = (
+                select(
+                    func.count(tasks_table.c.id).label("num_interactions"),
+                    func.avg(
+                        cast(
+                            func.jsonb_extract_path_text(
+                                task_feedback_table.c.feedback_data, "rating"
+                            ),
+                            sa.Numeric
+                        ) / 5.0  # Normalize 1-5 rating to 0-1
+                    ).label("average_feedback_score")
+                )
+                .select_from(
+                    tasks_table.outerjoin(
+                        task_feedback_table,
+                        tasks_table.c.id == task_feedback_table.c.task_id
+                    )
+                )
+                .where(tasks_table.c.prompt_id == prompt_id)
+            )
+            
+            result = await session.execute(stmt)
+            row = result.fetchone()
+            
+            return {
+                "num_interactions": row.num_interactions or 0,
+                "average_feedback_score": float(row.average_feedback_score) if row.average_feedback_score is not None else None,
+            }
+        
+        # Use provided session or create a new one
+        if session:
+            return await _calc(session)
+        else:
+            async with self._get_session_with_schema() as new_session:
+                return await _calc(new_session)

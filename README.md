@@ -973,40 +973,49 @@ config = {
 
 <br/>
 
-## Task Feedback and DSPy
+## [DSPy Integration](https://docs.getbindu.com/bindu/learn/dspy/overview)
 
-Bindu collects user feedback on task executions to enable continuous improvement through DSPy optimization. By storing feedback with ratings and metadata, you can build golden datasets from real interactions and use DSPy to automatically optimize your agent's prompts and behavior.
+> Automated prompt optimization and continuous improvement through machine learning
 
-### Submitting Feedback
+Bindu's DSPy integration provides automated prompt optimization and A/B testing for AI agents. Instead of manually tweaking prompts, DSPy uses machine learning to optimize prompts based on real user interactions and feedback, creating a continuous improvement loop.
 
-Provide feedback on any task using the `tasks/feedback` method:
+Its Optional - Requires PostgreSQL storage and is enabled via agent config.
 
-```bash
-curl --location 'http://localhost:3773/' \
---header 'Content-Type: application/json' \
---header 'Authorization: Bearer <your-token>' \
---data '{
-    "jsonrpc": "2.0",
-    "method": "tasks/feedback",
-    "params": {
-        "taskId": "550e8400-e29b-41d4-a716-446655440200",
-        "feedback": "Great job! The response was very helpful and accurate.",
-        "rating": 5,
-        "metadata": {
-            "category": "quality",
-            "source": "user",
-            "helpful": true
-        }
-    },
-    "id": "550e8400-e29b-41d4-a716-446655440024"
-}'
+### ⚙️ Configuration
+
+<details>
+<summary><b>View configuration example</b> (click to expand)</summary>
+
+Enable DSPy in your agent config:
+
+```python
+config = {
+    "author": "your.email@example.com",
+    "name": "research_agent",
+    "description": "A research assistant with continuous improvement",
+    "deployment": {"url": "http://localhost:3773", "expose": True},
+    "enable_dspy": True,  # ← Enable DSPy optimization
+}
 ```
 
-Feedback is stored in the `task_feedback` table and can be used to:
-- Filter high-quality task interactions for training data
-- Identify patterns in successful vs. unsuccessful completions
-- Optimize agent instructions and few-shot examples with DSPy
-- We are working on the DsPY - will release soon.
+Configure via environment variables:
+
+```bash
+# Required: PostgreSQL connection
+STORAGE_TYPE=postgres
+DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/bindu
+
+# OpenRouter API key for training
+OPENROUTER_API_KEY=your_openrouter_api_key
+
+# See examples/.env.example for complete configuration
+```
+
+</details>
+
+When enabled, system prompts are loaded from the database with automatic A/B testing, allowing gradual rollout of optimized prompts based on user feedback.
+
+> 📚 For complete DSPy documentation, training, and canary deployment, see [bindu/dspy/README.md](bindu/dspy/README.md)
 
 ---
 
