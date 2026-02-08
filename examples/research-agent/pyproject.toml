@@ -1,0 +1,126 @@
+[project]
+name = "research-agent"
+version = "0.1.0"
+description = "Research Agent using Agno framework"
+authors = [{ name = "Paras Chamoli", email = "paras25619@gmail.com" }]
+readme = "README.md"
+keywords = ['python']
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "bindu==2026.1.12",
+    "agno>=2.2.0",
+    "fastmcp>=2.11.0",
+    "requests>=2.31.0",
+    "pyperclip>=1.8.0",
+    "rich>=13.0.0",
+    "openai>=2.11.0",
+    "sqlalchemy>=2.0.45",
+    "mem0ai>=1.0.1",
+    "ddgs>=9.9.3",
+    "newspaper4k>=0.1.1",
+    "lxml_html_clean>=0.1.0",
+    "arxiv>=2.4.0",
+    "pypdf>=6.6.0",
+]
+classifiers = [
+    "Intended Audience :: Developers",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[project.urls]
+Repository = "https://github.com/Paraschamoli/research-agent"
+Homepage = "https://github.com/Paraschamoli/research-agent"
+Documentation = "https://github.com/Paraschamoli/research-agent#readme"
+
+
+[dependency-groups]
+dev = [
+    "pytest>=7.2.0",
+    "pytest-asyncio>=0.23.0",
+    "pre-commit>=2.20.0",
+    "tox-uv>=1.11.3",
+    "ty>=0.0.1a16",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.11.5",
+    "mkdocs>=1.4.2",
+    "mkdocs-material>=8.5.10",
+    "mkdocstrings[python]>=0.26.1",
+    "types-requests>=2.31.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["research_agent"]
+
+[tool.ty.environment]
+python = "./.venv"
+python-version = "3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+fix = true
+
+[tool.ruff.lint]
+select = [
+    # flake8-2020
+    "YTT",
+    # flake8-bandit
+    "S",
+    # flake8-bugbear
+    "B",
+    # flake8-builtins
+    "A",
+    # flake8-comprehensions
+    "C4",
+    # flake8-debugger
+    "T10",
+    # flake8-simplify
+    "SIM",
+    # isort
+    "I",
+    # mccabe
+    "C90",
+    # pycodestyle
+    "E", "W",
+    # pyflakes
+    "F",
+    # pygrep-hooks
+    "PGH",
+    # pyupgrade
+    "UP",
+    # ruff
+    "RUF",
+    # tryceratops
+    "TRY",
+]
+ignore = [
+    # LineTooLong
+    "E501",
+    # DoNotAssignLambda
+    "E731",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]
+
+[tool.ruff.format]
+preview = true
+
+[tool.coverage.report]
+skip_empty = true
+
+[tool.coverage.run]
+branch = true
+source = ["research_agent"]

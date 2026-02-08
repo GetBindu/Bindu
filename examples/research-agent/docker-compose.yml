@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  research-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.agent
+    container_name: research_agent
+    ports:
+      - "3773:3773"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+    env_file:
+      - .env
+    volumes:
+      - ./research_agent:/app/research_agent
+      - ./agent_config.json:/app/agent_config.json
+    restart: unless-stopped
+    networks:
+      - research-agent-network
+
+networks:
+  research-agent-network:
+    driver: bridge

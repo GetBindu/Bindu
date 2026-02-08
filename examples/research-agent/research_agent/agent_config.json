@@ -1,0 +1,47 @@
+{
+  "author": "paras25619@gmail.com",
+  "name": "research-agent",
+  "description": "AI research agent that combines web search with professional journalism to perform comprehensive research, fact-check information, and deliver well-structured NYT-style articles.",
+  "version": "1.0.0",
+  "recreate_keys": false,
+  "skills": [
+    "skills/research-agent"
+  ],
+  "capabilities": {},
+  "agent_trust": "low",
+  "debug_mode": true,
+  "debug_level": 2,
+  "deployment": {
+    "url": "http://0.0.0.0:3773",
+    "expose": true,
+    "protocol_version": "1.0.0",
+    "proxy_urls": [
+      "0.0.0.0"
+    ],
+   "cors": {
+      "allow_origins": ["http://localhost:5173", "http://127.0.0.1:5173"],
+      "allow_credentials": true,
+      "allow_methods": ["GET", "POST", "OPTIONS"],
+      "allow_headers": ["*"]
+    }
+  },
+  "storage": {
+    "type": "memory"
+  },
+  "scheduler": {
+    "type": "memory"
+  },
+  "num_history_sessions": 5,
+  "environment_variables": [
+    {
+      "key": "OPENROUTER_API_KEY",
+      "description": "OpenRouter API key for LLM calls",
+      "required": true
+    },
+    {
+      "key": "MEM0_API_KEY",
+      "description": "Mem0 API key for memory operations",
+      "required": false
+    }
+  ]
+}

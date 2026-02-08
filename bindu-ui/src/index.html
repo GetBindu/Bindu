@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bindu Agent Chat</title>
+    <link rel="stylesheet" href="./styles/main.css">
+    <link rel="stylesheet" href="./styles/components.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <button id="menu-toggle" class="menu-toggle" title="Toggle menu">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+                <div class="logo">
+                    <h1>Bindu 🌻</h1>
+                </div>
+                <div class="agent-info">
+                    <span id="agent-name">Loading...</span>
+                    <span id="agent-status" class="status-dot online"></span>
+                </div>
+            </div>
+            <div class="header-right">
+                <button id="info-btn" class="icon-btn" title="Agent Info" onclick="window.binduUI.showInfoModal()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                    </svg>
+                </button>
+                <button id="theme-toggle" class="icon-btn" title="Toggle theme">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+                <button id="settings-btn" class="icon-btn" title="Settings">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="m12 1 1.27 2.22L16 2l.78 1.63L19 4l-.27 1.55L20 7l-1.27 1.27L20 10l-1.22.78L18 13l-1.55-.27L15 14l-1.27-1.27L12 14l-.78-1.22L9 12l.27-1.55L8 9l1.27-1.27L8 6l1.22-.78L10 3l1.55.27L13 2l1.27 1.27z"></path>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Layout -->
+        <div class="main-container">
+            <!-- Sidebar -->
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-header">
+                    <h2>Conversations</h2>
+                    <button id="new-chat-btn" class="btn-primary">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        New Chat
+                    </button>
+                </div>
+                <div class="conversations-list" id="conversations-list">
+                    <div class="loading">Loading conversations...</div>
+                </div>
+            </aside>
+
+            <!-- Chat Area -->
+            <main class="chat-area">
+                <div class="tab-content">
+                    <!-- Chat Tab -->
+                    <div class="tab-pane active" id="chat-tab">
+                        <div class="chat-container">
+                            <div class="chat-messages" id="chat-messages">
+                                <div class="welcome-message">
+                                    <h2>Welcome to Bindu Agent Chat</h2>
+                                    <p>Start a conversation with your AI agent. Select an existing conversation from the sidebar or create a new one.</p>
+                                    <div class="example-prompts">
+                                        <h3>Try these examples:</h3>
+                                        <div class="prompt-card" data-prompt="Hello! Can you introduce yourself?">
+                                            <h4>👋 Introduction</h4>
+                                            <p>Hello! Can you introduce yourself?</p>
+                                        </div>
+                                        <div class="prompt-card" data-prompt="What can you help me with?">
+                                            <h4>🔍 Capabilities</h4>
+                                            <p>What can you help me with?</p>
+                                        </div>
+                                        <div class="prompt-card" data-prompt="Show me your skills and abilities">
+                                            <h4>⚡ Skills</h4>
+                                            <p>Show me your skills and abilities</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Input Area -->
+                            <div class="input-container">
+                                <div id="reply-indicator" class="reply-indicator">
+                                    <span id="reply-text">💬 Replying to previous message</span>
+                                    <button id="cancel-reply" class="cancel-reply-btn" title="Cancel reply">×</button>
+                                </div>
+                                <div class="input-wrapper">
+                                    <textarea 
+                                        id="message-input" 
+                                        placeholder="Type your message..." 
+                                        rows="1"
+                                        maxlength="4000"
+                                    ></textarea>
+                                    <button id="send-btn" class="send-btn" disabled>
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                                            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                                <div class="input-info">
+                                    <span id="char-count">0 / 4000</span>
+                                    <span class="shortcuts">Press Enter to send, Shift+Enter for new line</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settings-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Settings</h3>
+                    <button class="modal-close" id="close-settings">&times;</button>
+                </div>
+                <div class="modal-body" id="settings-modal-body">
+                    <div class="setting-group">
+                        <label for="agent-url">Agent URL:</label>
+                        <input type="text" id="agent-url" value="/api" />
+                    </div>
+                    <div class="setting-group">
+                        <label for="auth-token">Auth Token (optional):</label>
+                        <input type="password" id="auth-token" placeholder="Enter JWT token" />
+                    </div>
+                    <div class="setting-group">
+                        <label>
+                            <input type="checkbox" id="auto-scroll" checked />
+                            Auto-scroll to latest message
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" id="cancel-settings">Cancel</button>
+                    <button class="btn-primary" id="save-settings">Save</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info Modal -->
+        <div id="info-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Agent Information</h3>
+                    <button class="modal-close" id="close-info">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="info-modal-content">
+                        <div class="loading">Loading agent information...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="loading-overlay hidden">
+            <div class="loading-spinner"></div>
+            <span>Connecting to agent...</span>
+        </div>
+
+        <!-- Skill Details Modal -->
+        <div id="skill-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Skill Details</h3>
+                    <button class="modal-close" onclick="if(window.Modal) Modal.hide('skill-modal')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <!-- Content will be populated dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Feedback Modal -->
+        <div id="feedback-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Rate this Response</h3>
+                    <span class="modal-close" onclick="window.binduUI.closeFeedbackModal()">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>For:</label>
+                        <div id="feedback-message-preview" class="message-preview-display"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="feedback-rating">Rating (1-5):</label>
+                        <select id="feedback-rating" class="form-control">
+                            <option value="5">⭐⭐⭐⭐⭐ Excellent</option>
+                            <option value="4">⭐⭐⭐⭐ Good</option>
+                            <option value="3">⭐⭐⭐ Average</option>
+                            <option value="2">⭐⭐ Poor</option>
+                            <option value="1">⭐ Very Poor</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="feedback-text">Feedback <span style="color: #999; font-weight: normal;">(optional)</span>:</label>
+                        <textarea
+                            id="feedback-text"
+                            class="form-control"
+                            rows="4"
+                            placeholder="Share your thoughts (optional)..."
+                        ></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary" onclick="window.binduUI.closeFeedbackModal()">Cancel</button>
+                    <button class="btn-primary" onclick="window.binduUI.submitFeedback()">Submit Feedback</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>

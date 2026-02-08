@@ -1,0 +1,384 @@
+# Research and Investigative Journalism Skill
+# AI-powered investigative journalism assistant combining web search with professional reporting
+
+# Basic Metadata
+id: research-agent-v1
+name: research-agent
+version: 1.0.0
+author: paras25619@gmail.com
+
+# Description
+description: |
+  An AI-powered investigative journalism assistant that combines real-time web search
+  with professional reporting techniques. This skill enables deep research, fact-checking,
+  and NYT-style report generation on any topic. It searches across multiple sources,
+  analyzes content, and provides comprehensive, well-structured research reports.
+
+# Tags and Modes
+tags:
+  - research
+  - investigative-journalism
+  - fact-checking
+  - web-search
+  - article-analysis
+  - reporting
+  - data-analysis
+  - ny-times-style
+
+input_modes:
+  - text/plain
+  - application/json
+
+output_modes:
+  - text/plain
+  - application/json
+  - text/markdown
+
+# Example Queries
+examples:
+  - "Research the impact of artificial intelligence on healthcare diagnostics in the last 5 years"
+  - "Investigate the economic consequences of climate change policies in European countries"
+  - "Analyze recent developments in quantum computing and their potential applications"
+  - "What are the ethical implications of CRISPR gene editing in human embryos?"
+  - "Compare renewable energy adoption rates in Germany, China, and the United States"
+
+# Detailed Capabilities
+capabilities_detail:
+  research_depth:
+    supported: true
+    levels:
+      - quick_overview
+      - comprehensive_analysis
+      - deep_investigation
+    sources:
+      - web_search
+      - news_articles
+      - academic_papers
+      - government_reports
+    time_frame: "current_and_historical"
+
+  fact_checking:
+    supported: true
+    methods:
+      - source_cross_referencing
+      - credibility_assessment
+      - claim_verification
+    confidence_scoring: true
+
+  report_generation:
+    supported: true
+    styles:
+      - nytimes_investigative
+      - academic_paper
+      - executive_summary
+      - detailed_analysis
+    sections:
+      - executive_summary
+      - methodology
+      - findings
+      - analysis
+      - conclusions
+      - references
+
+  source_analysis:
+    supported: true
+    analysis_types:
+      - bias_detection
+      - credibility_scoring
+      - relevance_assessment
+      - recency_validation
+
+# Requirements
+requirements:
+  packages:
+    - agno>=2.2.0
+    - bindu>=2026.1.7
+    - duckduckgo-search>=7.1.0
+    - newspaper4k>=0.1.1
+    - openai>=1.60.0
+    - python-dotenv>=1.0.1
+  system: []
+  min_memory_mb: 512
+  external_services:
+    - DuckDuckGo Search API
+    - OpenAI API or OpenRouter API
+
+# Performance Metrics
+performance:
+  avg_processing_time_ms: 3000
+  avg_time_per_source_ms: 500
+  max_concurrent_requests: 5
+  memory_per_request_mb: 512
+  timeout_seconds: 120
+  max_sources_per_query: 20
+  scalability: horizontal
+
+# Tool Restrictions
+allowed_tools:
+  - DuckDuckGoTools
+  - Newspaper4kTools
+  - Read
+  - Search
+  - Analyze
+  - Generate
+
+# Rich Documentation
+documentation:
+  overview: |
+    This agent specializes in investigative journalism and research, combining real-time
+    web search with professional reporting techniques. It can conduct deep research on
+    any topic, fact-check information, analyze sources for credibility, and generate
+    comprehensive, well-structured reports in various journalistic styles.
+
+    The agent excels at breaking down complex topics, providing balanced perspectives,
+    and delivering insights backed by multiple credible sources.
+
+  use_cases:
+    when_to_use:
+      - User asks for research on a complex topic
+      - User needs fact-checking on claims or information
+      - User requests investigative analysis of an issue
+      - User wants a comprehensive report with multiple sources
+      - User needs current information with historical context
+      - User asks for comparative analysis between entities/regions
+
+    when_not_to_use:
+      - Simple Q&A without research requirement (use general assistant)
+      - Mathematical calculations (use calculator agent)
+      - Code generation or debugging (use programming agent)
+      - Personal advice or opinion-based responses
+      - Real-time events requiring live updates (use news agent)
+      - Highly specialized scientific research (use domain-specific agents)
+
+  input_structure: |
+    Accepts research queries with optional specifications:
+
+    {
+      "query": "Research topic or question",
+      "depth": "quick|comprehensive|deep",
+      "style": "nytimes|academic|executive|detailed",
+      "sources": 5,
+      "time_frame": "last_year|last_5_years|all_time",
+      "focus_areas": ["technology", "policy", "economics"],
+      "exclude_sources": ["specific_domains"]
+    }
+
+    Query constraints:
+    - Max query length: 500 characters
+    - Max sources per query: 20
+    - Timeout: 120 seconds
+    - Language: English primary, other languages with reduced capability
+
+  output_format: |
+    Standard Research Report:
+    {
+      "success": true,
+      "report": {
+        "title": "Generated report title",
+        "executive_summary": "Brief overview of findings...",
+        "methodology": "Search strategy and sources used...",
+        "findings": [
+          {
+            "key_finding": "Main finding 1",
+            "supporting_evidence": ["Source 1 summary", "Source 2 summary"],
+            "confidence": 0.95
+          }
+        ],
+        "analysis": "Detailed analysis connecting findings...",
+        "conclusions": "Key conclusions and implications...",
+        "recommendations": "Suggested next steps or areas for further research"
+      },
+      "sources": [
+        {
+          "url": "source_url",
+          "title": "article_title",
+          "credibility_score": 0.8,
+          "relevance_score": 0.9,
+          "summary": "Key points from source"
+        }
+      ],
+      "metadata": {
+        "query": "original_query",
+        "processing_time_ms": 4500,
+        "sources_analyzed": 12,
+        "sources_used": 8,
+        "confidence_score": 0.88,
+        "depth_level": "comprehensive"
+      }
+    }
+
+    Fact-Checking Report:
+    {
+      "success": true,
+      "claim": "Original claim to verify",
+      "verdict": "true|false|partially_true|unverified",
+      "confidence": 0.92,
+      "evidence": [
+        {
+          "source": "credible_source_url",
+          "support": "supports|contradicts|neutral",
+          "summary": "How this source relates to the claim"
+        }
+      ],
+      "detailed_analysis": "Explanation of verification process...",
+      "metadata": {
+        "processing_time_ms": 3200,
+        "sources_checked": 7
+      }
+    }
+
+  error_handling:
+    - "No sources found: Returns informative message with search strategy attempted"
+    - "Conflicting information: Presents balanced view with source credibility assessment"
+    - "Complex query timeout: Returns partial results with completion percentage"
+    - "API rate limits: Queues requests or suggests simpler queries"
+    - "Unclear query: Asks for clarification or provides scope suggestions"
+    - "Sensitive topics: Handles with appropriate disclaimers and balanced reporting"
+
+  examples:
+    - title: "AI in Healthcare Research"
+      input:
+        query: "Research the impact of artificial intelligence on healthcare diagnostics in the last 5 years"
+        depth: "comprehensive"
+        style: "academic"
+        sources: 10
+      output:
+        success: true
+        report:
+          title: "The Transformative Impact of AI on Healthcare Diagnostics: 2019-2024"
+          executive_summary: "AI has revolutionized healthcare diagnostics through..."
+          findings: [...]
+        sources: [...]
+        metadata:
+          processing_time_ms: 7800
+          sources_analyzed: 15
+          confidence_score: 0.91
+
+    - title: "Climate Policy Economic Analysis"
+      input:
+        query: "Investigate the economic consequences of climate change policies in European countries"
+        depth: "deep"
+        style: "nytimes"
+        time_frame: "last_10_years"
+      output:
+        success: true
+        report:
+          title: "Balancing Green Goals and Economic Growth: Europe's Climate Policy Challenge"
+          executive_summary: "European climate policies have created both opportunities and challenges..."
+          findings: [...]
+        sources: [...]
+        metadata:
+          processing_time_ms: 12500
+          sources_analyzed: 22
+
+    - title: "CRISPR Ethics Fact Check"
+      input:
+        query: "What are the ethical implications of CRISPR gene editing in human embryos?"
+        depth: "comprehensive"
+        style: "detailed"
+      output:
+        success: true
+        report:
+          title: "Ethical Frontiers: CRISPR Gene Editing in Human Embryos"
+          executive_summary: "CRISPR technology presents profound ethical questions around..."
+          findings: [...]
+        sources: [...]
+        metadata:
+          processing_time_ms: 6500
+          sources_analyzed: 18
+
+  best_practices:
+    for_developers:
+      - "Specify depth level to control research intensity (quick/comprehensive/deep)"
+      - "Use style parameter to match output to use case (nytimes/academic/executive)"
+      - "Set reasonable source limits based on query complexity"
+      - "Handle conflicting information by assessing source credibility"
+      - "Cache frequent queries to improve performance"
+      - "Monitor API usage and implement rate limiting"
+
+    for_orchestrators:
+      - "Route research-intensive queries to this agent"
+      - "Chain with summary agents for executive briefings"
+      - "Consider query complexity for timeout settings"
+      - "Balance between depth and response time based on user needs"
+      - "Use confidence scores for quality assurance"
+      - "Implement fallback to simpler research for time-sensitive queries"
+      - "Monitor source diversity to avoid bias"
+
+  installation: |
+    Required packages:
+    pip install agno bindu duckduckgo-search newspaper4k openai python-dotenv
+
+    Environment variables:
+    OPENAI_API_KEY=your_openai_api_key
+    OPENROUTER_API_KEY=your_openrouter_api_key  # Alternative to OpenAI
+
+    For web search capabilities:
+    # No additional system dependencies required
+    # Uses DuckDuckGo search via API
+
+  versioning:
+    - version: "1.0.0"
+      date: "2026-01-11"
+      changes: "Initial release with web search, fact-checking, and report generation"
+    - version: "1.1.0"
+      status: "planned"
+      changes: "Add academic database integration and citation management"
+    - version: "1.2.0"
+      status: "planned"
+      changes: "Enhanced bias detection and multi-language research support"
+
+# Assessment fields for skill negotiation
+assessment:
+  keywords:
+    - research
+    - investigate
+    - journalism
+    - fact-check
+    - factcheck
+    - analysis
+    - report
+    - investigative
+    - search
+    - sources
+    - evidence
+    - verify
+    - verification
+
+  specializations:
+    - domain: technology_research
+      confidence_boost: 0.3
+    - domain: policy_analysis
+      confidence_boost: 0.3
+    - domain: scientific_research
+      confidence_boost: 0.2
+    - domain: business_analysis
+      confidence_boost: 0.2
+
+  anti_patterns:
+    - "simple question"
+    - "basic answer"
+    - "opinion"
+    - "personal advice"
+    - "mathematical calculation"
+    - "code generation"
+    - "real-time events"
+    - "live updates"
+
+  complexity_indicators:
+    simple:
+      - "quick overview"
+      - "basic facts"
+      - "definition"
+      - "simple explanation"
+    medium:
+      - "research topic"
+      - "compare options"
+      - "analyze issue"
+      - "multiple sources"
+    complex:
+      - "investigate claims"
+      - "comprehensive report"
+      - "deep research"
+      - "fact checking"
+      - "conflicting information"
