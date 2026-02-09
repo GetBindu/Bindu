@@ -14,7 +14,12 @@ let contextId = null;
 let replyToTaskId = null;  // Explicit reply target (set by clicking agent message)
 let taskHistory = [];
 let contexts = [];
-const BASE_URL = window.location.origin;
+
+// Extract base path from current URL path
+// This supports both direct access and reverse proxy/tunnel scenarios:
+// - Direct: /docs → '' (empty, uses relative paths from root)
+// - Tunneled: /local_tunnel/slug/docs → '/local_tunnel/slug'
+const BASE_URL = window.location.pathname.replace(/\/docs$/, '');
 
 // Authentication State
 let authToken = localStorage.getItem('bindu_auth_token') || null;
