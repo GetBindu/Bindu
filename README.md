@@ -80,7 +80,7 @@ This is the easiest way to run Bindu without OpenAI billing.
 
    **PowerShell (Windows):**
    ```powershell
-   $env:OPENROUTER_API_KEY="your_key_here"
+   $env:OPENROUTER_API_KEY="your_key_here"  # pragma: allowlist secret
 
 
 ### Verify Your Setup

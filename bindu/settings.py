@@ -123,6 +123,31 @@ class NetworkSettings(BaseSettings):
         return f"http://{self.default_host}:{self.default_port}"
 
 
+class TunnelSettings(BaseSettings):
+    """FRP tunnel configuration settings."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="TUNNEL__",
+        extra="allow",
+    )
+
+    # Tunnel timeout (seconds)
+    timeout_seconds: int = 30
+
+    # Error message for tunnel failures
+    error_message: str = (
+        "Could not create tunnel. Please check the logs below for more information:"
+    )
+
+    # Default FRP server configuration
+    default_server_address: str = "142.132.241.44:7000"
+    default_tunnel_domain: str = "tunnel.getbindu.com"
+
+    # FRP client version
+    frpc_version: str = "0.61.0"
+
+
 class DeploymentSettings(BaseSettings):
     """Deployment and server configuration settings."""
 
@@ -918,6 +943,7 @@ class Settings(BaseSettings):
     project: ProjectSettings = ProjectSettings()
     did: DIDSettings = DIDSettings()
     network: NetworkSettings = NetworkSettings()
+    tunnel: TunnelSettings = TunnelSettings()
     deployment: DeploymentSettings = DeploymentSettings()
     logging: LoggingSettings = LoggingSettings()
     observability: ObservabilitySettings = ObservabilitySettings()

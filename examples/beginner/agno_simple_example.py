@@ -51,4 +51,7 @@ def handler(messages: list[dict[str, str]]):
 
 
 # Bindu-fy it
-bindufy(config, handler)
+bindufy(config, handler, launch=True)
+
+# To make your agent publicly accessible via tunnel, add launch=True:
+# bindufy(config, handler, launch=True)

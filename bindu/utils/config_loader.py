@@ -105,6 +105,53 @@ def create_scheduler_config_from_env(user_config: Dict[str, Any]):
     )
 
 
+def create_tunnel_config_from_env(user_config: Dict[str, Any]):
+    """Create TunnelConfig from environment variables and user config.
+
+    Args:
+        user_config: User-provided configuration dictionary
+
+    Returns:
+        TunnelConfig instance or None if not configured
+    """
+    from bindu.tunneling.config import TunnelConfig
+
+    # Check if user already provided tunnel config
+    if "tunnel" in user_config:
+        tunnel_dict = user_config["tunnel"]
+        return TunnelConfig(
+            enabled=tunnel_dict.get("enabled", False),
+            server_address=tunnel_dict.get("server_address", "142.132.241.44:7000"),
+            subdomain=tunnel_dict.get("subdomain"),
+            tunnel_domain=tunnel_dict.get("tunnel_domain", "tunnel.getbindu.com"),
+            protocol=tunnel_dict.get("protocol", "http"),
+            use_tls=tunnel_dict.get("use_tls", False),
+            local_host=tunnel_dict.get("local_host", "127.0.0.1"),
+        )
+
+    # Load from environment
+    tunnel_enabled = os.getenv("TUNNEL_ENABLED", "false").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+
+    if not tunnel_enabled:
+        return None
+
+    logger.debug("Tunnel enabled from environment")
+
+    return TunnelConfig(
+        enabled=True,
+        server_address=os.getenv("TUNNEL_SERVER_ADDRESS", "142.132.241.44:7000"),
+        subdomain=os.getenv("TUNNEL_SUBDOMAIN"),
+        tunnel_domain=os.getenv("TUNNEL_DOMAIN", "tunnel.getbindu.com"),
+        protocol=os.getenv("TUNNEL_PROTOCOL", "http"),
+        use_tls=os.getenv("TUNNEL_USE_TLS", "false").lower() in ("true", "1", "yes"),
+        local_host=os.getenv("TUNNEL_LOCAL_HOST", "127.0.0.1"),
+    )
+
+
 def create_sentry_config_from_env(user_config: Dict[str, Any]):
     """Create SentryConfig from environment variables and user config.
 

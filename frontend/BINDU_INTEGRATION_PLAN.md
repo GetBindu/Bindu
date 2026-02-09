@@ -167,7 +167,7 @@ return {
 // Convert chat-ui messages to Bindu format
 function chatUIToBindu(messages: Message[], convId: string): BinduRequest {
   const lastUserMessage = messages.filter(m => m.from === "user").pop();
-  
+
   return {
     jsonrpc: "2.0",
     method: "message/send",
@@ -217,7 +217,7 @@ async function* binduToTextGenerationStream(
   response: BinduResponse
 ): AsyncGenerator<TextGenerationStreamOutput> {
   const task = response.result.task;
-  
+
   for (const artifact of task.artifacts) {
     if (artifact.kind === "text") {
       // Emit the text as a single token (or chunk it)
@@ -302,12 +302,12 @@ async function* binduStreamToTextGeneration(
 4. **Update `src/lib/server/endpoints/endpoints.ts`**
    ```typescript
    import { endpointBindu, endpointBinduParametersSchema } from "./bindu/endpointBindu";
-   
+
    export const endpoints = {
      openai: endpointOai,
      bindu: endpointBindu,  // Add this
    };
-   
+
    export const endpointSchema = z.discriminatedUnion("type", [
      endpointOAIParametersSchema,
      endpointBinduParametersSchema,  // Add this

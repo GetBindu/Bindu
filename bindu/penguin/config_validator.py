@@ -8,6 +8,7 @@ ensuring they meet the required schema and have proper defaults.
 import os
 from typing import Any, Dict
 
+from bindu import __version__
 from bindu.common.protocol.types import AgentCapabilities, Skill
 
 
@@ -18,7 +19,7 @@ class ConfigValidator:
     DEFAULTS = {
         "name": "bindu-agent",
         "description": "A Bindu agent",
-        "version": "1.0.0",
+        "version": __version__,
         "recreate_keys": True,
         "skills": [],
         "capabilities": {},

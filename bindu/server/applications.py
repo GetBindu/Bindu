@@ -179,6 +179,15 @@ class BinduApplication(Starlette):
             ["HEAD", "GET", "OPTIONS"],
             with_app=True,
         )
+
+        # Root endpoint - redirect GET to agent card, POST for A2A protocol
+        from starlette.responses import RedirectResponse
+
+        async def root_redirect(app: BinduApplication, request: Request) -> Response:
+            """Redirect root GET requests to agent card."""
+            return RedirectResponse(url="/.well-known/agent.json", status_code=302)
+
+        self._add_route("/", root_redirect, ["GET"], with_app=True)
         self._add_route("/", agent_run_endpoint, ["POST"], with_app=True)
 
         # DID endpoints

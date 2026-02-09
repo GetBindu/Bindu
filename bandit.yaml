@@ -19,6 +19,7 @@ exclude_dirs:
   - /.tox/
   - /build/
   - /dist/
+  - /examples/*
 
 # Severity level: low, medium, high
 # Confidence level: low, medium, high

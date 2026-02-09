@@ -104,6 +104,7 @@ def bindufy(
     handler: Callable[[list[dict[str, str]]], Any],
     run_server: bool = True,
     key_dir: str | Path | None = None,
+    launch: bool = False,
 ) -> AgentManifest:
     """Transform an agent instance and handler into a bindu-compatible agent.
 
@@ -138,6 +139,8 @@ def bindufy(
                    immediately for testing/programmatic usage (default: True)
         key_dir: Directory for storing DID keys. If None, attempts to detect from caller's
                 directory (may fail in REPL/notebooks). Falls back to current working directory.
+        launch: If True, creates a public tunnel via FRP to expose the server to the internet
+               with an auto-generated subdomain (default: False)
 
     Returns:
         AgentManifest: The manifest for the bindufied agent
@@ -174,6 +177,13 @@ def bindufy(
     scheduler_config = create_scheduler_config_from_env(validated_config)
     sentry_config = create_sentry_config_from_env(validated_config)
     auth_config = create_auth_config_from_env(validated_config)
+
+    # Create tunnel config only if launch parameter is True
+    tunnel_config = None
+    if launch:
+        from bindu.tunneling.config import TunnelConfig
+
+        tunnel_config = TunnelConfig(enabled=True)
 
     # Update app_settings.auth based on config
     if auth_config is not None:
@@ -376,6 +386,39 @@ def bindufy(
     # Parse deployment URL
     host, port = _parse_deployment_url(deployment_config)
 
+    # Create tunnel if enabled
+    tunnel_url = None
+    tunnel_manager = None
+    if tunnel_config and tunnel_config.enabled:
+        from bindu.tunneling.manager import TunnelManager
+
+        logger.info("Tunnel enabled, creating public URL...")
+        tunnel_manager = TunnelManager()
+        tunnel_config.local_port = port
+
+        try:
+            tunnel_url = tunnel_manager.create_tunnel(
+                local_port=port,
+                config=tunnel_config,
+                subdomain=tunnel_config.subdomain,
+            )
+            logger.info(f"✅ Tunnel created: {tunnel_url}")
+
+            # Update manifest URL to use tunnel URL
+            _manifest.url = tunnel_url
+
+            # Update BinduApplication URL to use tunnel URL
+            bindu_app.url = tunnel_url
+
+            # Invalidate cached agent card so it gets regenerated with new URL
+            bindu_app._agent_card_json_schema = None
+
+        except Exception as e:
+            logger.error(f"Failed to create tunnel: {e}")
+            logger.warning("Continuing with local-only server...")
+            tunnel_url = None
+            tunnel_manager = None
+
     # Start server if requested (blocking), otherwise return manifest immediately
     if run_server:
         # Display server startup banner
@@ -386,6 +429,7 @@ def bindufy(
             agent_did=did_extension.did,
             client_id=credentials.client_id if credentials else None,
             client_secret=credentials.client_secret if credentials else None,
+            tunnel_url=tunnel_url,
         )
 
         # Run server with graceful shutdown handling

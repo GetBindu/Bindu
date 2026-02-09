@@ -50,7 +50,7 @@ class EnforceAttrsMeta(type):
     Metaclass that enforces the presence of specific attributes in a class
     and automatically decorates methods with a logging wrapper.
     """
-    
+
     required_attributes = ['name', 'version']
 
     def __new__(cls, name, bases, class_dict):
@@ -174,20 +174,20 @@ if __name__ == "__main__":
         const target = document.getElementById("target");
         const scoreDisplay = document.getElementById("score");
         const container = document.getElementById("game-container");
-        
+
         function moveTarget() {
             const maxX = container.clientWidth - target.clientWidth;
             const maxY = container.clientHeight - target.clientHeight;
             target.style.left = Math.random() * maxX + "px";
             target.style.top = Math.random() * maxY + "px";
         }
-        
+
         target.addEventListener("click", function() {
             score++;
             scoreDisplay.textContent = score;
             moveTarget();
         });
-        
+
         moveTarget();
     </script>
 </body>

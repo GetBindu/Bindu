@@ -214,8 +214,8 @@ setx OPENAI_API_KEY "your_openai_key"
 setx GOOGLE_API_KEY "your_gemini_key"
 
 # macOS / Linux
-export OPENAI_API_KEY="your_openai_key"
-export GOOGLE_API_KEY="your_gemini_key"
+export OPENAI_API_KEY="your_openai_key"  # pragma: allowlist secret
+export GOOGLE_API_KEY="your_gemini_key"  # pragma: allowlist secret
 ```
 
 ### OpenRouter (Optional)
@@ -227,7 +227,7 @@ setx OPENAI_API_KEY "your_openrouter_key"
 
 # macOS / Linux
 export OPENAI_API_BASE="https://openrouter.ai/api/v1"
-export OPENAI_API_KEY="your_openrouter_key"
+export OPENAI_API_KEY="your_openrouter_key"  # pragma: allowlist secret
 ```
 
 ---
