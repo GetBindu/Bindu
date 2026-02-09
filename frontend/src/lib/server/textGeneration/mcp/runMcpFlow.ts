@@ -478,7 +478,7 @@ export async function* runMcpFlow({
 				{
 					signal: abortSignal,
 					headers: {
-						"ChatUI-Conversation-ID": conv._id.toString(),
+						"BinduUI-Conversation-ID": conv._id.toString(),
 						"X-use-cache": "false",
 						...(locals?.token ? { Authorization: `Bearer ${locals.token}` } : {}),
 					},

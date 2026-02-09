@@ -82,6 +82,7 @@
 	let agentError = $state<string | null>(null);
 	let showRawJson = $state(false);
 	let expandedSkills = $state<Set<string>>(new Set());
+	let jsonCopied = $state(false);
 
 	onMount(async () => {
 		try {
@@ -145,7 +146,13 @@
 	}
 
 	function copyToClipboard(text: string) {
-		navigator.clipboard.writeText(text);
+		if (typeof navigator !== 'undefined' && navigator.clipboard) {
+			navigator.clipboard.writeText(text);
+			jsonCopied = true;
+			setTimeout(() => {
+				jsonCopied = false;
+			}, 2000);
+		}
 	}
 </script>
 
@@ -164,7 +171,7 @@
 					class="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
 					onclick={() => copyToClipboard(rawAgentJson)}
 				>
-					📋 Copy JSON
+					{jsonCopied ? '✓' : '📋 Copy JSON'}
 				</button>
 			</div>
 		{/if}

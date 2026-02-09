@@ -27,7 +27,7 @@ async function injectClipboardFiles(messages: EndpointMessage[]) {
 	return Promise.all(
 		messages.map((message) => {
 			const plaintextFiles = message.files
-				?.filter((file) => file.mime === "application/vnd.chatui.clipboard")
+				?.filter((file) => file.mime === "application/vnd.bindu_ui.clipboard")
 				.map((file) => Buffer.from(file.value, "base64").toString("utf-8"));
 
 			if (!plaintextFiles || plaintextFiles.length === 0) return message;
@@ -35,7 +35,7 @@ async function injectClipboardFiles(messages: EndpointMessage[]) {
 			return {
 				...message,
 				content: `${plaintextFiles.join("\n\n")}\n\n${message.content}`,
-				files: message.files?.filter((file) => file.mime !== "application/vnd.chatui.clipboard"),
+				files: message.files?.filter((file) => file.mime !== "application/vnd.bindu_ui.clipboard"),
 			};
 		})
 	);

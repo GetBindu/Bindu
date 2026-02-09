@@ -159,6 +159,7 @@
 	let timeDisplay = $state(getTimeRemaining());
 	let expiryTimeDisplay = $state(getExpirationTime());
 	let showFullToken = $state(false);
+	let tokenCopied = $state(false);
 
 	function getMaskedToken(): string {
 		if (!authToken) return "";
@@ -171,6 +172,10 @@
 	function copyTokenToClipboard() {
 		if (authToken) {
 			navigator.clipboard.writeText(authToken);
+			tokenCopied = true;
+			setTimeout(() => {
+				tokenCopied = false;
+			}, 2000);
 		}
 	}
 
@@ -374,7 +379,7 @@
 							class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
 							title="Copy to clipboard"
 						>
-							📋
+							{tokenCopied ? '✓' : '📋'}
 						</button>
 					</div>
 				</div>

@@ -150,7 +150,7 @@ export async function endpointOai(
 			const openAICompletion = await openai.completions.create(body, {
 				body: { ...body, ...extraBody },
 				headers: {
-					"ChatUI-Conversation-ID": conversationId?.toString() ?? "",
+					"BinduUI-Conversation-ID": conversationId?.toString() ?? "",
 					"X-use-cache": "false",
 					...(locals?.token ? { Authorization: `Bearer ${locals.token}` } : {}),
 					// Bill to organization if configured
