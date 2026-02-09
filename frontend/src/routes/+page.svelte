@@ -27,7 +27,7 @@
 
 			// Use the default (and only) model
 			const model = data.models[0].id;
-			
+
 			const res = await fetch(`${base}/conversation`, {
 				method: "POST",
 				headers: {

@@ -25,10 +25,10 @@ config = {
 def handler(messages: list[dict[str, str]]):
     """
     Process incoming messages and return agent response.
-    
+
     Args:
         messages: List of message dictionaries containing conversation history
-        
+
     Returns:
         Agent response with weather information
     """

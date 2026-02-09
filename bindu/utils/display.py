@@ -111,14 +111,14 @@ def prepare_server_display(
         console.print(
             Text(f"Local Server: http://{host}:{port}", style="green"), highlight=False
         )
-        
+
         # Display tunnel URL prominently if available
         if tunnel_url:
             console.print(
                 Text(f"🌐 Public URL: {tunnel_url}", style="bold bright_green"),
                 highlight=False,
             )
-        
+
         console.print()
 
     if agent_id:
@@ -134,7 +134,7 @@ def prepare_server_display(
     if host and port:
         # Use tunnel URL if available, otherwise local URL
         base_url = tunnel_url if tunnel_url else f"http://{host}:{port}"
-        
+
         console.print(Text("Protocol Endpoints:", style="bold white"), highlight=False)
         console.print(
             Text(f"  - Agent Endpoint: {base_url}/", style="white"), highlight=False
@@ -144,9 +144,7 @@ def prepare_server_display(
             highlight=False,
         )
         console.print(
-            Text(
-                f"  - DID Resolution: {base_url}/did/resolve", style="white"
-            ),
+            Text(f"  - DID Resolution: {base_url}/did/resolve", style="white"),
             highlight=False,
         )
         console.print()

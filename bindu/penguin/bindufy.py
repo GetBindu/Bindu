@@ -177,11 +177,12 @@ def bindufy(
     scheduler_config = create_scheduler_config_from_env(validated_config)
     sentry_config = create_sentry_config_from_env(validated_config)
     auth_config = create_auth_config_from_env(validated_config)
-    
+
     # Create tunnel config only if launch parameter is True
     tunnel_config = None
     if launch:
         from bindu.tunneling.config import TunnelConfig
+
         tunnel_config = TunnelConfig(enabled=True)
 
     # Update app_settings.auth based on config
@@ -384,17 +385,17 @@ def bindufy(
 
     # Parse deployment URL
     host, port = _parse_deployment_url(deployment_config)
-    
+
     # Create tunnel if enabled
     tunnel_url = None
     tunnel_manager = None
     if tunnel_config and tunnel_config.enabled:
         from bindu.tunneling.manager import TunnelManager
-        
+
         logger.info("Tunnel enabled, creating public URL...")
         tunnel_manager = TunnelManager()
         tunnel_config.local_port = port
-        
+
         try:
             tunnel_url = tunnel_manager.create_tunnel(
                 local_port=port,
@@ -402,16 +403,16 @@ def bindufy(
                 subdomain=tunnel_config.subdomain,
             )
             logger.info(f"✅ Tunnel created: {tunnel_url}")
-            
+
             # Update manifest URL to use tunnel URL
             _manifest.url = tunnel_url
-            
+
             # Update BinduApplication URL to use tunnel URL
             bindu_app.url = tunnel_url
-            
+
             # Invalidate cached agent card so it gets regenerated with new URL
             bindu_app._agent_card_json_schema = None
-            
+
         except Exception as e:
             logger.error(f"Failed to create tunnel: {e}")
             logger.warning("Continuing with local-only server...")

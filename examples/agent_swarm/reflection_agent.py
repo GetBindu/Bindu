@@ -45,5 +45,5 @@ Example Input: "Machine Learning is a subset of AI that uses algorithms to learn
 Example Output: {"quality":"good","issues":[],"fix_strategy":""}
 
 Remember: ONLY output the JSON object, nothing else.""",
-  
+
     )

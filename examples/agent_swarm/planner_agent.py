@@ -25,7 +25,7 @@ Your EXACT output format:
 
 Available agents:
 - researcher: Deep research on topics
-- summarizer: Create concise summaries  
+- summarizer: Create concise summaries
 - critic: Critical analysis and evaluation
 
 Example input: "What is quantum computing?"

@@ -8,7 +8,6 @@ from uuid import UUID
 from starlette.requests import Request
 from starlette.responses import Response
 
-from bindu import __version__
 from bindu.common.protocol.types import AgentCard, agent_card_ta
 from bindu.extensions.x402.extension import (
     is_activation_requested as x402_is_requested,

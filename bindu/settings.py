@@ -137,8 +137,7 @@ class TunnelSettings(BaseSettings):
 
     # Error message for tunnel failures
     error_message: str = (
-        "Could not create tunnel. "
-        "Please check the logs below for more information:"
+        "Could not create tunnel. Please check the logs below for more information:"
     )
 
     # Default FRP server configuration

@@ -41,7 +41,7 @@ class Orchestrator:
             print("Raw output (first 200 chars):", raw[:200])
             return fallback or {}
 
-    
+
     @staticmethod
     def _extract_final_content(critic_output: str) -> str:
         """
@@ -57,38 +57,38 @@ class Orchestrator:
             "Corrected Version:",
             "Updated Version:"
         ]
-        
+
         for marker in markers:
             if marker in critic_output:
                 parts = critic_output.split(marker, 1)
                 if len(parts) > 1:
                     return parts[1].strip()
-        
+
         lines = critic_output.split('\n')
-        
+
         skip_keywords = [
-            'evaluation', 'criticism', 'critique', 'weakness', 
-            'analysis', 'improvement:', 'constructive', 
+            'evaluation', 'criticism', 'critique', 'weakness',
+            'analysis', 'improvement:', 'constructive',
             'here\'s a', 'here is a', 'refined version',
             'suggested changes', 'issues found'
         ]
-        
+
         content_start = 0
         for i, line in enumerate(lines):
             lower_line = line.lower().strip()
-            
+
             if not lower_line:
                 continue
-                
+
             is_meta = any(keyword in lower_line for keyword in skip_keywords)
-            
+
             if is_meta:
                 content_start = i + 1
             else:
                 break
-        
+
         final_content = '\n'.join(lines[content_start:]).strip()
-        
+
         return final_content if final_content else critic_output
 
 
@@ -101,10 +101,10 @@ class Orchestrator:
                 print(f"    {agent_name} attempt {attempt + 1}")
                 response = agent.run(input_text)
                 content = response.to_dict()["content"]
-                
+
                 snippet = content[:150] + "..." if len(content) > 150 else content
                 print(f"    ✅ {agent_name} completed: {snippet}")
-                
+
                 return content
 
             except Exception as e:
@@ -151,7 +151,7 @@ class Orchestrator:
             for idx, step in enumerate(steps, start=1):
                 agent_name = step.get("agent")
                 task_instruction = step.get("task", "")
-                
+
                 if not agent_name:
                     print(f"\n⚠️ Skipping invalid step: {step}")
                     continue
