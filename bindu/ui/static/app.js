@@ -1,5 +1,10 @@
 // Bindu Agent Chat Interface - Main Application Logic
 
+import { renderMarkdown } from "./utils/markdown.js";
+import { cleanToken } from "./utils/validators.js";
+import { formatTime } from "./utils/formatters.js";
+import { byId } from "./utils/dom.js";
+
 // Global State
 let agentInfo = null;
 
@@ -101,19 +106,15 @@ async function handlePaymentRequired(originalRequest) {
 }
 
 function getPaymentHeaders() {
-    if (!paymentToken) return {};
-
-    // Ensure payment token is properly encoded
-    const cleanToken = paymentToken.trim();
-
-    // Check for non-ASCII characters
-    if (!/^[\x00-\x7F]*$/.test(cleanToken)) {
-        console.error('Payment token contains non-ASCII characters');
-        paymentToken = null;
-        return {};
+  const token = cleanToken(paymentToken);
+  if (!token) {
+    if (paymentToken) {
+      console.error("Payment token invalid format");
+      paymentToken = null;
     }
-
-    return { 'X-PAYMENT': cleanToken };
+    return {};
+  }
+  return { "X-PAYMENT": token };
 }
 
 // ============================================================================
@@ -121,21 +122,17 @@ function getPaymentHeaders() {
 // ============================================================================
 
 function getAuthHeaders() {
-    if (!authToken) return {};
-
-    // Ensure token is properly encoded (trim and validate ASCII)
-    const cleanToken = authToken.trim();
-
-    // Check for non-ASCII characters that would cause ISO-8859-1 errors
-    if (!/^[\x00-\x7F]*$/.test(cleanToken)) {
-        console.error('Auth token contains non-ASCII characters');
-        addMessage('⚠️ Invalid auth token format. Please re-enter your token.', 'status');
-        authToken = null;
-        localStorage.removeItem('bindu_auth_token');
-        return {};
+  const token = cleanToken(authToken);
+  if (!token) {
+    // if authToken existed but invalid -> clear
+    if (authToken) {
+      addMessage("⚠️ Invalid auth token format. Please re-enter your token.", "status");
+      authToken = null;
+      localStorage.removeItem("bindu_auth_token");
     }
-
-    return { 'Authorization': `Bearer ${cleanToken}` };
+    return {};
+  }
+  return { Authorization: `Bearer ${token}` };
 }
 
 function openAuthSettings() {
@@ -378,17 +375,6 @@ function displayAgentInfo() {
     const agentJsonDisplay = document.getElementById('agent-json-display');
     const agentJsonString = JSON.stringify(manifest, null, 2);
     agentJsonDisplay.textContent = agentJsonString;
-}
-
-function escapeHtml(text) {
-    const map = {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#039;'
-    };
-    return text.replace(/[&<>"']/g, m => map[m]);
 }
 
 function copyAgentCardJSON() {
@@ -881,19 +867,6 @@ async function clearContext(ctxId) {
     }
 }
 
-function formatTime(timestamp) {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diff = now - date;
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-
-    if (hours < 24) {
-        return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    } else {
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    }
-}
-
 // ============================================================================
 // Chat Functions
 // ============================================================================
@@ -906,13 +879,13 @@ function handleKeyPress(event) {
 }
 
 async function sendMessage() {
-    const input = document.getElementById('message-input');
+    const input = byId('message-input');
     const message = input.value.trim();
 
     if (!message) return;
 
     input.value = '';
-    const sendButton = document.getElementById('send-button');
+    const sendButton = byId('send-button');
     sendButton.disabled = true;
 
     try {
@@ -1301,7 +1274,7 @@ function extractResponse(task) {
 // ============================================================================
 
 function addThinkingIndicator(id, taskId = null) {
-    const messagesDiv = document.getElementById('chat-messages');
+    const messagesDiv = byId('chat-messages');
 
     // Remove any existing thinking indicator
     const existing = document.getElementById(id);
@@ -1363,7 +1336,7 @@ function addMessage(content, sender, taskId = null, state = null) {
     }
 
     if (sender === 'agent') {
-        contentDiv.innerHTML = marked.parse(content);
+        contentDiv.innerHTML = renderMarkdown(content);
     } else {
         contentDiv.textContent = content;
     }
@@ -1482,7 +1455,7 @@ async function submitFeedback() {
 // ============================================================================
 
 function showError(message) {
-    const errorDiv = document.getElementById('chat-error');
+    const errorDiv = byId('chat-error');
     errorDiv.textContent = message;
     errorDiv.style.display = 'block';
     setTimeout(() => {
@@ -1507,8 +1480,9 @@ document.addEventListener('DOMContentLoaded', () => {
     loadContexts();
 
     // Modal event listeners
-    const feedbackModal = document.getElementById('feedback-modal');
-    const skillModal = document.getElementById('skill-modal');
+    const feedbackModal = byId('feedback-modal');
+    const skillModal = byId('skill-modal');
+
 
     feedbackModal.addEventListener('click', (e) => {
         if (e.target === feedbackModal) {
