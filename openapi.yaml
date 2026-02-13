@@ -973,9 +973,23 @@ paths:
                 $ref: '#/components/schemas/HealthResponse'
               example:
                 status: "ok"
-                uptime_seconds: 12036.61
-                version: "2026.6.7.dev65+g6742cd6eb.d20260210"
                 ready: true
+                uptime_seconds: 37.56
+                version: "2026.6.7.dev65+g6742cd6eb.d20260210"
+                health: "healthy"
+                runtime:
+                  storage_backend: "PostgresStorage"
+                  scheduler_backend: "RedisScheduler"
+                  task_manager_running: true
+                  strict_ready: true
+                application:
+                  penguin_id: "a2c0532fd2474a1bba1325d1338377c9"
+                  agent_did: "did:bindu:your_email_at_example_com:research_agent:a2c0532fd2474a1bba1325d1338377c9"
+                system:
+                  python_version: "3.12.9"
+                  platform: "Darwin"
+                  platform_release: "24.6.0"
+                  environment: "development"
 
   /metrics:
     get:
