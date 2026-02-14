@@ -149,3 +149,6 @@ fallback-version = "0.3.14"
 
 [tool.hatch.build.hooks.vcs]
 version-file = "bindu/_version.py"
+
+[project.scripts]
+bindu = "bindu.cli.main:main"
