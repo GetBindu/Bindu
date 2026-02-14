@@ -52,8 +52,42 @@ def run_server(app: Any, host: str, port: int, display_info: bool = True) -> Non
         logger.info(f"Starting uvicorn server at {host}:{port}...")
         logger.info("Press Ctrl+C to stop the server gracefully")
 
+    ssl_kwargs = {}
+
+    # Configure mTLS if enabled
+    from bindu.settings import app_settings
+
+    if app_settings.security.mtls_enabled:
+        import ssl
+        from pathlib import Path
+
+        cert_dir = Path(app_settings.security.cert_dir)
+        cert_path = cert_dir / "agent.crt"
+        key_path = cert_dir / "agent.key"
+        ca_path = cert_dir / "ca.crt"
+
+        if not (cert_path.exists() and key_path.exists() and ca_path.exists()):
+            logger.error(f"mTLS enabled but certificates not found in {cert_dir}")
+            sys.exit(1)
+
+        logger.info("🔒 mTLS enabled: enforcing mutual authentication")
+
+        # Create SSL context for strict mTLS
+        ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        ssl_context.verify_mode = ssl.CERT_REQUIRED
+        ssl_context.load_verify_locations(cafile=str(ca_path))
+        ssl_context.load_cert_chain(certfile=str(cert_path), keyfile=str(key_path))
+
+        ssl_kwargs = {
+            "ssl_certfile": str(cert_path),
+            "ssl_keyfile": str(key_path),
+            "ssl_ca_certs": str(ca_path),
+            "ssl_cert_reqs": ssl.CERT_REQUIRED,
+            "ssl_version": ssl.PROTOCOL_TLS_SERVER,
+        }
+
     try:
-        uvicorn.run(app, host=host, port=port)
+        uvicorn.run(app, host=host, port=port, **ssl_kwargs)
     except KeyboardInterrupt:
         # This shouldn't be reached due to signal handler, but just in case
         logger.info("\n🛑 Server interrupted, shutting down...")

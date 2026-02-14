@@ -35,6 +35,9 @@ class AsyncHTTPClient:
         verify_ssl: bool = True,
         max_retries: int = 3,
         default_headers: Optional[Dict[str, str]] = None,
+        cert_file: Optional[str] = None,
+        key_file: Optional[str] = None,
+        ca_file: Optional[str] = None,
     ) -> None:
         """Initialize HTTP client.
 
@@ -44,12 +47,21 @@ class AsyncHTTPClient:
             verify_ssl: Whether to verify SSL certificates
             max_retries: Maximum number of retry attempts for failed requests
             default_headers: Default headers to include in all requests
+            cert_file: Path to client certificate file (PEM)
+            key_file: Path to client private key file (PEM)
+            ca_file: Path to CA certificate file (PEM)
         """
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.verify_ssl = verify_ssl
         self.max_retries = max_retries
         self.default_headers = default_headers or {}
+
+        # mTLS configuration
+        self.cert_file = cert_file
+        self.key_file = key_file
+        self.ca_file = ca_file
+
         self._session: Optional[aiohttp.ClientSession] = None
 
         logger.debug(f"HTTP client initialized: base_url={base_url}")
@@ -66,7 +78,24 @@ class AsyncHTTPClient:
     async def _ensure_session(self) -> None:
         """Ensure aiohttp session exists."""
         if self._session is None or self._session.closed:
-            connector = aiohttp.TCPConnector(ssl=self.verify_ssl)
+            import ssl
+
+            ssl_context: bool | ssl.SSLContext = True
+
+            # Configure SSL context if certificates provided
+            if self.cert_file and self.key_file:
+                ssl_context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+                ssl_context.load_cert_chain(
+                    certfile=self.cert_file, keyfile=self.key_file
+                )
+                if self.ca_file:
+                    ssl_context.load_verify_locations(cafile=self.ca_file)
+
+            # If no certs but verify_ssl is False, use unverified context
+            elif not self.verify_ssl:
+                ssl_context = False
+
+            connector = aiohttp.TCPConnector(ssl=ssl_context)
             timeout = aiohttp.ClientTimeout(total=self.timeout)
             self._session = aiohttp.ClientSession(
                 connector=connector,

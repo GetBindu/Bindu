@@ -617,6 +617,27 @@ class HydraSettings(BaseSettings):
     ]
 
 
+class SecuritySettings(BaseSettings):
+    """Security configuration settings (mTLS, etc)."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="SECURITY__",
+        extra="allow",
+    )
+
+    # mTLS Configuration
+    mtls_enabled: bool = False
+    cert_dir: str = ".bindu/certs"
+
+    # Certificate validity in days
+    ca_validity_days: int = 3650
+    cert_validity_days: int = 365
+
+    # Auto-generate certificates if missing
+    auto_generate_certs: bool = True
+
+
 class StorageSettings(BaseSettings):
     """Storage backend configuration settings.
 
@@ -958,6 +979,7 @@ class Settings(BaseSettings):
     retry: RetrySettings = RetrySettings()
     negotiation: NegotiationSettings = NegotiationSettings()
     sentry: SentrySettings = SentrySettings()
+    security: SecuritySettings = SecuritySettings()
 
 
 app_settings = Settings()

@@ -120,3 +120,30 @@ curl --location 'http://localhost:3773/' \
     "id": 1
 }'
 ```
+
+## Mutual TLS (mTLS)
+
+Bindu supports Mutual TLS (mTLS) for secure, encrypted, and authenticated communication between agents. This provides a Zero-Trust security layer where both the client and server verify each other's identities using X.509 certificates.
+
+### Enabling mTLS
+
+To enable mTLS, set the following environment variables:
+
+```bash
+# Enable mTLS
+SECURITY__MTLS_ENABLED=true
+
+# Directory for certificates
+SECURITY__CERT_DIR=.bindu/certs
+
+# Auto-generate certificates for development (default: false)
+SECURITY__AUTO_GENERATE_CERTS=true
+```
+
+When enabled, the server will enforce `ssl.CERT_REQUIRED`, rejecting any connections from clients that do not present a valid, trusted certificate.
+
+### Certificate Management
+
+For detailed instructions on managing keys, certificates, rotation, and revocation, please refer to the [Certificate Management Guide](security/certificate_management.md).
+
+For security best practices, see [Security Best Practices](security/best_practices.md).
