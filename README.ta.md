@@ -14,14 +14,13 @@
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
   <a href="https://hits.sh/github.com/Saptha-me/Bindu.svg"><img src="https://hits.sh/github.com/Saptha-me/Bindu.svg" alt="Hits"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="Python Version"></a>
+  <a href="https://pepy.tech/projects/bindu"><img src="https://static.pepy.tech/personalized-badge/bindu?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads" alt="PyPI Downloads"></a>
   <a href="https://pypi.org/project/bindu/"><img src="https://img.shields.io/pypi/v/bindu.svg" alt="PyPI version"></a>
   <a href="https://pypi.org/project/bindu/"><img src="https://img.shields.io/pypi/dm/bindu" alt="PyPI Downloads"></a>
   <a href="https://coveralls.io/github/Saptha-me/Bindu?branch=v0.3.18"><img src="https://coveralls.io/repos/github/Saptha-me/Bindu/badge.svg?branch=v0.3.18" alt="Coverage"></a>
   <a href="https://github.com/getbindu/Bindu/actions/workflows/release.yml"><img src="https://github.com/getbindu/Bindu/actions/workflows/release.yml/badge.svg" alt="Tests"></a>
   <a href="https://discord.gg/3w5zuYUuwt"><img src="https://img.shields.io/badge/Join%20Discord-7289DA?logo=discord&logoColor=white" alt="Discord"></a>
-  <a href="https://docs.getbindu.com"><img src="https://img.shields.io/badge/Documentation-📕-blue" alt="Documentation"></a>
-  <a href="https://github.com/getbindu/Bindu/pulls"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
-  <a href="https://github.com/getbindu/Bindu/stargazers"><img src="https://img.shields.io/github/stars/getbindu/Bindu" alt="GitHub stars"></a>
+  <a href="https://github.com/getbindu/Bindu/graphs/contributors"><img src="https://img.shields.io/github/contributors/getbindu/Bindu" alt="Contributors"></a>
 </p>
 
 ---
@@ -57,7 +56,7 @@ Bindu ஐ நிறுவுவதற்கு முன், உங்களி�
 
 ```bash
 # Python பதிப்பை சரிபார்க்கவும்
-python --version  # 3.12 அல்லது அதற்கு மேல் காட்ட வேண்டும்
+uv run python --version  # 3.12 அல்லது அதற்கு மேல் காட்ட வேண்டும்
 
 # UV நிறுவலை சரிபார்க்கவும்
 uv --version

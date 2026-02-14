@@ -28,6 +28,7 @@ from bindu.penguin.manifest import create_manifest, validate_agent_function
 from bindu.settings import app_settings
 from bindu.utils import add_extension_to_capabilities
 from bindu.utils.config_loader import (
+    create_auth_config_from_env,
     create_storage_config_from_env,
     create_scheduler_config_from_env,
     create_sentry_config_from_env,
@@ -103,6 +104,7 @@ def bindufy(
     handler: Callable[[list[dict[str, str]]], Any],
     run_server: bool = True,
     key_dir: str | Path | None = None,
+    launch: bool = False,
 ) -> AgentManifest:
     """Transform an agent instance and handler into a bindu-compatible agent.
 
@@ -137,6 +139,8 @@ def bindufy(
                    immediately for testing/programmatic usage (default: True)
         key_dir: Directory for storing DID keys. If None, attempts to detect from caller's
                 directory (may fail in REPL/notebooks). Falls back to current working directory.
+        launch: If True, creates a public tunnel via FRP to expose the server to the internet
+               with an auto-generated subdomain (default: False)
 
     Returns:
         AgentManifest: The manifest for the bindufied agent
@@ -152,8 +156,6 @@ def bindufy(
             "description": "A helpful assistant",
             "capabilities": {"streaming": True},
             "deployment": {"url": "http://localhost:3773", "protocol_version": "1.0.0"},
-            "storage": {"type": "memory"},
-            "scheduler": {"type": "memory"}
         }
 
         manifest = bindufy(agent, config, my_handler)
@@ -166,11 +168,6 @@ def bindufy(
 
     validated_config = ConfigValidator.validate_and_process(config)
 
-    # Update app_settings.auth based on config
-    auth_config = validated_config.get("auth")
-    if auth_config is not None:
-        update_auth_settings(auth_config)
-
     # Generate agent_id if not provided
     agent_id = validated_config.get("id", uuid4().hex)
 
@@ -179,6 +176,18 @@ def bindufy(
     storage_config = create_storage_config_from_env(validated_config)
     scheduler_config = create_scheduler_config_from_env(validated_config)
     sentry_config = create_sentry_config_from_env(validated_config)
+    auth_config = create_auth_config_from_env(validated_config)
+
+    # Create tunnel config only if launch parameter is True
+    tunnel_config = None
+    if launch:
+        from bindu.tunneling.config import TunnelConfig
+
+        tunnel_config = TunnelConfig(enabled=True)
+
+    # Update app_settings.auth based on config
+    if auth_config is not None:
+        update_auth_settings(auth_config)
 
     # Validate that this is a protocol-compliant function
     handler_name = getattr(handler, "__name__", "<unknown>")
@@ -301,6 +310,36 @@ def bindufy(
         f"Manifest: {_manifest.name} v{_manifest.version} | {_manifest.kind} | {skill_count} skills | {_manifest.url}"
     )
 
+    # Register agent in Hydra if authentication is enabled with Hydra provider
+    credentials = None
+    if app_settings.auth.enabled and app_settings.auth.provider == "hydra":
+        logger.info(
+            "Registering agent in Hydra OAuth2 server with DID-based authentication..."
+        )
+        import asyncio
+        from bindu.auth.hydra.registration import register_agent_in_hydra
+
+        credentials = asyncio.run(
+            register_agent_in_hydra(
+                agent_id=str(agent_id),
+                agent_name=validated_config["name"],
+                agent_url=agent_url,
+                did=did_extension.did,
+                credentials_dir=caller_dir / app_settings.did.pki_dir,
+                did_extension=did_extension,  # Pass DID extension for public key extraction
+            )
+        )
+
+        if credentials:
+            logger.info(
+                f"✅ Agent registered with OAuth client ID: {credentials.client_id}"
+            )
+        else:
+            logger.warning(
+                "⚠️  Agent registration in Hydra failed or was skipped. "
+                "Authentication may not work correctly."
+            )
+
     logger.info(f"Starting deployment for agent: {agent_id}")
 
     # Import server components (deferred to avoid circular import)
@@ -342,16 +381,56 @@ def bindufy(
         storage_config=storage_config,
         scheduler_config=scheduler_config,
         sentry_config=sentry_config,
+        cors_origins=deployment_config.cors_origins if deployment_config else None,
     )
 
     # Parse deployment URL
     host, port = _parse_deployment_url(deployment_config)
 
+    # Create tunnel if enabled
+    tunnel_url = None
+    tunnel_manager = None
+    if tunnel_config and tunnel_config.enabled:
+        from bindu.tunneling.manager import TunnelManager
+
+        logger.info("Tunnel enabled, creating public URL...")
+        tunnel_manager = TunnelManager()
+        tunnel_config.local_port = port
+
+        try:
+            tunnel_url = tunnel_manager.create_tunnel(
+                local_port=port,
+                config=tunnel_config,
+                subdomain=tunnel_config.subdomain,
+            )
+            logger.info(f"✅ Tunnel created: {tunnel_url}")
+
+            # Update manifest URL to use tunnel URL
+            _manifest.url = tunnel_url
+
+            # Update BinduApplication URL to use tunnel URL
+            bindu_app.url = tunnel_url
+
+            # Invalidate cached agent card so it gets regenerated with new URL
+            bindu_app._agent_card_json_schema = None
+
+        except Exception as e:
+            logger.error(f"Failed to create tunnel: {e}")
+            logger.warning("Continuing with local-only server...")
+            tunnel_url = None
+            tunnel_manager = None
+
     # Start server if requested (blocking), otherwise return manifest immediately
     if run_server:
         # Display server startup banner
         prepare_server_display(
-            host=host, port=port, agent_id=agent_id, agent_did=did_extension.did
+            host=host,
+            port=port,
+            agent_id=agent_id,
+            agent_did=did_extension.did,
+            client_id=credentials.client_id if credentials else None,
+            client_secret=credentials.client_secret if credentials else None,
+            tunnel_url=tunnel_url,
         )
 
         # Run server with graceful shutdown handling

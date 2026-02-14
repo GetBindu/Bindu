@@ -25,9 +25,8 @@ from uuid import UUID, uuid4
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.requests import Request
-from starlette.responses import FileResponse, Response
+from starlette.responses import Response
 from starlette.routing import Route
-from starlette.staticfiles import StaticFiles
 from starlette.types import Lifespan, Receive, Scope, Send
 
 from bindu.common.models import (
@@ -40,7 +39,7 @@ from bindu.common.models import (
 from bindu.settings import app_settings
 from bindu.utils.retry import execute_with_retry
 
-from .middleware import Auth0Middleware
+from .middleware.auth import HydraMiddleware
 from .scheduler.base import Scheduler
 from .storage.base import Storage
 from .task_manager import TaskManager
@@ -69,6 +68,7 @@ class BinduApplication(Starlette):
         auth_enabled: bool = False,
         telemetry_config: TelemetryConfig | None = None,
         sentry_config: SentryConfig | None = None,
+        cors_origins: list[str] | None = None,
     ):
         """Initialize Bindu application.
 
@@ -84,7 +84,7 @@ class BinduApplication(Starlette):
             lifespan: Optional custom lifespan
             routes: Optional custom routes
             middleware: Optional middleware
-            auth_enabled: Enable Auth0 authentication middleware
+            auth_enabled: Enable Hydra OAuth2 authentication middleware
             telemetry_config: Optional telemetry configuration (defaults to disabled)
             sentry_config: Optional Sentry configuration (defaults to disabled)
         """
@@ -118,6 +118,7 @@ class BinduApplication(Starlette):
             payment_requirements_for_middleware,
             manifest,
             auth_enabled,
+            cors_origins,
         )
 
         super().__init__(
@@ -157,7 +158,6 @@ class BinduApplication(Starlette):
 
     def _register_routes(self) -> None:
         """Register all application routes."""
-        from pathlib import Path
         from .endpoints import (
             agent_card_endpoint,
             agent_run_endpoint,
@@ -179,6 +179,15 @@ class BinduApplication(Starlette):
             ["HEAD", "GET", "OPTIONS"],
             with_app=True,
         )
+
+        # Root endpoint - redirect GET to agent card, POST for A2A protocol
+        from starlette.responses import RedirectResponse
+
+        async def root_redirect(app: BinduApplication, request: Request) -> Response:
+            """Redirect root GET requests to agent card."""
+            return RedirectResponse(url="/.well-known/agent.json", status_code=302)
+
+        self._add_route("/", root_redirect, ["GET"], with_app=True)
         self._add_route("/", agent_run_endpoint, ["POST"], with_app=True)
 
         # DID endpoints
@@ -218,18 +227,6 @@ class BinduApplication(Starlette):
             ["POST"],
             with_app=True,
         )
-
-        # Docs/Chat UI endpoint
-        self._add_route("/docs", self._docs_endpoint, ["GET"], with_app=False)
-
-        # Favicon endpoint
-        self._add_route("/favicon.ico", self._favicon_endpoint, ["GET"], with_app=False)
-
-        # Static files for CSS/JS
-        static_dir = Path(__file__).parent.parent / "ui" / "static"
-        if static_dir.exists():
-            self.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
-            logger.info(f"Serving static files from: {static_dir}")
 
         if self._x402_ext:
             self._register_payment_endpoints()
@@ -286,36 +283,6 @@ class BinduApplication(Starlette):
     async def _wrap_with_app(self, endpoint: Callable, request: Request) -> Response:
         """Wrap endpoint that requires app instance."""
         return await endpoint(self, request)
-
-    async def _docs_endpoint(self, request: Request) -> Response:
-        """Serve the chat UI documentation interface."""
-        from pathlib import Path
-
-        # Try modular version first, fallback to monolithic
-        docs_path = Path(__file__).parent.parent / "ui" / "static" / "chat.html"
-
-        if not docs_path.exists():
-            logger.error(f"Chat UI file not found: {docs_path}")
-            return Response(
-                content="Chat UI not available. File not found.",
-                status_code=404,
-                media_type="text/plain",
-            )
-
-        logger.debug(f"Serving chat UI from: {docs_path}")
-        return FileResponse(docs_path, media_type="text/html")
-
-    async def _favicon_endpoint(self, request: Request) -> Response:
-        """Serve the Bindu sunflower SVG as favicon."""
-        from pathlib import Path
-
-        favicon_path = Path(__file__).parent.parent.parent / "assets" / "light.svg"
-
-        if not favicon_path.exists():
-            logger.warning(f"Favicon not found: {favicon_path}")
-            return Response(content="", status_code=404)
-
-        return FileResponse(favicon_path, media_type="image/svg+xml")
 
     def _create_default_lifespan(
         self,
@@ -533,8 +500,9 @@ class BinduApplication(Starlette):
         payment_requirements: list[Any] | None,
         manifest: AgentManifest,
         auth_enabled: bool,
+        cors_origins: list[str] | None = None,
     ) -> list[Middleware]:
-        """Set up middleware chain with X402 and Auth0 middleware.
+        """Set up middleware chain with CORS, X402 and Hydra middleware.
 
         Args:
             middleware: Custom middleware to include
@@ -542,11 +510,29 @@ class BinduApplication(Starlette):
             payment_requirements: Payment requirements for X402
             manifest: Agent manifest
             auth_enabled: Whether authentication is enabled
+            cors_origins: List of allowed CORS origins
 
         Returns:
             List of configured middleware
         """
         middleware_list = list(middleware) if middleware else []
+
+        # Add CORS middleware if origins are specified
+        if cors_origins:
+            from starlette.middleware.cors import CORSMiddleware
+
+            logger.info(f"CORS middleware enabled for origins: {cors_origins}")
+            cors_middleware = Middleware(
+                CORSMiddleware,
+                allow_origins=cors_origins,
+                allow_credentials=True,
+                allow_methods=["*"],
+                allow_headers=["*"],
+                expose_headers=["*"],
+            )
+            # CORS must be first in middleware chain
+            middleware_list.insert(0, cors_middleware)
+            logger.info("CORS middleware added to position 0 in middleware chain")
 
         # Add X402 middleware if configured
         if x402_ext and payment_requirements:
@@ -565,13 +551,13 @@ class BinduApplication(Starlette):
                 x402_ext=x402_ext,
                 payment_requirements=payment_requirements,
             )
-            middleware_list.insert(0, x402_middleware)
+            middleware_list.append(x402_middleware)
 
         # Add authentication middleware if enabled
         if auth_enabled and app_settings.auth.enabled:
             auth_middleware = self._create_auth_middleware()
-            # Add auth middleware after X402 (if present)
-            middleware_list.insert(1 if x402_ext else 0, auth_middleware)
+            # Add auth middleware after CORS and X402
+            middleware_list.append(auth_middleware)
 
         # Add metrics middleware (should be last to capture all requests)
         from .middleware import MetricsMiddleware
@@ -593,14 +579,14 @@ class BinduApplication(Starlette):
         """
         provider = app_settings.auth.provider.lower()
 
-        if provider == "auth0":
-            logger.info("Auth0 authentication enabled")
-            return Middleware(Auth0Middleware, auth_config=app_settings.auth)
+        if provider == "hydra":
+            logger.info("Hydra OAuth2 authentication enabled")
+            return Middleware(HydraMiddleware, auth_config=app_settings.hydra)
         else:
             logger.error(f"Unknown authentication provider: {provider}")
             raise ValueError(
                 f"Unknown authentication provider: '{provider}'. "
-                f"Supported providers: auth0, cognito, azure, custom"
+                f"Supported providers: hydra"
             )
 
     def _setup_payment_session_manager(

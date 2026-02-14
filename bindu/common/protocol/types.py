@@ -98,11 +98,7 @@ TrustLevel: TypeAlias = Literal[
 ]
 
 IdentityProvider: TypeAlias = Literal[
-    "keycloak",  # Keycloak identity provider <NotPartOfA2A>
-    "azure_ad",  # Azure AD identity provider <NotPartOfA2A>
-    "okta",  # Okta identity provider <NotPartOfA2A>
-    "auth0",  # Auth0 identity provider <NotPartOfA2A>
-    "custom",  # Custom identity provider <NotPartOfA2A>
+    "hydra",  # Ory Hydra OAuth2 provider <NotPartOfA2A>
 ]
 
 CONTACT_ADDRESS_DATA_KEY = "contact_picker.ContactAddress"

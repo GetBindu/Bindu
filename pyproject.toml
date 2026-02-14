@@ -16,51 +16,76 @@ classifiers = [
     "Operating System :: OS Independent"
 ]
 dependencies = [
-    "uvicorn>=0.15.0",
-    "pydantic>=1.8.2",
-    "loguru>=0.7.3",
-    "rich>=13.0.0",
-    "cryptography>=44.0.2",
-    "orjson>=3.10.18",
-    "opentelemetry-instrumentation-httpx>=0.56b0",
-    "opentelemetry-api>=1.35.0",
-    "opentelemetry-exporter-otlp-proto-http>=1.35.0",
-    "opentelemetry-instrumentation-fastapi>=0.56b0",
-    "opentelemetry-sdk>=1.35.0",
-    "pyyaml>=6.0.2",
-    "aiofiles>=24.1.0",
-    "opentelemetry-exporter-otlp>=1.35.0",
-    "starlette>=0.48.0",
-    "base58>=2.1.1",
-    "ty>=0.0.1a14",
-    "pyjwt[crypto]>=2.8.0",
-    "requests>=2.31.0",
-    "pyperclip>=1.11.0",
-    "x402>=0.2.1",
-    "web3>=7.13.0",
-    "eth-account>=0.13.7",
-    "cdp-sdk>=0.21.0",
-    "coinbase-advanced-py>=1.8.2",
-    "asyncpg>=0.29.0",
-    "alembic>=1.13.0",
-    "sqlalchemy[asyncio]>=2.0.0",
-    "agno>=2.3.8",
-    "ddgs>=9.9.3",
-    "openai>=2.9.0",
-    "detect-secrets>=1.5.0",
-    "sentry-sdk>=2.0.0",
+    # Core runtime
+    "uvicorn==0.34.1",
+    "starlette==0.48.0",
+    "pydantic==2.11.3",
+    "loguru==0.7.3",
+    "rich==13.9.4",
+    "orjson==3.10.18",
+    "cryptography==44.0.2",
+    "base58==2.1.1",
+    "pyjwt[crypto]==2.10.1",
+    "httpx==0.28.1",
+    "aiofiles==24.1.0",
+    "pyyaml==6.0.2",
+    "requests==2.32.3",
     "tenacity==8.5.0",
-    "httpx>=0.27.0",
-    "numpy>=1.24.0",
-    "redis>=7.1.0",
+    "pynacl==1.5.0",
+    "numpy==2.3.5",
+    # Telemetry
+    "opentelemetry-api==1.35.0",
+    "opentelemetry-sdk==1.35.0",
+    "opentelemetry-exporter-otlp==1.35.0",
+    "opentelemetry-exporter-otlp-proto-http==1.35.0",
+    "opentelemetry-instrumentation-fastapi==0.56b0",
+    "opentelemetry-instrumentation-httpx==0.56b0",
+    "sentry-sdk==2.41.0",
+    # x402 payments
+    "x402==0.2.1",
+    "web3==7.13.0",
+    "eth-account==0.13.7",
+    "cdp-sdk==0.21.0",
+    "coinbase-advanced-py==1.8.2",
+    # Database storage
+    "sqlalchemy[asyncio]==2.0.44",
+    "asyncpg==0.31.0",
+    "alembic==1.17.2",
+    "redis==7.1.0",
+    # CLI tools
+    "cookiecutter==2.6.0",
+    "pyperclip==1.11.0",
+    # Security
+    "detect-secrets==1.5.0",
+    "dotenv>=0.9.9",
+    "agno>=2.4.8",
+    "ddgs>=9.10.0",
+    "openai>=2.17.0",
+    "openrouter>=0.6.0",
+    "langchain>=1.2.9",
+    "langchain-openai>=1.1.8",
+    "langgraph>=1.0.8",
+    "python-dotenv>=1.1.0",
 ]
 
 [project.optional-dependencies]
-sec = [
-    "detect-secrets>=1.5.0",
-]
-ui = [
-    "httpx>=0.27.0",
+# Minimal core only (use: pip install bindu[core] --only-deps)
+core = [
+    "uvicorn==0.34.1",
+    "starlette==0.48.0",
+    "pydantic==2.11.3",
+    "loguru==0.7.3",
+    "rich==13.9.4",
+    "orjson==3.10.18",
+    "cryptography==44.0.2",
+    "base58==2.1.1",
+    "pyjwt[crypto]==2.10.1",
+    "httpx==0.28.1",
+    "aiofiles==24.1.0",
+    "pyyaml==6.0.2",
+    "requests==2.32.3",
+    "tenacity==8.5.0",
+    "pynacl==1.5.0",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -87,6 +112,7 @@ dev = [
     "pipreqs>=0.5.0",
     "twine>=6.1.0",
     "uvx<2.0",
+    "ruff>=0.15.0",
 ]
 
 [tool.coverage.run]

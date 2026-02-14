@@ -1,0 +1,56 @@
+id: cbt-therapy-skill
+name: cbt-therapy-skill
+version: 1.0.0
+author: bindu.builder@getbindu.com
+description: |
+  Cognitive Behavioral Therapy (CBT) skill that provides personalized therapeutic exercises
+  and protocols based on user concerns and mental health needs.
+
+  Features:
+  - Multi-agent CBT protocol generation
+  - Clinical safety validation
+  - Therapeutic quality assessment
+  - Personalized exercise creation
+  - Evidence-based interventions
+
+  Uses a sophisticated multi-agent workflow with:
+  - Drafter Agent: Creates initial CBT exercise drafts
+  - Safety Guardian: Validates clinical safety and ethics
+  - Clinical Critic: Ensures therapeutic quality and effectiveness
+
+  All protocols are reviewed for safety and clinical appropriateness
+  before being provided to users.
+tags:
+  - cbt
+  - therapy
+  - mental-health
+  - cognitive-behavioral
+  - psychological
+  - wellness
+  - self-help
+input_modes:
+  - application/json
+output_modes:
+  - application/json
+examples:
+  - "I am overwhelmed with sleep problems"
+  - "Help me manage my anxiety about work"
+  - "I'm struggling with negative thoughts"
+  - "Can you help me with stress management?"
+  - "I need help coping with depression"
+capabilities_detail:
+  cbt_protocol_generation:
+    supported: true
+    description: "Generates personalized CBT exercises and protocols"
+  safety_validation:
+    supported: true
+    description: "Clinical safety and ethics validation for all protocols"
+  quality_assessment:
+    supported: true
+    description: "Therapeutic quality and effectiveness assessment"
+  multi_agent_workflow:
+    supported: true
+    description: "Sophisticated multi-agent orchestration for protocol creation"
+  evidence_based:
+    supported: true
+    description: "Evidence-based CBT interventions and techniques"

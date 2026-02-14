@@ -1,7 +1,6 @@
 """Base authentication middleware interface for Bindu server.
 
-Provides an abstract base class for authentication middleware supporting
-multiple providers (Auth0, AWS Cognito, Azure AD, etc.).
+Provides an abstract base class for authentication middleware.
 """
 
 from __future__ import annotations as _annotations
@@ -32,10 +31,6 @@ class AuthMiddleware(BaseHTTPMiddleware, ABC):
 
     Handles token extraction, validation, and user context attachment.
     Subclasses implement provider-specific validation logic.
-
-    Supported providers:
-    - Auth0 (Auth0Middleware)
-    - AWS Cognito, Azure AD, Custom JWT (future)
     """
 
     def __init__(self, app: Callable, auth_config: Any) -> None:

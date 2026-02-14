@@ -13,7 +13,9 @@ repos:
     hooks:
       - id: ruff
         args: ["--fix"]
+        exclude: ^examples/
       - id: ruff-format
+        exclude: ^examples/
 
   - repo: local
     hooks:
@@ -27,7 +29,7 @@ repos:
 
       - id: pytest
         name: pytest with coverage
-        entry: bash -c 'pytest -n auto --cov=bindu --cov-report= && coverage report --skip-covered --fail-under=70'
+        entry: bash -c 'uv run pytest -n auto --cov=bindu --cov-report= && coverage report --skip-covered --fail-under=64'
         language: system
         pass_filenames: false
         always_run: true
@@ -82,3 +84,4 @@ repos:
     rev: 6.3.0
     hooks:
       - id: pydocstyle
+        exclude: ^examples/

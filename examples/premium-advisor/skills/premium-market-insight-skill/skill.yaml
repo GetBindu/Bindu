@@ -1,0 +1,56 @@
+id: premium-market-insight-skill
+name: premium-market-insight-skill
+version: 1.0.0
+author: premium.advisor@example.com
+description: |
+  Premium market insights and financial analysis agent that provides
+  high-value investment recommendations and market analysis.
+
+  Features:
+  - Proprietary deep-chain analysis
+  - Market trend identification
+  - Risk assessment and recommendations
+  - Developer activity analysis
+  - Project audit verification
+  - Investment strategy guidance
+
+  Provides premium insights that require payment upfront through X402 protocol.
+  All recommendations are based on thorough analysis of market conditions,
+  project fundamentals, and developer activity.
+
+  Payment Required: 0.01 USDC per interaction
+tags:
+  - finance
+  - market-analysis
+  - investment
+  - cryptocurrency
+  - blockchain
+  - trading
+  - premium
+  - paid
+input_modes:
+  - application/json
+output_modes:
+  - application/json
+examples:
+  - "What are the best investment opportunities right now?"
+  - "Analyze the current market trends"
+  - "Should I invest in new DeFi projects?"
+  - "What's your outlook for Bitcoin this month?"
+  - "Which projects have strong developer activity?"
+capabilities_detail:
+  market_analysis:
+    supported: true
+    description: "Comprehensive market trend analysis and insights"
+  investment_recommendations:
+    supported: true
+    description: "Data-driven investment recommendations and strategies"
+  risk_assessment:
+    supported: true
+    description: "Project risk evaluation and safety analysis"
+  developer_activity_tracking:
+    supported: true
+    description: "Analysis of developer activity and project fundamentals"
+  payment_gated:
+    supported: true
+    description: "Premium service requiring X402 payment (0.01 USDC)"

@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 from starlette.requests import Request
-from starlette.responses import Response, FileResponse
+from starlette.responses import Response
 from starlette.routing import Route
 
 from bindu.server.applications import BinduApplication
@@ -119,10 +119,6 @@ class TestBinduApplicationRoutes:
         assert "/.well-known/agent.json" in route_paths
         assert "/" in route_paths
 
-        # UI routes
-        assert "/docs" in route_paths
-        assert "/favicon.ico" in route_paths
-
     def test_payment_routes_with_x402(self):
         """Test payment routes are registered when x402 is enabled."""
         from bindu.extensions.x402 import X402AgentExtension
@@ -177,52 +173,6 @@ class TestBinduApplicationRoutes:
 
 class TestBinduApplicationEndpoints:
     """Test BinduApplication built-in endpoints."""
-
-    @pytest.mark.asyncio
-    async def test_docs_endpoint_file_exists(self, mock_manifest):
-        """Test docs endpoint when file exists."""
-        app = BinduApplication(manifest=mock_manifest)
-        request = MagicMock(spec=Request)
-
-        with patch("pathlib.Path.exists", return_value=True):
-            response = await app._docs_endpoint(request)
-
-            assert isinstance(response, (FileResponse, Response))
-
-    @pytest.mark.asyncio
-    async def test_docs_endpoint_file_not_found(self, mock_manifest):
-        """Test docs endpoint when file doesn't exist."""
-        app = BinduApplication(manifest=mock_manifest)
-        request = MagicMock(spec=Request)
-
-        with patch("pathlib.Path.exists", return_value=False):
-            response = await app._docs_endpoint(request)
-
-            assert isinstance(response, Response)
-            assert response.status_code == 404
-
-    @pytest.mark.asyncio
-    async def test_favicon_endpoint_file_exists(self, mock_manifest):
-        """Test favicon endpoint when file exists."""
-        app = BinduApplication(manifest=mock_manifest)
-        request = MagicMock(spec=Request)
-
-        with patch("pathlib.Path.exists", return_value=True):
-            response = await app._favicon_endpoint(request)
-
-            assert isinstance(response, FileResponse)
-
-    @pytest.mark.asyncio
-    async def test_favicon_endpoint_file_not_found(self, mock_manifest):
-        """Test favicon endpoint when file doesn't exist."""
-        app = BinduApplication(manifest=mock_manifest)
-        request = MagicMock(spec=Request)
-
-        with patch("pathlib.Path.exists", return_value=False):
-            response = await app._favicon_endpoint(request)
-
-            assert isinstance(response, Response)
-            assert response.status_code == 404
 
     @pytest.mark.asyncio
     async def test_wrap_with_app(self, mock_manifest):

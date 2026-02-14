@@ -14,7 +14,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
 lib64/
 parts/
 sdist/
@@ -185,6 +184,9 @@ examples/.bindu/*
 examples/.bindu/private.pem
 examples/.bindu/public.pem
 
+examples/agent_swarm/.bindu/private.pem
+examples/agent_swarm/.bindu/public.pem
+
 # Pebbling keys (DID private/public keys)
 examples/.pebbling/*
 **/.pebbling/private.pem
@@ -198,3 +200,4 @@ examples/.pebbling/*
 bindu/_version.py
 bindu/penguin/.bindu/private.pem
 bindu/penguin/.bindu/public.pem
+.bindu/

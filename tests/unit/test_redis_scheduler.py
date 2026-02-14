@@ -48,6 +48,7 @@ class TestRedisSchedulerInit:
         assert scheduler.queue_name == "bindu:tasks"
         assert scheduler.max_connections == 10
         assert scheduler.retry_on_timeout is True
+        assert scheduler.poll_timeout == 1
 
     def test_init_with_custom_params(self):
         """Test initialization with custom parameters."""
@@ -56,11 +57,13 @@ class TestRedisSchedulerInit:
             queue_name="custom:queue",
             max_connections=20,
             retry_on_timeout=False,
+            poll_timeout=60,
         )
         assert scheduler.redis_url == "redis://custom:6380/1"
         assert scheduler.queue_name == "custom:queue"
         assert scheduler.max_connections == 20
         assert scheduler.retry_on_timeout is False
+        assert scheduler.poll_timeout == 60
 
 
 class TestRedisSchedulerConnection:

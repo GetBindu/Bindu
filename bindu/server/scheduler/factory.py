@@ -81,6 +81,7 @@ async def create_scheduler(config: SchedulerConfig | None = None) -> Scheduler:
                 queue_name=scheduler_settings.queue_name,
                 max_connections=scheduler_settings.max_connections,
                 retry_on_timeout=scheduler_settings.retry_on_timeout,
+                poll_timeout=scheduler_settings.poll_timeout,
             )
         else:
             raise ValueError(f"Unknown scheduler backend in settings: {backend}")
@@ -124,6 +125,7 @@ async def create_scheduler(config: SchedulerConfig | None = None) -> Scheduler:
             queue_name=config.queue_name,
             max_connections=config.max_connections,
             retry_on_timeout=config.retry_on_timeout,
+            poll_timeout=config.poll_timeout,
         )
 
         return scheduler

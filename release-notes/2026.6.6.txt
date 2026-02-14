@@ -1,0 +1,203 @@
+Release: Hydra OAuth2 Migration & Dependency Standardization
+=============================================================
+
+Version: 2026.6.6 (Commit: c80026c)
+Date: February 7, 2026
+Author: Raahul Dutta
+
+OVERVIEW
+--------
+Major refactoring release: Standardizes authentication on Ory Hydra OAuth2,
+removes legacy providers (Auth0, Cognito, Kratos), implements hybrid OAuth2 + DID
+authentication, and pins all dependency versions for reproducible builds.
+
+BREAKING CHANGES
+----------------
+⚠️ Auth0 and Cognito providers removed
+  - Only Hydra is now supported as the authentication provider
+  - Existing Auth0/Cognito configurations will need to migrate to Hydra
+
+⚠️ OAuth client authentication method changed
+  - Changed from client_secret_basic to client_secret_post
+  - DIDs containing colons are now properly supported as client_ids
+
+⚠️ Removed modules
+  - bindu/utils/auth_utils.py (Auth0 JWT utilities)
+  - bindu/server/middleware/auth/auth0.py
+  - bindu/server/middleware/auth/cognito.py
+  - Kratos, Vault, and user OAuth management modules
+
+NEW FEATURES
+------------
+🔐 Hybrid OAuth2 + DID Authentication
+  - Combines OAuth2 tokens with DID-based signatures
+  - DID used as stable key for credential storage
+  - Automatic client registration in Hydra with DID as client_id
+  - Public key metadata stored in Hydra client for verification
+
+🔑 Improved Hydra Client Registration
+  - Verifies client exists in Hydra before returning cached credentials
+  - Automatically recreates client if local credentials are stale
+  - Uses client_secret_post for token endpoint authentication
+  - Proper URL encoding for DIDs with special characters
+
+📦 Pinned Dependency Versions
+  - All dependencies now use exact versions (==) instead of minimum (>=)
+  - Prevents unexpected breakages from upstream updates
+  - Dependencies organized into functional groups:
+    * Core runtime (15 packages)
+    * Telemetry (7 packages)
+    * Payments/x402 (5 packages)
+    * Storage (4 packages)
+    * CLI tools (2 packages)
+    * Security (1 package)
+
+🖥️ New Web UI Infrastructure
+  - Static file serving for agent web interface
+  - Modular JavaScript architecture:
+    * api/client.js - HTTP client utilities
+    * state/store.js - State management
+    * chat/chat.js - Chat functionality
+    * core/ - Protocol, events, constants
+
+💬 Startup Display Improvements
+  - OAuth token retrieval curl command shown at startup
+  - Client secret path displayed (not exposed directly)
+  - Clear instructions for obtaining access tokens
+
+IMPROVEMENTS
+------------
+🏗️ Authentication Architecture
+  - Single auth provider (Hydra) simplifies configuration
+  - HydraMiddleware handles OAuth2 token introspection
+  - DID signature verification for enhanced security
+  - Cleaner separation between auth and middleware layers
+
+📝 Configuration Validation
+  - Simplified config validator for Hydra-only setup
+  - Removed Auth0/Cognito validation logic
+  - Better error messages for invalid configurations
+
+🧪 Test Simplification
+  - Removed complex mocking in auth tests
+  - Simplified hybrid auth client tests
+  - Removed outdated registration tests
+  - 565 tests passing with 68.59% coverage
+
+📚 Documentation Updates
+  - examples/README.md updated for Hydra-only setup
+  - Removed Auth0 token retrieval examples
+  - Added Hydra token retrieval instructions
+
+TECHNICAL DETAILS
+-----------------
+Files Changed: 60+ files
+  - Added: 25+ files (Hydra client, registration, middleware, UI)
+  - Modified: 20+ files (settings, config, applications)
+  - Deleted: 15+ files (Auth0, Cognito, Kratos, Vault modules)
+
+New Modules:
+  - bindu/auth/hydra/client.py (272 lines) - Hydra Admin API client
+  - bindu/auth/hydra/registration.py (220 lines) - Agent registration
+  - bindu/server/middleware/auth/hydra.py (397 lines) - OAuth2 middleware
+  - bindu/utils/agent_token_utils.py (178 lines) - Token utilities
+  - bindu/utils/did_signature.py (234 lines) - DID signature utilities
+  - bindu/ui/static/ - Web UI static files
+
+Removed Modules:
+  - bindu/utils/auth_utils.py - Auth0 JWT utilities
+  - bindu/server/middleware/auth/auth0.py - Auth0 middleware
+  - bindu/server/middleware/auth/cognito.py - Cognito middleware
+  - Kratos configuration and migration scripts
+
+DEPENDENCY CHANGES
+------------------
+Core Dependencies (pinned versions):
+  - uvicorn==0.34.1
+  - starlette==0.48.0
+  - pydantic==2.11.3
+  - loguru==0.7.3
+  - rich==13.9.4
+  - cryptography==44.0.2
+  - httpx==0.28.1
+  - pyjwt[crypto]==2.10.1
+
+Removed Dependencies:
+  - openai, agno, ddgs (AI/search - not needed)
+  - numpy (heavy - not needed)
+  - ty (dev tool - moved to dev deps)
+
+TESTING
+-------
+✅ 565 tests passing
+✅ Coverage: 68.59%
+✅ All Hydra authentication flows tested
+✅ DID signature verification tested
+✅ Token introspection and refresh tested
+
+MIGRATION GUIDE
+---------------
+For existing Auth0 deployments:
+
+1. Set up Ory Hydra server (or use https://hydra.getbindu.com)
+
+2. Update environment variables:
+   # Remove
+   AUTH0_DOMAIN=...
+   AUTH0_AUDIENCE=...
+   AUTH0_CLIENT_ID=...
+   AUTH0_CLIENT_SECRET=...
+
+   # Add
+   HYDRA__ADMIN_URL=https://hydra-admin.getbindu.com
+   HYDRA__PUBLIC_URL=https://hydra.getbindu.com
+   AUTH__ENABLED=true
+   AUTH__PROVIDER=hydra
+
+3. Update agent config:
+   auth:
+     enabled: true
+     provider: hydra  # Only option now
+
+4. Agent will auto-register in Hydra on startup with DID as client_id
+
+5. Get token using:
+   curl 'https://hydra.getbindu.com/oauth2/token' \
+     -d 'grant_type=client_credentials' \
+     -d 'client_id=YOUR_DID' \
+     -d 'client_secret=YOUR_SECRET'
+
+For Cognito deployments:
+  - Full migration to Hydra required
+  - No direct migration path available
+
+COMMIT DETAILS
+--------------
+Merge Commit: c80026cadef48ed3bee675fdf811619c7a8c99cd
+PR: #135 (Feature/hydra migration v2)
+Branch: feature/hydra-migration-v2
+Commits: 36
+
+Key Commits:
+  - add4d56: Remove Auth0/Cognito, standardize on Hydra
+  - 2108e97: Pin all dependency versions
+  - 4da6c58: Improve Hydra registration, switch to client_secret_post
+  - 979d836: Implement hybrid OAuth2 + DID authentication
+  - 31f4388: Remove Kratos, OAuth, Vault modules
+  - 93c92ec: Use DID as stable key for credential storage
+
+USAGE WITH GIT
+--------------
+# Create an annotated tag
+git tag -a 2026.6.6 c80026c -F release-notes/2026.6.6.txt
+
+# Create a GitHub release
+gh release create 2026.6.6 \
+  --notes-file release-notes/2026.6.6.txt \
+  --title "2026.6.6: Hydra OAuth2 Migration"
+
+# View this release
+git show 2026.6.6
+
+# Push tag to remote
+git push origin 2026.6.6

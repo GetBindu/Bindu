@@ -81,20 +81,20 @@ uv sync --dev
 
 ```bash
 # Install pre-commit hooks for code quality
-pre-commit install
+uv run pre-commit install
 
 # Run hooks on all files to verify setup
-pre-commit run --all-files
+uv run pre-commit run --all-files
 ```
 
 ### 4. Verify Installation
 
 ```bash
 # Run tests to ensure everything works
-pytest -n auto --cov=bindu --cov-report=term-missing
+uv run pytest -n auto --cov=bindu --cov-report=term-missing
 
 # Check that coverage is above 70%
-coverage report --skip-covered --fail-under=70
+uv run coverage report --skip-covered --fail-under=70
 ```
 
 ## How to Contribute
@@ -135,16 +135,16 @@ git checkout -b fix/issue-description
 
 ```bash
 # Run all tests
-pytest -n auto
+uv run pytest -n auto
 
 # Run tests with coverage
-pytest -n auto --cov=bindu --cov-report=term-missing
+uv run pytest -n auto --cov=bindu --cov-report=term-missing
 
 # Ensure coverage stays above 70%
-coverage report --fail-under=70
+uv run coverage report --fail-under=70
 
 # Run pre-commit checks
-pre-commit run --all-files
+uv run pre-commit run --all-files
 ```
 
 ### 3. Update Documentation

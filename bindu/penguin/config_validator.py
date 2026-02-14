@@ -8,6 +8,7 @@ ensuring they meet the required schema and have proper defaults.
 import os
 from typing import Any, Dict
 
+from bindu import __version__
 from bindu.common.protocol.types import AgentCapabilities, Skill
 
 
@@ -18,7 +19,7 @@ class ConfigValidator:
     DEFAULTS = {
         "name": "bindu-agent",
         "description": "A Bindu agent",
-        "version": "1.0.0",
+        "version": __version__,
         "recreate_keys": True,
         "skills": [],
         "capabilities": {},
@@ -94,11 +95,11 @@ class ConfigValidator:
         if isinstance(config.get("capabilities"), dict):
             config["capabilities"] = AgentCapabilities(**config["capabilities"])
 
-        # Process agent_trust if provided - keep as dict for now
-        # TypedDict will be validated when used, not at construction
-        # This allows partial configs during development
+        # TODO: Process agent_trust - IN DEVELOPMENT PHASE
+        # Agent trust validation is currently in development
+        # Keep as dict for now - TypedDict validation will be added in future
         if isinstance(config.get("agent_trust"), dict):
-            pass  # Keep as dict, don't construct TypedDict here
+            pass  # Keep as dict, validation to be implemented
 
         # Process key password - support environment variable and prompt
         if config.get("key_password"):
@@ -177,45 +178,109 @@ class ConfigValidator:
         if not auth_config.get("enabled", False):
             return  # Auth disabled, no further validation needed
 
-        # Required fields when auth is enabled
-        required_auth_fields = ["domain", "audience"]
-        missing = [
-            field for field in required_auth_fields if not auth_config.get(field)
-        ]
-        if missing:
+        # Get provider (default to hydra)
+        provider = auth_config.get("provider", "hydra").lower()
+
+        # Validate based on provider
+        if provider == "hydra":
+            cls._validate_hydra_config(auth_config)
+        else:
             raise ValueError(
-                f"Auth is enabled but missing required fields: {', '.join(missing)}. Required: domain, audience"
+                f"Unknown auth provider: '{provider}'. Supported providers: hydra"
             )
 
-        # Validate domain format
-        domain = auth_config.get("domain", "")
-        if not domain or "." not in domain:
-            raise ValueError(
-                f"Invalid auth domain: '{domain}'. "
-                f"Expected format: 'your-tenant.auth0.com' or 'your-tenant.us.auth0.com'"
-            )
+    @classmethod
+    def _validate_hydra_config(cls, auth_config: Dict[str, Any]) -> None:
+        """Validate Hydra-specific configuration.
 
-        # Validate audience format (should be a URL)
-        audience = auth_config.get("audience", "")
-        if not audience or not (
-            audience.startswith("http://") or audience.startswith("https://")
-        ):
-            raise ValueError(
-                f"Invalid auth audience: '{audience}'. "
-                f"Expected format: 'https://api.your-domain.com' or 'https://your-api-identifier'"
-            )
+        Args:
+            auth_config: Auth configuration dictionary
 
-        # Validate algorithms if provided
-        if "algorithms" in auth_config:
-            algorithms = auth_config["algorithms"]
-            if not isinstance(algorithms, list):
-                raise ValueError("Field 'auth.algorithms' must be a list")
-
-            valid_algorithms = ["RS256", "RS384", "RS512", "HS256", "HS384", "HS512"]
-            invalid_algs = [alg for alg in algorithms if alg not in valid_algorithms]
-            if invalid_algs:
+        Raises:
+            ValueError: If Hydra configuration is invalid
+        """
+        # Validate admin_url and public_url if provided
+        if "admin_url" in auth_config:
+            admin_url = auth_config["admin_url"]
+            if not admin_url.startswith("http://") and not admin_url.startswith(
+                "https://"
+            ):
                 raise ValueError(
-                    f"Invalid algorithms in auth config: {invalid_algs}. Valid options: {valid_algorithms}"
+                    f"Invalid Hydra admin_url: '{admin_url}'. "
+                    f"Expected format: 'https://hydra-admin.getbindu.com'"
+                )
+
+        if "public_url" in auth_config:
+            public_url = auth_config["public_url"]
+            if not public_url.startswith("http://") and not public_url.startswith(
+                "https://"
+            ):
+                raise ValueError(
+                    f"Invalid Hydra public_url: '{public_url}'. "
+                    f"Expected format: 'https://hydra.getbindu.com'"
+                )
+
+        # Validate timeout
+        if "timeout" in auth_config:
+            timeout = auth_config["timeout"]
+            if not isinstance(timeout, int) or timeout <= 0:
+                raise ValueError(
+                    f"Invalid Hydra timeout: '{timeout}'. "
+                    f"Expected positive integer (seconds)"
+                )
+
+        # Validate verify_ssl
+        if "verify_ssl" in auth_config:
+            verify_ssl = auth_config["verify_ssl"]
+            if not isinstance(verify_ssl, bool):
+                raise ValueError(
+                    f"Invalid Hydra verify_ssl: '{verify_ssl}'. "
+                    f"Expected boolean (true/false)"
+                )
+
+        # Validate max_retries
+        if "max_retries" in auth_config:
+            max_retries = auth_config["max_retries"]
+            if not isinstance(max_retries, int) or max_retries < 0:
+                raise ValueError(
+                    f"Invalid Hydra max_retries: '{max_retries}'. "
+                    f"Expected non-negative integer"
+                )
+
+        # Validate cache_ttl
+        if "cache_ttl" in auth_config:
+            cache_ttl = auth_config["cache_ttl"]
+            if not isinstance(cache_ttl, int) or cache_ttl <= 0:
+                raise ValueError(
+                    f"Invalid Hydra cache_ttl: '{cache_ttl}'. "
+                    f"Expected positive integer (seconds)"
+                )
+
+        # Validate max_cache_size
+        if "max_cache_size" in auth_config:
+            max_cache_size = auth_config["max_cache_size"]
+            if not isinstance(max_cache_size, int) or max_cache_size <= 0:
+                raise ValueError(
+                    f"Invalid Hydra max_cache_size: '{max_cache_size}'. "
+                    f"Expected positive integer"
+                )
+
+        # Validate auto_register_agents
+        if "auto_register_agents" in auth_config:
+            auto_register = auth_config["auto_register_agents"]
+            if not isinstance(auto_register, bool):
+                raise ValueError(
+                    f"Invalid Hydra auto_register_agents: '{auto_register}'. "
+                    f"Expected boolean (true/false)"
+                )
+
+        # Validate agent_client_prefix
+        if "agent_client_prefix" in auth_config:
+            prefix = auth_config["agent_client_prefix"]
+            if not isinstance(prefix, str) or not prefix:
+                raise ValueError(
+                    f"Invalid Hydra agent_client_prefix: '{prefix}'. "
+                    f"Expected non-empty string"
                 )
 
     @classmethod

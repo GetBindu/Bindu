@@ -396,7 +396,7 @@ class TestAgentManifestGlobalWebhook:
             version="1.0.0",
             protocol_version="1.0.0",
             agent_trust={  # type: ignore[arg-type]
-                "identity_provider": "auth0",
+                "identity_provider": "hydra",
                 "inherited_roles": [],
                 "creator_id": "test",
                 "creation_timestamp": 0,

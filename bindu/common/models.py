@@ -74,6 +74,7 @@ class SchedulerConfig:
     queue_name: str = "bindu:tasks"
     max_connections: int = 10
     retry_on_timeout: bool = True
+    poll_timeout: int = 1
 
 
 @dataclass(frozen=True)
@@ -246,3 +247,85 @@ class AgentManifest:
     def __repr__(self) -> str:
         """Human-readable representation of the agent."""
         return f"AgentManifest(name='{self.name}', id='{self.id}', version='{self.version}', kind='{self.kind}')"
+
+
+# ============================================================================
+# OAuth and Authentication Models
+# ============================================================================
+
+
+@dataclass(frozen=True)
+class TokenIntrospectionResult:
+    """Result of OAuth token introspection.
+
+    Standard OAuth 2.0 token introspection response as defined in RFC 7662.
+    """
+
+    active: bool
+    sub: str | None = None
+    client_id: str | None = None
+    exp: int | None = None
+    iat: int | None = None
+    aud: list[str] | None = None
+    iss: str | None = None
+    scope: str | None = None
+    token_type: str | None = None
+    username: str | None = None
+    ext: dict[str, Any] | None = None
+    grant_type: str | None = None
+    nbf: int | None = None
+
+
+@dataclass(frozen=True)
+class OAuthClient:
+    """OAuth2 client configuration.
+
+    Represents an OAuth 2.0 client registration as defined in RFC 7591.
+    """
+
+    client_id: str
+    client_name: str | None = None
+    client_secret: str | None = None
+    redirect_uris: list[str] = field(default_factory=list)
+    grant_types: list[str] = field(
+        default_factory=lambda: ["authorization_code", "refresh_token"]
+    )
+    response_types: list[str] = field(default_factory=lambda: ["code"])
+    scope: str = "openid offline"
+    token_endpoint_auth_method: str = "client_secret_basic"
+    metadata: dict[str, Any] | None = None
+
+
+@dataclass
+class AgentCredentials:
+    """Agent OAuth credentials storage.
+
+    Stores OAuth client credentials for a Bindu agent registered in Hydra.
+    """
+
+    agent_id: str
+    client_id: str
+    client_secret: str
+    created_at: str
+    scopes: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for serialization."""
+        return {
+            "agent_id": self.agent_id,
+            "client_id": self.client_id,
+            "client_secret": self.client_secret,
+            "created_at": self.created_at,
+            "scopes": self.scopes,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "AgentCredentials":
+        """Create from dictionary."""
+        return cls(
+            agent_id=data["agent_id"],
+            client_id=data["client_id"],
+            client_secret=data["client_secret"],
+            created_at=data["created_at"],
+            scopes=data.get("scopes", []),
+        )

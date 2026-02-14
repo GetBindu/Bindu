@@ -1,0 +1,50 @@
+id: cbt-drafter-v0
+name: cbt-drafter
+version: 0.1.0
+author: imdanishakhtar7@gmail.com
+description: |
+  Drafts a CBT (Cognitive Behavioral Therapy) exercise/protocol response from a user statement.
+  Output is an initial draft meant to be reviewed by Safety and Clinical Critic agents.
+tags:
+  - cbt
+  - mental-health
+  - drafting
+  - therapy
+input_modes:
+  - text/plain
+output_modes:
+  - application/json
+examples:
+  - "I feel like I'm failing at everything lately."
+  - "Help me create a thought record for anxiety about work."
+capabilities_detail:
+  draft_generation:
+    supported: true
+    formats:
+      - thought_record
+      - cbt_protocol
+    limitations: "This agent drafts content; it does not perform safety screening."
+requirements:
+  packages: []
+  system: []
+performance:
+  avg_processing_time_ms: 300
+  concurrent_requests: 5
+assessment:
+  keywords:
+    - cbt
+    - thought record
+    - cognitive distortions
+    - reframing
+    - coping skills
+  anti_patterns:
+    - "medical diagnosis"
+    - "prescribe medication"
+    - "self-harm instructions"
+  complexity_indicators:
+    simple:
+      - "single statement"
+      - "quick reframing"
+    complex:
+      - "multi-turn session"
+      - "safety concerns"

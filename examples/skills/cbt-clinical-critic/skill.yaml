@@ -1,0 +1,42 @@
+id: cbt-clinical-critic-v0
+name: cbt-clinical-critic
+version: 0.1.0
+author: imdanishakhtar7@gmail.com
+description: |
+  Reviews CBT drafts for tone, empathy, and basic clinical appropriateness.
+  Produces critique notes and an approval recommendation.
+tags:
+  - cbt
+  - review
+  - critique
+  - empathy
+input_modes:
+  - application/json
+output_modes:
+  - application/json
+examples:
+  - "Review a draft CBT thought record and suggest improvements."
+capabilities_detail:
+  critique:
+    supported: true
+    dimensions:
+      - empathy
+      - clarity
+      - structure
+      - non-judgmental_tone
+requirements:
+  packages: []
+  system: []
+performance:
+  avg_processing_time_ms: 200
+  concurrent_requests: 5
+assessment:
+  keywords:
+    - empathy
+    - tone
+    - critique
+    - cbt
+    - therapeutic
+  anti_patterns:
+    - "diagnose"
+    - "authoritative medical claims"
