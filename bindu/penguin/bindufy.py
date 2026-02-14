@@ -433,8 +433,45 @@ def bindufy(
             tunnel_url=tunnel_url,
         )
 
+        # Prepare SSL config
+        ssl_kwargs = {}
+        if app_settings.security.mtls_enabled:
+            import ssl
+            
+            # Helper to check if file exists
+            def check_path(path_str):
+                p = Path(path_str)
+                if not p.exists():
+                    # check relative to caller
+                    p = caller_dir / path_str
+                return str(p) if p.exists() else None
+
+            key_path = check_path(app_settings.security.server_key_path)
+            cert_path = check_path(app_settings.security.server_cert_path)
+            ca_path = check_path(app_settings.security.ca_cert_path)
+
+            if key_path and cert_path:
+                ssl_kwargs["ssl_keyfile"] = key_path
+                ssl_kwargs["ssl_certfile"] = cert_path
+                if ca_path:
+                    ssl_kwargs["ssl_ca_certs"] = ca_path
+                
+                # Configure client cert requirements
+                if app_settings.security.require_client_cert:
+                    ssl_kwargs["ssl_cert_reqs"] = ssl.CERT_REQUIRED
+                else:
+                    ssl_kwargs["ssl_cert_reqs"] = ssl.CERT_OPTIONAL
+            else:
+                logger.warning("⚠️ mTLS enabled but server key/cert not found. Starting without SSL.")
+
         # Run server with graceful shutdown handling
-        start_uvicorn_server(bindu_app, host=host, port=port, display_info=True)
+        start_uvicorn_server(
+            bindu_app, 
+            host=host, 
+            port=port, 
+            display_info=True,
+            **ssl_kwargs
+        )
     else:
         logger.info(
             "Server not started (run_server=False). Manifest returned for programmatic use."

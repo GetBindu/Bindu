@@ -28,6 +28,8 @@ class AsyncHTTPClient:
     - Request/response logging
     """
 
+    pydantic_model: Optional[Any] = None  # To avoid cyclic imports with model definitions
+    
     def __init__(
         self,
         base_url: str,
@@ -35,6 +37,7 @@ class AsyncHTTPClient:
         verify_ssl: bool = True,
         max_retries: int = 3,
         default_headers: Optional[Dict[str, str]] = None,
+        ssl_context: Optional[Any] = None,
     ) -> None:
         """Initialize HTTP client.
 
@@ -44,14 +47,16 @@ class AsyncHTTPClient:
             verify_ssl: Whether to verify SSL certificates
             max_retries: Maximum number of retry attempts for failed requests
             default_headers: Default headers to include in all requests
+            ssl_context: Optional SSL context for mTLS or custom verification
         """
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.verify_ssl = verify_ssl
         self.max_retries = max_retries
         self.default_headers = default_headers or {}
+        self.ssl_context = ssl_context
         self._session: Optional[aiohttp.ClientSession] = None
-
+        
         logger.debug(f"HTTP client initialized: base_url={base_url}")
 
     async def __aenter__(self) -> "AsyncHTTPClient":
@@ -66,7 +71,10 @@ class AsyncHTTPClient:
     async def _ensure_session(self) -> None:
         """Ensure aiohttp session exists."""
         if self._session is None or self._session.closed:
-            connector = aiohttp.TCPConnector(ssl=self.verify_ssl)
+            # Prefer ssl_context if provided, otherwise fall back to verify_ssl bool
+            ssl_config = self.ssl_context if self.ssl_context else self.verify_ssl
+            
+            connector = aiohttp.TCPConnector(ssl=ssl_config)
             timeout = aiohttp.ClientTimeout(total=self.timeout)
             self._session = aiohttp.ClientSession(
                 connector=connector,
@@ -298,6 +306,7 @@ async def http_client(
     verify_ssl: bool = True,
     max_retries: int = 3,
     default_headers: Optional[Dict[str, str]] = None,
+    ssl_context: Optional[Any] = None,
 ):
     """Context manager for creating and managing an HTTP client.
 
@@ -312,6 +321,7 @@ async def http_client(
         verify_ssl: Whether to verify SSL certificates
         max_retries: Maximum number of retry attempts
         default_headers: Default headers for all requests
+        ssl_context: Optional SSL context
 
     Yields:
         AsyncHTTPClient instance
@@ -322,6 +332,7 @@ async def http_client(
         verify_ssl=verify_ssl,
         max_retries=max_retries,
         default_headers=default_headers,
+        ssl_context=ssl_context,
     )
     try:
         await client._ensure_session()

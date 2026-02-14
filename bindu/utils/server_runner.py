@@ -36,7 +36,16 @@ def setup_signal_handlers() -> None:
     logger.debug("Signal handlers registered for graceful shutdown")
 
 
-def run_server(app: Any, host: str, port: int, display_info: bool = True) -> None:
+def run_server(
+    app: Any,
+    host: str,
+    port: int,
+    display_info: bool = True,
+    ssl_keyfile: str | None = None,
+    ssl_certfile: str | None = None,
+    ssl_ca_certs: str | None = None,
+    ssl_cert_reqs: int = 0,
+) -> None:
     """Run uvicorn server with graceful shutdown handling.
 
     Args:
@@ -44,6 +53,10 @@ def run_server(app: Any, host: str, port: int, display_info: bool = True) -> Non
         host: Host address to bind to
         port: Port number to bind to
         display_info: Whether to display startup info messages
+        ssl_keyfile: Path to SSL key file
+        ssl_certfile: Path to SSL certificate file
+        ssl_ca_certs: Path to CA certificate file
+        ssl_cert_reqs: SSL certificate requirements (default: 0 - ssl.CERT_NONE)
     """
     # Setup signal handlers
     setup_signal_handlers()
@@ -53,7 +66,19 @@ def run_server(app: Any, host: str, port: int, display_info: bool = True) -> Non
         logger.info("Press Ctrl+C to stop the server gracefully")
 
     try:
-        uvicorn.run(app, host=host, port=port)
+        if ssl_keyfile and ssl_certfile:
+            logger.info(f"🔒 Starting server with SSL/TLS enabled (mTLS: {'enabled' if ssl_cert_reqs else 'disabled'})")
+            uvicorn.run(
+                app,
+                host=host,
+                port=port,
+                ssl_keyfile=ssl_keyfile,
+                ssl_certfile=ssl_certfile,
+                ssl_ca_certs=ssl_ca_certs,
+                ssl_cert_reqs=ssl_cert_reqs,
+            )
+        else:
+            uvicorn.run(app, host=host, port=port)
     except KeyboardInterrupt:
         # This shouldn't be reached due to signal handler, but just in case
         logger.info("\n🛑 Server interrupted, shutting down...")

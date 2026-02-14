@@ -278,6 +278,29 @@ class ObservabilitySettings(BaseSettings):
     ]
 
 
+class SecuritySettings(BaseSettings):
+    """Security configuration settings including mTLS."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="SECURITY__",
+        extra="allow",
+    )
+
+    mtls_enabled: bool = False
+    
+    # Paths for certificates
+    ca_cert_path: str = "certs/ca.crt"
+    server_cert_path: str = "certs/server.crt"
+    server_key_path: str = "certs/server.key"
+    client_cert_path: str = "certs/client.crt"
+    client_key_path: str = "certs/client.key"
+    
+    # Whether to require client certificates for incoming connections
+    # If False, client certs are optional (good for browser compatibility)
+    require_client_cert: bool = False
+
+
 class X402Settings(BaseSettings):
     """x402 payments configuration settings."""
 
@@ -940,24 +963,47 @@ class Settings(BaseSettings):
         extra="allow",
     )
 
-    project: ProjectSettings = ProjectSettings()
-    did: DIDSettings = DIDSettings()
-    network: NetworkSettings = NetworkSettings()
-    tunnel: TunnelSettings = TunnelSettings()
-    deployment: DeploymentSettings = DeploymentSettings()
-    logging: LoggingSettings = LoggingSettings()
-    observability: ObservabilitySettings = ObservabilitySettings()
-    x402: X402Settings = X402Settings()
-    agent: AgentSettings = AgentSettings()
-    auth: AuthSettings = AuthSettings()
-    hydra: HydraSettings = HydraSettings()
-    vault: VaultSettings = VaultSettings()
-    oauth: OAuthSettings = OAuthSettings()
-    storage: StorageSettings = StorageSettings()
-    scheduler: SchedulerSettings = SchedulerSettings()
-    retry: RetrySettings = RetrySettings()
-    negotiation: NegotiationSettings = NegotiationSettings()
-    sentry: SentrySettings = SentrySettings()
+  # Initialize global settings
+project_settings = ProjectSettings()
+did_settings = DIDSettings()
+network_settings = NetworkSettings()
+tunnel_settings = TunnelSettings()
+deployment_settings = DeploymentSettings()
+logging_settings = LoggingSettings()
+observability_settings = ObservabilitySettings()
+x402_settings = X402Settings()
+agent_settings = AgentSettings()
+auth_settings = AuthSettings()
+hydra_settings = HydraSettings()
+storage_settings = StorageSettings()
+scheduler_settings = SchedulerSettings()
+retry_settings = RetrySettings()
+negotiation_settings = NegotiationSettings()
+vault_settings = VaultSettings()
+security_settings = SecuritySettings()
 
 
-app_settings = Settings()
+class AppSettings:
+    """Consolidated application settings."""
+
+    def __init__(self):
+        self.project = project_settings
+        self.did = did_settings
+        self.network = network_settings
+        self.tunnel = tunnel_settings
+        self.deployment = deployment_settings
+        self.logging = logging_settings
+        self.observability = observability_settings
+        self.x402 = x402_settings
+        self.agent = agent_settings
+        self.auth = auth_settings
+        self.hydra = hydra_settings
+        self.storage = storage_settings
+        self.scheduler = scheduler_settings
+        self.retry = retry_settings
+        self.negotiation = negotiation_settings
+        self.vault = vault_settings
+        self.security = security_settings
+
+
+app_settings = AppSettings()
