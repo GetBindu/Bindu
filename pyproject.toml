@@ -58,6 +58,7 @@ dependencies = [
     "detect-secrets==1.5.0",
     "python-dotenv>=1.1.0",
     "dspy>=2.5.0",
+    "psycopg2>=2.9.11",
 ]
 
 [project.optional-dependencies]

@@ -35,42 +35,11 @@ def upgrade() -> None:
         CREATE OR REPLACE FUNCTION create_bindu_tables_in_schema(schema_name TEXT)
         RETURNS VOID AS $$
         BEGIN
-            -- Create contexts table first (no dependencies)
-            EXECUTE format('
-                CREATE TABLE IF NOT EXISTS %I.contexts (
-                    id UUID PRIMARY KEY NOT NULL,
-                    context_data JSONB NOT NULL DEFAULT ''{}''::jsonb,
-                    message_history JSONB DEFAULT ''[]''::jsonb,
-                    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-                    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-                )', schema_name);
-
-            -- Create promptstatus enum type in the schema
-            EXECUTE format('
-                DO $enum$ BEGIN
-                    CREATE TYPE %I.promptstatus AS ENUM (''active'', ''candidate'', ''deprecated'', ''rolled_back'');
-                EXCEPTION
-                    WHEN duplicate_object THEN null;
-                END $enum$;
-            ', schema_name);
-
-            -- Create agent_prompts table (before tasks, so tasks can reference it)
-            EXECUTE format('
-                CREATE TABLE IF NOT EXISTS %I.agent_prompts (
-                    id SERIAL PRIMARY KEY NOT NULL,
-                    prompt_text TEXT NOT NULL,
-                    status %I.promptstatus NOT NULL,
-                    traffic NUMERIC(5, 4) NOT NULL DEFAULT 0,
-                    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-                    CONSTRAINT chk_agent_prompts_traffic_range CHECK (traffic >= 0 AND traffic <= 1)
-                )', schema_name, schema_name);
-
-            -- Create tasks table (references contexts and agent_prompts)
+            -- Create tasks table
             EXECUTE format('
                 CREATE TABLE IF NOT EXISTS %I.tasks (
                     id UUID PRIMARY KEY NOT NULL,
                     context_id UUID NOT NULL,
-                    prompt_id INTEGER,
                     kind VARCHAR(50) NOT NULL DEFAULT ''task'',
                     state VARCHAR(50) NOT NULL,
                     state_timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -80,10 +49,18 @@ def upgrade() -> None:
                     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
                     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
                     CONSTRAINT fk_tasks_context FOREIGN KEY (context_id)
-                        REFERENCES %I.contexts(id) ON DELETE CASCADE,
-                    CONSTRAINT fk_tasks_prompt FOREIGN KEY (prompt_id)
-                        REFERENCES %I.agent_prompts(id) ON DELETE SET NULL
-                )', schema_name, schema_name, schema_name);
+                        REFERENCES %I.contexts(id) ON DELETE CASCADE
+                )', schema_name, schema_name);
+
+            -- Create contexts table
+            EXECUTE format('
+                CREATE TABLE IF NOT EXISTS %I.contexts (
+                    id UUID PRIMARY KEY NOT NULL,
+                    context_data JSONB NOT NULL DEFAULT ''{}''::jsonb,
+                    message_history JSONB DEFAULT ''[]''::jsonb,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+                )', schema_name);
 
             -- Create task_feedback table
             EXECUTE format('
@@ -109,7 +86,6 @@ def upgrade() -> None:
 
             -- Create indexes for tasks
             EXECUTE format('CREATE INDEX IF NOT EXISTS idx_tasks_context_id ON %I.tasks(context_id)', schema_name);
-            EXECUTE format('CREATE INDEX IF NOT EXISTS idx_tasks_prompt_id ON %I.tasks(prompt_id)', schema_name);
             EXECUTE format('CREATE INDEX IF NOT EXISTS idx_tasks_state ON %I.tasks(state)', schema_name);
             EXECUTE format('CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON %I.tasks(created_at DESC)', schema_name);
             EXECUTE format('CREATE INDEX IF NOT EXISTS idx_tasks_updated_at ON %I.tasks(updated_at DESC)', schema_name);
@@ -129,19 +105,6 @@ def upgrade() -> None:
 
             -- Create indexes for webhook_configs
             EXECUTE format('CREATE INDEX IF NOT EXISTS idx_webhook_configs_created_at ON %I.webhook_configs(created_at DESC)', schema_name);
-
-            -- Create unique partial indexes for agent_prompts (only one active, only one candidate)
-            EXECUTE format('
-                CREATE UNIQUE INDEX IF NOT EXISTS uq_agent_prompts_status_active
-                ON %I.agent_prompts(status)
-                WHERE status = ''active''
-            ', schema_name);
-
-            EXECUTE format('
-                CREATE UNIQUE INDEX IF NOT EXISTS uq_agent_prompts_status_candidate
-                ON %I.agent_prompts(status)
-                WHERE status = ''candidate''
-            ', schema_name);
 
             -- Create triggers for updated_at
             EXECUTE format('
@@ -175,12 +138,10 @@ def upgrade() -> None:
         CREATE OR REPLACE FUNCTION drop_bindu_tables_in_schema(schema_name TEXT)
         RETURNS VOID AS $$
         BEGIN
-            EXECUTE format('DROP TABLE IF EXISTS %I.agent_prompts CASCADE', schema_name);
             EXECUTE format('DROP TABLE IF EXISTS %I.task_feedback CASCADE', schema_name);
             EXECUTE format('DROP TABLE IF EXISTS %I.webhook_configs CASCADE', schema_name);
             EXECUTE format('DROP TABLE IF EXISTS %I.tasks CASCADE', schema_name);
             EXECUTE format('DROP TABLE IF EXISTS %I.contexts CASCADE', schema_name);
-            EXECUTE format('DROP TYPE IF EXISTS %I.promptstatus CASCADE', schema_name);
 
             RAISE NOTICE 'Dropped all Bindu tables in schema: %', schema_name;
         END;
