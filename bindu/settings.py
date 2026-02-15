@@ -848,6 +848,76 @@ class OAuthSettings(BaseSettings):
             "OAUTH__GITHUB_CLIENT_SECRET", "GITHUB_CLIENT_SECRET"
         ),
     )
+class DSPySettings(BaseSettings):
+    """DSPy prompt optimization configuration settings.
+
+    This class defines the constants used for DSPy prompt optimization,
+    including model settings, filtering thresholds, and optimization parameters.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="DSPY__",
+        extra="allow",
+    )
+
+    # DSPy Model Configuration
+    default_model: str = "openrouter/openai/gpt-4o-mini"
+    """Default language model for DSPy optimization. Use openrouter/ prefix to route through OpenRouter."""
+
+    # Dataset Filtering Thresholds
+    min_feedback_threshold: float = 0.8
+    """Minimum normalized feedback score [0.0, 1.0] for interactions to be included in training dataset."""
+
+    # Golden Dataset Constraints
+    min_examples: int = 2
+    """Minimum number of examples required in golden dataset."""
+
+    max_examples: int = 10000
+    """Maximum number of examples allowed in golden dataset."""
+
+    min_input_length: int = 10
+    """Minimum character length for user input."""
+
+    min_output_length: int = 10
+    """Minimum character length for agent output."""
+
+    max_full_history_length: int = 10000
+    """Maximum character length for full history extraction strategy."""
+
+    default_n_turns: int = 3
+    """Default number of turns to extract for LAST_N_TURNS and FIRST_N_TURNS strategies."""
+
+    default_window_size: int = 2
+    """Default window size for sliding window strategy."""
+
+    default_stride: int = 1
+    """Default stride for sliding window strategy (1 = overlapping windows)."""
+
+    # Prompt Optimization Parameters
+    num_prompt_candidates: int = 3
+    """Number of optimized prompt candidates to generate and return."""
+
+    max_bootstrapped_demos: int = 8
+    """Maximum number of bootstrapped demonstrations for few-shot learning."""
+
+    # Database Query Limits
+    max_interactions_query_limit: int = 10000
+    """Maximum number of interactions to fetch from database in a single query."""
+
+    # Canary Deployment Thresholds
+    min_canary_interactions_threshold: int = 2
+    """Minimum number of interactions required for candidate prompt before comparing metrics in canary deployment."""
+
+    canary_traffic_step: float = 0.2
+    """Traffic adjustment step size for canary deployment (e.g., 0.1 = 10% increments)."""
+
+    # Initial A/B Test Traffic Split
+    initial_candidate_traffic: float = 0.4
+    """Initial traffic allocation for new candidate prompts during A/B testing (e.g., 0.10 = 10%)."""
+
+    initial_active_traffic: float = 0.6
+    """Initial traffic allocation for active prompt when candidate is introduced (e.g., 0.90 = 90%)."""
 
 
 class SentrySettings(BaseSettings):
@@ -957,6 +1027,7 @@ class Settings(BaseSettings):
     scheduler: SchedulerSettings = SchedulerSettings()
     retry: RetrySettings = RetrySettings()
     negotiation: NegotiationSettings = NegotiationSettings()
+    dspy: DSPySettings = DSPySettings()
     sentry: SentrySettings = SentrySettings()
 
 
