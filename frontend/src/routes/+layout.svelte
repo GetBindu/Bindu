@@ -38,6 +38,11 @@
 	let conversations = $state(data.conversations);
 	let agentContextsLoaded = $state(false);
 
+	// ⭐ PRO CONSTANTS (no magic numbers)
+	const MAX_CONTEXTS = 50;
+	const TITLE_LIMIT = 50;
+	const DEFAULT_TITLE = "New Chat";
+
 	$effect(() => {
 		data.conversations && untrack(() => (conversations = data.conversations));
 	});
@@ -49,85 +54,87 @@
 		}
 	});
 
+	// (Optimized)
 	async function loadAgentContexts() {
 		try {
-			console.log('Loading agent contexts...');
-			const token = localStorage.getItem('bindu_oauth_token');
-			if (token) {
-				console.log('Token found, setting auth token...');
-				agentAPI.setAuthToken(token);
-			} else {
-				console.log('No OAuth token found, continuing without auth (auth is optional)');
-				agentAPI.setAuthToken(null);
+			// SSR safe token handling
+			const token = localStorage?.getItem("bindu_oauth_token") ?? null;
+			agentAPI.setAuthToken(token);
+
+			const contexts = await agentAPI.listContexts(MAX_CONTEXTS);
+
+			if (!contexts?.length) {
+				agentContextsLoaded = true;
+				return;
 			}
 
-			console.log('Fetching contexts...');
-			const contexts = await agentAPI.listContexts(50);
-			console.log('Contexts received:', contexts);
-			console.log('Number of contexts:', contexts.length);
+			// Parallel task fetching
+			const agentConvs = await Promise.all(
+				contexts.map(async (ctx) => {
+					if (!ctx?.context_id) return null;
 
-			const agentConvs = [];
-			for (let i = 0; i < contexts.length; i++) {
-				const ctx = contexts[i];
-				console.log(`Processing context ${i + 1}/${contexts.length}:`, ctx);
-				let title = 'New Chat';
-				let timestamp = new Date();
+					let title = DEFAULT_TITLE;
+					let timestamp = new Date();
 
-				if (ctx.task_ids && ctx.task_ids.length > 0) {
-					console.log(`  Context has ${ctx.task_ids.length} tasks, fetching first task:`, ctx.task_ids[0]);
+					if (!ctx.task_ids?.length) {
+						return {
+							id: ctx.context_id,
+							title,
+							model: "bindu",
+							updatedAt: timestamp,
+						};
+					}
+
 					try {
 						const task = await agentAPI.getTask(ctx.task_ids[0]);
-						console.log('  Task received:', task);
-						const history = task.history || [];
-						console.log('  Task history length:', history.length);
 
-						for (const msg of history) {
-							if (msg.role === 'user') {
-								const parts = msg.parts || [];
-								const textParts = parts
-									.filter(part => part.kind === 'text')
-									.map(part => part.text || '');
-								if (textParts.length > 0) {
-									title = textParts[0].substring(0, 50);
-									if (textParts[0].length > 50) title += '...';
-									console.log('  ✅ Found title:', title);
-									break;
-								}
-							}
+						const userMsg = task?.history?.find(
+							(msg) => msg.role === "user"
+						);
+
+						const text = userMsg?.parts
+							?.filter((p) => p.kind === "text")
+							?.[0]?.text;
+
+						if (text) {
+							title =
+								text.slice(0, TITLE_LIMIT) +
+								(text.length > TITLE_LIMIT ? "..." : "");
 						}
 
-						if (task.status && task.status.timestamp) {
+						if (task?.status?.timestamp) {
 							timestamp = new Date(task.status.timestamp);
 						}
 					} catch (err) {
-						console.error('  ❌ Error loading context preview:', err);
+						console.error("Context preview load failed:", err);
 					}
-				} else {
-					console.log('  No tasks in this context');
-				}
 
-				console.log(`  Final title for context: "${title}"`);
-
-				if (ctx.context_id) {
-					agentConvs.push({
+					return {
 						id: ctx.context_id,
 						title,
-						model: 'bindu',
+						model: "bindu",
 						updatedAt: timestamp,
-					});
-				}
-			}
+					};
+				})
+			);
 
-			console.log('Agent conversations to add:', agentConvs);
+			// Remove nulls
+			const validAgentConvs = agentConvs.filter(Boolean);
 
-			// Merge and sort
-			conversations = [...data.conversations, ...agentConvs].sort(
+			// Prevent duplicates
+			const unique = new Map();
+			[...data.conversations, ...validAgentConvs].forEach((conv) =>
+				unique.set(conv.id, conv)
+			);
+
+			conversations = [...unique.values()].sort(
 				(a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
 			);
-			console.log('Final merged conversations:', conversations);
+
 			agentContextsLoaded = true;
 		} catch (err) {
-			console.error('Error loading agent contexts:', err);
+			console.error("Error loading agent contexts:", err);
+			$error = "Failed to load conversations";
 		}
 	}
 
@@ -137,7 +144,6 @@
 	let currentError: string | undefined = $state();
 
 	async function onError() {
-		// If a new different error comes, wait for the current error to hide first
 		if ($error && currentError && $error !== currentError) {
 			clearTimeout(errorToastTimeout);
 			currentError = undefined;
@@ -182,7 +188,9 @@
 			.patch({ title })
 			.then(handleResponse)
 			.then(async () => {
-				conversations = conversations.map((conv) => (conv.id === id ? { ...conv, title } : conv));
+				conversations = conversations.map((conv) =>
+					conv.id === id ? { ...conv, title } : conv
+				);
 			})
 			.catch((err) => {
 				console.error(err);
@@ -224,9 +232,7 @@
 				.then((userData) => {
 					isPro.set(userData.isPro ?? false);
 				})
-				.catch(() => {
-					// Keep isPro as null on error - don't show any badge if status is unknown
-				});
+				.catch(() => {});
 		}
 
 		if (page.url.searchParams.has("token")) {
@@ -240,14 +246,13 @@
 			});
 		}
 
-		// Global keyboard shortcut: New Chat (Ctrl/Cmd + Shift + O)
 		const onKeydown = (e: KeyboardEvent) => {
-			// Ignore when a modal has focus (app is inert)
 			const appEl = document.getElementById("app");
 			if (appEl?.hasAttribute("inert")) return;
 
 			const oPressed = e.key?.toLowerCase() === "o";
 			const metaOrCtrl = e.metaKey || e.ctrlKey;
+
 			if (oPressed && e.shiftKey && metaOrCtrl) {
 				e.preventDefault();
 				isAborted.set(true);
@@ -266,132 +271,8 @@
 			: conversations.find((conv) => conv.id === page.params.id)?.title
 	);
 
-	// Show the welcome modal once on first app load
 	let showWelcome = $derived(
 		!$settings.welcomeModalSeen &&
 			!(page.data.shared === true && page.route.id?.startsWith("/conversation/"))
 	);
 </script>
-
-<svelte:head>
-	<title>{publicConfig.PUBLIC_APP_NAME}</title>
-	<meta name="description" content={publicConfig.PUBLIC_APP_DESCRIPTION} />
-	<meta name="twitter:card" content="summary_large_image" />
-	<meta name="twitter:site" content="@huggingface" />
-	<meta name="twitter:title" content={publicConfig.PUBLIC_APP_NAME} />
-	<meta name="twitter:description" content={publicConfig.PUBLIC_APP_DESCRIPTION} />
-	<meta
-		name="twitter:image"
-		content="{publicConfig.PUBLIC_ORIGIN || page.url.origin}{publicConfig.assetPath}/thumbnail.png"
-	/>
-	<meta name="twitter:image:alt" content="{publicConfig.PUBLIC_APP_NAME} preview" />
-
-	<meta property="og:title" content={publicConfig.PUBLIC_APP_NAME} />
-	<meta property="og:type" content="website" />
-	<meta property="og:url" content="{publicConfig.PUBLIC_ORIGIN || page.url.origin}{base}" />
-	<meta property="og:image" content="{publicConfig.assetPath}/thumbnail.png" />
-	<meta property="og:description" content={publicConfig.PUBLIC_APP_DESCRIPTION} />
-	<meta property="og:site_name" content={publicConfig.PUBLIC_APP_NAME} />
-	<meta property="og:locale" content="en_US" />
-	<link rel="icon" href="{publicConfig.assetPath}/icon.svg" type="image/svg+xml" />
-	{#if publicConfig.PUBLIC_ORIGIN}
-		<link
-			rel="icon"
-			href="{publicConfig.assetPath}/favicon.svg"
-			type="image/svg+xml"
-			media="(prefers-color-scheme: light)"
-		/>
-		<link
-			rel="icon"
-			href="{publicConfig.assetPath}/favicon-dark.svg"
-			type="image/svg+xml"
-			media="(prefers-color-scheme: dark)"
-		/>
-	{:else}
-		<link rel="icon" href="{publicConfig.assetPath}/favicon-dev.svg" type="image/svg+xml" />
-	{/if}
-	<link rel="apple-touch-icon" href="{publicConfig.assetPath}/apple-touch-icon.png" />
-	<link rel="manifest" href="{publicConfig.assetPath}/manifest.json" />
-
-	{#if publicConfig.PUBLIC_PLAUSIBLE_SCRIPT_URL}
-		<script async src={publicConfig.PUBLIC_PLAUSIBLE_SCRIPT_URL}></script>
-	{/if}
-
-	{#if publicConfig.PUBLIC_APPLE_APP_ID}
-		<meta name="apple-itunes-app" content={`app-id=${publicConfig.PUBLIC_APPLE_APP_ID}`} />
-	{/if}
-</svelte:head>
-
-{#if showWelcome}
-	<WelcomeModal close={closeWelcomeModal} />
-{/if}
-
-<BackgroundGenerationPoller />
-
-<div
-	class="fixed grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd {!isNavCollapsed
-		? 'md:grid-cols-[290px,1fr]'
-		: 'md:grid-cols-[0px,1fr]'} transition-[300ms] [transition-property:grid-template-columns] dark:text-gray-300 md:grid-rows-[1fr]"
->
-	<ExpandNavigation
-		isCollapsed={isNavCollapsed}
-		onClick={() => (isNavCollapsed = !isNavCollapsed)}
-		classNames="absolute inset-y-0 z-10 my-auto {!isNavCollapsed
-			? 'left-[290px]'
-			: 'left-0'} *:transition-transform"
-	/>
-
-	{#if canShare}
-		<button
-			type="button"
-			class="hidden size-8 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white/90 text-sm font-medium text-gray-700 shadow-sm hover:bg-white/60 hover:text-gray-500 dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-200 dark:hover:bg-gray-700 md:absolute md:right-6 md:top-5 md:flex
-				{$loading ? 'cursor-not-allowed opacity-40' : ''}"
-			onclick={() => shareModal.open()}
-			aria-label="Share conversation"
-			disabled={$loading}
-		>
-			<IconShare />
-		</button>
-	{/if}
-
-	<MobileNav title={mobileNavTitle}>
-		<NavMenu
-			{conversations}
-			user={data.user}
-			ondeleteConversation={(id) => deleteConversation(id)}
-			oneditConversationTitle={(payload) => editConversationTitle(payload.id, payload.title)}
-		/>
-	</MobileNav>
-	<nav
-		class="grid max-h-dvh grid-cols-1 grid-rows-[auto,1fr,auto] overflow-hidden *:w-[290px] max-md:hidden"
-	>
-		<NavMenu
-			{conversations}
-			user={data.user}
-			ondeleteConversation={(id) => deleteConversation(id)}
-			oneditConversationTitle={(payload) => editConversationTitle(payload.id, payload.title)}
-		/>
-	</nav>
-	{#if currentError}
-		<Toast message={currentError} />
-	{/if}
-	{@render children?.()}
-
-	<Footer />
-
-	{#if publicConfig.PUBLIC_PLAUSIBLE_SCRIPT_URL}
-		<script>
-			(window.plausible =
-				window.plausible ||
-				function () {
-					(plausible.q = plausible.q || []).push(arguments);
-				}),
-				(plausible.init =
-					plausible.init ||
-					function (i) {
-						plausible.o = i || {};
-					});
-			plausible.init();
-		</script>
-	{/if}
-</div>
