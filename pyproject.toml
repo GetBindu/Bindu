@@ -66,6 +66,8 @@ dependencies = [
     "langchain-openai>=1.1.8",
     "langgraph>=1.0.8",
     "python-dotenv>=1.1.0",
+    "dspy>=2.5.0",
+    "psycopg2>=2.9.11",
 ]
 
 [project.optional-dependencies]
@@ -147,3 +149,6 @@ fallback-version = "0.3.14"
 
 [tool.hatch.build.hooks.vcs]
 version-file = "bindu/_version.py"
+
+[project.scripts]
+bindu = "bindu.cli.main:main"
