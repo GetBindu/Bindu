@@ -2,7 +2,9 @@
 
 from __future__ import annotations as _annotations
 
+import asyncio
 import json
+import random
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -39,6 +41,8 @@ class RedisScheduler(Scheduler):
         max_connections: int = 10,
         retry_on_timeout: bool = True,
         poll_timeout: int = 1,
+        error_backoff_base: float = 0.1,
+        error_backoff_max: float = 30.0,
     ):
         """Initialize Redis scheduler.
 
@@ -49,13 +53,19 @@ class RedisScheduler(Scheduler):
             retry_on_timeout: Whether to retry on Redis timeout
             poll_timeout: Timeout in seconds for blpop operations (default: 1s)
                 Higher values reduce API calls but slightly increase task start latency.
+            error_backoff_base: Base delay in seconds for exponential backoff on
+                receive errors. Actual delay = base * 2^(consecutive_errors - 1) + jitter.
+            error_backoff_max: Maximum backoff delay in seconds during sustained failures.
         """
         self.redis_url = redis_url
         self.queue_name = queue_name
         self.max_connections = max_connections
         self.retry_on_timeout = retry_on_timeout
         self.poll_timeout = poll_timeout
+        self.error_backoff_base = error_backoff_base
+        self.error_backoff_max = error_backoff_max
         self._redis_client: redis.Redis | None = None
+        self._consecutive_errors: int = 0
 
     async def __aenter__(self):
         """Initialize Redis connection pool."""
@@ -122,8 +132,26 @@ class RedisScheduler(Scheduler):
         )
         await self._push_task_operation(task_operation)
 
+    def _compute_backoff_delay(self) -> float:
+        """Compute backoff delay with exponential growth and jitter.
+
+        Uses the formula: min(base * 2^(errors-1), max) + jitter
+        Jitter is 0-25% of the computed delay to prevent thundering herd.
+
+        Returns:
+            Delay in seconds to sleep before next retry.
+        """
+        exp_delay = self.error_backoff_base * (2 ** (self._consecutive_errors - 1))
+        capped = min(exp_delay, self.error_backoff_max)
+        jitter = random.uniform(0, capped * 0.25)
+        return capped + jitter
+
     async def receive_task_operations(self) -> AsyncIterator[TaskOperation]:
-        """Receive task operations from Redis queue using blocking pop."""
+        """Receive task operations from Redis queue using blocking pop.
+
+        Implements exponential backoff with jitter on consecutive errors to prevent
+        tight error loops during Redis outages. Backoff resets on successful receive.
+        """
         if not self._redis_client:
             raise RuntimeError(
                 "Redis client not initialized. Use async context manager."
@@ -140,6 +168,13 @@ class RedisScheduler(Scheduler):
                     self.queue_name, timeout=self.poll_timeout
                 )
 
+                # Reset error counter on successful poll (even if no result)
+                if self._consecutive_errors > 0:
+                    logger.info(
+                        f"Redis connection recovered after {self._consecutive_errors} consecutive errors"
+                    )
+                    self._consecutive_errors = 0
+
                 if result:
                     _, task_data = result
                     task_operation = self._deserialize_task_operation(task_data)
@@ -149,18 +184,26 @@ class RedisScheduler(Scheduler):
                     yield task_operation
 
             except redis.RedisError as e:
-                # Log error and continue (Redis connection issues)
-                logger.error(f"Redis error in receive_task_operations: {e}")
-                # Could add exponential backoff here for production
-                continue
+                self._consecutive_errors += 1
+                delay = self._compute_backoff_delay()
+                logger.error(
+                    f"Redis error in receive_task_operations (consecutive={self._consecutive_errors}, "
+                    f"backoff={delay:.2f}s): {e}"
+                )
+                await asyncio.sleep(delay)
             except json.JSONDecodeError as e:
-                # Log deserialization errors but continue
+                # Deserialization errors don't indicate connectivity issues;
+                # no backoff needed, but count for monitoring
                 logger.error(f"Failed to deserialize task operation: {e}")
                 continue
             except Exception as e:
-                # Log unexpected errors
-                logger.error(f"Unexpected error in receive_task_operations: {e}")
-                continue
+                self._consecutive_errors += 1
+                delay = self._compute_backoff_delay()
+                logger.error(
+                    f"Unexpected error in receive_task_operations (consecutive={self._consecutive_errors}, "
+                    f"backoff={delay:.2f}s): {e}"
+                )
+                await asyncio.sleep(delay)
 
     async def _push_task_operation(self, task_operation: TaskOperation) -> None:
         """Push a task operation to Redis queue."""
@@ -309,3 +352,36 @@ class RedisScheduler(Scheduler):
         except Exception as e:
             logger.warning(f"Redis health check failed: {e}")
             return False
+
+    async def get_health_status(self) -> dict:
+        """Return structured health status including degradation state.
+
+        Provides observability into the receive loop's backoff state,
+        allowing monitoring systems to detect and alert on scheduler degradation
+        before it causes visible task processing delays.
+
+        Returns:
+            Dict with keys:
+                - healthy (bool): Whether Redis ping succeeds
+                - consecutive_errors (int): Errors since last successful receive
+                - backoff_active (bool): Whether the receive loop is in backoff
+                - current_backoff_delay (float | None): Current delay if in backoff
+                - status (str): "healthy", "degraded", or "unavailable"
+        """
+        ping_ok = await self.health_check()
+        backoff_active = self._consecutive_errors > 0
+
+        if not self._redis_client:
+            status = "unavailable"
+        elif not ping_ok or self._consecutive_errors >= 5:
+            status = "degraded"
+        else:
+            status = "healthy"
+
+        return {
+            "healthy": ping_ok,
+            "consecutive_errors": self._consecutive_errors,
+            "backoff_active": backoff_active,
+            "current_backoff_delay": self._compute_backoff_delay() if backoff_active else None,
+            "status": status,
+        }
