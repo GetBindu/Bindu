@@ -126,6 +126,8 @@ async def create_scheduler(config: SchedulerConfig | None = None) -> Scheduler:
             max_connections=config.max_connections,
             retry_on_timeout=config.retry_on_timeout,
             poll_timeout=config.poll_timeout,
+            error_backoff_base=app_settings.scheduler.error_backoff_base,
+            error_backoff_max=app_settings.scheduler.error_backoff_max,
         )
 
         return scheduler
