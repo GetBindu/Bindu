@@ -162,6 +162,11 @@ class ManifestWorker(Worker):
                         system_prompt = app_settings.agent.structured_response_system_prompt
                         logger.warning("No prompts in database, creating initial active prompt")
 
+                        if not system_prompt:
+                            raise RuntimeError(
+                                "DSPy enabled but no fallback system prompt configured."
+                            )
+
                         # Insert default prompt as active with 100% traffic using worker's storage
                         selected_prompt_id = await insert_prompt(
                             text=system_prompt,
@@ -178,12 +183,12 @@ class ManifestWorker(Worker):
                         )
 
                     # Store prompt_id in task for tracking when using DB prompts
-                    if selected_prompt_id is not None:
-                        await self.storage.update_task(
-                            task["id"],
-                            state="working",
-                            prompt_id=selected_prompt_id,
-                        )
+                    await self.storage.update_task(
+                        task["id"],
+                        state=task["status"]["state"],  # preserve current state
+                        prompt_id=selected_prompt_id,
+                    )
+
                 else:
                     # DSPy disabled for this agent; use manifest-provided system prompt
                     system_prompt = getattr(self.manifest, "system_prompt", None) or (
