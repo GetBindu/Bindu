@@ -133,7 +133,7 @@ class ManifestWorker(Worker):
         await self._notify_lifecycle(task["id"], task["context_id"], "working", False)
 
         # Step 2: Build conversation history (A2A Protocol)
-        message_history = await self._build_complete_message_history(task)
+        message_history = await self.build_complete_message_history(task)
 
         try:
             # Step 3: Execute manifest with system prompt (if enabled)
@@ -295,7 +295,7 @@ class ManifestWorker(Worker):
         did_extension = self.manifest.did_extension
         return ArtifactBuilder.from_result(result, did_extension=did_extension)
 
-    async def _build_complete_message_history(self, task: Task) -> list[dict[str, str]]:
+    async def build_complete_message_history(self, task: Task) -> list[dict[str, str]]:
         """Build complete conversation history following A2A Protocol.
 
         A2A Protocol Strategy:
@@ -449,7 +449,7 @@ class ManifestWorker(Worker):
 
             # Handle payment settlement if payment context is available
             if payment_context:
-                settlement_metadata = await self._settle_payment(payment_context)
+                settlement_metadata = await self.settle_payment(payment_context)
                 if additional_metadata:
                     additional_metadata.update(settlement_metadata)
                 else:
@@ -503,7 +503,7 @@ class ManifestWorker(Worker):
         )
         await self._notify_lifecycle(task["id"], task["context_id"], "failed", True)
 
-    async def _settle_payment(self, payment_context: dict[str, Any]) -> dict[str, Any]:
+    async def settle_payment(self, payment_context: dict[str, Any]) -> dict[str, Any]:
         """Settle payment after successful task completion.
 
         This method is called only when a task completes successfully with payment context.
