@@ -24,6 +24,9 @@ class _Span:
     def set_status(self, *args, **kwargs):  # noqa: D401
         return None
 
+    def end(self, *args, **kwargs):  # noqa: D401
+        return None
+
 
 def get_current_span():  # noqa: D401
     """Return a mock span for testing without OpenTelemetry."""
