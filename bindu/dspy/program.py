@@ -21,15 +21,29 @@ import dspy
 from .signature import AgentSignature
 
 
+# class AgentProgram(dspy.Module):
+#     """Agent program for response generation."""
+
+#     def __init__(self, current_prompt_text: str) -> None:
+#         super().__init__()
+
+#         self.instructions = current_prompt_text
+
+#         self.predictor = dspy.Predict(AgentSignature)
+
+#     def forward(self, input: str) -> dspy.Prediction:
+#         return self.predictor(input=input)
+
 class AgentProgram(dspy.Module):
     """Agent program for response generation."""
 
     def __init__(self, current_prompt_text: str) -> None:
         super().__init__()
 
-        self.instructions = current_prompt_text
+        # Inject system prompt into signature so SIMBA can mutate it
+        signature = AgentSignature.with_instructions(current_prompt_text)
 
-        self.predictor = dspy.Predict(AgentSignature)
+        self.predictor = dspy.Predict(signature)
 
     def forward(self, input: str) -> dspy.Prediction:
         return self.predictor(input=input)
