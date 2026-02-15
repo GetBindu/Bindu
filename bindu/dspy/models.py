@@ -43,15 +43,3 @@ class Interaction:
     feedback_score: float | None = None
     feedback_type: str | None = None
     system_prompt: str | None = None
-
-
-@dataclass(frozen=True)
-class PromptCandidate:
-    """Represents an optimized prompt candidate.
-
-    After DSPy optimization, multiple prompt candidates are generated
-    with associated quality scores. This model captures one such candidate.
-    """
-
-    text: str
-    metadata: dict[str, Any]
