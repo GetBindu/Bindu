@@ -28,7 +28,6 @@ from bindu.server.storage.postgres_storage import PostgresStorage
 from .dataset import build_golden_dataset, convert_to_dspy_examples
 from .strategies import BaseExtractionStrategy, LastTurnStrategy
 from .guard import ensure_system_stable
-from .models import PromptCandidate
 from .optimizer import optimize
 from .program import AgentProgram
 from .prompts import (
@@ -42,11 +41,26 @@ from dspy.teleprompt import SIMBA, GEPA
 
 logger = get_logger("bindu.dspy.train")
 
+def extract_optimized_prompt(program: dspy.Module) -> str:
+    predictor = program.predictor
+
+    instructions = predictor.signature.instructions or ""
+    demos = predictor.demos or []
+
+    prompt_parts = [instructions.strip()]
+
+    for demo in demos:
+        prompt_parts.append(
+            f"\nUser: {demo.input}\nAssistant: {demo.output}"
+        )
+
+    return "\n".join(prompt_parts).strip()
+
 async def train_async(
     optimizer: Any,
     strategy: BaseExtractionStrategy | None = None,
-    require_feedback: bool = True,
     did: str | None = None,
+    min_feedback_threshold: float = None,
 ) -> None:
     """Train and optimize agent prompts using DSPy.
 
@@ -79,7 +93,6 @@ async def train_async(
             - LastNTurnsStrategy(n_turns=3)
             - FirstNTurnsStrategy(n_turns=3)
             - ContextWindowStrategy(n_turns=3, system_prompt="...")
-        require_feedback: Whether to require feedback for inclusion in dataset
         did: Decentralized Identifier for schema isolation (required for multi-tenancy)
     Returns:
         None. The optimized prompt is inserted into the database as a candidate.
@@ -144,17 +157,18 @@ async def train_async(
         # Note: build_golden_dataset creates its own storage connection for data fetching
         logger.info(
             f"Building golden dataset (strategy={strategy.name}, "
-            f"require_feedback={require_feedback}, "
-            f"threshold={app_settings.dspy.min_feedback_threshold})"
+            f"threshold={min_feedback_threshold})"
         )
         golden_dataset = await build_golden_dataset(
             limit=None,  # Use default from settings
             strategy=strategy,
-            require_feedback=require_feedback,
-            min_feedback_threshold=app_settings.dspy.min_feedback_threshold,
+            min_feedback_threshold=min_feedback_threshold,
             did=did,
         )
 
+        if not golden_dataset:
+            raise ValueError("Golden dataset is empty. Cannot proceed with training.")
+        
         logger.info(f"Golden dataset prepared with {len(golden_dataset)} examples")
 
         # Step 5: Convert to DSPy examples
@@ -199,7 +213,7 @@ async def train_async(
         logger.info(
             "Extracting optimized instructions from predictor"
         )
-        instructions = optimized_program.instructions
+        instructions = extract_optimized_prompt(optimized_program)
         
         if not instructions or not instructions.strip():
             raise RuntimeError("Optimizer did not produce valid instructions")
@@ -242,8 +256,8 @@ async def train_async(
 def train(
     optimizer: Any = None,
     strategy: BaseExtractionStrategy | None = None,
-    require_feedback: bool = True,
     did: str | None = None,
+    min_feedback_threshold: float = None,
 ) -> None:
     """Synchronous wrapper for train_async().
 
@@ -253,7 +267,6 @@ def train(
     Args:
         optimizer: DSPy optimizer instance (default: None)
         strategy: Extraction strategy (LAST_TURN or FULL_HISTORY)
-        require_feedback: Whether to require feedback for inclusion in dataset
         did: Decentralized Identifier for schema isolation (required for multi-tenancy)
 
     Returns:
@@ -267,8 +280,8 @@ def train(
             train_async(
                 optimizer=optimizer,
                 strategy=strategy,
-                require_feedback=require_feedback,
                 did=did,
+                min_feedback_threshold=min_feedback_threshold,
             )
         )
     except RuntimeError as e:
