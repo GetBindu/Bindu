@@ -106,7 +106,6 @@ def create_manifest(
     extra_metadata: dict[str, Any] | None = None,
     global_webhook_url: str | None = None,
     global_webhook_token: str | None = None,
-    enable_dspy: bool = False,
 ) -> AgentManifest:
     """Create a protocol-compliant AgentManifest from any Python function.
 
@@ -194,7 +193,6 @@ def create_manifest(
         kind=kind,
         num_history_sessions=num_history_sessions,
         enable_system_message=enable_system_message,
-        enable_dspy=enable_dspy,
         enable_context_based_history=enable_context_based_history,
         extra_data=extra_metadata or {},
         debug_mode=debug_mode,
