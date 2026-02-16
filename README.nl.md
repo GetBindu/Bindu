@@ -11,18 +11,6 @@
 </p>
 
 <p align="center">
-  <a href="README.md">🇬🇧 English</a> •
-  <a href="README.de.md">🇩🇪 Deutsch</a> •
-  <a href="README.es.md">🇪🇸 Español</a> •
-  <a href="README.fr.md">🇫🇷 Français</a> •
-  <a href="README.hi.md">🇮🇳 हिंदी</a> •
-  <a href="README.bn.md">🇮🇳 বাংলা</a> •
-  <a href="README.zh.md">🇨🇳 中文</a> •
-  <a href="README.nl.md">🇳🇱 Nederlands</a> •
-  <a href="README.ta.md">🇮🇳 தமிழ்</a>
-</p>
-
-<p align="center">
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
   <a href="https://hits.sh/github.com/Saptha-me/Bindu.svg"><img src="https://hits.sh/github.com/Saptha-me/Bindu.svg" alt="Hits"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="Python Version"></a>
@@ -686,49 +674,40 @@ score = (
 
 <br/>
 
-## [DSPy Integratie](https://docs.getbindu.com/bindu/learn/dspy/overview)
+## Task Feedback en DSPy
 
-> Geautomatiseerde prompt optimalisatie en continue verbetering door machine learning
+Bindu verzamelt gebruikersfeedback op task executions om continue verbetering mogelijk te maken via DSPy-optimalisatie. Door feedback op te slaan met ratings en metadata, kun je golden datasets bouwen uit echte interacties en DSPy gebruiken om de prompts en het gedrag van je agent automatisch te optimaliseren.
 
-Bindu's DSPy integratie biedt geautomatiseerde prompt optimalisatie en A/B testing voor AI-agents. In plaats van handmatig prompts aan te passen, gebruikt DSPy machine learning om prompts te optimaliseren op basis van echte gebruikersinteracties en feedback, waarbij een continue verbeteringscyclus wordt gecreëerd.
+### Feedback indienen
 
-Optioneel - Vereist PostgreSQL storage en wordt ingeschakeld via agent config.
-
-### ⚙️ Configuratie
-
-<details>
-<summary><b>Bekijk configuratievoorbeeld</b> (klik om uit te vouwen)</summary>
-
-Schakel DSPy in je agent config in:
-
-```python
-config = {
-    "author": "your.email@example.com",
-    "name": "research_agent",
-    "description": "Een onderzoeksassistent met continue verbetering",
-    "deployment": {"url": "http://localhost:3773", "expose": True},
-    "enable_dspy": True,  # ← Schakel DSPy optimalisatie in
-}
-```
-
-Configureer via omgevingsvariabelen:
+Geef feedback op elke task met behulp van de `tasks/feedback` methode:
 
 ```bash
-# Vereist: PostgreSQL verbinding
-STORAGE_TYPE=postgres
-DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/bindu
-
-# OpenRouter API key voor training
-OPENROUTER_API_KEY=your_openrouter_api_key
-
-# Zie examples/.env.example voor volledige configuratie
+curl --location 'http://localhost:3773/' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: Bearer <your-token>' \
+--data '{
+    "jsonrpc": "2.0",
+    "method": "tasks/feedback",
+    "params": {
+        "taskId": "550e8400-e29b-41d4-a716-446655440200",
+        "feedback": "Geweldig werk! De response was zeer behulpzaam en accuraat.",
+        "rating": 5,
+        "metadata": {
+            "category": "quality",
+            "source": "user",
+            "helpful": true
+        }
+    },
+    "id": "550e8400-e29b-41d4-a716-446655440024"
+}'
 ```
 
-</details>
-
-Wanneer ingeschakeld, worden systeemprompts geladen vanuit de database met automatische A/B testing, wat geleidelijke uitrol van geoptimaliseerde prompts mogelijk maakt op basis van gebruikersfeedback.
-
-> 📚 Voor volledige DSPy documentatie, training en canary deployment, zie [bindu/dspy/README.md](bindu/dspy/README.md)
+Feedback wordt opgeslagen in de `task_feedback` tabel en kan worden gebruikt om:
+- Hoogwaardige task interacties te filteren voor trainingsdata
+- Patronen te identificeren in succesvolle versus mislukte completions
+- Agent instructies en few-shot voorbeelden te optimaliseren met DSPy
+- We werken aan DsPY - binnenkort beschikbaar.
 
 ---
 
