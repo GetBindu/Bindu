@@ -109,11 +109,17 @@ async def promote_step(active: dict, candidate: dict, storage: Storage, did: str
     await update_prompt_traffic(active["id"], new_active_traffic, storage=storage, did=did)
 
     # Check for stabilization
-    await _check_stabilization(active, candidate, new_active_traffic, new_candidate_traffic, storage=storage, did=did)
+    if new_candidate_traffic == 1.0 and new_active_traffic == 0.0:
+        logger.info(
+            f"System stabilized: candidate won, promoting candidate {candidate['id']} "
+            f"to active and deprecating old active {active['id']}"
+        )
+        await update_prompt_status(candidate["id"], "active", storage=storage, did=did)
+        await update_prompt_status(active["id"], "deprecated", storage=storage, did=did)
 
-
-async def rollback_step(active: dict, candidate: dict, storage: Storage, did: str | None = None) -> None:
-    """Rollback candidate by decreasing its traffic by 0.1 and increasing active's.
+async def hard_rollback(active: dict, candidate: dict, storage: Storage, did: str | None = None) -> None:
+    """Immediately roll back candidate by setting its traffic to 0 and
+    restoring active to 1.0.
 
     Args:
         active: Active prompt data with id and current traffic
@@ -121,22 +127,20 @@ async def rollback_step(active: dict, candidate: dict, storage: Storage, did: st
         storage: Storage instance to use for database operations
         did: Decentralized Identifier for schema isolation
     """
-    traffic_step = app_settings.dspy.canary_traffic_step
-    new_candidate_traffic = max(0.0, candidate["traffic"] - traffic_step)
-    new_active_traffic = min(1.0, active["traffic"] + traffic_step)
-
-    logger.info(
-        f"Rolling back candidate: traffic {candidate['traffic']:.1f} -> "
-        f"{new_candidate_traffic:.1f}, active {active['traffic']:.1f} -> "
-        f"{new_active_traffic:.1f}"
+    logger.warning(
+        f"Hard rollback triggered: candidate {candidate['id']} "
+        f"loses to active {active['id']}. "
+        f"Setting candidate traffic to 0 and active to 1.0."
     )
 
-    await update_prompt_traffic(candidate["id"], new_candidate_traffic, storage=storage, did=did)
-    await update_prompt_traffic(active["id"], new_active_traffic, storage=storage, did=did)
+    # Immediately restore traffic split
+    await update_prompt_traffic(candidate["id"], 0.0, storage=storage, did=did)
+    await update_prompt_traffic(active["id"], 1.0, storage=storage, did=did)
 
-    # Check for stabilization
-    await _check_stabilization(active, candidate, new_active_traffic, new_candidate_traffic, storage=storage, did=did)
-
+    # Mark candidate as rolled back
+    await update_prompt_status(
+        candidate["id"], "rolled_back", storage=storage, did=did
+    )
 
 async def _check_stabilization(
     active: dict, candidate: dict, active_traffic: float, candidate_traffic: float, storage: Storage, did: str | None = None
@@ -151,16 +155,7 @@ async def _check_stabilization(
         storage: Storage instance to use for database operations
         did: Decentralized Identifier for schema isolation
     """
-    # Stabilization: one prompt at 1.0, the other at 0.0
-    if active_traffic == 1.0 and candidate_traffic == 0.0:
-        # Active won, candidate is rolled back
-        logger.info(
-            f"System stabilized: active won, setting candidate {candidate['id']} "
-            f"to rolled_back"
-        )
-        await update_prompt_status(candidate["id"], "rolled_back", storage=storage, did=did)
-
-    elif candidate_traffic == 1.0 and active_traffic == 0.0:
+    if candidate_traffic == 1.0 and active_traffic == 0.0:
         # Candidate won, promote to active and deprecate old active
         logger.info(
             f"System stabilized: candidate won, promoting candidate {candidate['id']} "
@@ -204,7 +199,7 @@ async def run_canary_controller(did: str | None = None) -> None:
         if winner == "candidate":
             await promote_step(active, candidate, storage=storage, did=did)
         elif winner == "active":
-            await rollback_step(active, candidate, storage=storage, did=did)
+            await hard_rollback(active, candidate, storage=storage, did=did)
         else:
             logger.info("No clear winner - maintaining current traffic distribution")
     
