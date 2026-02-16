@@ -75,7 +75,6 @@ class Storage(ABC, Generic[ContextT]):
         new_artifacts: list[Artifact] | None = None,
         new_messages: list[Message] | None = None,
         metadata: dict[str, Any] | None = None,
-        prompt_id: int | None = None,
     ) -> Task:
         """Update task state and append new content.
 
@@ -278,3 +277,4 @@ class Storage(ABC, Generic[ContextT]):
         Returns:
             Dictionary mapping task IDs to their webhook configurations
         """
+
