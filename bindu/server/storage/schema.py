@@ -19,19 +19,14 @@ from __future__ import annotations as _annotations
 
 from sqlalchemy import (
     TIMESTAMP,
-    CheckConstraint,
     Column,
-    Enum,
     ForeignKey,
     Index,
     Integer,
     MetaData,
-    Numeric,
     String,
     Table,
-    Text,
     func,
-    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 
@@ -53,12 +48,6 @@ tasks_table = Table(
         PG_UUID(as_uuid=True),
         ForeignKey("contexts.id", ondelete="CASCADE"),
         nullable=False,
-    ),
-    Column(
-        "prompt_id",
-        Integer,
-        ForeignKey("agent_prompts.id", ondelete="SET NULL"),
-        nullable=True,
     ),
     # Task metadata
     Column("kind", String(50), nullable=False, default="task"),
@@ -84,7 +73,6 @@ tasks_table = Table(
     ),
     # Indexes
     Index("idx_tasks_context_id", "context_id"),
-    Index("idx_tasks_prompt_id", "prompt_id"),
     Index("idx_tasks_state", "state"),
     Index("idx_tasks_created_at", "created_at"),
     Index("idx_tasks_updated_at", "updated_at"),
@@ -198,49 +186,6 @@ webhook_configs_table = Table(
     # Table comment
     comment="Webhook configurations for long-running task notifications",
 )
-# Agent Prompts Table
-# -----------------------------------------------------------------------------
-
-# Define prompt status enum
-prompt_status_enum = Enum(
-    "active",
-    "candidate",
-    "deprecated",
-    "rolled_back",
-    name="promptstatus",
-    create_type=True,
-)
-
-agent_prompts_table = Table(
-    "agent_prompts",
-    metadata,
-    # Primary key
-    Column("id", Integer, primary_key=True, autoincrement=True, nullable=False),
-    # Columns
-    Column("prompt_text", Text, nullable=False),
-    Column("status", prompt_status_enum, nullable=False),
-    Column("traffic", Numeric(precision=5, scale=4), nullable=False, server_default="0"),
-    # Constraints
-    CheckConstraint("traffic >= 0 AND traffic <= 1", name="chk_agent_prompts_traffic_range"),
-    # Table comment
-    comment="Prompts used by agents with constrained active/candidate counts",
-)
-
-# Create partial unique indexes for agent_prompts
-# These enforce only one active and only one candidate prompt
-Index(
-    "uq_agent_prompts_status_active",
-    agent_prompts_table.c.status,
-    unique=True,
-    postgresql_where=text("status = 'active'"),
-)
-
-Index(
-    "uq_agent_prompts_status_candidate",
-    agent_prompts_table.c.status,
-    unique=True,
-    postgresql_where=text("status = 'candidate'"),
-)
 
 # -----------------------------------------------------------------------------
 # Helper Functions
@@ -285,3 +230,4 @@ def drop_all_tables(engine):
         This is a destructive operation. Use with caution!
     """
     metadata.drop_all(engine)
+
