@@ -20,10 +20,13 @@ Workers implement the hybrid pattern by:
 
 from __future__ import annotations as _annotations
 
+import asyncio
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, AsyncIterator
+from uuid import UUID
+from datetime import datetime, timezone
 
 import anyio
 from opentelemetry.trace import get_tracer, use_span
@@ -67,6 +70,11 @@ class Worker(ABC):
     storage: Storage[Any]
     """Storage backend for task and context persistence."""
 
+    _running_tasks: dict[UUID, anyio.CancelScope] = field(
+        default_factory=dict, init=False, repr=False
+    )
+    """Active task executions mapped by task_id for pause/cancel control."""
+
     # -------------------------------------------------------------------------
     # Worker Lifecycle
     # -------------------------------------------------------------------------
@@ -98,7 +106,7 @@ class Worker(ABC):
         Runs until cancelled by the task group.
         """
         async for task_operation in self.scheduler.receive_task_operations():
-            await self._handle_task_operation(task_operation)
+            asyncio.create_task(self._handle_task_operation(task_operation))
 
     async def _handle_task_operation(self, task_operation: dict[str, Any]) -> None:
         """Dispatch task operation to appropriate handler.
@@ -117,7 +125,7 @@ class Worker(ABC):
         - Preserves OpenTelemetry trace context
         """
         operation_handlers: dict[str, Any] = {
-            "run": self.run_task,
+            "run": self._execute_and_track_task,
             "cancel": self.cancel_task,
             "pause": self._handle_pause,
             "resume": self._handle_resume,
@@ -218,22 +226,97 @@ class Worker(ABC):
     # Future Operations (Not Yet Implemented)
     # -------------------------------------------------------------------------
 
+    async def _execute_and_track_task(self, params: TaskSendParams) -> None:
+        """Execute task and track it in _running_tasks for pause/cancel support.
+
+        Args:
+            params: Task execution parameters
+        """
+        task_id_raw = params["task_id"]
+        task_id = UUID(task_id_raw) if isinstance(task_id_raw, str) else task_id_raw
+
+        current_task = asyncio.current_task()
+        if current_task:
+            self._running_tasks[task_id] = current_task
+
+        try:
+            await self.run_task(params)
+        except asyncio.CancelledError:
+            logger.info(f"Task {task_id} execution was cancelled")
+            raise
+        finally:
+            self._running_tasks.pop(task_id, None)
+
     async def _handle_pause(self, params: TaskIdParams) -> None:
         """Handle pause operation.
 
-        TODO: Implement task pause functionality
-        - Save current execution state
-        - Update task to 'suspended' state
-        - Release resources while preserving context
+        Pauses a running task by canceling execution and updating state.
+        Does NOT compress history - keeps it accessible.
         """
-        raise NotImplementedError("Pause operation not yet implemented")
+        task_id_raw = params["task_id"]
+        task_id = UUID(task_id_raw) if isinstance(task_id_raw, str) else task_id_raw
+
+        # 1. Cancel running task FIRST
+        running_task = self._running_tasks.get(task_id)
+        if running_task and not running_task.done():
+            logger.info(f"Cancelling running task {task_id} for pause operation")
+            running_task.cancel()
+            try:
+                import asyncio
+
+                await asyncio.wait_for(running_task, timeout=2.0)
+            except Exception:
+                pass
+
+        # 2. Load task to validate state
+        task = await self.storage.load_task(task_id)
+        if task is None:
+            raise ValueError(f"Task {task_id} not found")
+
+        current_state = task["status"]["state"]
+
+        # 3. Create snapshot state (metadata only)
+        state_snapshot = {
+            "previous_state": current_state,
+            "paused_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        # 4. Update task metadata and state
+        # We store subtasks if they exist in the running state, but here we assume
+        # subtasks are stored in the DB as separate entities or in the 'subtasks' field if supported.
+        # For now, we just mark the main task as paused.
+        # If the worker supports subtasks, it should have updated them.
+
+        await self.storage.update_task(
+            task_id, state="paused", metadata={"pause_snapshot": state_snapshot}
+        )
+
+        # Add span event
+        current_span = get_tracer(__name__).start_span("task.paused")
+        current_span.set_attribute("task_id", str(task_id))
+        current_span.end()
 
     async def _handle_resume(self, params: TaskIdParams) -> None:
         """Handle resume operation.
 
-        TODO: Implement task resume functionality
-        - Restore execution state
-        - Update task to 'resumed' state
-        - Continue from last checkpoint
+        Resumes a paused task by restoring its state from metadata.
         """
-        raise NotImplementedError("Resume operation not yet implemented")
+        task_id_raw = params["task_id"]
+        task_id = UUID(task_id_raw) if isinstance(task_id_raw, str) else task_id_raw
+
+        task = await self.storage.load_task(task_id)
+        if task is None:
+            raise ValueError(f"Task {task_id} not found")
+
+        if task["status"]["state"] != "paused":
+            raise ValueError(f"Task {task_id} is not paused")
+
+        # Load snapshot
+        metadata = task.get("metadata", {})
+        snapshot = metadata.get("pause_snapshot", {})
+        restored_state = snapshot.get("previous_state", "working")
+
+        # Update state to restored state
+        await self.storage.update_task(task_id, state=restored_state)
+
+        logger.info(f"Task {task_id} resumed to state '{restored_state}'")

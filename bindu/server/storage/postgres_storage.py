@@ -32,6 +32,9 @@ from sqlalchemy import delete, func, select, update, cast
 from sqlalchemy.dialects.postgresql import insert, JSONB, JSON
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from typing_extensions import TypeVar
+import zlib
+import base64
+import json
 
 from bindu.common.protocol.types import (
     Artifact,
@@ -279,6 +282,7 @@ class PostgresStorage(Storage[ContextT]):
             history=row.history or [],
             artifacts=row.artifacts or [],
             metadata=row.metadata or {},
+            subtasks=(row.metadata or {}).get("subtasks", []),
         )
 
     # -------------------------------------------------------------------------
@@ -431,6 +435,7 @@ class PostgresStorage(Storage[ContextT]):
         new_artifacts: list[Artifact] | None = None,
         new_messages: list[Message] | None = None,
         metadata: dict[str, Any] | None = None,
+        subtasks: list[Task] | None = None,
     ) -> Task:
         """Update task state and append new content using SQLAlchemy.
 
@@ -440,6 +445,7 @@ class PostgresStorage(Storage[ContextT]):
             new_artifacts: Optional artifacts to append
             new_messages: Optional messages to append to history
             metadata: Optional metadata to update/merge
+            subtasks: Optional list of subtasks to store with the task
 
         Returns:
             Updated task object
@@ -470,8 +476,14 @@ class PostgresStorage(Storage[ContextT]):
                         "updated_at": now,
                     }
 
+                    metadata_update = {}
                     if metadata:
-                        serialized_metadata = serialize_for_jsonb(metadata)
+                        metadata_update.update(metadata)
+                    if subtasks is not None:
+                        metadata_update["subtasks"] = subtasks
+
+                    if metadata_update:
+                        serialized_metadata = serialize_for_jsonb(metadata_update)
                         update_values["metadata"] = func.jsonb_concat(
                             tasks_table.c.metadata, cast(serialized_metadata, JSONB)
                         )
@@ -600,6 +612,104 @@ class PostgresStorage(Storage[ContextT]):
                 row = result.first()
 
                 return row.context_data if row else None
+
+    async def save_checkpoint(
+        self,
+        task_id: UUID,
+        message_history: list[Message],
+        state_snapshot: dict[str, Any],
+    ) -> None:
+        """Save a task execution checkpoint to metadata.
+
+        Stores message history directly in the task's metadata field under
+        'checkpoint' key.
+
+        Args:
+            task_id: Task identifier
+            message_history: Current list of messages
+            state_snapshot: additional state to persist
+        """
+        task_id = validate_uuid_type(task_id, "task_id")
+        self._ensure_connected()
+
+        checkpoint_data = {
+            "message_history": serialize_for_jsonb(message_history),
+            "state_snapshot": state_snapshot,
+            "timestamp": get_current_utc_timestamp(),
+        }
+
+        async def _save():
+            async with self._get_session_with_schema() as session:
+                async with session.begin():
+                    # Update task metadata with checkpoint
+                    serialized_checkpoint = serialize_for_jsonb(checkpoint_data)
+                    stmt = (
+                        update(tasks_table)
+                        .where(tasks_table.c.id == task_id)
+                        .values(
+                            metadata=func.jsonb_concat(
+                                tasks_table.c.metadata,
+                                cast({"checkpoint": serialized_checkpoint}, JSONB),
+                            ),
+                            updated_at=get_current_utc_timestamp(),
+                        )
+                    )
+                    await session.execute(stmt)
+
+        await self._retry_on_connection_error(_save)
+
+    async def load_checkpoint(
+        self, task_id: UUID
+    ) -> tuple[list[Message], dict[str, Any]] | None:
+        """Load a task execution checkpoint from metadata.
+
+        Retrieves 'checkpoint' from task metadata and returns the restored state.
+        Supports both direct storage and legacy compressed storage.
+
+        Args:
+            task_id: Task identifier
+
+        Returns:
+            Tuple of (message_history, state_snapshot) if checkpoint exists,
+            otherwise None.
+        """
+        task_id = validate_uuid_type(task_id, "task_id")
+        self._ensure_connected()
+
+        async def _load():
+            async with self._get_session_with_schema() as session:
+                stmt = select(tasks_table.c.metadata).where(tasks_table.c.id == task_id)
+                result = await session.execute(stmt)
+                row = result.first()
+
+                if not row or not row.metadata or "checkpoint" not in row.metadata:
+                    return None
+
+                checkpoint = row.metadata["checkpoint"]
+                stored_history = checkpoint.get("message_history")
+                state_snapshot = checkpoint.get("state_snapshot", {})
+
+                if stored_history is not None:
+                    return stored_history, state_snapshot
+
+                encoded_history = checkpoint.get("message_history_compressed")
+
+                if not encoded_history:
+                    return [], state_snapshot
+
+                try:
+                    # Decode and decompress
+                    compressed_history = base64.b64decode(
+                        encoded_history.encode("utf-8")
+                    )
+                    history_json = zlib.decompress(compressed_history).decode("utf-8")
+                    message_history = json.loads(history_json)
+                    return message_history, state_snapshot
+                except Exception as e:
+                    logger.error(
+                        f"Failed to decompress checkpoint for task {task_id}: {e}"
+                    )
+                    return None
 
         return await self._retry_on_connection_error(_load)
 

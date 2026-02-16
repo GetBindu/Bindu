@@ -213,6 +213,7 @@ class InMemoryStorage(Storage[ContextT]):
         new_artifacts: list[Artifact] | None = None,
         new_messages: list[Message] | None = None,
         metadata: dict[str, Any] | None = None,
+        subtasks: list[Task] | None = None,
     ) -> Task:
         """Update task state and append new content.
 
@@ -226,6 +227,7 @@ class InMemoryStorage(Storage[ContextT]):
             new_artifacts: Optional artifacts to append (for completion)
             new_messages: Optional messages to append to history
             metadata: Optional metadata to update/merge with task metadata
+            subtasks: Optional list of subtasks to store with the task
 
         Returns:
             Updated task object
@@ -249,6 +251,11 @@ class InMemoryStorage(Storage[ContextT]):
             if "metadata" not in task:
                 task["metadata"] = {}
             task["metadata"].update(metadata)
+
+        if subtasks is not None:
+            if "metadata" not in task:
+                task["metadata"] = {}
+            task["metadata"]["subtasks"] = subtasks
 
         if new_artifacts:
             if "artifacts" not in task:
@@ -545,3 +552,60 @@ class InMemoryStorage(Storage[ContextT]):
             Dictionary mapping task IDs to their webhook configurations
         """
         return dict(self._webhook_configs)
+
+    # -------------------------------------------------------------------------
+    # Checkpoint Operations
+    # -------------------------------------------------------------------------
+
+    async def save_checkpoint(
+        self,
+        task_id: UUID,
+        message_history: list[Message],
+        state_snapshot: dict[str, Any],
+    ) -> None:
+        """Save a task execution checkpoint to metadata.
+
+        Args:
+            task_id: Task identifier
+            message_history: Current list of messages
+            state_snapshot: additional state to persist
+        """
+        if not isinstance(task_id, UUID):
+            raise TypeError(f"task_id must be UUID, got {type(task_id).__name__}")
+
+        if task_id not in self.tasks:
+            raise KeyError(f"Task {task_id} not found")
+
+        checkpoint_data = {
+            "message_history": message_history,
+            "state_snapshot": state_snapshot,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
+        task = self.tasks[task_id]
+        if "metadata" not in task:
+            task["metadata"] = {}
+
+        task["metadata"]["checkpoint"] = checkpoint_data
+
+    async def load_checkpoint(
+        self, task_id: UUID
+    ) -> tuple[list[Message], dict[str, Any]] | None:
+        """Load a task execution checkpoint from metadata.
+
+        Args:
+            task_id: Task identifier
+
+        Returns:
+            Tuple of (message_history, state_snapshot) if checkpoint exists,
+            otherwise None.
+        """
+        if not isinstance(task_id, UUID):
+            raise TypeError(f"task_id must be UUID, got {type(task_id).__name__}")
+
+        task = self.tasks.get(task_id)
+        if not task or not task.get("metadata") or "checkpoint" not in task["metadata"]:
+            return None
+
+        checkpoint = task["metadata"]["checkpoint"]
+        return checkpoint["message_history"], checkpoint.get("state_snapshot", {})

@@ -190,7 +190,14 @@ class TaskManager:
             return getattr(self._message_handlers, name)
 
         # Task handler methods
-        if name in ("get_task", "list_tasks", "cancel_task", "task_feedback"):
+        if name in (
+            "get_task",
+            "list_tasks",
+            "cancel_task",
+            "pause_task",
+            "resume_task",
+            "task_feedback",
+        ):
             return getattr(self._task_handlers, name)
 
         # Context handler methods
