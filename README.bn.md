@@ -11,18 +11,6 @@
 </p>
 
 <p align="center">
-  <a href="README.md">🇬🇧 English</a> •
-  <a href="README.de.md">🇩🇪 Deutsch</a> •
-  <a href="README.es.md">🇪🇸 Español</a> •
-  <a href="README.fr.md">🇫🇷 Français</a> •
-  <a href="README.hi.md">🇮🇳 हिंदी</a> •
-  <a href="README.bn.md">🇮🇳 বাংলা</a> •
-  <a href="README.zh.md">🇨🇳 中文</a> •
-  <a href="README.nl.md">🇳🇱 Nederlands</a> •
-  <a href="README.ta.md">🇮🇳 தமிழ்</a>
-</p>
-
-<p align="center">
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
   <a href="https://hits.sh/github.com/Saptha-me/Bindu.svg"><img src="https://hits.sh/github.com/Saptha-me/Bindu.svg" alt="Hits"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="Python Version"></a>
@@ -697,49 +685,40 @@ score = (
 
 <br/>
 
-## [DSPy ইন্টিগ্রেশন](https://docs.getbindu.com/bindu/learn/dspy/overview)
+## Task Feedback এবং DSPy
 
-> মেশিন লার্নিং এর মাধ্যমে স্বয়ংক্রিয় prompt অপ্টিমাইজেশন ও নিরন্তর উন্নতি
+Bindu DSPy optimization-এর মাধ্যমে ক্রমাগত উন্নতি সক্ষম করতে task execution-এ user feedback সংগ্রহ করে। Rating এবং metadata সহ feedback স্টোর করে, আপনি বাস্তব interaction থেকে golden dataset তৈরি করতে পারেন এবং আপনার এজেন্টের prompt এবং behavior স্বয়ংক্রিয়ভাবে optimize করতে DSPy ব্যবহার করতে পারেন।
 
-Bindu-র DSPy ইন্টিগ্রেশন AI এজেন্টদের জন্য স্বয়ংক্রিয় prompt অপ্টিমাইজেশন ও A/B টেস্টিং প্রদান করে। ম্যানুয়ালি prompt টুইক করার পরিবর্তে, DSPy বাস্তব user interaction ও feedback এর উপর ভিত্তি করে prompt অপ্টিমাইজ করতে মেশিন লার্নিং ব্যবহার করে, একটি নিরন্তর উন্নতির loop তৈরি করে।
+### Feedback জমা দেওয়া
 
-অপশনাল - PostgreSQL স্টোরেজ প্রয়োজন এবং এজেন্ট config এর মাধ্যমে সক্রিয় করা হয়।
-
-### ⚙️ কনফিগারেশন
-
-<details>
-<summary><b>কনফিগারেশন উদাহরণ দেখুন</b> (বিস্তৃত করতে ক্লিক করুন)</summary>
-
-আপনার এজেন্ট config-এ DSPy সক্ষম করুন:
-
-```python
-config = {
-    "author": "your.email@example.com",
-    "name": "research_agent",
-    "description": "নিরন্তর উন্নতি সহ একটি গবেষণা সহায়ক",
-    "deployment": {"url": "http://localhost:3773", "expose": True},
-    "enable_dspy": True,  # ← DSPy অপ্টিমাইজেশন সক্ষম করুন
-}
-```
-
-Environment variable এর মাধ্যমে কনফিগার করুন:
+`tasks/feedback` method ব্যবহার করে যেকোনো task-এ feedback প্রদান করুন:
 
 ```bash
-# প্রয়োজনীয়: PostgreSQL connection
-STORAGE_TYPE=postgres
-DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/bindu
-
-# ট্রেনিং এর জন্য OpenRouter API key
-OPENROUTER_API_KEY=your_openrouter_api_key
-
-# সম্পূর্ণ কনফিগারেশনের জন্য examples/.env.example দেখুন
+curl --location 'http://localhost:3773/' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: Bearer <your-token>' \
+--data '{
+    "jsonrpc": "2.0",
+    "method": "tasks/feedback",
+    "params": {
+        "taskId": "550e8400-e29b-41d4-a716-446655440200",
+        "feedback": "দুর্দান্ত কাজ! রেসপন্স খুবই সহায়ক এবং সঠিক ছিল।",
+        "rating": 5,
+        "metadata": {
+            "category": "quality",
+            "source": "user",
+            "helpful": true
+        }
+    },
+    "id": "550e8400-e29b-41d4-a716-446655440024"
+}'
 ```
 
-</details>
-
-যখন সক্রিয় করা হয়, সিস্টেম promptগুলি স্বয়ংক্রিয় A/B টেস্টিং সহ database থেকে লোড করা হয়, user feedback এর উপর ভিত্তি করে অপ্টিমাইজড promptের ক্রমাগত rollout এর অনুমতি দেয়।
-
-> 📚 সম্পূর্ণ DSPy ডকুমেন্টেশন, ট্রেনিং ও canary deployment এর জন্য, [bindu/dspy/README.md](bindu/dspy/README.md) দেখুন
+Feedback `task_feedback` table-এ স্টোর করা হয় এবং ব্যবহার করা যেতে পারে:
+- Training data-র জন্য উচ্চ-মানের task interaction ফিল্টার করতে
+- সফল বনাম ব্যর্থ completion-এ pattern চিহ্নিত করতে
+- DSPy দিয়ে এজেন্ট instruction এবং few-shot example optimize করতে
+- আমরা DsPY-তে কাজ করছি - শীঘ্রই রিলিজ করব।
 
 ---
 

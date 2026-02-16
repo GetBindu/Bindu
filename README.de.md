@@ -11,18 +11,6 @@
 </p>
 
 <p align="center">
-  <a href="README.md">🇬🇧 English</a> •
-  <a href="README.de.md">🇩🇪 Deutsch</a> •
-  <a href="README.es.md">🇪🇸 Español</a> •
-  <a href="README.fr.md">🇫🇷 Français</a> •
-  <a href="README.hi.md">🇮🇳 हिंदी</a> •
-  <a href="README.bn.md">🇮🇳 বাংলা</a> •
-  <a href="README.zh.md">🇨🇳 中文</a> •
-  <a href="README.nl.md">🇳🇱 Nederlands</a> •
-  <a href="README.ta.md">🇮🇳 தமிழ்</a>
-</p>
-
-<p align="center">
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
   <a href="https://hits.sh/github.com/Saptha-me/Bindu.svg"><img src="https://hits.sh/github.com/Saptha-me/Bindu.svg" alt="Hits"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="Python Version"></a>
@@ -959,49 +947,40 @@ config = {
 
 <br/>
 
-## [DSPy-Integration](https://docs.getbindu.com/bindu/learn/dspy/overview)
+## Task-Feedback und DSPy
 
-> Automatisierte Prompt-Optimierung und kontinuierliche Verbesserung durch maschinelles Lernen
+Bindu sammelt Benutzer-Feedback zu Task-Ausführungen, um kontinuierliche Verbesserung durch DSPy-Optimierung zu ermöglichen. Durch das Speichern von Feedback mit Bewertungen und Metadaten kannst du Golden Datasets aus echten Interaktionen erstellen und DSPy verwenden, um die Prompts und das Verhalten deines Agenten automatisch zu optimieren.
 
-Bindus DSPy-Integration bietet automatisierte Prompt-Optimierung und A/B-Testing für KI-Agenten. Anstatt Prompts manuell anzupassen, verwendet DSPy maschinelles Lernen, um Prompts basierend auf echten Benutzerinteraktionen und Feedback zu optimieren und einen kontinuierlichen Verbesserungskreislauf zu schaffen.
+### Feedback einreichen
 
-Optional - Erfordert PostgreSQL-Speicher und wird über die Agenten-Konfiguration aktiviert.
-
-### ⚙️ Konfiguration
-
-<details>
-<summary><b>Konfigurationsbeispiel anzeigen</b> (zum Erweitern klicken)</summary>
-
-DSPy in deiner Agenten-Konfiguration aktivieren:
-
-```python
-config = {
-    "author": "your.email@example.com",
-    "name": "research_agent",
-    "description": "Ein Forschungsassistent mit kontinuierlicher Verbesserung",
-    "deployment": {"url": "http://localhost:3773", "expose": True},
-    "enable_dspy": True,  # ← DSPy-Optimierung aktivieren
-}
-```
-
-Konfiguration über Umgebungsvariablen:
+Gib Feedback zu jedem Task mit der `tasks/feedback`-Methode:
 
 ```bash
-# Erforderlich: PostgreSQL-Verbindung
-STORAGE_TYPE=postgres
-DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/bindu
-
-# OpenRouter API-Schlüssel für Training
-OPENROUTER_API_KEY=your_openrouter_api_key
-
-# Siehe examples/.env.example für vollständige Konfiguration
+curl --location 'http://localhost:3773/' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: Bearer <dein-token>' \
+--data '{
+    "jsonrpc": "2.0",
+    "method": "tasks/feedback",
+    "params": {
+        "taskId": "550e8400-e29b-41d4-a716-446655440200",
+        "feedback": "Großartige Arbeit! Die Antwort war sehr hilfreich und präzise.",
+        "rating": 5,
+        "metadata": {
+            "category": "quality",
+            "source": "user",
+            "helpful": true
+        }
+    },
+    "id": "550e8400-e29b-41d4-a716-446655440024"
+}'
 ```
 
-</details>
-
-Wenn aktiviert, werden System-Prompts aus der Datenbank mit automatischem A/B-Testing geladen, was eine schrittweise Einführung optimierter Prompts basierend auf Benutzerfeedback ermöglicht.
-
-> 📚 Für die vollständige DSPy-Dokumentation, Training und Canary-Deployment siehe [bindu/dspy/README.md](bindu/dspy/README.md)
+Feedback wird in der `task_feedback`-Tabelle gespeichert und kann verwendet werden, um:
+- Hochwertige Task-Interaktionen für Trainingsdaten zu filtern
+- Muster in erfolgreichen vs. erfolglosen Abschlüssen zu identifizieren
+- Agenten-Anweisungen und Few-Shot-Beispiele mit DSPy zu optimieren
+- Wir arbeiten an der DSPy-Integration – wird bald veröffentlicht.
 
 ---
 
