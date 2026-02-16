@@ -38,11 +38,15 @@ def handle(args):
 
     if cmd == "upgrade":
         revision = args[1] if len(args) > 1 else "head"
+        print(f"Upgrading database to revision: {revision}")
         command.upgrade(cfg, revision)
+        print("Upgrade complete.")
 
     elif cmd == "downgrade":
         revision = args[1] if len(args) > 1 else "-1"
+        print(f"Downgrading database to revision: {revision}")
         command.downgrade(cfg, revision)
+        print("Downgrade complete.")
 
     elif cmd == "revision":
         autogen = "--autogenerate" in args
@@ -58,12 +62,20 @@ def handle(args):
 
         message = args[msg_index]
 
+        if autogen:
+            print(f"Creating new revision (autogenerate): '{message}'")
+        else:
+            print(f"Creating new revision: '{message}'")
+
         command.revision(cfg, message=message, autogenerate=autogen)
+        print("Revision created.")
 
     elif cmd == "current":
+        print("Current database revision:")
         command.current(cfg)
 
     elif cmd == "history":
+        print("Migration history:")
         command.history(cfg)
 
     else:

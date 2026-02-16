@@ -392,14 +392,6 @@ class BinduApplication(Starlette):
             if app._payment_session_manager:
                 await app._payment_session_manager.start_cleanup_task()
 
-            # Log DSPy status
-            if manifest:
-                enable_dspy = getattr(manifest, 'enable_dspy', False)
-                if enable_dspy:
-                    logger.info("🔧 DSPy Optimization: ✅ ENABLED - System prompts will be loaded from database with canary deployment")
-                else:
-                    logger.info("🔧 DSPy Optimization: ❌ DISABLED - Using static system prompts from agent configuration")
-
             # Start TaskManager
             if manifest:
                 logger.info("🔧 Starting TaskManager...")
