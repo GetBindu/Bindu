@@ -50,8 +50,6 @@ from bindu.server.workers.helpers import ResponseDetector, ResultProcessor
 from bindu.utils.logging import get_logger
 from bindu.utils.retry import retry_worker_operation
 from bindu.utils.worker_utils import ArtifactBuilder, MessageConverter, TaskStateManager
-from bindu.dspy.prompt_selector import select_prompt_with_canary
-from bindu.dspy.prompts import insert_prompt
 
 tracer = get_tracer("bindu.server.workers.manifest_worker")
 logger = get_logger("bindu.server.workers.manifest_worker")
@@ -139,7 +137,6 @@ class ManifestWorker(Worker):
 
         try:
             # Step 3: Execute manifest with system prompt (if enabled)
-            selected_prompt_id = None  # Track prompt ID for metrics
             if (
                 self.manifest.enable_system_message
                 and app_settings.agent.enable_structured_responses
@@ -188,19 +185,6 @@ class ManifestWorker(Worker):
                         state=task["status"]["state"],  # preserve current state
                         prompt_id=selected_prompt_id,
                     )
-
-                else:
-                    # DSPy disabled for this agent; use manifest-provided system prompt
-                    system_prompt = getattr(self.manifest, "system_prompt", None) or (
-                        (self.manifest.extra_data or {}).get("system_prompt")
-                    ) or app_settings.agent.structured_response_system_prompt
-
-                    logger.debug("DSPy disabled for agent; using manifest/system prompt")
-
-                    if system_prompt:
-                        message_history = [{"role": "system", "content": system_prompt}] + (
-                            message_history or []
-                        )
 
             # Step 3.1: Execute agent with tracing
             with tracer.start_as_current_span("agent.execute") as agent_span:
