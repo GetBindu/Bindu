@@ -232,4 +232,3 @@ def drop_all_tables(engine):
         This is a destructive operation. Use with caution!
     """
     metadata.drop_all(engine)
-
