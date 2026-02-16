@@ -11,18 +11,6 @@
 </p>
 
 <p align="center">
-  <a href="README.md">🇬🇧 English</a> •
-  <a href="README.de.md">🇩🇪 Deutsch</a> •
-  <a href="README.es.md">🇪🇸 Español</a> •
-  <a href="README.fr.md">🇫🇷 Français</a> •
-  <a href="README.hi.md">🇮🇳 हिंदी</a> •
-  <a href="README.bn.md">🇮🇳 বাংলা</a> •
-  <a href="README.zh.md">🇨🇳 中文</a> •
-  <a href="README.nl.md">🇳🇱 Nederlands</a> •
-  <a href="README.ta.md">🇮🇳 தமிழ்</a>
-</p>
-
-<p align="center">
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
   <a href="https://hits.sh/github.com/Saptha-me/Bindu.svg"><img src="https://hits.sh/github.com/Saptha-me/Bindu.svg" alt="Hits"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="Python Version"></a>
@@ -697,49 +685,40 @@ score = (
 
 <br/>
 
-## [Intégration DSPy](https://docs.getbindu.com/bindu/learn/dspy/overview)
+## Task Feedback et DSPy
 
-> Optimisation automatique des prompts et amélioration continue par apprentissage automatique
+Bindu collecte les retours des utilisateurs sur les exécutions de tâches pour permettre une amélioration continue via l'optimisation DSPy. En stockant les retours avec des notes et des métadonnées, vous pouvez construire des ensembles de données de référence à partir d'interactions réelles et utiliser DSPy pour optimiser automatiquement les prompts et le comportement de votre agent.
 
-L'intégration DSPy de Bindu fournit une optimisation automatique des prompts et des tests A/B pour les agents IA. Au lieu d'ajuster manuellement les prompts, DSPy utilise l'apprentissage automatique pour optimiser les prompts en fonction des interactions réelles des utilisateurs et des retours, créant une boucle d'amélioration continue.
+### Soumettre un feedback
 
-Optionnel - Nécessite un stockage PostgreSQL et est activé via la configuration de l'agent.
-
-### ⚙️ Configuration
-
-<details>
-<summary><b>Voir exemple de configuration</b> (cliquer pour développer)</summary>
-
-Activez DSPy dans la configuration de votre agent :
-
-```python
-config = {
-    "author": "your.email@example.com",
-    "name": "research_agent",
-    "description": "Un assistant de recherche avec amélioration continue",
-    "deployment": {"url": "http://localhost:3773", "expose": True},
-    "enable_dspy": True,  # ← Activer l'optimisation DSPy
-}
-```
-
-Configurer via les variables d'environnement :
+Fournissez un feedback sur n'importe quelle tâche en utilisant la méthode `tasks/feedback` :
 
 ```bash
-# Requis : Connexion PostgreSQL
-STORAGE_TYPE=postgres
-DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/bindu
-
-# Clé API OpenRouter pour l'entraînement
-OPENROUTER_API_KEY=your_openrouter_api_key
-
-# Voir examples/.env.example pour la configuration complète
+curl --location 'http://localhost:3773/' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: Bearer <your-token>' \
+--data '{
+    "jsonrpc": "2.0",
+    "method": "tasks/feedback",
+    "params": {
+        "taskId": "550e8400-e29b-41d4-a716-446655440200",
+        "feedback": "Excellent travail ! La réponse était très utile et précise.",
+        "rating": 5,
+        "metadata": {
+            "category": "quality",
+            "source": "user",
+            "helpful": true
+        }
+    },
+    "id": "550e8400-e29b-41d4-a716-446655440024"
+}'
 ```
 
-</details>
-
-Lorsqu'il est activé, les prompts système sont chargés depuis la base de données avec des tests A/B automatiques, permettant un déploiement progressif de prompts optimisés basé sur les retours des utilisateurs.
-
-> 📚 Pour la documentation complète de DSPy, l'entraînement et le déploiement canary, consultez [bindu/dspy/README.md](bindu/dspy/README.md)
+Le feedback est stocké dans la table `task_feedback` et peut être utilisé pour :
+- Filtrer les interactions de tâches de haute qualité pour les données d'entraînement
+- Identifier les modèles dans les complétions réussies vs échouées
+- Optimiser les instructions d'agents et les exemples few-shot avec DSPy
+- Nous travaillons sur DsPY - bientôt disponible.
 
 ---
 
