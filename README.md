@@ -68,6 +68,17 @@ Before installing Bindu, ensure you have:
 - **UV package manager** - [Installation guide](https://github.com/astral-sh/uv)
 - **API Key Required**: Set `OPENROUTER_API_KEY` or `OPENAI_API_KEY` in your environment variables. Free OpenRouter models are available for testing.
 
+### 👶 Beginner Notes (First-Time Contributors)
+
+If you are new to GitHub or contributing to open source:
+
+- You do **not** need to understand the entire codebase to get started.
+- Start by exploring the `examples/` folder to see minimal working agents.
+- Small documentation improvements and example enhancements are welcome.
+- If anything feels confusing, that is valuable feedback — feel free to open a discussion or PR.
+
+This project is beginner-friendly, and maintainers are happy to guide new contributors.
+
 
 ### Verify Your Setup
 
