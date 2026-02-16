@@ -11,18 +11,6 @@
 </p>
 
 <p align="center">
-  <a href="README.md">🇬🇧 English</a> •
-  <a href="README.de.md">🇩🇪 Deutsch</a> •
-  <a href="README.es.md">🇪🇸 Español</a> •
-  <a href="README.fr.md">🇫🇷 Français</a> •
-  <a href="README.hi.md">🇮🇳 हिंदी</a> •
-  <a href="README.bn.md">🇮🇳 বাংলা</a> •
-  <a href="README.zh.md">🇨🇳 中文</a> •
-  <a href="README.nl.md">🇳🇱 Nederlands</a> •
-  <a href="README.ta.md">🇮🇳 தமிழ்</a>
-</p>
-
-<p align="center">
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
   <a href="https://hits.sh/github.com/Saptha-me/Bindu.svg"><img src="https://hits.sh/github.com/Saptha-me/Bindu.svg" alt="Hits"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="Python Version"></a>
@@ -224,49 +212,9 @@ Bindu இன் பேச்சுவார்த்தை அமைப்பு
 
 <br/>
 
-## [DSPy ஒருங்கிணைப்பு](https://docs.getbindu.com/bindu/learn/dspy/overview)
+## Task Feedback மற்றும் DSPy
 
-> இயந்திரக் கற்றல் மூலம் தானியங்கி prompt உயர்த்தல் மற்றும் தொடர்ச்சியான மேம்பாடு
-
-Bindu இன் DSPy ஒருங்கிணைப்பு AI ஏஜென்ட்களுக்கான தானியங்கி prompt உயர்த்தல் மற்று் A/B சோதனையை வழங்குகிறது. promptகளை கையாள செய்யும் படியாக, DSPy உண்மையான பயனர் தொடர்புகள் மற்றும் கருத்துக்களின் அடிப்படையில் promptகளை உயர்த்த இயந்திரக் கற்றலைப் பயன்படுத்துகிறது, ஒரு தொடர்ச்சியான மேம்பாட்டு சுழற்சியை உருவாக்குகிறது.
-
-தேர்வு - PostgreSQL செயலிழப்பு தேவை மற்றும் ஏஜென்ட் config ஆல் செயல்படுத்தப்படுகிறது.
-
-### ⚙️ கோணமைப்பு
-
-<details>
-<summary><b>கோணமைப்பு உதாரணத்தைப் பாருங்கள்</b> (விரிவாக்க கிளிக் செய்யவும்)</summary>
-
-உங்கள் ஏஜென்ட் config இல் DSPy என்று செயல்படுத்தவும்:
-
-```python
-config = {
-    "author": "your.email@example.com",
-    "name": "research_agent",
-    "description": "தொடர்ச்சியான மேம்பாடுடன் ஒரு ஆராய்ச்சி உதவியாளர்",
-    "deployment": {"url": "http://localhost:3773", "expose": True},
-    "enable_dspy": True,  # ← DSPy உயர்த்தலை செயல்படுத்தவும்
-}
-```
-
-சூழல் மாறிகள் மூலம் கோணமைக்கவும்:
-
-```bash
-# தேவை: PostgreSQL இணைப்பு
-STORAGE_TYPE=postgres
-DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/bindu
-
-# பயிற்சிக்க OpenRouter API key
-OPENROUTER_API_KEY=your_openrouter_api_key
-
-# முழு கோணமைப்புக்கு examples/.env.example என்று பாருங்கள்
-```
-
-</details>
-
-செயல்படுத்தப்பட்டால், கணினி promptகள் தனியங்கி A/B சோதனையுடன் தரவுத்தறட்டு தரவுத்தளத்திலிருந்து ஏற்றப்படுகின்றன, பயனர் கருத்துக்களின் அடிப்படையில் உயர்த்தப்பட்ட promptகளின் படிப்படியான வெளியீட்டை அனுமதிக்கிறது.
-
-> 📚 முழு DSPy ஆவணங்கள், பயிற்சி மற்றும் canary பனிமாற்றத்துக்கு, [bindu/dspy/README.md](bindu/dspy/README.md) என்று பாருங்கள்
+Bindu DSPy மேம்படுத்தல் மூலம் தொடர்ச்சியான மேம்பாட்டை செயல்படுத்த பணி செயல்படுத்தல்களில் பயனர் கருத்துக்களை சேகரிக்கிறது.
 
 ---
 
