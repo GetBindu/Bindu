@@ -545,4 +545,3 @@ class InMemoryStorage(Storage[ContextT]):
             Dictionary mapping task IDs to their webhook configurations
         """
         return dict(self._webhook_configs)
-

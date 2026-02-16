@@ -995,4 +995,3 @@ class PostgresStorage(Storage[ContextT]):
                 return {row.task_id: row.config for row in rows}
 
         return await self._retry_on_connection_error(_load_all)
-
