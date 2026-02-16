@@ -277,4 +277,3 @@ class Storage(ABC, Generic[ContextT]):
         Returns:
             Dictionary mapping task IDs to their webhook configurations
         """
-
