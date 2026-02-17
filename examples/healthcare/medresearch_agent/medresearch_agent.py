@@ -80,7 +80,7 @@ logger = logging.getLogger(__name__)
 # ─────────────────────────────────────────────
 # CONFIG
 # ─────────────────────────────────────────────
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyCCr1gXezSvWtp_BwIhflI14gma4H5YPrM")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 UPLOAD_DIR = Path("./uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
