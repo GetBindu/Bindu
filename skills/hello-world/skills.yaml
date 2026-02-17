@@ -1,0 +1,28 @@
+skill_id: "hello-world-v1"
+name: "Hello World"
+version: "1.0.0"
+description: "A simple skill that returns Hello World"
+
+capabilities:
+  - greeting
+
+tags:
+  - hello
+  - example
+
+input_structure: |
+  {
+    "name": "string"
+  }
+
+output_format: |
+  {
+    "greeting": "string"
+  }
+
+examples:
+  - title: "Basic example"
+    input:
+      name: "Alice"
+    output:
+      greeting: "Hello, Alice!"
