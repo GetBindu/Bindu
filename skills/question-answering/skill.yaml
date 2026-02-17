@@ -1,0 +1,3 @@
+name: question-answering
+description: Handles direct question answering tasks.
+version: 1.0.0
