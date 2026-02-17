@@ -31,5 +31,4 @@ pre-commit>=3.6.0
 
 # Optional: Enhanced Features
 # sentence-transformers>=2.3.0  # For semantic similarity in synthesis
-# openai>=1.10.0  # If using OpenAI for summarization
-# anthropic>=0.18.0  # If using Claude for summarization
+# gemini ai>=1.10.0  # If using OpenAI for summarization
