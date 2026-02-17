@@ -1,0 +1,7 @@
+name: langgraph_blog_writing_agent
+description: Autonomous blog writing agent using LangGraph Map-Reduce workflow.
+author: amritanshu9973@gmail.com
+version: 1.0.0
+
+runtime: python
+entrypoint: main.py
