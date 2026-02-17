@@ -11,7 +11,7 @@ Streaming is implemented through the full **worker pipeline**, preserving all fe
 - **DID Signing** — Final artifacts are signed with the agent's DID identity
 - **Payment Settlement** — x402 payments are verified and settled on completion
 - **Push Notifications** — Lifecycle events fire at each state transition
-- **Incremental Storage** — Artifact chunks are persisted as they arrive
+- **Deferred Storage** — Final DID-signed artifacts are persisted on completion
 
 ## Architecture
 
@@ -35,10 +35,10 @@ sequenceDiagram
     Worker->>Manifest: manifest.run(history)
     loop Each chunk from generator
         Manifest-->>Worker: yield chunk
-        Worker->>Storage: append_artifact_chunk()
         Worker-->>Client: SSE: artifact-update (append=true)
     end
 
+    Worker->>Worker: build_artifacts(accumulated)
     Worker->>Storage: update_task(state=completed, artifacts)
     Worker-->>Client: SSE: artifact-update (last_chunk=true)
     Worker-->>Client: SSE: status-update (completed, final=true)
@@ -139,7 +139,7 @@ Pipeline:
 
 ### Storage.append_artifact_chunk()
 
-New storage method for incremental artifact persistence:
+Optional storage method for incremental artifact persistence (available for custom streaming strategies):
 
 ```python
 async def append_artifact_chunk(
@@ -150,6 +150,12 @@ async def append_artifact_chunk(
 - **InMemoryStorage**: Finds existing artifact by `artifact_id` and extends `parts`
 - **PostgresStorage**: Uses `jsonb_concat` for atomic JSONB array append
 - **Base class**: Default no-op (safe for custom implementations)
+
+> **Note**: The default `stream_task()` implementation uses **deferred persistence** — chunks are
+> streamed to the client in real-time, but only the final DID-signed artifacts are written to storage
+> on completion. This avoids duplicate artifacts and ensures only signed content is persisted.
+> The `append_artifact_chunk()` method is provided for custom worker implementations that need
+> incremental persistence (e.g., for crash recovery of long-running streams).
 
 ### Stable Artifact IDs
 

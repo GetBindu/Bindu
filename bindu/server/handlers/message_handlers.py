@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from bindu.common.protocol.types import (
@@ -25,6 +26,8 @@ from bindu.common.protocol.types import (
     StreamMessageRequest,
     Task,
     TaskSendParams,
+    TaskStatus,
+    TaskStatusUpdateEvent,
 )
 
 from bindu.utils.task_telemetry import trace_task_operation, track_active_task
@@ -96,6 +99,7 @@ class MessageHandlers:
         return SendMessageResponse(jsonrpc="2.0", id=request["id"], result=task)
 
     @trace_task_operation("stream_message")
+    @track_active_task
     async def stream_message(self, request: StreamMessageRequest) -> StreamingResponse:
         """Stream messages using Server-Sent Events via the worker pipeline.
 
@@ -155,27 +159,33 @@ class MessageHandlers:
                         yield f"data: {json.dumps(event, default=str)}\n\n"
                 else:
                     # No workers available — yield error event
-                    error_event = {
-                        "kind": "status-update",
-                        "task_id": str(task["id"]),
-                        "context_id": str(context_id),
-                        "status": {"state": "failed"},
-                        "final": True,
-                        "metadata": {"error": "No workers available for streaming"},
-                    }
-                    yield f"data: {json.dumps(error_event)}\n\n"
+                    error_event = TaskStatusUpdateEvent(
+                        task_id=task["id"],
+                        context_id=context_id,
+                        kind="status-update",
+                        status=TaskStatus(
+                            state="failed",
+                            timestamp=datetime.now(timezone.utc).isoformat(),
+                        ),
+                        final=True,
+                        metadata={"error": "No workers available for streaming"},
+                    )
+                    yield f"data: {json.dumps(error_event, default=str)}\n\n"
                     await self.storage.update_task(task["id"], state="failed")
             except Exception as e:
                 # Yield error event if stream_task() raises unexpectedly
-                error_event = {
-                    "kind": "status-update",
-                    "task_id": str(task["id"]),
-                    "context_id": str(context_id),
-                    "status": {"state": "failed"},
-                    "final": True,
-                    "metadata": {"error": str(e)},
-                }
-                yield f"data: {json.dumps(error_event)}\n\n"
+                error_event = TaskStatusUpdateEvent(
+                    task_id=task["id"],
+                    context_id=context_id,
+                    kind="status-update",
+                    status=TaskStatus(
+                        state="failed",
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                    ),
+                    final=True,
+                    metadata={"error": str(e)},
+                )
+                yield f"data: {json.dumps(error_event, default=str)}\n\n"
                 await self.storage.update_task(task["id"], state="failed")
 
         return StreamingResponse(stream_generator(), media_type="text/event-stream")
