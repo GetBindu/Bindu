@@ -27,6 +27,7 @@
 	import { shareModal } from "$lib/stores/shareModal";
 	import LucideHammer from "~icons/lucide/hammer";
 	import ReplyIndicator from "./ReplyIndicator.svelte";
+	import { agentInspector, resetAgentInspector } from "$lib/stores/agentInspector";
 
 	import { fly } from "svelte/transition";
 	import { cubicInOut } from "svelte/easing";
@@ -58,6 +59,10 @@
 		onReplyToTask?: (taskId: string) => void;
 		replyToTaskId?: string | null;
 		onClearReply?: () => void;
+		/** Optional override for what we show as "Session" identity */
+		sessionId?: string | null;
+		onClearContext?: () => void | Promise<void>;
+		onClearTasks?: () => void | Promise<void>;
 		draft?: string;
 	}
 
@@ -79,9 +84,48 @@
 		onReplyToTask,
 		replyToTaskId = null,
 		onClearReply,
+		sessionId = null,
+		onClearContext,
+		onClearTasks,
 	}: Props = $props();
 
 	let isReadOnly = $derived(!models.some((model) => model.id === currentModel.id));
+
+	let agentContextId = $derived.by(() => {
+		// Derive from message task metadata when available (works for both normal and agent mode).
+		for (let i = messages.length - 1; i >= 0; i -= 1) {
+			const cid = messages[i]?.taskMetadata?.contextId;
+			if (cid) return cid;
+		}
+		return null;
+	});
+
+	let agentTaskCount = $derived.by(() => {
+		const ids = new Set<string>();
+		for (const m of messages) {
+			const tid = m.taskMetadata?.taskId;
+			if (tid) ids.add(tid);
+		}
+		return ids.size;
+	});
+
+	let agentSessionId = $derived.by(() => {
+		// Prefer an explicit session id, then the derived context id, then route param id if present.
+		return sessionId ?? agentContextId ?? (page.params as Record<string, string> | undefined)?.id ?? null;
+	});
+
+	// Publish agent state + clear handlers for the sidebar inspector.
+	$effect(() => {
+		agentInspector.set({
+			agentName: currentModel.displayName,
+			contextId: agentContextId,
+			sessionId: agentSessionId,
+			taskCount: agentTaskCount,
+			disabled: loading,
+			onClearContext,
+			onClearTasks,
+		});
+	});
 
 	let shareModalOpen = $state(false);
 	let editMsdgId: Message["id"] | null = $state(null);
@@ -224,6 +268,7 @@
 	onDestroy(() => {
 		unsubscribeShareModal();
 		shareModal.close();
+		resetAgentInspector();
 	});
 
 	let chatContainer: HTMLElement | undefined = $state();
@@ -425,7 +470,7 @@
 			dark:from-gray-900 dark:via-gray-900/100
 			dark:to-gray-900/0 max-sm:py-0 sm:px-5 md:pb-4 xl:max-w-4xl [&>*]:pointer-events-auto"
 	>
-				{#if sources?.length && !loading}
+		{#if sources?.length && !loading}
 			<div
 				in:fly|local={sources.length === 1 ? { y: -20, easing: cubicInOut } : undefined}
 				class="flex flex-row flex-wrap justify-center gap-2.5 rounded-xl pb-3"

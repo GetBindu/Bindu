@@ -19,6 +19,10 @@
 		isThinking,
 		sendMessage as sendAgentMessage,
 		contextId,
+		currentTaskId,
+		currentTaskState,
+		createNewContext,
+		clearContext as clearAgentContext,
 		setReplyTo,
 		clearReplyTo,
 		replyToTaskId
@@ -188,6 +192,22 @@
 	function handleClearReply() {
 		clearReplyTo();
 	}
+
+	async function handleClearTasks() {
+		// UI-only reset: start a fresh task thread (keep context if it exists)
+		currentTaskId.set(null);
+		currentTaskState.set(null);
+		setReplyTo(null);
+	}
+
+	async function handleClearContext() {
+		// Best-effort: reset UI immediately, then try clearing server-side if reachable.
+		const ctx = $contextId;
+		createNewContext();
+		if (ctx) {
+			await clearAgentContext(ctx);
+		}
+	}
 </script>
 
 <svelte:head>
@@ -205,6 +225,8 @@
 			onReplyToTask={handleReplyToTask}
 			replyToTaskId={$replyToTaskId}
 			onClearReply={handleClearReply}
+			onClearContext={handleClearContext}
+			onClearTasks={handleClearTasks}
 		/>
 	{:else}
 		<ChatWindow
@@ -214,6 +236,8 @@
 			models={data.models}
 			bind:files
 			bind:draft
+			onClearContext={handleClearContext}
+			onClearTasks={handleClearTasks}
 		/>
 	{/if}
 {:else}
