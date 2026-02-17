@@ -284,6 +284,15 @@ class ManifestWorker(Worker):
         payment_context = params.get("payment_context")
         await TaskStateManager.validate_task_state(task)
 
+        # Add span event for state transition (matches run_task pattern)
+        from opentelemetry.trace import get_current_span
+
+        current_span = get_current_span()
+        if current_span.is_recording():
+            current_span.add_event(
+                "task.state_changed", attributes={"to_state": "working"}
+            )
+
         # Step 2: Transition to working and yield initial status event
         await self.storage.update_task(task["id"], state="working")
         await self._notify_lifecycle(task["id"], task["context_id"], "working", False)
@@ -330,6 +339,10 @@ class ManifestWorker(Worker):
                 try:
                     raw_results = self.manifest.run(message_history or [])
 
+                    # Handle coroutine returns (async def without yield)
+                    if inspect.iscoroutine(raw_results):
+                        raw_results = await raw_results
+
                     # Step 6: Stream results based on return type
                     artifact_id = uuid4()
                     collected_chunks: list[str] = []
@@ -340,16 +353,12 @@ class ManifestWorker(Worker):
                                 chunk_str = str(chunk)
                                 collected_chunks.append(chunk_str)
 
-                                # Store incremental artifact chunk
                                 chunk_artifact = Artifact(
                                     artifact_id=artifact_id,
                                     name="streaming_response",
                                     parts=[TextPart(kind="text", text=chunk_str)],
                                     append=True,
                                     last_chunk=False,
-                                )
-                                await self.storage.append_artifact_chunk(
-                                    task["id"], chunk_artifact
                                 )
 
                                 yield TaskArtifactUpdateEvent(
@@ -373,9 +382,6 @@ class ManifestWorker(Worker):
                                     parts=[TextPart(kind="text", text=chunk_str)],
                                     append=True,
                                     last_chunk=False,
-                                )
-                                await self.storage.append_artifact_chunk(
-                                    task["id"], chunk_artifact
                                 )
 
                                 yield TaskArtifactUpdateEvent(
@@ -443,6 +449,12 @@ class ManifestWorker(Worker):
 
             if state in ("input-required", "auth-required"):
                 # Intermediate state — task stays open
+                current_span = get_current_span()
+                if current_span.is_recording():
+                    current_span.add_event(
+                        "task.state_changed",
+                        attributes={"from_state": "working", "to_state": state},
+                    )
                 await self._handle_intermediate_state(task, state, message_content)
                 yield TaskStatusUpdateEvent(
                     task_id=task["id"],
@@ -456,6 +468,12 @@ class ManifestWorker(Worker):
                 )
             else:
                 # Terminal state — handle payment settlement
+                current_span = get_current_span()
+                if current_span.is_recording():
+                    current_span.add_event(
+                        "task.state_changed",
+                        attributes={"from_state": "working", "to_state": state},
+                    )
                 additional_metadata: dict[str, Any] | None = None
                 if payment_context and state == "completed":
                     additional_metadata = await self._settle_payment(payment_context)
@@ -488,6 +506,16 @@ class ManifestWorker(Worker):
 
         except Exception as e:
             # Handle failure — update storage and yield error event
+            current_span = get_current_span()
+            if current_span.is_recording():
+                current_span.add_event(
+                    "task.state_changed",
+                    attributes={
+                        "from_state": "working",
+                        "to_state": "failed",
+                        "error": str(e),
+                    },
+                )
             await self._handle_task_failure(task, str(e))
 
             yield TaskStatusUpdateEvent(

@@ -92,6 +92,21 @@ class DirectReturnMockManifest(MockManifest):
         return self._result
 
 
+class CoroutineMockManifest(MockManifest):
+    """Mock manifest that returns a coroutine (async def without yield)."""
+
+    def __init__(self, result: str, **kwargs):
+        super().__init__(**kwargs)
+        self._result = result
+
+    def run(self, message_history: list):
+        """Return a coroutine object."""
+        return self._async_result()
+
+    async def _async_result(self):
+        return self._result
+
+
 class ErrorMockManifest(MockManifest):
     """Mock manifest that raises an error during execution."""
 
@@ -445,6 +460,72 @@ class TestStreamTaskDirectReturn:
 
         updated = await storage.load_task(task["id"])
         assert updated["status"]["state"] == "completed"
+
+
+# ===========================================================================
+# Test Suite 3b: ManifestWorker.stream_task() — Coroutine Return
+# ===========================================================================
+
+
+class TestStreamTaskCoroutineReturn:
+    """Test streaming when manifest returns a coroutine (async def)."""
+
+    @pytest.mark.asyncio
+    async def test_coroutine_return_yields_final_artifact(
+        self, storage: InMemoryStorage, scheduler: InMemoryScheduler
+    ):
+        """Coroutine return should be awaited and yielded as final artifact."""
+        manifest = CoroutineMockManifest(result="Async result")
+        worker = ManifestWorker(
+            scheduler=scheduler,
+            storage=storage,
+            manifest=cast(AgentManifest, manifest),
+        )
+
+        message = create_test_message(text="Coroutine test")
+        task = await storage.submit_task(message["context_id"], message)
+        params = cast(
+            TaskSendParams,
+            {"task_id": task["id"], "context_id": task["context_id"], "message": message},
+        )
+
+        events = await collect_stream_events(worker, params)
+
+        # Should have: working status + final artifact(s) + completed status
+        status_events = [e for e in events if e["kind"] == "status-update"]
+        artifact_events = [e for e in events if e["kind"] == "artifact-update"]
+
+        assert len(status_events) == 2  # working + completed
+        assert len(artifact_events) >= 1
+
+        # Last status should be completed
+        assert events[-1]["kind"] == "status-update"
+        assert events[-1]["status"]["state"] == "completed"
+
+    @pytest.mark.asyncio
+    async def test_coroutine_return_completes_task(
+        self, storage: InMemoryStorage, scheduler: InMemoryScheduler
+    ):
+        """Coroutine return should complete the task in storage."""
+        manifest = CoroutineMockManifest(result="Async done")
+        worker = ManifestWorker(
+            scheduler=scheduler,
+            storage=storage,
+            manifest=cast(AgentManifest, manifest),
+        )
+
+        message = create_test_message(text="Coroutine test")
+        task = await storage.submit_task(message["context_id"], message)
+        params = cast(
+            TaskSendParams,
+            {"task_id": task["id"], "context_id": task["context_id"], "message": message},
+        )
+
+        await collect_stream_events(worker, params)
+
+        updated = await storage.load_task(task["id"])
+        assert updated["status"]["state"] == "completed"
+        assert len(updated.get("artifacts", [])) > 0
 
 
 # ===========================================================================
@@ -987,6 +1068,80 @@ class TestStreamMessageHandler:
         assert len(tasks) == 1
         assert tasks[0]["status"]["state"] == "submitted"
 
+    @pytest.mark.asyncio
+    async def test_stream_message_sse_body_is_valid_json(
+        self, storage: InMemoryStorage, scheduler: InMemoryScheduler
+    ):
+        """Consuming the SSE stream body should produce valid JSON events."""
+        from starlette.responses import StreamingResponse
+
+        from bindu.server.handlers.message_handlers import MessageHandlers
+
+        manifest = StreamingMockManifest(chunks=["Hello", "World"])
+        worker = ManifestWorker(
+            scheduler=scheduler,
+            storage=storage,
+            manifest=cast(AgentManifest, manifest),
+        )
+
+        def context_id_parser(cid):
+            from uuid import UUID as _UUID
+
+            if isinstance(cid, str):
+                return _UUID(cid)
+            return cid if cid else uuid4()
+
+        handler = MessageHandlers(
+            scheduler=scheduler,
+            storage=storage,
+            manifest=manifest,
+            workers=[worker],
+            context_id_parser=context_id_parser,
+        )
+
+        msg_id = uuid4()
+        ctx_id = uuid4()
+        task_id = uuid4()
+        request = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "message/stream",
+            "params": {
+                "message": {
+                    "role": "user",
+                    "parts": [{"kind": "text", "text": "Hello"}],
+                    "message_id": str(msg_id),
+                    "task_id": str(task_id),
+                    "context_id": str(ctx_id),
+                }
+            },
+        }
+
+        result = await handler.stream_message(request)
+        assert isinstance(result, StreamingResponse)
+
+        # Actually consume the stream body and verify each SSE frame is valid JSON
+        sse_frames = []
+        async for chunk in result.body_iterator:
+            text = chunk if isinstance(chunk, str) else chunk.decode()
+            if text.startswith("data: "):
+                data_str = text[len("data: "):].strip()
+                parsed = json.loads(data_str)  # Should NOT raise
+                sse_frames.append(parsed)
+
+        # Must have at least: working status + chunk artifacts + final artifact + completed status
+        assert len(sse_frames) >= 3
+        assert sse_frames[0]["kind"] == "status-update"
+        assert sse_frames[0]["status"]["state"] == "working"
+        assert sse_frames[-1]["kind"] == "status-update"
+        assert sse_frames[-1]["status"]["state"] == "completed"
+
+        # Verify artifact events have serialized UUIDs (strings, not UUID objects)
+        artifact_frames = [f for f in sse_frames if f["kind"] == "artifact-update"]
+        for af in artifact_frames:
+            assert isinstance(af["task_id"], str)
+            assert isinstance(af["artifact"]["artifact_id"], str)
+
 
 # ===========================================================================
 # Test Suite 10: Empty and Edge Cases
@@ -1093,3 +1248,38 @@ class TestStreamingEdgeCases:
         # Task should still complete
         updated = await storage.load_task(task["id"])
         assert updated["status"]["state"] == "completed"
+
+    @pytest.mark.asyncio
+    async def test_no_duplicate_artifacts_in_storage(
+        self, storage: InMemoryStorage, scheduler: InMemoryScheduler
+    ):
+        """Streaming should not create duplicate artifacts in storage.
+
+        Only the final DID-signed artifacts from build_artifacts() should be stored,
+        not the per-chunk streaming artifacts.
+        """
+        chunks = ["chunk1", "chunk2", "chunk3"]
+        manifest = StreamingMockManifest(chunks=chunks)
+        worker = ManifestWorker(
+            scheduler=scheduler,
+            storage=storage,
+            manifest=cast(AgentManifest, manifest),
+        )
+
+        message = create_test_message(text="Dedup test")
+        task = await storage.submit_task(message["context_id"], message)
+        params = cast(
+            TaskSendParams,
+            {"task_id": task["id"], "context_id": task["context_id"], "message": message},
+        )
+
+        await collect_stream_events(worker, params)
+
+        updated = await storage.load_task(task["id"])
+        artifacts = updated.get("artifacts", [])
+        # Should only have the final artifacts from build_artifacts(), not per-chunk duplicates
+        # build_artifacts() typically returns 1 artifact for a text response
+        assert len(artifacts) <= 2, (
+            f"Expected at most 2 artifacts (from build_artifacts), got {len(artifacts)}. "
+            "Per-chunk artifacts should NOT be stored — only final DID-signed ones."
+        )

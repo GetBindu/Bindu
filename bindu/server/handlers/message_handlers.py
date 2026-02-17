@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from bindu.common.protocol.types import (
     SendMessageRequest,
@@ -28,6 +28,9 @@ from bindu.common.protocol.types import (
 )
 
 from bindu.utils.task_telemetry import trace_task_operation, track_active_task
+
+if TYPE_CHECKING:
+    from starlette.responses import StreamingResponse
 
 from bindu.server.scheduler import Scheduler
 from bindu.server.storage import Storage
@@ -92,7 +95,8 @@ class MessageHandlers:
         await self.scheduler.run_task(scheduler_params)
         return SendMessageResponse(jsonrpc="2.0", id=request["id"], result=task)
 
-    async def stream_message(self, request: StreamMessageRequest):
+    @trace_task_operation("stream_message")
+    async def stream_message(self, request: StreamMessageRequest) -> StreamingResponse:
         """Stream messages using Server-Sent Events via the worker pipeline.
 
         This method delegates streaming to ManifestWorker.stream_task() which
@@ -148,7 +152,7 @@ class MessageHandlers:
                 if self.workers:
                     worker = self.workers[0]
                     async for event in worker.stream_task(scheduler_params):
-                        yield f"data: {json.dumps(event)}\n\n"
+                        yield f"data: {json.dumps(event, default=str)}\n\n"
                 else:
                     # No workers available — yield error event
                     error_event = {
@@ -172,5 +176,6 @@ class MessageHandlers:
                     "metadata": {"error": str(e)},
                 }
                 yield f"data: {json.dumps(error_event)}\n\n"
+                await self.storage.update_task(task["id"], state="failed")
 
         return StreamingResponse(stream_generator(), media_type="text/event-stream")
