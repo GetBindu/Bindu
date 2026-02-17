@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedResearch Agent - Medical Research Analyzer</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .medical-gradient { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+        .card-shadow { box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); }
+        .chat-message { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+        .upload-zone { border: 2px dashed #cbd5e0; transition: all 0.3s ease; }
+        .upload-zone:hover { border-color: #4299e1; background-color: #ebf8ff; }
+        .upload-zone.dragging { border-color: #3182ce; background-color: #bee3f8; }
+        .paper-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        .paper-card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+        .loading-spinner { border: 3px solid #f3f4f6; border-top: 3px solid #4299e1; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        .mini-spinner { border: 2px solid #f3f4f6; border-top: 2px solid #4299e1; border-radius: 50%; width: 16px; height: 16px; animation: spin 1s linear infinite; display: inline-block; }
+        @keyframes spin { 0% { transform:rotate(0deg); } 100% { transform:rotate(360deg); } }
+        .badge { display:inline-flex; align-items:center; padding:0.25rem 0.75rem; border-radius:9999px; font-size:0.75rem; font-weight:500; }
+        .badge-success { background-color:#c6f6d5; color:#22543d; }
+        .badge-warning { background-color:#feebc8; color:#744210; }
+        .badge-info { background-color:#bee3f8; color:#2c5282; }
+        .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:50; display:flex; align-items:center; justify-content:center; }
+        .modal-box { background:white; border-radius:12px; padding:24px; max-width:700px; width:90%; max-height:80vh; overflow-y:auto; }
+        .prose-content { white-space: pre-wrap; line-height: 1.7; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const API_BASE_URL = 'http://localhost:3773';
+
+        // ── MARKDOWN RENDERER ──
+        // Converts **bold**, # headers, • bullets, numbered lists to proper HTML
+        function renderMarkdown(text) {
+            if (!text) return [];
+            const lines = text.split('\n');
+            const elements = [];
+            let i = 0;
+
+            while (i < lines.length) {
+                const line = lines[i];
+
+                // H1 heading: # Title
+                if (/^#\s+(.+)/.test(line)) {
+                    const content = line.replace(/^#\s+/, '');
+                    elements.push(
+                        <h2 key={i} className="text-lg font-bold text-gray-900 mt-4 mb-1 flex items-center gap-2">
+                            {renderInline(content)}
+                        </h2>
+                    );
+                }
+                // H2/H3 heading: ## or ###
+                else if (/^#{2,3}\s+(.+)/.test(line)) {
+                    const content = line.replace(/^#{2,3}\s+/, '');
+                    elements.push(
+                        <h3 key={i} className="text-base font-semibold text-gray-800 mt-3 mb-1">
+                            {renderInline(content)}
+                        </h3>
+                    );
+                }
+                // Horizontal rule ---
+                else if (/^---+$/.test(line.trim())) {
+                    elements.push(<hr key={i} className="my-3 border-gray-200" />);
+                }
+                // Bullet point: • or - or *
+                else if (/^[\u2022\-\*]\s+(.+)/.test(line)) {
+                    const content = line.replace(/^[\u2022\-\*]\s+/, '');
+                    elements.push(
+                        <div key={i} className="flex gap-2 my-0.5 ml-2">
+                            <span className="text-indigo-500 font-bold mt-0.5 flex-shrink-0">•</span>
+                            <span className="text-gray-700 text-sm leading-relaxed">{renderInline(content)}</span>
+                        </div>
+                    );
+                }
+                // Numbered list: 1. 2. 3.
+                else if (/^\d+\.\s+(.+)/.test(line)) {
+                    const num = line.match(/^(\d+)\./)[1];
+                    const content = line.replace(/^\d+\.\s+/, '');
+                    elements.push(
+                        <div key={i} className="flex gap-2 my-0.5 ml-2">
+                            <span className="text-indigo-600 font-semibold text-sm flex-shrink-0 w-5">{num}.</span>
+                            <span className="text-gray-700 text-sm leading-relaxed">{renderInline(content)}</span>
+                        </div>
+                    );
+                }
+                // Empty line → spacing
+                else if (line.trim() === '') {
+                    elements.push(<div key={i} className="h-2" />);
+                }
+                // Normal paragraph
+                else {
+                    elements.push(
+                        <p key={i} className="text-sm text-gray-700 leading-relaxed my-0.5">
+                            {renderInline(line)}
+                        </p>
+                    );
+                }
+                i++;
+            }
+            return elements;
+        }
+
+        // Render inline markdown: **bold**, *italic*, `code`
+        function renderInline(text) {
+            if (!text) return null;
+            // Split on bold (**text**), italic (*text*), code (`text`)
+            const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g);
+            return parts.map((part, idx) => {
+                if (/^\*\*(.+)\*\*$/.test(part)) {
+                    return <strong key={idx} className="font-semibold text-gray-900">{part.slice(2, -2)}</strong>;
+                } else if (/^\*(.+)\*$/.test(part)) {
+                    return <em key={idx} className="italic text-gray-800">{part.slice(1, -1)}</em>;
+                } else if (/^`(.+)`$/.test(part)) {
+                    return <code key={idx} className="bg-gray-100 px-1 rounded text-xs font-mono text-indigo-700">{part.slice(1, -1)}</code>;
+                }
+                return part;
+            });
+        }
+
+        // ── MAIN APP ──
+        function MedResearchApp() {
+            const [activeTab, setActiveTab] = useState('upload');
+            const [papers, setPapers] = useState([]);
+            const [messages, setMessages] = useState([]);
+            const [inputMessage, setInputMessage] = useState('');
+            const [loading, setLoading] = useState(false);
+            const [synthesisReport, setSynthesisReport] = useState(null);
+            const [analysisModal, setAnalysisModal] = useState(null); // {title, content}
+
+            const completedPapers = papers.filter(p => p.status === 'completed');
+
+            return (
+                <div className="min-h-screen bg-gray-50">
+                    <Header paperCount={completedPapers.length} />
+                    <NavigationTabs activeTab={activeTab} setActiveTab={setActiveTab} />
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                        {activeTab === 'upload' && <UploadSection papers={papers} setPapers={setPapers} setActiveTab={setActiveTab} />}
+                        {activeTab === 'analysis' && <AnalysisSection papers={papers} setAnalysisModal={setAnalysisModal} />}
+                        {activeTab === 'synthesis' && <SynthesisSection papers={papers} synthesisReport={synthesisReport} setSynthesisReport={setSynthesisReport} />}
+                        {activeTab === 'chat' && <ChatSection messages={messages} setMessages={setMessages} inputMessage={inputMessage} setInputMessage={setInputMessage} loading={loading} setLoading={setLoading} />}
+                    </div>
+                    <Footer />
+                    {analysisModal && (
+                        <div className="modal-overlay" onClick={() => setAnalysisModal(null)}>
+                            <div className="modal-box" onClick={e => e.stopPropagation()}>
+                                <div className="flex justify-between items-start mb-4">
+                                    <h2 className="text-xl font-bold text-gray-800">{analysisModal.title}</h2>
+                                    <button onClick={() => setAnalysisModal(null)} className="text-gray-400 hover:text-gray-600 text-2xl ml-4">&times;</button>
+                                </div>
+                                <div className="text-sm text-gray-700">{renderMarkdown(analysisModal.content)}</div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // ── HEADER ──
+        function Header({ paperCount }) {
+            return (
+                <header className="gradient-bg text-white shadow-lg">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-4">
+                                <div className="bg-white rounded-full p-3">
+                                    <i className="fas fa-microscope text-3xl text-indigo-600"></i>
+                                </div>
+                                <div>
+                                    <h1 className="text-3xl font-bold">MedResearch Agent</h1>
+                                    <p className="text-indigo-200 text-sm">AI-Powered Medical Research Analyzer</p>
+                                </div>
+                            </div>
+                            <div className="hidden md:flex items-center space-x-6">
+                                <div className="text-center">
+                                    <div className="text-2xl font-bold">{paperCount}</div>
+                                    <div className="text-xs text-indigo-200">Papers Loaded</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </header>
+            );
+        }
+
+        // ── NAV TABS ──
+        function NavigationTabs({ activeTab, setActiveTab }) {
+            const tabs = [
+                { id: 'upload', name: 'Upload Papers', icon: 'fa-upload' },
+                { id: 'analysis', name: 'Analysis', icon: 'fa-chart-line' },
+                { id: 'synthesis', name: 'Multi-Paper Synthesis', icon: 'fa-layer-group' },
+                { id: 'chat', name: 'Q&A Chat', icon: 'fa-comments' }
+            ];
+            return (
+                <div className="bg-white shadow">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                        <nav className="flex space-x-8 overflow-x-auto">
+                            {tabs.map(tab => (
+                                <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                                    className={`py-4 px-3 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
+                                        activeTab === tab.id ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+                                    }`}>
+                                    <i className={`fas ${tab.icon} mr-2`}></i>{tab.name}
+                                </button>
+                            ))}
+                        </nav>
+                    </div>
+                </div>
+            );
+        }
+
+        // ── UPLOAD SECTION ──
+        function UploadSection({ papers, setPapers, setActiveTab }) {
+            const [dragging, setDragging] = useState(false);
+            const fileInputRef = useRef(null);
+
+            const handleFiles = async (files) => {
+                const pdfFiles = Array.from(files).filter(f => f.type === 'application/pdf');
+                if (pdfFiles.length === 0) { alert('Please upload PDF files only.'); return; }
+
+                for (const file of pdfFiles) {
+                    const tempId = `temp_${Date.now()}_${Math.random()}`;
+                    // Add card with uploading status
+                    setPapers(prev => [...prev, {
+                        id: tempId, name: file.name,
+                        title: file.name.replace('.pdf',''),
+                        uploadDate: new Date().toISOString(),
+                        status: 'uploading', score: null,
+                        authors: [], year: '', study_type: '', sample_size: ''
+                    }]);
+
+                    try {
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        const res = await fetch(`${API_BASE_URL}/upload`, { method: 'POST', body: formData });
+                        if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Upload failed'); }
+                        const data = await res.json();
+
+                        // Update with REAL data from backend
+                        setPapers(prev => prev.map(p => p.id === tempId ? {
+                            ...p,
+                            id: data.paper_id,
+                            title: data.title,
+                            authors: data.authors || [],
+                            year: data.year || '',
+                            study_type: data.study_type || '',
+                            sample_size: data.sample_size || '',
+                            score: data.evidence_score || null,
+                            status: 'completed',
+                        } : p));
+                    } catch (err) {
+                        setPapers(prev => prev.map(p => p.id === tempId ? { ...p, status: 'error', error: err.message } : p));
+                        console.error('Upload error:', err);
+                    }
+                }
+            };
+
+            return (
+                <div className="space-y-6">
+                    <div className={`upload-zone rounded-lg p-12 text-center cursor-pointer ${dragging ? 'dragging' : ''}`}
+                        onDragEnter={e => { e.preventDefault(); setDragging(true); }}
+                        onDragOver={e => e.preventDefault()}
+                        onDragLeave={() => setDragging(false)}
+                        onDrop={e => { e.preventDefault(); setDragging(false); handleFiles(e.dataTransfer.files); }}
+                        onClick={() => fileInputRef.current.click()}>
+                        <input ref={fileInputRef} type="file" multiple accept=".pdf" onChange={e => handleFiles(e.target.files)} className="hidden" />
+                        <i className="fas fa-cloud-upload-alt text-6xl text-gray-400 mb-4"></i>
+                        <h3 className="text-xl font-semibold text-gray-700 mb-2">Drop PDF research papers here or click to browse</h3>
+                        <p className="text-gray-500">Supports multiple files • PDFs only</p>
+                    </div>
+
+                    {papers.length > 0 && (
+                        <div>
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-2xl font-bold text-gray-800">Uploaded Papers ({papers.length})</h2>
+                                {papers.filter(p=>p.status==='completed').length >= 2 && (
+                                    <button onClick={() => setActiveTab('analysis')}
+                                        className="medical-gradient text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90">
+                                        <i className="fas fa-chart-line mr-2"></i>View Analysis
+                                    </button>
+                                )}
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {papers.map(paper => <PaperCard key={paper.id} paper={paper} />)}
+                            </div>
+                        </div>
+                    )}
+
+                    {papers.length === 0 && (
+                        <div className="bg-blue-50 rounded-lg p-6 border border-blue-200">
+                            <h3 className="text-lg font-semibold text-blue-900 mb-3"><i className="fas fa-info-circle mr-2"></i>Getting Started</h3>
+                            <ol className="space-y-2 text-blue-800">
+                                <li><span className="font-semibold">1.</span> Upload medical research PDFs above</li>
+                                <li><span className="font-semibold">2.</span> Papers are automatically analyzed by AI</li>
+                                <li><span className="font-semibold">3.</span> View analysis details in the Analysis tab</li>
+                                <li><span className="font-semibold">4.</span> Ask questions in the Q&A Chat tab</li>
+                                <li><span className="font-semibold">5.</span> Compare 2+ papers in the Synthesis tab</li>
+                            </ol>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // ── PAPER CARD ──
+        function PaperCard({ paper }) {
+            return (
+                <div className="paper-card bg-white rounded-lg p-4 card-shadow">
+                    <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                            <h3 className="font-semibold text-gray-800 mb-1 text-sm leading-tight">{paper.title}</h3>
+                            {paper.authors && paper.authors.length > 0 && (
+                                <p className="text-xs text-gray-500">{paper.authors.slice(0,2).join(', ')}{paper.authors.length > 2 ? ' et al.' : ''}</p>
+                            )}
+                        </div>
+                        <i className="fas fa-file-pdf text-2xl text-red-500 ml-2 flex-shrink-0"></i>
+                    </div>
+
+                    {paper.status === 'uploading' && (
+                        <div className="flex items-center justify-center py-4">
+                            <div className="loading-spinner"></div>
+                            <span className="ml-3 text-sm text-gray-600">Uploading & analyzing...</span>
+                        </div>
+                    )}
+
+                    {paper.status === 'error' && (
+                        <div className="bg-red-50 border border-red-200 rounded p-2 text-xs text-red-600">
+                            <i className="fas fa-exclamation-circle mr-1"></i>
+                            Upload failed: {paper.error}
+                        </div>
+                    )}
+
+                    {paper.status === 'completed' && (
+                        <div className="space-y-2">
+                            {paper.score && (
+                                <div>
+                                    <div className="flex items-center justify-between mb-1">
+                                        <span className="text-xs font-medium text-gray-600">Evidence Quality</span>
+                                        <span className={`badge text-xs ${paper.score >= 85 ? 'badge-success' : paper.score >= 70 ? 'badge-info' : 'badge-warning'}`}>
+                                            {paper.score >= 85 ? 'Excellent' : paper.score >= 70 ? 'Good' : 'Fair'}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center">
+                                        <div className="flex-1 bg-gray-200 rounded-full h-2 mr-2">
+                                            <div className={`h-2 rounded-full ${paper.score >= 85 ? 'bg-green-500' : paper.score >= 70 ? 'bg-blue-500' : 'bg-yellow-500'}`}
+                                                style={{ width: `${paper.score}%` }}></div>
+                                        </div>
+                                        <span className="text-sm font-bold text-gray-700">{paper.score}/100</span>
+                                    </div>
+                                </div>
+                            )}
+                            <div className="text-xs text-gray-500 space-y-0.5">
+                                {paper.study_type && <p><i className="fas fa-flask mr-1"></i>{paper.study_type}</p>}
+                                {paper.sample_size && paper.sample_size !== 'Not specified' && <p><i className="fas fa-users mr-1"></i>n = {paper.sample_size}</p>}
+                                {paper.year && <p><i className="fas fa-calendar mr-1"></i>{paper.year}</p>}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // ── ANALYSIS SECTION ──
+        function AnalysisSection({ papers, setAnalysisModal }) {
+            const [loadingAnalysis, setLoadingAnalysis] = useState(null); // paper id being analyzed
+            const completedPapers = papers.filter(p => p.status === 'completed');
+
+            if (papers.length === 0) {
+                return (
+                    <div className="text-center py-16">
+                        <i className="fas fa-chart-line text-6xl text-gray-300 mb-4"></i>
+                        <h3 className="text-xl font-semibold text-gray-600 mb-2">No Papers to Analyze</h3>
+                        <p className="text-gray-500">Upload papers first to see detailed analysis</p>
+                    </div>
+                );
+            }
+
+            const avgScore = completedPapers.length > 0
+                ? Math.round(completedPapers.filter(p=>p.score).reduce((s,p)=>s+p.score,0) / completedPapers.filter(p=>p.score).length)
+                : 0;
+
+            const viewFullAnalysis = async (paper) => {
+                setLoadingAnalysis(paper.id);
+                try {
+                    // Ask the agent to summarize this specific paper
+                    const res = await fetch(`${API_BASE_URL}/messages`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify([{ role: 'user', content: `Summarize the paper: "${paper.title}". Give me all details including methodology, findings, limitations and clinical relevance.` }])
+                    });
+                    const text = await res.text();
+                    setAnalysisModal({ title: paper.title, content: text.replace(/^"|"$/g, '').replace(/\\n/g, '\n') });
+                } catch (e) {
+                    setAnalysisModal({ title: paper.title, content: `Error loading analysis: ${e.message}` });
+                } finally {
+                    setLoadingAnalysis(null);
+                }
+            };
+
+            return (
+                <div className="space-y-6">
+                    {/* Stats Row */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {[
+                            { icon:'fa-file-alt', value:papers.length, label:'Total Papers', color:'bg-blue-500' },
+                            { icon:'fa-check-circle', value:completedPapers.length, label:'Analyzed', color:'bg-green-500' },
+                            { icon:'fa-star', value:avgScore || '—', label:'Avg Quality Score', color:'bg-purple-500' },
+                            { icon:'fa-layer-group', value:completedPapers.length >= 2 ? 'Ready' : 'Upload More', label:'Synthesis Status', color:'bg-indigo-500' },
+                        ].map((s,i) => (
+                            <div key={i} className="bg-white rounded-lg card-shadow p-5 flex items-center justify-between">
+                                <div>
+                                    <p className="text-3xl font-bold text-gray-800">{s.value}</p>
+                                    <p className="text-xs text-gray-500 mt-1">{s.label}</p>
+                                </div>
+                                <div className={`${s.color} rounded-full p-3`}>
+                                    <i className={`fas ${s.icon} text-white text-xl`}></i>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Paper Details */}
+                    <div className="bg-white rounded-lg card-shadow p-6">
+                        <h2 className="text-2xl font-bold text-gray-800 mb-6">Paper Analysis Details</h2>
+                        <div className="space-y-5">
+                            {completedPapers.map(paper => (
+                                <div key={paper.id} className="border-l-4 border-indigo-500 pl-5 py-2">
+                                    <h3 className="font-semibold text-gray-800 text-base">{paper.title}</h3>
+                                    {paper.authors && paper.authors.length > 0 && (
+                                        <p className="text-sm text-gray-500 mt-0.5">
+                                            <i className="fas fa-users mr-1"></i>
+                                            {paper.authors.slice(0,3).join(', ')}{paper.authors.length > 3 ? ' et al.' : ''}
+                                        </p>
+                                    )}
+                                    <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
+                                        {paper.score && (
+                                            <span className={`font-semibold ${paper.score >= 85 ? 'text-green-600' : paper.score >= 70 ? 'text-blue-600' : 'text-yellow-600'}`}>
+                                                <i className="fas fa-award mr-1"></i>Score: {paper.score}/100
+                                            </span>
+                                        )}
+                                        {paper.study_type && <span className="text-gray-600"><i className="fas fa-flask mr-1"></i>{paper.study_type}</span>}
+                                        {paper.sample_size && paper.sample_size !== 'Not specified' && <span className="text-gray-600"><i className="fas fa-users mr-1"></i>n={paper.sample_size}</span>}
+                                        {paper.year && <span className="text-gray-600"><i className="fas fa-calendar mr-1"></i>{paper.year}</span>}
+                                    </div>
+                                    <button
+                                        onClick={() => viewFullAnalysis(paper)}
+                                        disabled={loadingAnalysis === paper.id}
+                                        className="mt-3 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-60 flex items-center gap-2"
+                                    >
+                                        {loadingAnalysis === paper.id ? (
+                                            <><div className="mini-spinner"></div> Loading AI Analysis...</>
+                                        ) : (
+                                            <><i className="fas fa-robot"></i> View Full AI Analysis</>
+                                        )}
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // ── SYNTHESIS SECTION ──
+        function SynthesisSection({ papers, synthesisReport, setSynthesisReport }) {
+            const [generating, setGenerating] = useState(false);
+            const [topic, setTopic] = useState('');
+            const completedPapers = papers.filter(p => p.status === 'completed');
+
+            if (completedPapers.length < 2) {
+                return (
+                    <div className="text-center py-16">
+                        <i className="fas fa-layer-group text-6xl text-gray-300 mb-4"></i>
+                        <h3 className="text-xl font-semibold text-gray-600 mb-2">Need More Papers</h3>
+                        <p className="text-gray-500">Upload at least 2 papers to generate multi-paper synthesis</p>
+                        <p className="text-sm text-gray-400 mt-2">Currently: {completedPapers.length} paper(s)</p>
+                    </div>
+                );
+            }
+
+            // ✅ FIXED: Calls real backend API
+            const generateSynthesis = async () => {
+                setGenerating(true);
+                setSynthesisReport(null);
+                try {
+                    const res = await fetch(`${API_BASE_URL}/synthesize`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            topic: topic || 'medical research synthesis',
+                            paper_ids: completedPapers.map(p => p.id)
+                        })
+                    });
+                    if (!res.ok) throw new Error('Synthesis failed');
+                    const data = await res.json();
+                    setSynthesisReport({ text: data.synthesis, paperCount: completedPapers.length });
+                } catch (e) {
+                    alert('Synthesis failed: ' + e.message);
+                } finally {
+                    setGenerating(false);
+                }
+            };
+
+            return (
+                <div className="space-y-6">
+                    {!synthesisReport && (
+                        <div className="bg-white rounded-lg card-shadow p-8 text-center">
+                            <i className="fas fa-layer-group text-5xl text-indigo-600 mb-4"></i>
+                            <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                                Ready to Synthesize {completedPapers.length} Papers
+                            </h2>
+                            <p className="text-gray-600 mb-4">AI will compare findings, identify consensus, and highlight contradictions</p>
+                            <input
+                                type="text"
+                                value={topic}
+                                onChange={e => setTopic(e.target.value)}
+                                placeholder="Optional: Enter a specific topic (e.g., 'diabetes treatment')"
+                                className="w-full max-w-md border border-gray-300 rounded-lg px-4 py-2 mb-4 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
+                            <br/>
+                            <button onClick={generateSynthesis} disabled={generating}
+                                className="medical-gradient text-white px-8 py-3 rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50">
+                                {generating ? (
+                                    <><i className="fas fa-spinner fa-spin mr-2"></i>Generating AI Synthesis...</>
+                                ) : (
+                                    <><i className="fas fa-magic mr-2"></i>Generate Multi-Paper Synthesis</>
+                                )}
+                            </button>
+                        </div>
+                    )}
+
+                    {synthesisReport && (
+                        <div className="space-y-4">
+                            <div className="bg-white rounded-lg card-shadow p-6">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div>
+                                        <h2 className="text-2xl font-bold text-gray-800">Multi-Paper Synthesis Report</h2>
+                                        <p className="text-gray-500 mt-1">AI Analysis of {synthesisReport.paperCount} papers</p>
+                                    </div>
+                                    <button onClick={() => setSynthesisReport(null)}
+                                        className="text-sm text-indigo-600 hover:text-indigo-800 border border-indigo-300 px-3 py-1 rounded-lg">
+                                        <i className="fas fa-redo mr-1"></i>Re-generate
+                                    </button>
+                                </div>
+                                <div className="text-gray-700 text-sm bg-gray-50 p-4 rounded-lg">
+                                    {renderMarkdown(synthesisReport.text)}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // ── CHAT SECTION ──
+        function ChatSection({ messages, setMessages, inputMessage, setInputMessage, loading, setLoading }) {
+            const messagesEndRef = useRef(null);
+
+            useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+
+            const sendMessage = async () => {
+                if (!inputMessage.trim()) return;
+                const userMsg = { id: Date.now(), role: 'user', content: inputMessage, timestamp: new Date().toISOString() };
+                setMessages(prev => [...prev, userMsg]);
+                const q = inputMessage;
+                setInputMessage('');
+                setLoading(true);
+
+                try {
+                    const history = [...messages, userMsg].map(m => ({ role: m.role, content: m.content }));
+                    const res = await fetch(`${API_BASE_URL}/messages`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(history)
+                    });
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    const raw = await res.text();
+                    const text = raw.replace(/^"|"$/g, '').replace(/\\n/g, '\n').replace(/\\t/g, '\t');
+                    setMessages(prev => [...prev, { id: Date.now()+1, role: 'assistant', content: text, timestamp: new Date().toISOString() }]);
+                } catch (err) {
+                    setMessages(prev => [...prev, {
+                        id: Date.now()+1, role: 'assistant',
+                        content: `❌ Could not connect to agent.\n\n1. Make sure backend is running: python medresearch_agent.py\n2. Check http://localhost:3773 is accessible\n\nError: ${err.message}`,
+                        timestamp: new Date().toISOString()
+                    }]);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const quickQuestions = [
+                "What were the main findings?",
+                "Explain the methodology",
+                "What are the limitations?",
+                "Compare the results of both papers",
+                "What was the sample size?",
+                "Were results statistically significant?"
+            ];
+
+            return (
+                <div className="bg-white rounded-lg card-shadow flex flex-col" style={{ height: 'calc(100vh - 280px)', minHeight: '500px' }}>
+                    <div className="border-b p-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-t-lg">
+                        <h2 className="text-xl font-bold flex items-center">
+                            <i className="fas fa-robot mr-2"></i>Q&A with MedResearch Agent
+                        </h2>
+                        <p className="text-sm text-indigo-100 mt-1">Ask anything about your uploaded papers</p>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                        {messages.length === 0 && (
+                            <div className="text-center py-8">
+                                <i className="fas fa-comments text-5xl text-gray-300 mb-4"></i>
+                                <h3 className="text-lg font-semibold text-gray-600 mb-2">Start a Conversation</h3>
+                                <p className="text-gray-400 text-sm mb-6">Upload papers then ask anything about them</p>
+                                <div className="grid grid-cols-2 gap-2 max-w-lg mx-auto">
+                                    {quickQuestions.map((q,i) => (
+                                        <button key={i} onClick={() => setInputMessage(q)}
+                                            className="text-left text-sm bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-2 rounded-lg transition-colors">
+                                            {q}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {messages.map(msg => (
+                            <div key={msg.id} className={`chat-message flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-3xl ${msg.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-white border border-gray-200 text-gray-800'} rounded-lg p-4 shadow`}>
+                                    <div className="flex items-center mb-2">
+                                        <i className={`fas ${msg.role === 'user' ? 'fa-user' : 'fa-robot text-indigo-600'} mr-2`}></i>
+                                        <span className="font-semibold text-sm">{msg.role === 'user' ? 'You' : 'MedResearch Agent'}</span>
+                                    </div>
+                                    {msg.role === 'user' ? (
+                                        <p className="text-sm leading-relaxed">{msg.content}</p>
+                                    ) : (
+                                        <div className="text-sm leading-relaxed">{renderMarkdown(msg.content)}</div>
+                                    )}
+                                    <p className={`text-xs mt-2 ${msg.role === 'user' ? 'text-indigo-200' : 'text-gray-400'}`}>
+                                        {new Date(msg.timestamp).toLocaleTimeString()}
+                                    </p>
+                                </div>
+                            </div>
+                        ))}
+
+                        {loading && (
+                            <div className="flex justify-start">
+                                <div className="bg-gray-100 rounded-lg p-4 shadow flex items-center space-x-2">
+                                    <div className="loading-spinner w-5 h-5" style={{width:'20px',height:'20px'}}></div>
+                                    <span className="text-sm text-gray-600">Agent is thinking...</span>
+                                </div>
+                            </div>
+                        )}
+                        <div ref={messagesEndRef} />
+                    </div>
+
+                    <div className="border-t p-4">
+                        <div className="flex items-center space-x-2">
+                            <textarea value={inputMessage} onChange={e => setInputMessage(e.target.value)}
+                                onKeyPress={e => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }}}
+                                placeholder="Ask anything about your papers... (Enter to send)"
+                                className="flex-1 border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none text-sm"
+                                rows="2" />
+                            <button onClick={sendMessage} disabled={!inputMessage.trim() || loading}
+                                className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50">
+                                <i className="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1">Enter to send • Shift+Enter for new line</p>
+                    </div>
+                </div>
+            );
+        }
+
+        // ── FOOTER ──
+        function Footer() {
+            return (
+                <footer className="bg-gray-800 text-white mt-12">
+                    <div className="max-w-7xl mx-auto px-4 py-6 text-center">
+                        <p className="text-xs text-gray-400">
+                            ⚠️ Medical Disclaimer: For educational and research purposes only. Not medical advice. Always consult healthcare professionals.
+                        </p>
+                    </div>
+                </footer>
+            );
+        }
+
+        ReactDOM.render(<MedResearchApp />, document.getElementById('root'));
+    </script>
+</body>
+</html>

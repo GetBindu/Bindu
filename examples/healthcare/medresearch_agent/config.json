@@ -1,0 +1,76 @@
+{
+  "author": "your.email@example.com",
+  "name": "medresearch_agent",
+  "description": "Medical research paper analyzer with multi-paper synthesis, evidence quality scoring, and citation-backed Q&A. Processes PDF research papers to extract key findings, compare studies, and identify consensus across medical literature.",
+  "version": "1.0.0",
+  "capabilities": {
+    "pdf_processing": true,
+    "multi_paper_synthesis": true,
+    "evidence_scoring": true,
+    "medical_nlp": true,
+    "citation_tracking": true,
+    "bias_detection": true
+  },
+  "auth": {
+    "enabled": false,
+    "note": "Can be enabled in production with DID authentication"
+  },
+  "storage": {
+    "type": "memory",
+    "note": "Stores paper cache and analysis results in memory. Can be upgraded to Redis or PostgreSQL for persistence."
+  },
+  "scheduler": {
+    "type": "memory",
+    "note": "Can be upgraded to Redis for distributed scheduling"
+  },
+  "deployment": {
+    "url": "http://localhost:3773",
+    "expose": true,
+    "cors": true
+  },
+  "skills": [
+    "skills/pdf-processing",
+    "skills/question-answering"
+  ],
+  "features": {
+    "single_paper_analysis": {
+      "description": "Analyze individual research papers",
+      "capabilities": [
+        "Plain-language summaries",
+        "Key findings extraction",
+        "Evidence quality scoring",
+        "Medical entity recognition"
+      ]
+    },
+    "multi_paper_synthesis": {
+      "description": "Compare and synthesize findings across multiple papers",
+      "capabilities": [
+        "Consensus finding detection",
+        "Contradiction identification",
+        "Meta-analysis generation",
+        "Overall evidence strength assessment"
+      ]
+    },
+    "qa_with_citations": {
+      "description": "Answer questions about papers with proper citations",
+      "capabilities": [
+        "Evidence-based answers",
+        "Proper citation formatting",
+        "Quality assessment of sources"
+      ]
+    }
+  },
+  "medical_disclaimer": {
+    "required": true,
+    "text": "This information is for educational and research purposes only. It is NOT medical advice and should NOT be used for diagnosis or treatment. Always consult qualified healthcare professionals for medical decisions."
+  },
+  "observability": {
+    "enabled": true,
+    "tracing": true,
+    "metrics": ["papers_processed", "queries_answered", "synthesis_generated"]
+  },
+  "rate_limiting": {
+    "enabled": false,
+    "note": "Can be enabled for production to prevent abuse"
+  }
+}

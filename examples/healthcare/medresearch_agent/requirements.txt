@@ -1,0 +1,35 @@
+# MedResearch Agent Requirements
+# Python 3.12+
+
+# Core Dependencies
+bindu>=0.3.18
+agno>=0.5.0
+
+# PDF Processing (optional - for production use)
+# pypdf2>=3.0.0
+# pymupdf>=1.23.0
+# pdfplumber>=0.10.0
+
+# Medical NLP (optional - for enhanced entity extraction)
+# spacy>=3.7.0
+# scispacy>=0.5.3
+# en-core-sci-md @ https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.3/en_core_sci_md-0.5.3.tar.gz
+
+# Data Processing
+# numpy>=1.26.0
+# pandas>=2.1.0
+
+# Testing
+pytest>=8.0.0
+pytest-cov>=4.1.0
+pytest-asyncio>=0.23.0
+
+# Code Quality
+black>=24.0.0
+ruff>=0.1.0
+pre-commit>=3.6.0
+
+# Optional: Enhanced Features
+# sentence-transformers>=2.3.0  # For semantic similarity in synthesis
+# openai>=1.10.0  # If using OpenAI for summarization
+# anthropic>=0.18.0  # If using Claude for summarization

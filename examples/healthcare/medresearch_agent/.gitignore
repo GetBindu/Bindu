@@ -1,0 +1,20 @@
+# Environment variables (contains API keys)
+.env
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+chroma_db/
+*.db
+logs/
+
+*.log
+
+uploads/
+
+mnt/
+
+.DS_Store
+
+Thumbs.db
+
