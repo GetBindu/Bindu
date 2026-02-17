@@ -215,6 +215,66 @@ class Storage(ABC, Generic[ContextT]):
         return None
 
     # -------------------------------------------------------------------------
+    # Checkpoint Operations (Pause/Resume)
+    # -------------------------------------------------------------------------
+
+    async def save_checkpoint(
+        self, task_id: UUID, checkpoint: dict[str, Any]
+    ) -> None:
+        """Persist checkpoint data for a suspended task.
+
+        Stores checkpoint information in the task's metadata under the
+        ``checkpoint`` key. Implementations may override to use a
+        dedicated checkpoint store.
+
+        Args:
+            task_id: Task to save checkpoint for
+            checkpoint: Checkpoint data (paused_from_state, message_history,
+                        artifacts, paused_at)
+        """
+        await self.update_task(
+            task_id,
+            state="suspended",
+            metadata={"checkpoint": checkpoint},
+        )
+
+    async def load_checkpoint(self, task_id: UUID) -> dict[str, Any] | None:
+        """Load checkpoint data for a suspended task.
+
+        Reads the ``checkpoint`` key from the task's metadata.
+
+        Args:
+            task_id: Task to load checkpoint for
+
+        Returns:
+            Checkpoint dict if found, None otherwise
+        """
+        task = await self.load_task(task_id)
+        if task is None:
+            return None
+        return (task.get("metadata") or {}).get("checkpoint")
+
+    async def clear_checkpoint(self, task_id: UUID) -> None:
+        """Remove checkpoint data after successful resume.
+
+        Clears the ``checkpoint`` key from task metadata. Called after a
+        task has been fully resumed and is running again.
+
+        Args:
+            task_id: Task to clear checkpoint for
+        """
+        task = await self.load_task(task_id)
+        if task and "metadata" in task and "checkpoint" in task["metadata"]:
+            # Set checkpoint to None rather than deleting the key, because
+            # some storage backends (e.g. InMemoryStorage) merge metadata
+            # dicts and cannot detect key deletions.
+            await self.update_task(
+                task_id,
+                state=task["status"]["state"],
+                metadata={"checkpoint": None},
+            )
+
+    # -------------------------------------------------------------------------
     # Webhook Persistence Operations (for long-running tasks)
     # -------------------------------------------------------------------------
 

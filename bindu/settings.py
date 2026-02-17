@@ -358,6 +358,8 @@ class AgentSettings(BaseSettings):
         "message/send": "send_message",
         "tasks/get": "get_task",
         "tasks/cancel": "cancel_task",
+        "tasks/pause": "pause_task",
+        "tasks/resume": "resume_task",
         "tasks/list": "list_tasks",
         "contexts/list": "list_contexts",
         "contexts/clear": "clear_context",
@@ -372,6 +374,7 @@ class AgentSettings(BaseSettings):
             "working",  # Agent actively processing
             "input-required",  # Waiting for user input
             "auth-required",  # Waiting for authentication
+            "suspended",  # Task paused, awaiting resume
         }
     )
 
@@ -382,6 +385,15 @@ class AgentSettings(BaseSettings):
             "failed",  # Failed due to error
             "canceled",  # Canceled by user
             "rejected",  # Rejected by agent
+        }
+    )
+
+    # Pausable states: Task can be paused from these states
+    pausable_states: frozenset[str] = frozenset(
+        {
+            "submitted",  # Task submitted but not yet started
+            "working",  # Agent actively processing
+            "input-required",  # Waiting for user input
         }
     )
 
@@ -518,6 +530,8 @@ class AuthSettings(BaseSettings):
         "message/send": ["agent:write"],
         "tasks/get": ["agent:read"],
         "tasks/cancel": ["agent:write"],
+        "tasks/pause": ["agent:write"],
+        "tasks/resume": ["agent:write"],
         "tasks/list": ["agent:read"],
         "contexts/list": ["agent:read"],
         "tasks/feedback": ["agent:write"],

@@ -269,6 +269,131 @@ class ManifestWorker(Worker):
                 params["task_id"], task["context_id"], "canceled", True
             )
 
+    @retry_worker_operation(max_attempts=2)
+    async def _handle_pause(self, params: TaskIdParams) -> None:
+        """Pause a running task, persisting full execution context as a checkpoint.
+
+        Captures the complete message history (in chat format for the manifest)
+        alongside any partial artifacts, then transitions the task to 'suspended'.
+        The checkpoint is stored in task metadata so that ``_handle_resume`` can
+        reconstruct the exact execution context later.
+
+        Args:
+            params: Task identification parameters containing task_id
+        """
+        task = await self.storage.load_task(params["task_id"])
+        if not task:
+            logger.warning(f"Cannot pause task {params['task_id']}: not found")
+            return
+
+        current_state = task["status"]["state"]
+        if current_state in {"completed", "failed", "canceled", "rejected"}:
+            logger.warning(
+                f"Cannot pause task {params['task_id']}: terminal state '{current_state}'"
+            )
+            return
+
+        from datetime import datetime, timezone
+        from opentelemetry.trace import get_current_span
+
+        current_span = get_current_span()
+        if current_span.is_recording():
+            current_span.add_event(
+                "task.state_changed",
+                attributes={
+                    "from_state": current_state,
+                    "to_state": "suspended",
+                },
+            )
+
+        # Build checkpoint with full execution context
+        checkpoint = {
+            "paused_from_state": current_state,
+            "message_history": task.get("history", []),
+            "artifacts": task.get("artifacts", []),
+            "paused_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        await self.storage.save_checkpoint(params["task_id"], checkpoint)
+        await self._notify_lifecycle(
+            params["task_id"], task["context_id"], "suspended", False
+        )
+
+    @retry_worker_operation(max_attempts=2)
+    async def _handle_resume(self, params: TaskIdParams) -> None:
+        """Resume a suspended task by restoring its checkpoint and re-executing.
+
+        Reads the checkpoint from task metadata, transitions the task to
+        'resumed' (a transient marker), clears the checkpoint data, then
+        delegates to ``run_task`` which picks up the existing message history
+        and continues execution.
+
+        Args:
+            params: Task identification parameters containing task_id
+        """
+        task = await self.storage.load_task(params["task_id"])
+        if not task:
+            logger.warning(f"Cannot resume task {params['task_id']}: not found")
+            return
+
+        current_state = task["status"]["state"]
+        if current_state != "suspended":
+            logger.warning(
+                f"Cannot resume task {params['task_id']}: "
+                f"expected 'suspended' but got '{current_state}'"
+            )
+            return
+
+        from opentelemetry.trace import get_current_span
+
+        # Load checkpoint before clearing it
+        checkpoint = await self.storage.load_checkpoint(params["task_id"])
+
+        current_span = get_current_span()
+        if current_span.is_recording():
+            current_span.add_event(
+                "task.state_changed",
+                attributes={
+                    "from_state": "suspended",
+                    "to_state": "resumed",
+                },
+            )
+
+        # Transition to resumed, then let run_task take over
+        await self.storage.update_task(
+            params["task_id"],
+            state="resumed",
+        )
+        await self._notify_lifecycle(
+            params["task_id"], task["context_id"], "resumed", False
+        )
+
+        # Clear checkpoint data now that we've restored it
+        await self.storage.clear_checkpoint(params["task_id"])
+
+        # Re-execute with existing history — run_task reads history from storage
+        task = await self.storage.load_task(params["task_id"])
+        if task and task.get("history"):
+            last_message = task["history"][-1]
+            run_params = {
+                "task_id": task["id"],
+                "context_id": task["context_id"],
+                "message": last_message,
+            }
+            await self.run_task(run_params)
+        elif task:
+            logger.warning(
+                f"Cannot resume task {params['task_id']}: no message history. "
+                f"Transitioning to failed."
+            )
+            await self.storage.update_task(
+                params["task_id"],
+                state="failed",
+            )
+            await self._notify_lifecycle(
+                params["task_id"], task["context_id"], "failed", True
+            )
+
     def build_message_history(self, history: list[Message]) -> list[dict[str, str]]:
         """Convert A2A protocol messages to chat format for manifest execution.
 
