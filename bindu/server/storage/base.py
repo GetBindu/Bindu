@@ -215,6 +215,31 @@ class Storage(ABC, Generic[ContextT]):
         return None
 
     # -------------------------------------------------------------------------
+    # Streaming Operations (for SSE streaming support)
+    # -------------------------------------------------------------------------
+
+    async def append_artifact_chunk(
+        self, task_id: UUID, artifact: Artifact
+    ) -> None:
+        """Append an artifact chunk during streaming.
+
+        Used by stream_task() to incrementally store artifact chunks as they
+        are produced by the agent. If an artifact with the same artifact_id
+        already exists in the task, the new parts are appended to it.
+        Otherwise, a new artifact entry is created.
+
+        Args:
+            task_id: Task to append the artifact chunk to
+            artifact: Artifact chunk with append=True and parts to add
+
+        Note:
+            Default implementation is a no-op. Override in subclass
+            to enable incremental artifact persistence during streaming.
+        """
+        # Default no-op — subclasses can override for streaming persistence
+        pass
+
+    # -------------------------------------------------------------------------
     # Webhook Persistence Operations (for long-running tasks)
     # -------------------------------------------------------------------------
 

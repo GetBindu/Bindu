@@ -300,7 +300,7 @@ class X402Settings(BaseSettings):
     # Similar to auth's public_endpoints, this defines which JSON-RPC methods need payment
     protected_methods: list[str] = [
         "message/send",  # Creating new tasks requires payment
-        # "message/stream",  # Uncomment if streaming should require payment
+        "message/stream",  # Streaming tasks also require payment
     ]
 
     # Metadata keys
@@ -356,6 +356,7 @@ class AgentSettings(BaseSettings):
     # Maps JSON-RPC method names to task_manager handler method names
     method_handlers: dict[str, str] = {
         "message/send": "send_message",
+        "message/stream": "stream_message",
         "tasks/get": "get_task",
         "tasks/cancel": "cancel_task",
         "tasks/list": "list_tasks",
@@ -516,6 +517,7 @@ class AuthSettings(BaseSettings):
     require_permissions: bool = False
     permissions: dict[str, list[str]] = {
         "message/send": ["agent:write"],
+        "message/stream": ["agent:write"],
         "tasks/get": ["agent:read"],
         "tasks/cancel": ["agent:write"],
         "tasks/list": ["agent:read"],

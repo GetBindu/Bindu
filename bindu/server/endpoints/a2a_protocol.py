@@ -66,7 +66,10 @@ async def agent_run_endpoint(app: BinduApplication, request: Request) -> Respons
 
         # Pass payment details from middleware to handler if available
         # Payment context is passed through the metadata field in params
-        if hasattr(request.state, "payment_payload") and method == "message/send":
+        if hasattr(request.state, "payment_payload") and method in (
+            "message/send",
+            "message/stream",
+        ):
             # Inject payment context into message metadata
             if "params" in a2a_request and "message" in a2a_request["params"]:
                 message = a2a_request["params"]["message"]
@@ -94,7 +97,19 @@ async def agent_run_endpoint(app: BinduApplication, request: Request) -> Respons
                     "verify_response": serialize_to_dict(request.state.verify_response),
                 }
 
-        jsonrpc_response = await handler(a2a_request)
+        # Call the handler
+        handler_result = await handler(a2a_request)
+
+        # Streaming responses (message/stream) return a Starlette StreamingResponse
+        # directly instead of a JSON-RPC response object
+        from starlette.responses import StreamingResponse
+
+        if isinstance(handler_result, StreamingResponse):
+            if x402_is_requested(request):
+                handler_result = x402_add_header(handler_result)
+            return handler_result
+
+        jsonrpc_response = handler_result
 
         logger.debug(f"A2A response to {client_ip}: method={method}, id={request_id}")
 
