@@ -134,13 +134,6 @@ class DIDAgentExtension:
 
         return private_pem, public_pem
 
-    def _get_key_paths(self) -> dict[str, str]:
-        """Get KeyPaths object from current paths."""
-        return {
-            "private_key_path": str(self.private_key_path),
-            "public_key_path": str(self.public_key_path),
-        }
-
     def generate_and_save_key_pair(self) -> dict[str, str]:
         """Generate and save key pair to files if they don't exist.
 
@@ -159,7 +152,10 @@ class DIDAgentExtension:
             and self.private_key_path.exists()
             and self.public_key_path.exists()
         ):
-            return self._get_key_paths()
+            return {
+                "private_key_path": str(self.private_key_path),
+                "public_key_path": str(self.public_key_path),
+            }
 
         private_pem, public_pem = self._generate_key_pair_data()
 
@@ -171,7 +167,10 @@ class DIDAgentExtension:
         self.private_key_path.chmod(0o600)
         self.public_key_path.chmod(0o644)
 
-        return self._get_key_paths()
+        return {
+            "private_key_path": str(self.private_key_path),
+            "public_key_path": str(self.public_key_path),
+        }
 
     def _load_key_from_file(self, key_path: Path, key_type: str) -> bytes:
         """Load key PEM data from file.
@@ -241,11 +240,6 @@ class DIDAgentExtension:
 
         return public_key
 
-    @staticmethod
-    def _encode_text(text: str) -> bytes:
-        """Encode text to UTF-8 bytes."""
-        return text.encode(app_settings.did.text_encoding)
-
     def sign_text(self, text: str) -> str:
         """Sign the given text using the private key.
 
@@ -259,7 +253,8 @@ class DIDAgentExtension:
             FileNotFoundError: If private key file does not exist
             ValueError: If signing fails
         """
-        signature = self.private_key.sign(self._encode_text(text))
+        text_bytes = text.encode(app_settings.did.text_encoding)
+        signature = self.private_key.sign(text_bytes)
         return base58.b58encode(signature).decode(app_settings.did.base58_encoding)
 
     def verify_text(self, text: str, signature: str) -> bool:
@@ -273,18 +268,12 @@ class DIDAgentExtension:
             True if signature is valid, False otherwise
         """
         try:
+            text_bytes = text.encode(app_settings.did.text_encoding)
             signature_bytes = base58.b58decode(signature)
-            self.public_key.verify(signature_bytes, self._encode_text(text))
+            self.public_key.verify(signature_bytes, text_bytes)
             return True
         except Exception:
             return False
-
-    @staticmethod
-    def _sanitize_did_component(component: str) -> str:
-        """Sanitize a component for use in DID."""
-        return (
-            component.lower().replace(" ", "_").replace("@", "_at_").replace(".", "_")
-        )
 
     @cached_property
     def did(self) -> str:
@@ -296,8 +285,18 @@ class DIDAgentExtension:
         """
         # Use custom bindu format if author, agent_name, and agent_id provided
         if self.author and self.agent_name and self.agent_id:
-            sanitized_author = self._sanitize_did_component(self.author)
-            sanitized_agent_name = self._sanitize_did_component(self.agent_name)
+            sanitized_author = (
+                self.author.lower()
+                .replace(" ", "_")
+                .replace("@", "_at_")
+                .replace(".", "_")
+            )
+            sanitized_agent_name = (
+                self.agent_name.lower()
+                .replace(" ", "_")
+                .replace("@", "_at_")
+                .replace(".", "_")
+            )
             return f"did:{app_settings.did.method_bindu}:{sanitized_author}:{sanitized_agent_name}:{self.agent_id}"
 
         # Fallback to did:key format with multibase encoding
@@ -327,11 +326,10 @@ class DIDAgentExtension:
         Returns:
             Dictionary containing the full DID document with agent metadata
         """
-        did_doc = {
+        return {
             "@context": [app_settings.did.w3c_context, app_settings.did.bindu_context],
             "id": self.did,
             "created": self._created_at,
-            # Authentication method
             "authentication": [
                 {
                     "id": f"{self.did}#{app_settings.did.key_fragment}",
@@ -341,4 +339,3 @@ class DIDAgentExtension:
                 }
             ],
         }
-        return did_doc

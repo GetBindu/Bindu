@@ -66,30 +66,6 @@ class RawTaskData:
 
 
 # =============================================================================
-# Data Models
-# =============================================================================
-
-
-@dataclass
-class RawTaskData:
-    """Raw task data fetched from the database.
-
-    This represents the raw data before interaction extraction.
-
-    Attributes:
-        id: Task UUID
-        history: List of message dictionaries from the conversation
-        created_at: Timestamp when the task was created
-        feedback_data: Optional feedback dictionary (ratings, thumbs up/down)
-    """
-
-    id: UUID
-    history: list[dict[str, Any]]
-    created_at: Any
-    feedback_data: dict[str, Any] | None = None
-
-
-# =============================================================================
 # Data Access Functions
 # =============================================================================
 
@@ -241,6 +217,44 @@ def extract_interactions(
     )
     return interactions
 
+def filter_by_feedback_quality(
+    interactions: list[Interaction],
+    min_threshold: float,
+) -> list[Interaction]:
+    """Filter interactions based on minimum feedback score threshold.
+
+    Only interactions with a feedback_score >= min_threshold
+    are retained. Interactions with missing feedback are discarded.
+
+    Args:
+        interactions: List of extracted interactions
+        min_threshold: Minimum feedback score required (0.0–1.0)
+
+    Returns:
+        Filtered list of interactions
+    """
+    if min_threshold is None:
+        return interactions
+
+    filtered: list[Interaction] = []
+
+    for interaction in interactions:
+        score = interaction.feedback_score
+
+        # Skip interactions without feedback
+        if score is None:
+            continue
+
+        if score >= min_threshold:
+            filtered.append(interaction)
+
+    logger.info(
+        f"Filtered interactions by feedback threshold {min_threshold}: "
+        f"{len(filtered)} kept out of {len(interactions)}"
+    )
+
+    return filtered
+
 def validate_and_clean_interactions(
     interactions: list[Interaction],
 ) -> list[Interaction]:
@@ -376,7 +390,6 @@ def validate_dataset_size(dataset: list[dict[str, Any]]) -> None:
 async def build_golden_dataset(
     limit: int | None = None,
     strategy: BaseExtractionStrategy | None = None,
-    require_feedback: bool = True,
     min_feedback_threshold: float = None,
     did: str | None = None,
 ) -> list[dict[str, Any]]:
@@ -394,7 +407,6 @@ async def build_golden_dataset(
     Args:
         limit: Maximum number of tasks to fetch from database (default: from settings)
         strategy: Extraction strategy to use. Defaults to LastTurnStrategy.
-        require_feedback: Whether to require feedback for inclusion
         min_feedback_threshold: Minimum feedback score threshold
         did: Decentralized Identifier for schema isolation (required for multi-tenancy)
 
@@ -425,14 +437,13 @@ async def build_golden_dataset(
     if not interactions:
         raise ValueError("No interactions extracted from raw tasks")
 
-    # # Step 2: Filter by feedback quality
-    # interactions = filter_by_feedback_quality(
-    #     interactions,
-    #     require_feedback=require_feedback,
-    #     min_threshold=min_feedback_threshold,
-    # )
-    # if not interactions:
-    #     raise ValueError("No interactions passed feedback quality filter")
+    # Step 2: Filter by feedback quality
+    interactions = filter_by_feedback_quality(
+        interactions,
+        min_threshold=min_feedback_threshold,
+    )
+    if not interactions:
+        raise ValueError("No interactions passed feedback quality filter")
 
     # Step 3: Validate and clean
     interactions = validate_and_clean_interactions(interactions)
@@ -474,7 +485,6 @@ def convert_to_dspy_examples(
         example = dspy.Example(
             input=item["input"],
             output=item["output"],
-            feedback=item.get("feedback"),
         ).with_inputs("input")
         examples.append(example)
 
