@@ -1,29 +1,33 @@
 <script lang="ts">
-	import { goto, replaceState } from "$app/navigation";
-	import { base } from "$app/paths";
-	import { page } from "$app/state";
-	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
+import { goto, replaceState } from "$app/navigation";
+import { base } from "$app/paths";
+import { page } from "$app/state";
+import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
 
 	const publicConfig = usePublicConfig();
 
-	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
-	import { ERROR_MESSAGES, error } from "$lib/stores/errors";
-	import { pendingMessage } from "$lib/stores/pendingMessage";
-	import { sanitizeUrlParam } from "$lib/utils/urlParams";
-	import { onMount, tick } from "svelte";
-	import { loading } from "$lib/stores/loading.js";
-	import { loadAttachmentsFromUrls } from "$lib/utils/loadAttachmentsFromUrls";
-	import { requireAuthUser } from "$lib/utils/auth";
-	import {
-		messages as agentMessages,
-		isThinking,
-		sendMessage as sendAgentMessage,
-		contextId,
-		setReplyTo,
-		clearReplyTo,
-		replyToTaskId
-	} from "$lib/stores/chat";
-	import type { Message } from "$lib/types/Message";
+import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
+import { ERROR_MESSAGES, error } from "$lib/stores/errors";
+import { pendingMessage } from "$lib/stores/pendingMessage";
+import { sanitizeUrlParam } from "$lib/utils/urlParams";
+import { onMount, tick } from "svelte";
+import { loading } from "$lib/stores/loading.js";
+import { loadAttachmentsFromUrls } from "$lib/utils/loadAttachmentsFromUrls";
+import { requireAuthUser } from "$lib/utils/auth";
+import {
+	messages as agentMessages,
+	isThinking,
+	sendMessage as sendAgentMessage,
+	contextId,
+	setReplyTo,
+	clearReplyTo,
+	replyToTaskId,
+	clearMessages,
+	clearContext
+} from "$lib/stores/chat";
+import IconEraser from "~icons/lucide/eraser";
+import IconTrash2 from "~icons/lucide/trash-2";
+import type { Message } from "$lib/types/Message";
 
 	let { data } = $props();
 
@@ -188,6 +192,23 @@
 	function handleClearReply() {
 		clearReplyTo();
 	}
+
+	async function handleClearContextClick() {
+		if (!$contextId) return;
+		const confirmed = confirm(
+			"Are you sure you want to clear this context and its tasks? This action cannot be undone."
+		);
+		if (!confirmed) return;
+		await clearContext($contextId);
+	}
+
+	function handleClearTasksClick() {
+		const confirmed = confirm(
+			"Are you sure you want to clear all tasks/messages in the current view?"
+		);
+		if (!confirmed) return;
+		clearMessages();
+	}
 </script>
 
 <svelte:head>
@@ -196,6 +217,28 @@
 
 {#if hasModels}
 	{#if isAgentMode}
+		{#if $contextId}
+			<div
+				class="mx-auto flex max-w-3xl items-center justify-end gap-2 px-5 pt-4 xl:max-w-4xl"
+			>
+				<button
+					type="button"
+					class="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+					on:click={handleClearContextClick}
+				>
+					<IconTrash2 class="size-3.5" />
+					<span>Clear context</span>
+				</button>
+				<button
+					type="button"
+					class="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+					on:click={handleClearTasksClick}
+				>
+					<IconEraser class="size-3.5" />
+					<span>Clear tasks</span>
+				</button>
+			</div>
+		{/if}
 		<ChatWindow
 			messages={displayMessages}
 			loading={$isThinking}
