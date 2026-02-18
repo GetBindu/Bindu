@@ -5,20 +5,36 @@ from schemas import AgentResponse
 graph = build_graph()
 
 def handler(messages):
-    query = messages[0]["content"]
+    try:
+        # Handle possible dict wrapper
+        if isinstance(messages, dict) and "messages" in messages:
+            messages = messages["messages"]
 
-    result = graph.invoke({
-        "topic": query,
-    "plan":  None,
-    "sections": [],  # reducer concatenates worker outputs
-    "final": ""
+        if not messages:
+            raise ValueError("No messages received")
 
-    })
+        last_message = messages[-1]
 
-    return AgentResponse(
-        answer=result["final"],
-        reasoning="Generated via LangGraph blog writter agent"
-    ).dict()
+        # Support both formats:
+        # 1) [{"role": "user", "content": "..."}]
+        # 2) ["plain string"]
+        if isinstance(last_message, dict):
+            query = last_message.get("content", "")
+        else:
+            query = str(last_message)
+
+        result = graph.invoke({
+            "topic": query,
+            "plan": [],          
+            "sections": [],
+            "final": ""
+        })
+
+        return AgentResponse( answer=result["final"],)
+
+    except Exception as e:
+        return AgentResponse(
+            answer="Agent execution failed.",)
 
 config = {
     "author": "amritanshu9973@gmail.com",
@@ -27,7 +43,8 @@ config = {
         "url": "http://localhost:3773",
         "expose": True,
         "cors_origins": ["*"],
-    }
+    }, 
+    "skills": ["skills/Blog_writing_agent"],
 }
 
 bindufy(config, handler)

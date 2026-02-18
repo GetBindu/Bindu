@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import operator
 
-from typing import TypedDict, List, Annotated, Literal
+from typing import TypedDict, List, Annotated, Literal,Optional
 
 from pydantic import BaseModel, Field
 from langgraph.graph import StateGraph, START, END
@@ -47,9 +47,9 @@ class Plan(BaseModel):
 
 class State(TypedDict):
     topic: str
-    plan: Plan
+    plan: Optional[Plan]
     sections: Annotated[List[str], operator.add]  # reducer concatenates worker outputs
-    final: str
+    final: Optional[str]
 
 llm = ChatOpenAI(model="gpt-5.2")
 
