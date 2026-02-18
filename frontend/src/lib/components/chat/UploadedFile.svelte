@@ -14,10 +14,23 @@
 	interface Props {
 		file: MessageFile;
 		canClose?: boolean;
+		loading?: boolean;
+		loading?: boolean;
+		error?: string;
+		progress?: number;
 		onclose?: () => void;
+		onclick?: () => void;
 	}
 
-	let { file, canClose = true, onclose }: Props = $props();
+	let {
+		file,
+		canClose = true,
+		loading = false,
+		error = undefined,
+		progress = undefined,
+		onclose,
+		onclick,
+	}: Props = $props();
 
 	let showModal = $state(false);
 
@@ -42,7 +55,7 @@
 	const isAudio = (mime: string) =>
 		mime.startsWith("audio/") || mime === "mp3" || mime === "wav" || mime === "x-wav";
 	const isVideo = (mime: string) =>
-		mime.startsWith("video/") || mime === "mp4" || mime === "x-mpeg";
+		mime.startsWith("video/") || mime === "video/" || mime === "mp4" || mime === "x-mpeg";
 
 	function matchesAllowed(contentType: string, allowed: readonly string[]): boolean {
 		const ct = contentType.split(";")[0]?.trim().toLowerCase();
@@ -127,20 +140,76 @@
 {/if}
 
 <div
-	onclick={() => isClickable && (showModal = true)}
+	onclick={() => {
+		isClickable && (showModal = true);
+		onclick?.();
+	}}
 	onkeydown={(e) => {
 		if (!isClickable) {
 			return;
 		}
 		if (e.key === "Enter" || e.key === " ") {
 			showModal = true;
+			onclick?.();
 		}
 	}}
-	class:clickable={isClickable}
+	class:clickable={isClickable && !error}
 	role="button"
 	tabindex="0"
 >
-	<div class="group relative flex items-center rounded-xl shadow-sm">
+	<div
+		class="group relative flex items-center rounded-xl shadow-sm"
+		class:border-red-500={!!error}
+		class:border={!!error}
+	>
+		{#if error}
+			<div
+				class="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-xl bg-white/80 text-center text-xs font-semibold text-red-500 backdrop-blur-sm dark:bg-black/60"
+			>
+				<span>Error</span>
+				<span class="max-w-[90%] truncate px-1">{error}</span>
+			</div>
+		{:else if loading}
+			<div
+				class="absolute inset-0 z-20 flex items-center justify-center rounded-xl bg-gray-100/50 backdrop-blur-sm dark:bg-gray-800/50"
+			>
+				{#if progress !== undefined}
+					{@const radius = 14}
+					{@const circumference = 2 * Math.PI * radius}
+					<div class="relative flex items-center justify-center">
+						<svg class="size-8 -rotate-90 transform" viewBox="0 0 32 32">
+							<circle
+								cx="16" cy="16" r={radius}
+								fill="none"
+								stroke="currentColor"
+								stroke-width="4"
+								class="text-gray-300 dark:text-gray-600 opacity-30"
+							/>
+							<circle
+								cx="16" cy="16" r={radius}
+								fill="none"
+								stroke="currentColor"
+								stroke-width="4"
+								class="text-black dark:text-white transition-all duration-200 ease-out"
+								stroke-dasharray={circumference}
+								stroke-dashoffset={circumference - (circumference * progress) / 100}
+							/>
+						</svg>
+						<span class="absolute text-[10px] font-bold text-black dark:text-white">
+							{Math.round(progress)}%
+						</span>
+					</div>
+				{:else}
+					<EosIconsLoading class="text-2xl text-black dark:text-white" />
+				{/if}
+			</div>
+		{:else if progress === undefined}
+			<div class="absolute bottom-0 right-0 z-10 p-0.5">
+				<div class="bg-black/50 backdrop-blur-md rounded-full p-0.5" title="Ready to upload">
+					<div class="h-2 w-2 rounded-full bg-white/80"></div>
+				</div>
+			</div>
+		{/if}
 		{#if isImage(file.mime)}
 			<div class="h-36 overflow-hidden rounded-xl">
 				<img

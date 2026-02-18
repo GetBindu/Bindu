@@ -137,14 +137,23 @@
 			$loading = true;
 			pending = true;
 			const base64Files = await Promise.all(
-				(files ?? []).map((file) =>
-					file2base64(file).then((value) => ({
+				(files ?? []).map(async (file) => {
+					const hash = (file as any).hash;
+					if (hash) {
+						return {
+							type: "hash" as const,
+							value: hash,
+							mime: file.type,
+							name: file.name,
+						};
+					}
+					return file2base64(file).then((value) => ({
 						type: "base64" as const,
 						value,
 						mime: file.type,
 						name: file.name,
-					}))
-				)
+					}));
+				})
 			);
 
 			let messageToWriteToId: Message["id"] | undefined = undefined;
@@ -252,7 +261,8 @@
 					messageUpdatesAbortController.signal,
 					currentTaskId ?? undefined,
 					currentTaskState ?? undefined,
-					replyToTaskId ?? undefined
+					replyToTaskId ?? undefined,
+					base64Files
 				);
 				// Clear reply after sending
 				clearReply();

@@ -4,17 +4,20 @@
  */
 
 import { z } from "zod";
+import { collections, ObjectId } from "$lib/server/database";
 import { config } from "$lib/server/config";
 import type { Endpoint, EndpointMessage } from "../endpoints";
 import { binduResponseToStream } from "./binduToTextGenerationStream";
 import type {
 	BinduMessage,
-	Part,
 	MessageSendParams,
 	BinduJsonRpcRequest,
 	Task,
+	Part,
 	TaskState
 } from "./types";
+import { writable } from "svelte/store"; // This might not be needed, but stream needs Writable from stream module if specialized
+
 import { TERMINAL_STATES, NON_TERMINAL_STATES } from "./types";
 
 export const endpointBinduParametersSchema = z.object({
@@ -78,7 +81,7 @@ function determineTaskIdAndReferences(
 /**
  * Convert chat-ui message format to Bindu message parts
  */
-function messageContentToParts(message: EndpointMessage): Part[] {
+async function messageContentToParts(message: EndpointMessage): Promise<Part[]> {
 	const parts: Part[] = [];
 
 	// Handle string content
@@ -87,17 +90,42 @@ function messageContentToParts(message: EndpointMessage): Part[] {
 	}
 
 	// Handle file attachments if present
-	if (message.files && message.files.length > 0) {
+	if (message.files?.length) {
 		for (const file of message.files) {
 			if (file.type === "base64") {
 				parts.push({
 					kind: "file",
+					text: "",
 					file: {
 						name: file.name,
 						mimeType: file.mime,
 						bytes: file.value,
 					},
 				});
+			} else if (file.type === "hash") {
+				try {
+					const stream = collections.bucket.openDownloadStream(new ObjectId(file.value));
+					const chunks: Buffer[] = [];
+					const writableStream = {
+						write: (chunk: Buffer) => chunks.push(chunk),
+						end: () => { },
+					};
+					// @ts-ignore - The mock stream implementation is simple
+					stream.pipe(writableStream);
+
+					const buffer = Buffer.concat(chunks);
+					parts.push({
+						kind: "file",
+						text: "",
+						file: {
+							name: file.name,
+							mimeType: file.mime,
+							bytes: buffer.toString("base64"),
+						},
+					});
+				} catch (e) {
+					console.error(`Failed to read file ${file.value}`, e);
+				}
 			}
 		}
 	}
@@ -109,10 +137,10 @@ function messageContentToParts(message: EndpointMessage): Part[] {
  * Build the complete message history for context
  * Tracks task IDs and states for proper task continuity
  */
-function buildMessageHistory(
+async function buildMessageHistory(
 	messages: EndpointMessage[],
 	contextId: string
-): { lastMessage: BinduMessage; history: BinduMessage[]; lastTaskId?: string; lastTaskState?: string } {
+): Promise<{ lastMessage: BinduMessage; history: BinduMessage[]; lastTaskId?: string; lastTaskState?: string }> {
 	const history: BinduMessage[] = [];
 	let lastTaskId: string | undefined;
 	let lastTaskState: string | undefined;
@@ -122,7 +150,7 @@ function buildMessageHistory(
 		const taskId = crypto.randomUUID();
 		const binduMsg: BinduMessage = {
 			role: msg.from === "assistant" ? "agent" : "user",
-			parts: messageContentToParts(msg),
+			parts: await messageContentToParts(msg),
 			kind: "message",
 			messageId: crypto.randomUUID(),
 			contextId,
@@ -168,8 +196,12 @@ export async function endpointBindu(
 			? conversationId.toString().padEnd(32, '0')  // Pad to 32 chars for UUID format
 			: crypto.randomUUID();
 
-		// Build message with history and track task state
-		const { lastMessage, lastTaskId, lastTaskState } = buildMessageHistory(conversationMessages, contextId);
+		// 4. Build context and task
+		const { lastMessage, lastTaskId, lastTaskState } = await buildMessageHistory(
+			conversationMessages,
+			contextId
+		);
+		let currentTaskId = lastTaskId;
 
 		// Determine task ID based on A2A protocol state machine
 		const { taskId, referenceTaskIds } = determineTaskIdAndReferences(
