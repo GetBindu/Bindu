@@ -299,6 +299,7 @@ def bindufy(
         oltp_service_name=validated_config.get("oltp_service_name"),
         num_history_sessions=validated_config["num_history_sessions"],
         enable_system_message=validated_config.get("enable_system_message", True),
+        enable_dspy=validated_config.get("enable_dspy", False),
         enable_context_based_history=validated_config.get(
             "enable_context_based_history", False
         ),

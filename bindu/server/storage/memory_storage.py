@@ -213,6 +213,7 @@ class InMemoryStorage(Storage[ContextT]):
         new_artifacts: list[Artifact] | None = None,
         new_messages: list[Message] | None = None,
         metadata: dict[str, Any] | None = None,
+        prompt_id: int | None = None,
     ) -> Task:
         """Update task state and append new content.
 
@@ -226,6 +227,7 @@ class InMemoryStorage(Storage[ContextT]):
             new_artifacts: Optional artifacts to append (for completion)
             new_messages: Optional messages to append to history
             metadata: Optional metadata to update/merge with task metadata
+            prompt_id: Optional prompt ID to associate with this task
 
         Returns:
             Updated task object
@@ -244,6 +246,9 @@ class InMemoryStorage(Storage[ContextT]):
         task["status"] = TaskStatus(
             state=state, timestamp=datetime.now(timezone.utc).isoformat()
         )
+
+        if prompt_id is not None:
+            task["prompt_id"] = prompt_id
 
         if metadata:
             if "metadata" not in task:
