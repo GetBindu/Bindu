@@ -15,6 +15,7 @@ sending messages and streaming responses.
 
 from __future__ import annotations
 
+import hashlib
 import inspect
 import json
 import uuid
@@ -59,8 +60,23 @@ class MessageHandlers:
         message = request["params"]["message"]
         context_id = self.context_id_parser(message.get("context_id"))
 
-        # Submit task to storage
-        task: Task = await self.storage.submit_task(context_id, message)
+        # Safe retry: check for duplicate request via deterministic fingerprint
+        
+        fingerprint = self._compute_message_fingerprint(message, context_id)
+        existing_task = await self.storage.load_task_by_fingerprint(fingerprint)
+        if existing_task is not None:
+            from bindu.server.storage.helpers import serialize_for_jsonb
+
+            return SendMessageResponse(
+                jsonrpc="2.0",
+                id=request["id"],
+                result=serialize_for_jsonb(existing_task),
+            )
+
+        # Submit task to storage (with fingerprint for future dedup)
+        task: Task = await self.storage.submit_task(
+            context_id, message, fingerprint=fingerprint
+        )
 
         # Schedule task for execution
         scheduler_params: TaskSendParams = TaskSendParams(
@@ -94,6 +110,30 @@ class MessageHandlers:
 
         await self.scheduler.run_task(scheduler_params)
         return SendMessageResponse(jsonrpc="2.0", id=request["id"], result=task)
+
+    @staticmethod
+    def _compute_message_fingerprint(message: dict, context_id: Any) -> str:
+        """Compute a deterministic SHA256 fingerprint for deduplication.
+
+        The fingerprint is derived from:
+        - Sender identity (DID from message metadata, or "anonymous")
+        - context_id
+        - Normalized JSON of the message (sorted keys, compact separators)
+
+        This ensures that retrying the exact same logical request produces
+        the same fingerprint, while any change in content produces a different one.
+        """
+        # Extract sender identity from message metadata if available
+        metadata = message.get("metadata", {}) or {}
+        sender_did = metadata.get("did", "anonymous")
+
+        # Normalize the message to a canonical JSON form
+        normalized_message = json.dumps(
+            message, sort_keys=True, separators=(",", ":")
+        )
+
+        fingerprint_input = f"{sender_did}:{context_id}:{normalized_message}"
+        return hashlib.sha256(fingerprint_input.encode("utf-8")).hexdigest()
 
     async def stream_message(self, request: StreamMessageRequest):
         """Stream messages using Server-Sent Events.

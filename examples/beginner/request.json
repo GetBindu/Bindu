@@ -1,0 +1,23 @@
+{
+  "jsonrpc": "2.0",
+  "id": "11111111-1111-1111-1111-111111111111",
+  "method": "message/send",
+  "params": {
+    "configuration": {
+      "acceptedOutputModes": ["text"]
+    },
+    "message": {
+      "messageId": "22222222-2222-2222-2222-222222222222",
+      "contextId": "33333333-3333-3333-3333-333333333333",
+      "taskId": "44444444-4444-4444-4444-444444444444",
+      "role": "user",
+      "kind": "message",
+      "parts": [
+        {
+          "kind": "text",
+          "text": "hello"
+        }
+      ]
+    }
+  }
+}

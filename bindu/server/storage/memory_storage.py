@@ -60,6 +60,7 @@ class InMemoryStorage(Storage[ContextT]):
         self.contexts: dict[UUID, list[UUID]] = {}
         self.task_feedback: dict[UUID, list[dict[str, Any]]] = {}
         self._webhook_configs: dict[UUID, PushNotificationConfig] = {}
+        self._fingerprints: dict[str, UUID] = {}
 
     @retry_storage_operation(max_attempts=3, min_wait=0.1, max_wait=1)
     async def load_task(
@@ -90,8 +91,27 @@ class InMemoryStorage(Storage[ContextT]):
 
         return task_copy
 
+    async def load_task_by_fingerprint(self, fingerprint: str) -> Task | None:
+        """Load a task by its deterministic request fingerprint.
+
+        Args:
+            fingerprint: SHA256 hex digest for deduplication lookup.
+
+        Returns:
+            Task object if found, None otherwise.
+        """
+        task_id = self._fingerprints.get(fingerprint)
+        if task_id is None:
+            return None
+        return await self.load_task(task_id)
+
     @retry_storage_operation(max_attempts=3, min_wait=0.1, max_wait=1)
-    async def submit_task(self, context_id: UUID, message: Message) -> Task:
+    async def submit_task(
+        self,
+        context_id: UUID,
+        message: Message,
+        fingerprint: str | None = None,
+    ) -> Task:
         """Create a new task or continue an existing non-terminal task.
 
         Task-First Pattern (Bindu):
@@ -197,6 +217,10 @@ class InMemoryStorage(Storage[ContextT]):
             history=[message],
         )
         self.tasks[task_id] = task
+
+        # Index fingerprint for dedup lookups
+        if fingerprint:
+            self._fingerprints[fingerprint] = task_id
 
         # Add task to context
         if context_id not in self.contexts:
@@ -428,6 +452,14 @@ class InMemoryStorage(Storage[ContextT]):
         # Remove the context itself
         del self.contexts[context_id]
 
+        # Clean up fingerprints pointing to deleted tasks
+        deleted_ids = set(task_ids)
+        self._fingerprints = {
+            fp: tid
+            for fp, tid in self._fingerprints.items()
+            if tid not in deleted_ids
+        }
+
         logger.info(f"Cleared context {context_id}: removed {len(task_ids)} tasks")
 
     async def clear_all(self) -> None:
@@ -439,6 +471,7 @@ class InMemoryStorage(Storage[ContextT]):
         self.contexts.clear()
         self.task_feedback.clear()
         self._webhook_configs.clear()
+        self._fingerprints.clear()
 
     async def store_task_feedback(
         self, task_id: UUID, feedback_data: dict[str, Any]
