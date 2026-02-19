@@ -359,6 +359,8 @@ class AgentSettings(BaseSettings):
         "tasks/get": "get_task",
         "tasks/cancel": "cancel_task",
         "tasks/list": "list_tasks",
+        "tasks/pause": "pause_task",
+        "tasks/resume": "resume_task",
         "contexts/list": "list_contexts",
         "contexts/clear": "clear_context",
         "tasks/feedback": "task_feedback",
@@ -370,6 +372,7 @@ class AgentSettings(BaseSettings):
         {
             "submitted",  # Task submitted, awaiting execution
             "working",  # Agent actively processing
+            "paused",  # Task paused by user
             "input-required",  # Waiting for user input
             "auth-required",  # Waiting for authentication
         }

@@ -1499,6 +1499,16 @@ CancelTaskResponse = JSONRPCResponse[
     Task, Union[TaskNotCancelableError, TaskNotFoundError]
 ]
 
+PauseTaskRequest = JSONRPCRequest[Literal["tasks/pause"], TaskIdParams]
+PauseTaskResponse = JSONRPCResponse[
+    Task, Union[TaskNotFoundError, TaskNotCancelableError]
+]
+
+ResumeTaskRequest = JSONRPCRequest[Literal["tasks/resume"], TaskIdParams]
+ResumeTaskResponse = JSONRPCResponse[
+    Task, Union[TaskNotFoundError, TaskNotCancelableError]
+]
+
 ListTasksRequest = JSONRPCRequest[Literal["tasks/list"], ListTasksParams]
 ListTasksResponse = JSONRPCResponse[
     List[Task], Union[TaskNotFoundError, TaskNotCancelableError]
@@ -1557,6 +1567,8 @@ A2ARequest = Annotated[
         StreamMessageRequest,
         GetTaskRequest,
         CancelTaskRequest,
+        PauseTaskRequest,
+        ResumeTaskRequest,
         ListTasksRequest,
         TaskFeedbackRequest,
         ListContextsRequest,
@@ -1575,6 +1587,8 @@ A2AResponse: TypeAlias = Union[
     StreamMessageResponse,
     GetTaskResponse,
     CancelTaskResponse,
+    PauseTaskResponse,
+    ResumeTaskResponse,
     ListTasksResponse,
     TaskFeedbackResponse,
     ListContextsResponse,
