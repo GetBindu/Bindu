@@ -327,8 +327,6 @@ class InMemoryStorage(Storage[ContextT]):
         if not isinstance(messages, list):
             raise TypeError(f"messages must be list, got {type(messages).__name__}")
 
-        # Ensure context exists
-        if context_id not in self.contexts:
             self.contexts[context_id] = []
 
     async def list_tasks(self, length: int | None = None) -> list[Task]:
@@ -346,6 +344,20 @@ class InMemoryStorage(Storage[ContextT]):
         # Optimize: Only convert to list what we need
         all_tasks = list(self.tasks.values())
         return all_tasks[-length:] if length < len(all_tasks) else all_tasks
+
+    async def count_tasks(self, status: str | None = None) -> int:
+        """Count number of tasks, optionally filtered by status.
+
+        Args:
+            status: Optional status to filter by
+
+        Returns:
+            Count of matching tasks
+        """
+        if status is None:
+            return len(self.tasks)
+        
+        return sum(1 for t in self.tasks.values() if t["status"]["state"] == status)
 
     async def list_tasks_by_context(
         self, context_id: UUID, length: int | None = None

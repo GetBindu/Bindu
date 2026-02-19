@@ -57,9 +57,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
 
             # Get response size
             response_size = 0
-            if hasattr(response, "body") and response.body:
-                response_size = len(response.body)
-            elif response.headers.get("content-length"):
+            if response.headers.get("content-length"):
                 try:
                     response_size = int(response.headers["content-length"])
                 except (ValueError, TypeError):
@@ -68,7 +66,13 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             # Record metrics
             try:
                 method = request.method
+                # Sanitize endpoint to avoid high cardinality
+                # Replace UUIDs and numeric IDs with placeholders
+                import re
                 endpoint = request.url.path
+                endpoint = re.sub(r"/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", "/:id", endpoint)
+                endpoint = re.sub(r"/\d+", "/:id", endpoint)
+                
                 status = str(response.status_code)
 
                 metrics.record_http_request(

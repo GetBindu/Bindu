@@ -536,6 +536,29 @@ class PostgresStorage(Storage[ContextT]):
 
         return await self._retry_on_connection_error(_list)
 
+    async def count_tasks(self, status: str | None = None) -> int:
+        """Count number of tasks, optionally filtered by status.
+
+        Args:
+            status: Optional status to filter by
+
+        Returns:
+            Count of matching tasks
+        """
+        self._ensure_connected()
+
+        async def _count():
+            async with self._get_session_with_schema() as session:
+                stmt = select(func.count()).select_from(tasks_table)
+                
+                if status is not None:
+                    stmt = stmt.where(tasks_table.c.state == status)
+
+                result = await session.execute(stmt)
+                return result.scalar() or 0
+
+        return await self._retry_on_connection_error(_count)
+
     async def list_tasks_by_context(
         self, context_id: UUID, length: int | None = None
     ) -> list[Task]:
