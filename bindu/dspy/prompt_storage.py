@@ -44,6 +44,7 @@ class PromptStorage:
 
     def __init__(self, filepath: Path | str = DEFAULT_PROMPT_FILE):
         self.filepath = Path(filepath)
+        # Lock file will be created alongside the JSON file
         self.lock_path = self.filepath.with_suffix(".lock")
         self._ensure_file()
         self._async_lock = asyncio.Lock()  # For async coordination within process

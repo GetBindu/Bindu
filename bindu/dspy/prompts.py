@@ -19,7 +19,6 @@ from collections import UserString
 from typing import Any
 
 from bindu.dspy.prompt_storage import PromptStorage
-from bindu.server.storage.base import Storage
 
 # Initialize global prompt storage
 _storage = PromptStorage()
@@ -52,12 +51,8 @@ class Prompt(UserString):
         return self.data
 
 
-async def get_active_prompt(storage: Storage | None = None, did: str | None = None) -> dict[str, Any] | None:
+async def get_active_prompt() -> dict[str, Any] | None:
     """Get the current active prompt.
-    
-    Args:
-        storage: Ignored (kept for compatibility)
-        did: Ignored (kept for compatibility)
     
     Returns:
         Dictionary containing prompt data (id, prompt_text, status, traffic)
@@ -66,12 +61,8 @@ async def get_active_prompt(storage: Storage | None = None, did: str | None = No
     return await _storage.get_active_prompt()
 
 
-async def get_candidate_prompt(storage: Storage | None = None, did: str | None = None) -> dict[str, Any] | None:
+async def get_candidate_prompt() -> dict[str, Any] | None:
     """Get the current candidate prompt.
-    
-    Args:
-        storage: Ignored (kept for compatibility)
-        did: Ignored (kept for compatibility)
     
     Returns:
         Dictionary containing prompt data (id, prompt_text, status, traffic)
@@ -80,15 +71,13 @@ async def get_candidate_prompt(storage: Storage | None = None, did: str | None =
     return await _storage.get_candidate_prompt()
 
 
-async def insert_prompt(text: str, status: str, traffic: float, storage: Storage | None = None, did: str | None = None) -> str:
+async def insert_prompt(text: str, status: str, traffic: float) -> str:
     """Insert a new prompt into the storage.
     
     Args:
         text: The prompt text content
         status: The prompt status (active, candidate, deprecated, rolled_back)
         traffic: Traffic allocation (0.0 to 1.0)
-        storage: Ignored (kept for compatibility)
-        did: Ignored (kept for compatibility)
         
     Returns:
         The ID of the newly inserted prompt (UUID string)
@@ -96,36 +85,30 @@ async def insert_prompt(text: str, status: str, traffic: float, storage: Storage
     return await _storage.insert_prompt(text, status, traffic)
 
 
-async def update_prompt_traffic(prompt_id: str, traffic: float, storage: Storage | None = None, did: str | None = None) -> None:
+async def update_prompt_traffic(prompt_id: str, traffic: float) -> None:
     """Update the traffic allocation for a specific prompt.
     
     Args:
         prompt_id: The ID of the prompt to update
         traffic: New traffic allocation (0.0 to 1.0)
-        storage: Ignored (kept for compatibility)
-        did: Ignored (kept for compatibility)
     """
     await _storage.update_prompt_traffic(prompt_id, traffic)
 
 
-async def update_prompt_status(prompt_id: str, status: str, storage: Storage | None = None, did: str | None = None) -> None:
+async def update_prompt_status(prompt_id: str, status: str) -> None:
     """Update the status of a specific prompt.
     
     Args:
         prompt_id: The ID of the prompt to update
         status: New status (active, candidate, deprecated, rolled_back)
-        storage: Ignored (kept for compatibility)
-        did: Ignored (kept for compatibility)
     """
     await _storage.update_prompt_status(prompt_id, status)
 
 
-async def zero_out_all_except(prompt_ids: list[str], storage: Storage | None = None, did: str | None = None) -> None:
+async def zero_out_all_except(prompt_ids: list[str]) -> None:
     """Set traffic to 0 for all prompts except those in the given list.
     
     Args:
         prompt_ids: List of prompt IDs to preserve (keep their traffic unchanged)
-        storage: Ignored (kept for compatibility)
-        did: Ignored (kept for compatibility)
     """
     await _storage.zero_out_all_except(prompt_ids)

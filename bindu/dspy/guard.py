@@ -31,16 +31,15 @@ async def ensure_system_stable(agent_id: str | None = None, storage: Storage | N
     should not start new training until that experiment concludes.
     
     Args:
-        agent_id: Agent identifier (currently unused, reserved for future
-                 multi-agent support)
-        storage: Optional existing storage instance to reuse
-        did: Decentralized Identifier for schema isolation (only used if storage is None)
+        agent_id: Agent identifier (currently unused)
+        storage: Ignored (kept for compatibility)
+        did: Ignored (kept for compatibility)
     
     Raises:
         RuntimeError: If a candidate prompt already exists (experiment active)
     """
-    # Check if there's already a candidate prompt with provided storage or DID isolation
-    candidate = await get_candidate_prompt(storage=storage, did=did)
+    # Check if there's already a candidate prompt
+    candidate = await get_candidate_prompt()
     
     if candidate is not None:
         logger.error(
