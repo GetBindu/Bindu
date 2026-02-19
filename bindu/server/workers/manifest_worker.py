@@ -269,6 +269,67 @@ class ManifestWorker(Worker):
                 params["task_id"], task["context_id"], "canceled", True
             )
 
+    async def stream_task(self, task_id: UUID):
+        """
+        Stream task execution while preserving worker lifecycle,
+        storage updates, and lifecycle notifications.
+        """
+
+        task = await self.storage.load_task(task_id)
+        if task is None:
+            raise ValueError(f"Task {task_id} not found")
+
+        # Move to working state
+        await self.storage.update_task(task_id, state="working")
+        await self._notify_lifecycle(task_id, task["context_id"], "working", False)
+
+        message_history = await self._build_complete_message_history(task)
+
+        try:
+            raw_result = self.manifest.run(message_history or [])
+
+            # Async generator
+            if hasattr(raw_result, "__aiter__"):
+                async for chunk in raw_result:
+                    if chunk:
+                        yield {
+                            "event": "artifact-update",
+                            "chunk": str(chunk),
+                        }
+
+            # Sync generator
+            elif hasattr(raw_result, "__iter__") and not isinstance(raw_result, (str, bytes)):
+                for chunk in raw_result:
+                    if chunk:
+                        yield {
+                            "event": "artifact-update",
+                            "chunk": str(chunk),
+                        }
+
+            # Normal result
+            else:
+                if raw_result:
+                    yield {
+                        "event": "artifact-update",
+                        "chunk": str(raw_result),
+                    }
+
+            await self.storage.update_task(task_id, state="completed")
+            await self._notify_lifecycle(task_id, task["context_id"], "completed", True)
+
+            yield {"event": "status-update", "state": "completed"}
+
+        except Exception as e:
+            await self.storage.update_task(task_id, state="failed")
+            await self._notify_lifecycle(task_id, task["context_id"], "failed", True)
+
+            yield {
+                "event": "status-update",
+                "state": "failed",
+                "error": str(e),
+            }
+            raise
+
     def build_message_history(self, history: list[Message]) -> list[dict[str, str]]:
         """Convert A2A protocol messages to chat format for manifest execution.
 

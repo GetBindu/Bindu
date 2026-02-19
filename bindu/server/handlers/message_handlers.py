@@ -15,7 +15,6 @@ sending messages and streaming responses.
 
 from __future__ import annotations
 
-import inspect
 import json
 import uuid
 from dataclasses import dataclass
@@ -50,12 +49,7 @@ class MessageHandlers:
     @trace_task_operation("send_message")
     @track_active_task
     async def send_message(self, request: SendMessageRequest) -> SendMessageResponse:
-        """Send a message using the A2A protocol.
-
-        Note: Payment enforcement is handled by X402Middleware before this method is called.
-        If the request reaches here, payment has already been verified.
-        Settlement will be handled by ManifestWorker when task completes.
-        """
+        """Send a message using the A2A protocol."""
         message = request["params"]["message"]
         context_id = self.context_id_parser(message.get("context_id"))
 
@@ -69,53 +63,47 @@ class MessageHandlers:
             message=message,
         )
 
-        # Add optional configuration parameters
         config = request["params"].get("configuration", {})
         if history_length := config.get("history_length"):
             scheduler_params["history_length"] = history_length
 
-        # A2A Protocol: Register push notification config if provided inline
-        # Supports both inline (in message/send) and separate RPC registration
         push_config = config.get("push_notification_config")
         if push_config and self.push_manager:
-            # Use long_running flag to determine if config should be persisted
             is_long_running = config.get("long_running", False)
             await self.push_manager.register_push_config(
                 task["id"], push_config, persist=is_long_running
             )
 
-        # Pass payment context from message metadata to worker if available
-        # This is injected by the endpoint when x402 middleware verifies payment
         message_metadata = message.get("metadata", {})
         if "_payment_context" in message_metadata:
             scheduler_params["payment_context"] = message_metadata["_payment_context"]
-            # Remove from message metadata to keep it clean (internal use only)
             del message["metadata"]["_payment_context"]
 
         await self.scheduler.run_task(scheduler_params)
-        return SendMessageResponse(jsonrpc="2.0", id=request["id"], result=task)
+
+        return SendMessageResponse(
+            jsonrpc="2.0",
+            id=request["id"],
+            result=task,
+        )
 
     async def stream_message(self, request: StreamMessageRequest):
-        """Stream messages using Server-Sent Events.
+        """Stream messages using Server-Sent Events (SSE)."""
 
-        This method returns a StreamingResponse directly to support SSE,
-        which will be handled at the application layer.
-
-        Note: Not fully implemented yet. #TODO
-        """
         from starlette.responses import StreamingResponse
 
         message = request["params"]["message"]
         context_id = self.context_id_parser(message.get("context_id"))
 
-        # similar to the "messages/send flow submit the task to the configured storage"
+        # Submit task (same pattern as send_message)
         task: Task = await self.storage.submit_task(context_id, message)
 
         async def stream_generator():
-            """Generate a consumable stream based on the function which was decorated using pebblify."""
             try:
+                # Move task to working
                 await self.storage.update_task(task["id"], state="working")
-                # yield the initial status update event to indicate processing of the task has started
+
+                # Initial status event
                 status_event = {
                     "kind": "status-update",
                     "task_id": str(task["id"]),
@@ -128,63 +116,33 @@ class MessageHandlers:
                 }
                 yield f"data: {json.dumps(status_event)}\n\n"
 
-                if self.workers and self.manifest:
+                # Worker-based streaming execution
+                if self.workers:
                     worker = self.workers[0]
-                    message_history = await worker._build_complete_message_history(task)
-                    manifest_result = self.manifest.run(message_history)
 
-                    if inspect.isasyncgen(manifest_result):
-                        async for chunk in manifest_result:
-                            if chunk:
-                                artifact_event = {
-                                    "kind": "artifact-update",
-                                    "task_id": str(task["id"]),
-                                    "context_id": str(context_id),
-                                    "artifact": {
-                                        "artifact_id": str(uuid.uuid4()),
-                                        "name": "streaming_response",
-                                        "parts": [{"kind": "text", "text": str(chunk)}],
-                                    },
-                                    "append": True,
-                                    "last_chunk": False,
-                                }
-                                yield f"data: {json.dumps(artifact_event)}\n\n"
-
-                    elif inspect.isgenerator(manifest_result):
-                        for chunk in manifest_result:
-                            if chunk:
-                                artifact_event = {
-                                    "kind": "artifact-update",
-                                    "task_id": str(task["id"]),
-                                    "context_id": str(context_id),
-                                    "artifact": {
-                                        "artifact_id": str(uuid.uuid4()),
-                                        "name": "streaming_response",
-                                        "parts": [{"kind": "text", "text": str(chunk)}],
-                                    },
-                                    "append": True,
-                                    "last_chunk": False,
-                                }
-                                yield f"data: {json.dumps(artifact_event)}\n\n"
-
-                    else:
-                        if manifest_result:
+                    async for event in worker.stream_task(task["id"]):
+                        if event.get("event") == "artifact-update":
                             artifact_event = {
                                 "kind": "artifact-update",
                                 "task_id": str(task["id"]),
                                 "context_id": str(context_id),
                                 "artifact": {
                                     "artifact_id": str(uuid.uuid4()),
-                                    "name": "response",
+                                    "name": "streaming_response",
                                     "parts": [
-                                        {"kind": "text", "text": str(manifest_result)}
+                                        {"kind": "text", "text": event["chunk"]}
                                     ],
                                 },
-                                "last_chunk": True,
+                                "append": True,
+                                "last_chunk": False,
                             }
                             yield f"data: {json.dumps(artifact_event)}\n\n"
 
-                # Send completion status
+                        elif event.get("event") == "status-update":
+                            # Worker handles lifecycle internally
+                            pass
+
+                # Final completion event (SSE contract consistency)
                 completion_event = {
                     "kind": "status-update",
                     "task_id": str(task["id"]),
@@ -197,8 +155,8 @@ class MessageHandlers:
                 }
                 yield f"data: {json.dumps(completion_event)}\n\n"
 
-                # Update task state in storage
                 await self.storage.update_task(task["id"], state="completed")
+
             except Exception as e:
                 error_event = {
                     "kind": "status-update",
@@ -214,4 +172,7 @@ class MessageHandlers:
                 yield f"data: {json.dumps(error_event)}\n\n"
                 await self.storage.update_task(task["id"], state="failed")
 
-        return StreamingResponse(stream_generator(), media_type="text/event-stream")
+        return StreamingResponse(
+            stream_generator(),
+            media_type="text/event-stream",
+        )
