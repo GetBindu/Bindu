@@ -1,0 +1,163 @@
+# News Summarization Skill
+# Searches and summarizes latest news on any topic using web search
+
+id: news-summarization-v1
+name: news-summarization
+version: 1.0.0
+author: Shabd Snehi Juneja 
+
+description: |
+  Searches the web for latest news on any topic and returns structured
+  summaries with headlines, brief descriptions, and sentiment analysis.
+  Use when users ask for current news, recent events, or topic updates.
+
+tags:
+  - news
+  - summarization
+  - web-search
+  - research
+  - current-events
+
+input_modes:
+  - text/plain
+  - application/json
+
+output_modes:
+  - text/plain
+  - application/json
+
+examples:
+  - "Give me latest cricket news"
+  - "What's happening in AI today?"
+  - "Summarize recent Tesla news"
+  - "Latest updates on climate change"
+  - "What happened in football this week?"
+
+capabilities_detail:
+  news_search:
+    supported: true
+    sources:
+      - web
+      - news sites
+    description: "Real-time web search using DuckDuckGo"
+
+  summarization:
+    supported: true
+    output_format:
+      - headlines
+      - brief summaries
+      - sentiment analysis
+    description: "Structured news summaries with top 3 headlines"
+
+  topics:
+    - sports
+    - technology
+    - finance
+    - politics
+    - science
+    - entertainment
+    - general
+
+requirements:
+  packages:
+    - ollama
+    - duckduckgo-search
+  system:
+    - "Ollama running locally with llama3.2 model"
+  min_memory_mb: 500
+
+performance:
+  avg_processing_time_ms: 20000
+  max_concurrent_requests: 5
+  memory_per_request_mb: 500
+  scalability: vertical
+
+allowed_tools:
+  - Search
+  - Read
+  - Summarize
+
+documentation:
+  overview: |
+    This skill enables the agent to fetch and summarize latest news on any
+    topic. Unlike static summarization, this skill actively searches the web
+    for current information using DuckDuckGo, then uses a local Llama 3.2
+    model to produce structured summaries — completely free and private.
+
+  use_cases:
+    when_to_use:
+      - User asks for latest news on any topic
+      - User wants current events summarized
+      - User needs quick news briefing
+      - User asks "what's happening with X"
+
+    when_not_to_use:
+      - User provides their own text to summarize (use summarizer skill)
+      - User needs historical data analysis
+      - User needs real-time live scores (latency too high)
+
+  output_format: |
+    Structured response with three sections:
+
+    1. Top 3 Headlines
+    2. Brief summary of each headline
+    3. Overall sentiment (positive/negative/neutral)
+
+  examples:
+    - title: "Sports News"
+      input: "Give me latest cricket news"
+      output:
+        answer: |
+          Top 3 Headlines:
+          1. Australia T20 World Cup Update...
+          2. Imran Khan Cricket Captains Letter...
+          3. Afghanistan vs Canada Match Preview...
+
+          Overall Sentiment: Neutral
+
+assessment:
+  keywords:
+    - news
+    - latest
+    - recent
+    - today
+    - current
+    - update
+    - happening
+    - summarize
+    - headlines
+    - cricket
+    - football
+    - sports
+    - technology
+    - finance
+    - politics
+
+  specializations:
+    - domain: sports_news
+      confidence_boost: 0.4
+    - domain: tech_news
+      confidence_boost: 0.3
+    - domain: general_news
+      confidence_boost: 0.3
+
+  anti_patterns:
+    - "summarize this text"
+    - "summarize this document"
+    - "explain this"
+    - "what is"
+    - "define"
+    - "calculate"
+    - "write code"
+
+  complexity_indicators:
+    simple:
+      - "latest news"
+      - "recent updates"
+      - "what happened"
+    medium:
+      - "summarize news about"
+      - "give me headlines on"
+    complex:
+      - "compare coverage of"
+      - "sentiment analysis of news"
