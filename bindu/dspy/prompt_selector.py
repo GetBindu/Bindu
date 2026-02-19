@@ -34,8 +34,8 @@ async def select_prompt_with_canary(storage: Storage | None = None, did: str | N
     3. Returning the selected prompt with its metadata
 
     Args:
-        storage: Optional existing storage instance to reuse
-        did: Decentralized Identifier for schema isolation (only used if storage is None)
+        storage: Ignored (kept for compatibility)
+        did: Ignored (kept for compatibility)
 
     Returns:
         Selected prompt dict with keys: id, prompt_text, status, traffic,
@@ -43,18 +43,18 @@ async def select_prompt_with_canary(storage: Storage | None = None, did: str | N
         Returns None if no prompts are available
 
     Example:
-        >>> prompt = await select_prompt_with_canary(storage=storage)
+        >>> prompt = await select_prompt_with_canary()
         >>> if prompt:
         ...     system_message = prompt["prompt_text"]
         ...     logger.info(f"Using prompt {prompt['id']} with status {prompt['status']}")
     """
-    # Fetch both prompts from database with provided storage or DID isolation
-    active = await get_active_prompt(storage=storage, did=did)
-    candidate = await get_candidate_prompt(storage=storage, did=did)
+    # Fetch both prompts from storage
+    active = await get_active_prompt()
+    candidate = await get_candidate_prompt()
 
     # If no prompts exist, return None
     if not active and not candidate:
-        logger.warning("No prompts found in database (no active or candidate)")
+        logger.warning("No prompts found in storage (no active or candidate)")
         return None
 
     # If only active exists, use it
