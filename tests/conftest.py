@@ -223,6 +223,66 @@ sys.modules["x402.facilitator"] = x402_fac
 sys.modules["x402.encoding"] = x402_encoding
 sys.modules["x402.paywall"] = x402_paywall
 
+# --- Redis Stub ---
+class _RedisError(Exception): pass
+
+class _RedisClient:
+    def __init__(self, *args, **kwargs): pass
+    async def ping(self): return True
+    async def aclose(self): pass
+    async def rpush(self, *args, **kwargs): pass
+    async def blpop(self, *args, **kwargs): return None
+    async def delete(self, *args, **kwargs): return 0
+    async def llen(self, *args, **kwargs): return 0
+
+redis_mod = ModuleType("redis")
+redis_mod.asyncio = ModuleType("redis.asyncio")
+redis_mod.asyncio.Redis = _RedisClient
+redis_mod.asyncio.RedisError = _RedisError
+redis_mod.asyncio.from_url = lambda *args, **kwargs: _RedisClient()
+sys.modules["redis"] = redis_mod
+sys.modules["redis.asyncio"] = redis_mod.asyncio
+
+# --- Web3 Stub ---
+class _Web3:
+    """Mock Web3 for testing."""
+    
+    class HTTPProvider:
+        def __init__(self, *args, **kwargs): pass
+
+    class _Eth:
+        def __init__(self):
+            self.chain_id = 84532  # Base Sepolia
+        
+        def get_code(self, address):
+            return b"mock_code"
+            
+        def contract(self, address, abi):
+            return _Contract()
+
+    eth = _Eth()
+
+    def __init__(self, *args, **kwargs): pass
+    
+    @staticmethod
+    def to_checksum_address(address):
+        return address
+
+class _Contract:
+    class _Functions:
+        def balanceOf(self, address):
+            return _ContractFunction()
+            
+    functions = _Functions()
+
+class _ContractFunction:
+    def call(self):
+        return 1000000000000000000  # 1.0 token
+
+web3_mod = ModuleType("web3")
+web3_mod.Web3 = _Web3  # type: ignore[attr-defined]
+sys.modules["web3"] = web3_mod
+
 # Imports must come after dependency mock setup
 import asyncio  # noqa: E402
 from typing import AsyncGenerator, cast  # noqa: E402
