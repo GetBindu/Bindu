@@ -50,7 +50,7 @@ jobs:
         run: uv build
 
       - name: Upload package artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: bindu-dist
           path: dist/
