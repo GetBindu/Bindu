@@ -511,6 +511,53 @@ class PostgresStorage(Storage[ContextT]):
 
         return await self._retry_on_connection_error(_update)
 
+    async def append_artifact_chunk(
+        self, task_id: UUID, artifact: Artifact
+    ) -> None:
+        """Append an artifact chunk during streaming using JSONB concat.
+
+        For PostgreSQL, appends the artifact chunk to the task's artifacts
+        JSONB array using a single atomic SQL operation.
+
+        Args:
+            task_id: Task to append the artifact chunk to
+            artifact: Artifact chunk with parts to append
+
+        Raises:
+            TypeError: If task_id is not UUID
+            KeyError: If task not found
+        """
+        task_id = validate_uuid_type(task_id, "task_id")
+        self._ensure_connected()
+
+        async def _append():
+            async with self._get_session_with_schema() as session:
+                async with session.begin():
+                    stmt = select(tasks_table).where(tasks_table.c.id == task_id)
+                    result = await session.execute(stmt)
+                    task_row = result.first()
+
+                    if task_row is None:
+                        raise KeyError(f"Task {task_id} not found")
+
+                    serialized = serialize_for_jsonb([dict(artifact)])
+                    now = get_current_utc_timestamp()
+
+                    stmt = (
+                        update(tasks_table)
+                        .where(tasks_table.c.id == task_id)
+                        .values(
+                            artifacts=func.jsonb_concat(
+                                tasks_table.c.artifacts,
+                                cast(serialized, JSONB),
+                            ),
+                            updated_at=now,
+                        )
+                    )
+                    await session.execute(stmt)
+
+        await self._retry_on_connection_error(_append)
+
     async def list_tasks(self, length: int | None = None) -> list[Task]:
         """List all tasks using SQLAlchemy.
 

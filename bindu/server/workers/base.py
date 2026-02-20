@@ -21,14 +21,22 @@ Workers implement the hybrid pattern by:
 from __future__ import annotations as _annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, Union
 
 import anyio
 from opentelemetry.trace import get_tracer, use_span
 
-from bindu.common.protocol.types import Artifact, Message, TaskIdParams, TaskSendParams
+from bindu.common.protocol.types import (
+    Artifact,
+    Message,
+    TaskArtifactUpdateEvent,
+    TaskIdParams,
+    TaskSendParams,
+    TaskStatusUpdateEvent,
+)
 from bindu.server.scheduler.base import Scheduler
 from bindu.server.storage.base import Storage
 from bindu.utils.logging import get_logger
@@ -180,6 +188,38 @@ class Worker(ABC):
         3. Clean up any resources
         """
         ...
+
+    async def stream_task(
+        self, params: TaskSendParams
+    ) -> AsyncGenerator[Union[TaskStatusUpdateEvent, TaskArtifactUpdateEvent], None]:
+        """Stream task results as Server-Sent Events.
+
+        This method provides a streaming execution path that yields SSE events
+        incrementally as the agent produces output, rather than waiting for
+        the complete result like run_task().
+
+        The worker pipeline (state management, tracing, payment, DID signing,
+        push notifications) is fully preserved.
+
+        Args:
+            params: Task execution parameters including task_id, context_id, message
+
+        Yields:
+            TaskStatusUpdateEvent or TaskArtifactUpdateEvent for each streaming chunk
+
+        Implementation should:
+        1. Load task from storage and validate state
+        2. Yield initial working status event
+        3. Build message history from context
+        4. Execute agent logic with streaming
+        5. Yield artifact update events for each chunk
+        6. Handle state detection and payment settlement
+        7. Yield final status event (completed/failed)
+        8. Update storage with final state
+        """
+        raise NotImplementedError("stream_task is not implemented for this worker")
+        # Yield statement to make this a valid async generator
+        yield  # type: ignore[misc]  # pragma: no cover
 
     @abstractmethod
     def build_message_history(self, history: list[Message]) -> list[Any]:

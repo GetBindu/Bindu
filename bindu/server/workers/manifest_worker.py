@@ -27,10 +27,13 @@ Hybrid Agent Architecture (A2A Protocol):
 
 from __future__ import annotations
 
+import inspect
 import time
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
-from uuid import UUID
+from datetime import datetime, timezone
+from typing import Any, Callable, Optional, Union
+from uuid import UUID, uuid4
 
 from opentelemetry.trace import Status, StatusCode, get_tracer
 
@@ -40,9 +43,13 @@ from bindu.common.protocol.types import (
     Artifact,
     Message,
     Task,
+    TaskArtifactUpdateEvent,
     TaskIdParams,
     TaskSendParams,
     TaskState,
+    TaskStatus,
+    TaskStatusUpdateEvent,
+    TextPart,
 )
 from bindu.penguin.manifest import AgentManifest
 from bindu.server.workers.base import Worker
@@ -242,6 +249,286 @@ class ManifestWorker(Worker):
             await self._handle_task_failure(task, str(e))
             raise
         return
+
+    async def stream_task(
+        self, params: TaskSendParams
+    ) -> AsyncGenerator[Union[TaskStatusUpdateEvent, TaskArtifactUpdateEvent], None]:
+        """Stream task results as Server-Sent Events using the full worker pipeline.
+
+        Unlike run_task() which collects all results before responding, this method
+        yields events incrementally as the agent produces output. The full worker
+        pipeline is preserved: state management, tracing, DID signing, payment
+        settlement, and push notifications all function identically to run_task().
+
+        Streaming Protocol:
+        1. Yields TaskStatusUpdateEvent(state="working") at start
+        2. Yields TaskArtifactUpdateEvent(append=True) for each chunk
+        3. Yields TaskArtifactUpdateEvent(last_chunk=True) for final chunk
+        4. Yields TaskStatusUpdateEvent(state="completed", final=True) at end
+
+        Args:
+            params: Task execution parameters containing task_id, context_id, message,
+                   and optional payment_context from middleware
+
+        Yields:
+            TaskStatusUpdateEvent or TaskArtifactUpdateEvent for each streaming event
+
+        Raises:
+            ValueError: If task not found
+        """
+        # Step 1: Load and validate task
+        task = await self.storage.load_task(params["task_id"])
+        if task is None:
+            raise ValueError(f"Task {params['task_id']} not found")
+
+        payment_context = params.get("payment_context")
+        await TaskStateManager.validate_task_state(task)
+
+        # Add span event for state transition (matches run_task pattern)
+        from opentelemetry.trace import get_current_span
+
+        current_span = get_current_span()
+        if current_span.is_recording():
+            current_span.add_event(
+                "task.state_changed", attributes={"to_state": "working"}
+            )
+
+        # Step 2: Transition to working and yield initial status event
+        await self.storage.update_task(task["id"], state="working")
+        await self._notify_lifecycle(task["id"], task["context_id"], "working", False)
+
+        yield TaskStatusUpdateEvent(
+            task_id=task["id"],
+            context_id=task["context_id"],
+            kind="status-update",
+            status=TaskStatus(
+                state="working",
+                timestamp=datetime.now(timezone.utc).isoformat(),
+            ),
+            final=False,
+        )
+
+        try:
+            # Step 3: Build conversation history (same as run_task)
+            message_history = await self._build_complete_message_history(task)
+
+            # Step 4: Inject system prompt if configured
+            if (
+                self.manifest.enable_system_message
+                and app_settings.agent.enable_structured_responses
+            ):
+                system_prompt = app_settings.agent.structured_response_system_prompt
+                if system_prompt:
+                    message_history = [
+                        {"role": "system", "content": system_prompt}
+                    ] + (message_history or [])
+
+            # Step 5: Execute manifest with tracing
+            with tracer.start_as_current_span("agent.execute.streaming") as agent_span:
+                start_time = time.time()
+                agent_span.set_attributes(
+                    {
+                        "bindu.agent.name": self.manifest.name,
+                        "bindu.agent.did": str(self.manifest.did_extension.did),
+                        "bindu.agent.message_count": len(message_history or []),
+                        "bindu.agent.streaming": True,
+                        "bindu.component": "agent_execution",
+                    }
+                )
+
+                try:
+                    raw_results = self.manifest.run(message_history or [])
+
+                    # Handle coroutine returns (async def without yield)
+                    if inspect.iscoroutine(raw_results):
+                        raw_results = await raw_results
+
+                    # Step 6: Stream results based on return type
+                    artifact_id = uuid4()
+                    collected_chunks: list[str] = []
+
+                    if inspect.isasyncgen(raw_results):
+                        async for chunk in raw_results:
+                            if chunk:
+                                chunk_str = str(chunk)
+                                collected_chunks.append(chunk_str)
+
+                                chunk_artifact = Artifact(
+                                    artifact_id=artifact_id,
+                                    name="streaming_response",
+                                    parts=[TextPart(kind="text", text=chunk_str)],
+                                    append=True,
+                                    last_chunk=False,
+                                )
+
+                                yield TaskArtifactUpdateEvent(
+                                    task_id=task["id"],
+                                    context_id=task["context_id"],
+                                    kind="artifact-update",
+                                    artifact=chunk_artifact,
+                                    append=True,
+                                    last_chunk=False,
+                                )
+
+                    elif inspect.isgenerator(raw_results):
+                        for chunk in raw_results:
+                            if chunk:
+                                chunk_str = str(chunk)
+                                collected_chunks.append(chunk_str)
+
+                                chunk_artifact = Artifact(
+                                    artifact_id=artifact_id,
+                                    name="streaming_response",
+                                    parts=[TextPart(kind="text", text=chunk_str)],
+                                    append=True,
+                                    last_chunk=False,
+                                )
+
+                                yield TaskArtifactUpdateEvent(
+                                    task_id=task["id"],
+                                    context_id=task["context_id"],
+                                    kind="artifact-update",
+                                    artifact=chunk_artifact,
+                                    append=True,
+                                    last_chunk=False,
+                                )
+
+                    else:
+                        # Direct return (non-generator) — single artifact event
+                        if raw_results:
+                            collected_chunks.append(str(raw_results))
+
+                    # Step 7: Build final artifact with DID signature
+                    accumulated_result = "\n".join(collected_chunks) if collected_chunks else ""
+                    final_artifacts = self.build_artifacts(accumulated_result)
+
+                    # Yield final chunk marker for each artifact
+                    for artifact in final_artifacts:
+                        artifact["last_chunk"] = True
+                        await self._notify_artifact(
+                            task["id"], task["context_id"], artifact
+                        )
+                        yield TaskArtifactUpdateEvent(
+                            task_id=task["id"],
+                            context_id=task["context_id"],
+                            kind="artifact-update",
+                            artifact=artifact,
+                            last_chunk=True,
+                        )
+
+                    execution_time = time.time() - start_time
+                    agent_span.set_attribute(
+                        "bindu.agent.execution_time", execution_time
+                    )
+                    agent_span.set_attribute(
+                        "bindu.agent.chunks_streamed", len(collected_chunks)
+                    )
+                    agent_span.set_status(Status(StatusCode.OK))
+
+                except Exception as agent_error:
+                    execution_time = time.time() - start_time
+                    agent_span.set_attributes(
+                        {
+                            "bindu.agent.execution_time": execution_time,
+                            "bindu.agent.error_type": type(agent_error).__name__,
+                            "bindu.agent.error_message": str(agent_error),
+                        }
+                    )
+                    agent_span.set_status(
+                        Status(StatusCode.ERROR, str(agent_error))
+                    )
+                    raise
+
+            # Step 8: Detect final state from accumulated results
+            structured_response = ResponseDetector.parse_structured_response(
+                accumulated_result
+            )
+            state, message_content = ResponseDetector.determine_task_state(
+                accumulated_result, structured_response
+            )
+
+            if state in ("input-required", "auth-required"):
+                # Intermediate state — task stays open
+                current_span = get_current_span()
+                if current_span.is_recording():
+                    current_span.add_event(
+                        "task.state_changed",
+                        attributes={"from_state": "working", "to_state": state},
+                    )
+                await self._handle_intermediate_state(task, state, message_content)
+                yield TaskStatusUpdateEvent(
+                    task_id=task["id"],
+                    context_id=task["context_id"],
+                    kind="status-update",
+                    status=TaskStatus(
+                        state=state,
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                    ),
+                    final=False,
+                )
+            else:
+                # Terminal state — handle payment settlement
+                current_span = get_current_span()
+                if current_span.is_recording():
+                    current_span.add_event(
+                        "task.state_changed",
+                        attributes={"from_state": "working", "to_state": state},
+                    )
+                additional_metadata: dict[str, Any] | None = None
+                if payment_context and state == "completed":
+                    additional_metadata = await self._settle_payment(payment_context)
+
+                # Build agent messages and store final state
+                agent_messages = MessageConverter.to_protocol_messages(
+                    accumulated_result, task["id"], task["context_id"]
+                )
+                await self.storage.update_task(
+                    task["id"],
+                    state=state,
+                    new_artifacts=final_artifacts,
+                    new_messages=agent_messages,
+                    metadata=additional_metadata,
+                )
+                await self._notify_lifecycle(
+                    task["id"], task["context_id"], state, True
+                )
+
+                yield TaskStatusUpdateEvent(
+                    task_id=task["id"],
+                    context_id=task["context_id"],
+                    kind="status-update",
+                    status=TaskStatus(
+                        state=state,
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                    ),
+                    final=True,
+                )
+
+        except Exception as e:
+            # Handle failure — update storage and yield error event
+            current_span = get_current_span()
+            if current_span.is_recording():
+                current_span.add_event(
+                    "task.state_changed",
+                    attributes={
+                        "from_state": "working",
+                        "to_state": "failed",
+                        "error": str(e),
+                    },
+                )
+            await self._handle_task_failure(task, str(e))
+
+            yield TaskStatusUpdateEvent(
+                task_id=task["id"],
+                context_id=task["context_id"],
+                kind="status-update",
+                status=TaskStatus(
+                    state="failed",
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                ),
+                final=True,
+                metadata={"error": str(e)},
+            )
 
     @retry_worker_operation(max_attempts=2)
     async def cancel_task(self, params: TaskIdParams) -> None:
