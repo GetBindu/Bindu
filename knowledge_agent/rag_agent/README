@@ -1,0 +1,34 @@
+# RAG Knowledge Agent ( Bindu )
+
+PageSense is an AI-powered Chrome extension that allows you to 'chat with any website'. Whether it's a research paper, blog post, Wikipedia article, or university website — just click and ask questions about the content directly without reading the whole page.
+
+## Demo Video
+
+[Watch the Demo] -> https://www.linkedin.com/posts/cmd-jayesh_ai-machinelearning-generativeai-activity-7356755637784961024-YtXN?utm_medium=ios_app&rcm=ACoAAFlqJGoBl68XgWGQ56UL9i8cfNrN4L5nMUQ&utm_source=social_share_send&utm_campaign=copy_link
+
+## Features
+
+-  Extracts full webpage content dynamically
+-  Splits large text into context-aware chunks using `RecursiveCharacterTextSplitter`
+-  Embeds those chunks into a vector database using `SentenceTransformer` + `FAISS`
+-  Uses `Ollama LLaMA 3.2` (via LangChain) as the RAG LLM
+-  Handles user queries via a `FastAPI`-based RAG pipeline
+-  Chrome Extension front-end allows 1-click chatting on any page
+
+## How It Works
+
+1. **Frontend (Chrome Extension)**: Captures the content of the current page and sends it to the FastAPI backend along with the user's query.
+2. **Backend (FastAPI + LangChain)**:
+                                    - Splits and embeds the content
+                                    - Stores the vectors in FAISS
+                                    - Retrieves the most relevant context for the query
+                                    - Passes everything to the LLM to generate a smart response
+3. **LLM Response**: Sent back to the extension and displayed in a chat bubble or popup.
+
+## Tech Stack
+
+- **Frontend**: HTML, JS (Chrome Extension)
+- **Backend**: Python, FastAPI
+- **LLM**: Ollama with `LLaMA 3.2`
+- **RAG Tools**: LangChain, FAISS, SentenceTransformer
+- **Embeddings**: Sentence Transformer - `BAAI/bge-small-en`
