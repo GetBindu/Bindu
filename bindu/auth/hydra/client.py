@@ -27,6 +27,7 @@ class HydraClient:
         timeout: int = 10,
         verify_ssl: bool = True,
         max_retries: int = 3,
+        ssl_context: Optional[Any] = None,
     ) -> None:
         """Initialize Hydra client.
 
@@ -36,6 +37,7 @@ class HydraClient:
             timeout: Request timeout in seconds
             verify_ssl: Whether to verify SSL certificates
             max_retries: Maximum number of retry attempts for failed requests
+            ssl_context: Optional SSL context for mTLS
         """
         self.admin_url = admin_url.rstrip("/")
         self.public_url = (
@@ -52,6 +54,7 @@ class HydraClient:
                 "Content-Type": "application/x-www-form-urlencoded",
                 "Accept": "application/json",
             },
+            ssl_context=ssl_context,
         )
 
         logger.debug(
