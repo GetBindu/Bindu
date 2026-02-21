@@ -26,45 +26,44 @@ logger = get_logger("bindu.utils.schema_manager")
 def sanitize_did_for_schema(did: str) -> str:
     """Sanitize a DID string to be used as a PostgreSQL schema name.
 
-    PostgreSQL schema names must:
-    - Start with a letter or underscore
-    - Contain only letters, digits, and underscores
-    - Be <= 63 characters
-    - Not be a reserved keyword
-
-    For long DIDs (>63 chars), uses a hash suffix to maintain uniqueness
-    while keeping the schema name readable and within PostgreSQL limits.
+    Steps:
+    1. Normalize/Lowering
+    2. Character Replacement
+    3. Handling numeric prefixes
+    4. Length truncation with hashing
 
     Args:
         did: DID string (e.g., "did:bindu:alice:agent1:abc123")
 
     Returns:
         Sanitized schema name (e.g., "did_bindu_alice_agent1_abc123")
-
-    Examples:
-        >>> sanitize_did_for_schema("did:bindu:alice:agent1:abc123")
-        'did_bindu_alice_agent1_abc123'
-        >>> sanitize_did_for_schema("did:bindu:very_long_email_address:agent:uuid")
-        'did_bindu_very_long_email_address_agent_uuid_a1b2c3d4'
     """
     import hashlib
 
-    # Replace colons and other special characters with underscores
-    sanitized = re.sub(r"[^a-zA-Z0-9_]", "_", did.lower())
+    # Step 1: Normalize/Lowering
+    normalized_did = did.lower()
 
-    # Ensure it starts with a letter or underscore
-    if sanitized and sanitized[0].isdigit():
-        sanitized = f"schema_{sanitized}"
+    # Step 2: Character Replacement (all non-alphanumeric or underscore replaced with _)
+    replaced_chars_did = re.sub(r"[^a-zA-Z0-9_]", "_", normalized_did)
 
-    # Truncate if too long (PostgreSQL limit is 63 chars)
-    # Use hash suffix to maintain uniqueness
-    if len(sanitized) > 63:
-        # Generate 8-character hash from the full sanitized string
-        hash_suffix = hashlib.sha256(sanitized.encode()).hexdigest()[:8]
-        # Keep first 54 chars + underscore + 8 char hash = 63 chars total
-        sanitized = f"{sanitized[:54]}_{hash_suffix}"
+    # Step 3: Ensure starts with letter or underscore (add prefix if first char is digit)
+    if replaced_chars_did and replaced_chars_did[0].isdigit():
+        schema_candidate = f"schema_{replaced_chars_did}"
+    else:
+        schema_candidate = replaced_chars_did
 
-    return sanitized
+    # Step 4: Truncate to 63 characters (PostgreSQL limit), using hash for uniqueness if needed
+    if len(schema_candidate) > 63:
+        # Generate a hash suffix for uniqueness
+        hash_suffix = hashlib.sha256(schema_candidate.encode()).hexdigest()[:8]
+        # Truncate to fit hash and underscore, keeping total 63 characters
+        truncated = schema_candidate[:54]
+        final_schema_name = f"{truncated}_{hash_suffix}"
+    else:
+        final_schema_name = schema_candidate
+
+    return final_schema_name
+
 
 
 async def create_schema_if_not_exists(

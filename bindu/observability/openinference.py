@@ -333,7 +333,7 @@ def setup(
         batch_export_timeout_millis=batch_export_timeout_millis,
     )
 
-    # Step 1: Detect installed framework for optional instrumentation
+    # Step 1: Detect installed framework for optional instrumentation (logic from _detect_framework, now inlined)
     installed_dists = {dist.name: dist for dist in distributions()}
     framework_spec = next(
         (spec for spec in SUPPORTED_FRAMEWORKS if spec.framework in installed_dists),
@@ -348,7 +348,7 @@ def setup(
             )
         return
 
-    # Step 2: Validate framework version
+    # Step 2: Validate framework version (logic from _validate_framework_version, now inlined)
     installed_version = installed_dists[framework_spec.framework].version
 
     if version.parse(installed_version) < version.parse(framework_spec.min_version):
@@ -373,7 +373,7 @@ def setup(
     missing_packages = _check_missing_packages(framework_spec, installed_dists)
 
     if missing_packages:
-        # Detect package manager
+        # Detect package manager (logic from _get_package_manager, now inlined)
         current_directory = Path.cwd()
         has_uv = (current_directory / "uv.lock").exists() or (
             current_directory / "pyproject.toml"

@@ -1,4 +1,4 @@
-"""Unit tests for DID Agent Extension."""
+"""Unit tests for DID Agent Extension and related utilities."""
 
 import tempfile
 from pathlib import Path
@@ -9,6 +9,8 @@ import pytest
 from bindu.extensions.did.did_agent_extension import DIDAgentExtension
 from bindu.settings import app_settings
 
+# Import the sanitize_did_for_schema for schema utility tests
+from bindu.utils.schema_manager import sanitize_did_for_schema
 
 class TestDIDAgentExtension:
     """Test suite for DID Agent Extension."""
@@ -29,6 +31,79 @@ class TestDIDAgentExtension:
             agent_name="test_agent",
             agent_id=str(uuid4()),
         )
+
+    # --- Begin tests for sanitize_did_for_schema ---
+
+    @pytest.mark.parametrize(
+        "did,expected",
+        [
+            # Test lowercase conversion and replacement
+            ("did:Bindu:Bob:Example/ABC.123", "did_bindu_bob_example_abc_123"),
+            ("DID:TEST:ABC", "did_test_abc"),
+            # Test non-alphanumeric replacement
+            ("did:Bindu:Name-With*Special#Chars", "did_bindu_name_with_special_chars"),
+            # Test numeric prefix becomes 'schema_' prefix
+            ("1did:bindu:abc", "schema_1did_bindu_abc"),
+            ("7_PREFIX:foo", "schema_7_prefix_foo"),
+            # Already starts with underscore is okay
+            ("_abc:def", "_abc_def"),
+            # Already starts with a letter is preserved
+            ("abc:def:ghi", "abc_def_ghi"),
+        ]
+    )
+    def test_sanitize_did_for_schema_basic(self, did, expected):
+        """Test DID schema sanitization - lowercase and underscore rules, digit prefix."""
+        schema = sanitize_did_for_schema(did)
+        assert schema == expected
+
+    def test_truncation_and_hash(self):
+        """Test schema truncation at 63 chars with hash suffix for long names."""
+        import hashlib
+
+        # Build a DID such that, after norm/replacement, it's >63 chars
+        base = "did:bindu:" + "a" * 60  # base replaced will be ~71 chars
+        schema = sanitize_did_for_schema(base)
+        # Should be exactly 63 chars
+        assert len(schema) == 63
+
+        # It should end with _ + 8 hex chars (from sha256), and up to 54 base chars
+        base_replaced = "did_bindu_" + "a" * 60
+        hash_suffix = hashlib.sha256(base_replaced.encode()).hexdigest()[:8]
+        expected_prefix = base_replaced[:54]
+        assert schema == f"{expected_prefix}_{hash_suffix}"
+
+        # Test that the hash is actually derived from the full original string
+        # Even for different long DIDs, hash should be different if string differs
+        base2 = "did:bindu:" + "b" * 60
+        schema2 = sanitize_did_for_schema(base2)
+        assert schema != schema2
+
+    @pytest.mark.parametrize(
+        "orig,expected_prefix",
+        [
+            # Truncation should still apply even if prefix is added
+            ("8" + "b" * 70, "schema_8" + "b" * 45),  # schema_ + 8 + 45*'b' = 54 chars before _hash
+        ],
+    )
+    def test_schema_prefix_and_truncation(self, orig, expected_prefix):
+        """Test digit prefix and truncation."""
+        import hashlib
+
+        replaced = "".join(["_" if not c.isalnum() else c.lower() for c in orig])
+        # In the logic, if it begins with digit, shows as 'schema_' + replaced.
+        if replaced[0].isdigit():
+            candidate = f"schema_{replaced}"
+        else:
+            candidate = replaced
+
+        hash_suffix = hashlib.sha256(candidate.encode()).hexdigest()[:8]
+        # Full final name = up to 54 chars + _ + hash (8 chars)
+        expected = f"{expected_prefix}_{hash_suffix}"
+        result = sanitize_did_for_schema(orig)
+        assert result == expected
+        assert len(result) == 63
+
+    # --- End tests for sanitize_did_for_schema ---
 
     def test_initialization(self, temp_key_dir):
         """Test DID extension initialization."""
