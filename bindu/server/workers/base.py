@@ -23,6 +23,7 @@ from __future__ import annotations as _annotations
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, AsyncIterator
 
 import anyio
@@ -219,21 +220,85 @@ class Worker(ABC):
     # -------------------------------------------------------------------------
 
     async def _handle_pause(self, params: TaskIdParams) -> None:
-        """Handle pause operation.
+        """Handle pause operation — save checkpoint and suspend the task.
 
-        TODO: Implement task pause functionality
-        - Save current execution state
-        - Update task to 'suspended' state
-        - Release resources while preserving context
+        Default implementation persists the current message history and any
+        partial artifacts as checkpoint data in the task's metadata, then
+        transitions the task to 'suspended' state. Subclasses may override
+        for agent-specific checkpoint logic.
         """
-        raise NotImplementedError("Pause operation not yet implemented")
+        task = await self.storage.load_task(params["task_id"])
+        if task is None:
+            logger.warning(f"Cannot pause task {params['task_id']}: not found")
+            return
+
+        current_state = task["status"]["state"]
+        if current_state in {"completed", "failed", "canceled", "rejected"}:
+            logger.warning(
+                f"Cannot pause task {params['task_id']}: terminal state '{current_state}'"
+            )
+            return
+
+        # Build checkpoint from current task state
+        checkpoint = {
+            "paused_from_state": current_state,
+            "message_history": task.get("history", []),
+            "artifacts": task.get("artifacts", []),
+            "paused_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        await self.storage.save_checkpoint(params["task_id"], checkpoint)
 
     async def _handle_resume(self, params: TaskIdParams) -> None:
-        """Handle resume operation.
+        """Handle resume operation — restore checkpoint and re-execute the task.
 
-        TODO: Implement task resume functionality
-        - Restore execution state
-        - Update task to 'resumed' state
-        - Continue from last checkpoint
+        Default implementation reads checkpoint data from task metadata,
+        transitions the task to 'resumed' state, clears the checkpoint, then
+        delegates to ``run_task`` so that the worker re-executes with the full
+        message history that was preserved at pause time.
         """
-        raise NotImplementedError("Resume operation not yet implemented")
+        task = await self.storage.load_task(params["task_id"])
+        if task is None:
+            logger.warning(f"Cannot resume task {params['task_id']}: not found")
+            return
+
+        current_state = task["status"]["state"]
+        if current_state != "suspended":
+            logger.warning(
+                f"Cannot resume task {params['task_id']}: "
+                f"expected 'suspended' but got '{current_state}'"
+            )
+            return
+
+        # Load checkpoint before clearing it
+        checkpoint = await self.storage.load_checkpoint(params["task_id"])
+
+        # Transition to 'resumed' temporarily, run_task will set 'working'
+        await self.storage.update_task(
+            params["task_id"],
+            state="resumed",
+        )
+
+        # Clear checkpoint data now that we've restored it
+        await self.storage.clear_checkpoint(params["task_id"])
+
+        # Re-execute via run_task — message history is already in the task
+        task = await self.storage.load_task(params["task_id"])
+        if task:
+            last_message = task["history"][-1] if task.get("history") else None
+            if last_message:
+                run_params = {
+                    "task_id": task["id"],
+                    "context_id": task["context_id"],
+                    "message": last_message,
+                }
+                await self.run_task(run_params)
+            else:
+                logger.warning(
+                    f"Cannot resume task {params['task_id']}: no message history. "
+                    f"Transitioning to failed."
+                )
+                await self.storage.update_task(
+                    params["task_id"],
+                    state="failed",
+                )

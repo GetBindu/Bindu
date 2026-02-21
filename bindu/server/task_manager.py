@@ -154,13 +154,18 @@ class TaskManager:
         self._aexit_stack = None
 
     def _create_error_response(
-        self, response_class: type, request_id: str, error_class: type, message: str
+        self,
+        response_class: type,
+        request_id: str,
+        error_class: type,
+        message: str,
+        error_code: int = -32001,
     ) -> Any:
         """Create a standardized error response."""
         return response_class(
             jsonrpc="2.0",
             id=request_id,
-            error=error_class(code=-32001, message=message),
+            error=error_class(code=error_code, message=message),
         )
 
     def _parse_context_id(self, context_id: Any) -> uuid.UUID:
@@ -212,7 +217,7 @@ class TaskManager:
             return getattr(self._message_handlers, name)
 
         # Task handler methods
-        if name in ("get_task", "list_tasks", "cancel_task", "task_feedback"):
+        if name in ("get_task", "list_tasks", "cancel_task", "pause_task", "resume_task", "task_feedback"):
             return getattr(self._task_handlers, name)
 
         # Context handler methods

@@ -26,10 +26,16 @@ from bindu.common.protocol.types import (
     GetTaskResponse,
     ListTasksRequest,
     ListTasksResponse,
+    PauseTaskRequest,
+    PauseTaskResponse,
+    ResumeTaskRequest,
+    ResumeTaskResponse,
     TaskFeedbackRequest,
     TaskFeedbackResponse,
     TaskNotCancelableError,
     TaskNotFoundError,
+    TaskNotPausableError,
+    TaskNotResumableError,
 )
 from bindu.settings import app_settings
 
@@ -90,6 +96,72 @@ class TaskHandlers:
         task = await self.storage.load_task(task_id)
 
         return CancelTaskResponse(jsonrpc="2.0", id=request["id"], result=task)
+
+    @trace_task_operation("pause_task")
+    async def pause_task(self, request: PauseTaskRequest) -> PauseTaskResponse:
+        """Pause a running task, saving its current execution state as a checkpoint.
+
+        Validates that the task is in a pausable state (submitted, working, or
+        input-required) before transitioning to 'suspended'. The scheduler
+        coordinates the worker to persist checkpoint data in task metadata.
+        """
+        task_id = request["params"]["task_id"]
+        task = await self.storage.load_task(task_id)
+
+        if task is None:
+            return self.error_response_creator(
+                PauseTaskResponse, request["id"], TaskNotFoundError, "Task not found"
+            )
+
+        current_state = task["status"]["state"]
+
+        if current_state not in app_settings.agent.pausable_states:
+            return self.error_response_creator(
+                PauseTaskResponse,
+                request["id"],
+                TaskNotPausableError,
+                f"Task cannot be paused in '{current_state}' state. "
+                f"Tasks can only be paused while submitted, working, or awaiting input.",
+                error_code=-32040,
+            )
+
+        await self.scheduler.pause_task(request["params"])
+        task = await self.storage.load_task(task_id)
+
+        return PauseTaskResponse(jsonrpc="2.0", id=request["id"], result=task)
+
+    @trace_task_operation("resume_task")
+    async def resume_task(self, request: ResumeTaskRequest) -> ResumeTaskResponse:
+        """Resume a suspended task, restoring its execution from checkpoint.
+
+        Validates that the task is in 'suspended' state before scheduling
+        a resume operation. The scheduler coordinates the worker to restore
+        checkpoint data and continue execution.
+        """
+        task_id = request["params"]["task_id"]
+        task = await self.storage.load_task(task_id)
+
+        if task is None:
+            return self.error_response_creator(
+                ResumeTaskResponse, request["id"], TaskNotFoundError, "Task not found"
+            )
+
+        current_state = task["status"]["state"]
+
+        if current_state != "suspended":
+            return self.error_response_creator(
+                ResumeTaskResponse,
+                request["id"],
+                TaskNotResumableError,
+                f"Task cannot be resumed from '{current_state}' state. "
+                f"Only suspended tasks can be resumed.",
+                error_code=-32041,
+            )
+
+        await self.scheduler.resume_task(request["params"])
+        task = await self.storage.load_task(task_id)
+
+        return ResumeTaskResponse(jsonrpc="2.0", id=request["id"], result=task)
 
     @trace_task_operation("list_tasks", include_params=False)
     async def list_tasks(self, request: ListTasksRequest) -> ListTasksResponse:
