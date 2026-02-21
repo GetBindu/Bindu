@@ -1,0 +1,8 @@
+name: langchain_pirate
+description: A LangChain example agent that speaks like a pirate.
+version: 0.1.0
+author: contributor
+framework: langchain
+deployment:
+  url: http://localhost:3773
+  expose: true
