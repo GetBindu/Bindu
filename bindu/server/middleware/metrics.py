@@ -69,10 +69,15 @@ class MetricsMiddleware(BaseHTTPMiddleware):
                 # Sanitize endpoint to avoid high cardinality
                 # Replace UUIDs and numeric IDs with placeholders
                 import re
+
                 endpoint = request.url.path
-                endpoint = re.sub(r"/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", "/:id", endpoint)
+                endpoint = re.sub(
+                    r"/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+                    "/:id",
+                    endpoint,
+                )
                 endpoint = re.sub(r"/\d+", "/:id", endpoint)
-                
+
                 status = str(response.status_code)
 
                 metrics.record_http_request(

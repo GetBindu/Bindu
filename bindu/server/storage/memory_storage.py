@@ -356,7 +356,7 @@ class InMemoryStorage(Storage[ContextT]):
         """
         if status is None:
             return len(self.tasks)
-        
+
         return sum(1 for t in self.tasks.values() if t["status"]["state"] == status)
 
     async def list_tasks_by_context(

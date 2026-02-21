@@ -550,7 +550,7 @@ class PostgresStorage(Storage[ContextT]):
         async def _count():
             async with self._get_session_with_schema() as session:
                 stmt = select(func.count()).select_from(tasks_table)
-                
+
                 if status is not None:
                     stmt = stmt.where(tasks_table.c.state == status)
 

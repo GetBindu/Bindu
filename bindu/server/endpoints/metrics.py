@@ -34,15 +34,15 @@ async def _update_agent_metrics(app: BinduApplication) -> None:
             # or just count total active if storage supports it.
             # For now, let's use the most common active state "submitted" + "working"
             # Or if storage supports efficient filtering.
-            
+
             # Optimization: most tasks are likely completed.
             # If we want total active, we can count total and subtract completed/failed?
             # Or just count 'submitted' and 'working' which are the main active ones.
-            
+
             submitted = await app._storage.count_tasks(status="submitted")
             working = await app._storage.count_tasks(status="working")
             input_required = await app._storage.count_tasks(status="input-required")
-            
+
             active_count = submitted + working + input_required
             metrics.set_agent_tasks_active(agent_id, active_count)
 

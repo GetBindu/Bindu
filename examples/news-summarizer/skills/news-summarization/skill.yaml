@@ -4,7 +4,7 @@
 id: news-summarization-v1
 name: news-summarization
 version: 1.0.0
-author: Shabd Snehi Juneja 
+author: Shabd Snehi Juneja
 
 description: |
   Searches the web for latest news on any topic and returns structured

@@ -32,8 +32,9 @@ class NotificationDeliveryError(Exception):
 @dataclass
 class NotificationService:
     """Deliver push notification events to configured HTTP endpoints.
-    
-    Includes lightweight in-memory delivery metrics for observability."""
+
+    Includes lightweight in-memory delivery metrics for observability.
+    """
 
     timeout: float = 5.0
     max_retries: int = 2
@@ -69,7 +70,7 @@ class NotificationService:
     ) -> None:
         # --- Metrics: count total attempts to send ---
         self.total_sent += 1
-        
+
         attempt = 0
         backoff = self.base_backoff
         last_error: NotificationDeliveryError | None = None
@@ -84,7 +85,7 @@ class NotificationService:
                     status=status,
                 )
 
-                self.total_success +=1
+                self.total_success += 1
                 return
             except NotificationDeliveryError as exc:
                 last_error = exc
@@ -166,7 +167,7 @@ class NotificationService:
         if token:
             headers["Authorization"] = f"Bearer {token}"
         return headers
-    
+
     # --- NEW METHOD ---
     def get_metrics(self) -> dict[str, int]:
         """Return delivery metrics for observability."""
@@ -176,6 +177,3 @@ class NotificationService:
             "total_failures": self.total_failures,
             "total_retries": self.total_retries,
         }
-
-
-   
