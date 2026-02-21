@@ -52,6 +52,8 @@ dependencies = [
     "asyncpg==0.31.0",
     "alembic==1.17.2",
     "redis==7.1.0",
+    # WhatsApp integration
+    "py-whatsapp-cloudbot[fastapi]>=0.1.0",
     # CLI tools
     "cookiecutter==2.6.0",
     "pyperclip==1.11.0",

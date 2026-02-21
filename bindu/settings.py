@@ -343,6 +343,40 @@ class X402Settings(BaseSettings):
     }
 
 
+class WhatsAppSettings(BaseSettings):
+    """WhatsApp Cloud API configuration settings."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="WHATSAPP__",
+        extra="allow",
+    )
+
+    # Enable/disable WhatsApp integration
+    enabled: bool = False
+
+    # WhatsApp Cloud API credentials
+    access_token: str = Field(
+        default="",
+        validation_alias=AliasChoices("WHATSAPP__ACCESS_TOKEN", "WHATSAPP_TOKEN"),
+    )
+
+    phone_number_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("WHATSAPP__PHONE_NUMBER_ID", "PHONE_NUMBER_ID"),
+    )
+
+    verify_token: str = Field(
+        default="",
+        validation_alias=AliasChoices("WHATSAPP__VERIFY_TOKEN", "VERIFY_TOKEN"),
+    )
+
+    # WhatsApp Cloud API configuration
+    api_version: str = "v21.0"
+    base_url: str = "https://graph.facebook.com"
+    webhook_path: str = "/whatsapp/webhook"
+
+
 class AgentSettings(BaseSettings):
     """Agent behavior and protocol configuration settings."""
 
@@ -948,6 +982,7 @@ class Settings(BaseSettings):
     logging: LoggingSettings = LoggingSettings()
     observability: ObservabilitySettings = ObservabilitySettings()
     x402: X402Settings = X402Settings()
+    whatsapp: WhatsAppSettings = WhatsAppSettings()
     agent: AgentSettings = AgentSettings()
     auth: AuthSettings = AuthSettings()
     hydra: HydraSettings = HydraSettings()
