@@ -115,7 +115,7 @@ async def train_async(
 
     # Step 0: Ensure system is stable (no active experiments)
     logger.info("Checking system stability")
-    await ensure_system_stable(did=did)
+    await ensure_system_stable()
 
     # Step 1: Fetch current active prompt from storage
     logger.info("Fetching active prompt from storage")

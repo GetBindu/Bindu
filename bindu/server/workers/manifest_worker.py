@@ -147,7 +147,7 @@ class ManifestWorker(Worker):
                 # If DSPy is enabled for this manifest, fetch prompts from DB with DID isolation.
                 if getattr(self.manifest, "enable_dspy", False):
                     # Use worker's storage instance (already configured with DID)
-                    selected_prompt = await select_prompt_with_canary(storage=self.storage)
+                    selected_prompt = await select_prompt_with_canary()
 
                     if selected_prompt:
                         # Use database-selected prompt with canary pooling
