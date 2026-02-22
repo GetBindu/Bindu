@@ -65,9 +65,10 @@ TaskState: TypeAlias = Literal[
     "pending",  # The task is pending execution. <NotPartOfA2A>
     "suspended",  # The task is suspended and is not currently running. <NotPartOfA2A>
     "resumed",  # The task is resumed and is currently running. <NotPartOfA2A>
+    "paused",  # The task is paused and is not currently running. <NotPartOfA2A>
     "negotiation-bid-submitted",  # The task is submitted for negotiation. <NotPartOfA2A>
-    "negotiation-bid-lost",  # The task bid was lost in negotiation. <NotPartOfA2A>
     "negotiation-bid-won",  # The task bid was won in negotiation. <NotPartOfA2A>
+    "negotiation-bid-lost",  # The task bid was lost in negotiation. <NotPartOfA2A>
 ]
 
 NegotiationStatus: TypeAlias = Literal[
@@ -495,6 +496,9 @@ class Task(TypedDict):
 
     metadata: NotRequired[dict[str, Any]]
     """The metadata of the task."""
+
+    subtasks: NotRequired[list[Task]]
+    """List of subtasks associated with this task."""
 
 
 @pydantic.with_config(ConfigDict(alias_generator=to_camel))
@@ -1499,6 +1503,16 @@ CancelTaskResponse = JSONRPCResponse[
     Task, Union[TaskNotCancelableError, TaskNotFoundError]
 ]
 
+PauseTaskRequest = JSONRPCRequest[Literal["tasks/pause"], TaskIdParams]
+PauseTaskResponse = JSONRPCResponse[
+    Task, Union[TaskNotFoundError, TaskNotCancelableError]
+]
+
+ResumeTaskRequest = JSONRPCRequest[Literal["tasks/resume"], TaskIdParams]
+ResumeTaskResponse = JSONRPCResponse[
+    Task, Union[TaskNotFoundError, TaskNotCancelableError]
+]
+
 ListTasksRequest = JSONRPCRequest[Literal["tasks/list"], ListTasksParams]
 ListTasksResponse = JSONRPCResponse[
     List[Task], Union[TaskNotFoundError, TaskNotCancelableError]
@@ -1557,6 +1571,8 @@ A2ARequest = Annotated[
         StreamMessageRequest,
         GetTaskRequest,
         CancelTaskRequest,
+        PauseTaskRequest,
+        ResumeTaskRequest,
         ListTasksRequest,
         TaskFeedbackRequest,
         ListContextsRequest,
@@ -1574,7 +1590,10 @@ A2AResponse: TypeAlias = Union[
     SendMessageResponse,
     StreamMessageResponse,
     GetTaskResponse,
+    GetTaskResponse,
     CancelTaskResponse,
+    PauseTaskResponse,
+    ResumeTaskResponse,
     ListTasksResponse,
     TaskFeedbackResponse,
     ListContextsResponse,
