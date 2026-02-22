@@ -5,6 +5,7 @@
  */
 
 import type { MessageUpdate } from '$lib/types/MessageUpdate';
+import type { MessageFile } from '$lib/types/Message';
 import { MessageUpdateType, MessageUpdateStatus } from '$lib/types/MessageUpdate';
 import { handlePaymentRequired, getPaymentHeaders, clearPaymentToken } from './paymentHandler';
 
@@ -61,9 +62,33 @@ export async function submitTaskFeedback(
 	return result.result;
 }
 
+interface TextPart {
+	kind: 'text';
+	text: string;
+}
+
+export interface FilePart {
+	kind: 'file';
+	text: string;
+	file: {
+		name?: string;
+		mimeType?: string;
+		bytes?: string; // base64 encoded
+		uri?: string;
+	};
+}
+
+export interface DataPart {
+	kind: 'data';
+	text: string;
+	data: Record<string, unknown>;
+}
+
+type Part = TextPart | FilePart | DataPart;
+
 interface AgentMessage {
 	role: 'user' | 'agent';
-	parts: Array<{ kind: 'text'; text: string }>;
+	parts: Part[];
 	kind: 'message';
 	messageId: string;
 	contextId: string;
@@ -164,7 +189,8 @@ export async function* sendAgentMessage(
 	abortSignal?: AbortSignal,
 	currentTaskId?: string,
 	taskState?: string,
-	replyToTaskId?: string
+	replyToTaskId?: string,
+	files?: MessageFile[]
 ): AsyncGenerator<MessageUpdate, void, unknown> {
 	const token = typeof window !== 'undefined' ? localStorage.getItem('bindu_oauth_token') : null;
 	const headers: Record<string, string> = {
@@ -213,10 +239,28 @@ export async function* sendAgentMessage(
 		? (contextId.length === 24 ? contextId.padEnd(32, '0') : contextId)
 		: generateId();
 
+	// Build message parts
+	const parts: Part[] = [{ kind: 'text', text: message }];
+
+	// Add file parts if present
+	if (files && files.length > 0) {
+		for (const file of files) {
+			parts.push({
+				kind: 'file',
+				text: '',
+				file: {
+					name: file.name,
+					mimeType: file.mime,
+					bytes: file.value // base64 data
+				}
+			});
+		}
+	}
+
 	// Build message with optional referenceTaskIds
 	const agentMessage: AgentMessage = {
 		role: 'user',
-		parts: [{ kind: 'text', text: message }],
+		parts,
 		kind: 'message',
 		messageId,
 		contextId: newContextId,

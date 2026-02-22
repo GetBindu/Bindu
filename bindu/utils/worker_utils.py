@@ -17,7 +17,7 @@ from bindu.settings import app_settings
 from bindu.extensions.did import DIDAgentExtension
 
 # Type aliases for better readability
-ChatMessage = dict[str, str]
+ChatMessage = dict[str, Any]
 ProtocolMessage = Message
 
 
@@ -37,14 +37,36 @@ class MessageConverter:
         Returns:
             List of chat messages with role and content fields
         """
-        return [
-            {
-                "role": MessageConverter.ROLE_MAP.get(msg.get("role", "user"), "user"),
-                "content": content,
-            }
-            for msg in history
-            if (content := MessageConverter._extract_text_content(msg))
-        ]
+        chat_history = []
+        for msg in history:
+            role = MessageConverter.ROLE_MAP.get(msg.get("role", "user"), "user")
+            parts = msg.get("parts", [])
+            
+            content_list = []
+            for part in parts:
+                kind = part.get("kind")
+                if kind == "text":
+                    content_list.append({"type": "text", "text": part.get("text", "")})
+                elif kind == "file":
+                    file_data = part.get("file", {})
+                    mime = file_data.get("mimeType", "")
+                    byte_str = file_data.get("bytes", "")
+                    url = f"data:{mime};base64,{byte_str}"
+                    content_list.append({
+                        "type": "image_url", 
+                        "image_url": {"url": url}
+                    })
+            
+            if not content_list:
+                continue
+
+            if all(c["type"] == "text" for c in content_list):
+                 content_str = " ".join(c["text"] for c in content_list)
+                 chat_history.append({"role": role, "content": content_str})
+            else:
+                 chat_history.append({"role": role, "content": content_list})
+                 
+        return chat_history
 
     @staticmethod
     def to_protocol_messages(
