@@ -26,9 +26,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from bindu.dspy.prompts import Prompt
+
 # Define your agent
 agent = Agent(
-    instructions=(
+    instructions=Prompt(
         "You are a witty joke-telling agent. "
         "Your job is to entertain users with clever, clean, and funny jokes. "
         "You can tell puns, dad jokes, tech jokes, and situational humor. "

@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 
 from state import ProtocolState
 from utils import log_agent_activity
+from bindu.dspy.prompts import Prompt
 
 # Load environment variables from .env file in cbt folder
 env_path = Path(__file__).parent / ".env"
@@ -63,7 +64,7 @@ class DrafterAgent:
             [
                 (
                     "system",
-                    """You are a clinical psychologist specializing in Cognitive Behavioral Therapy (CBT).
+                    Prompt("""You are a clinical psychologist specializing in Cognitive Behavioral Therapy (CBT).
 Your task is to create structured, empathetic, and evidence-based CBT exercises.
 
 Guidelines:
@@ -73,7 +74,7 @@ Guidelines:
 4. Evidence-based: Use established CBT techniques
 5. Accessibility: Clear language, actionable steps
 
-Format your response as a complete CBT exercise protocol.""",
+Format your response as a complete CBT exercise protocol."""),
                 ),
                 (
                     "human",
@@ -158,7 +159,7 @@ class SafetyGuardianAgent:
             [
                 (
                     "system",
-                    """You are a safety reviewer for clinical content.
+                    Prompt("""You are a safety reviewer for clinical content.
 Your job is to identify:
 1. References to self-harm or suicide
 2. Medical advice (diagnosis, medication, treatment)
@@ -171,7 +172,7 @@ Respond with a JSON object:
     "safety_score": 0.0-1.0,
     "issues": ["list of issues"],
     "recommendations": ["how to fix"]
-}}""",
+}}"""),
                 ),
                 ("human", "Review this CBT exercise for safety:\n\n{draft}"),
             ]
@@ -253,7 +254,7 @@ class ClinicalCriticAgent:
             [
                 (
                     "system",
-                    """You are a senior clinical psychologist reviewing CBT exercises.
+                    Prompt("""You are a senior clinical psychologist reviewing CBT exercises.
 Evaluate:
 1. Clinical appropriateness (evidence-based techniques)
 2. Empathy and tone (warm, supportive, non-judgmental)
@@ -268,7 +269,7 @@ Respond with JSON:
     "strengths": ["list"],
     "weaknesses": ["list"],
     "recommendations": ["how to improve"]
-}}""",
+}}"""),
                 ),
                 ("human", "Critique this CBT exercise:\n\n{draft}"),
             ]

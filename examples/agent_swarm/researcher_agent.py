@@ -1,5 +1,6 @@
 from agno.agent import Agent
 from agno.models.openrouter import OpenRouter
+from bindu.dspy.prompts import Prompt
 import os
 
 def build_research_agent():
@@ -11,7 +12,7 @@ def build_research_agent():
             temperature=0.3  # Slightly higher for creative research
         ),
 
-        description=(
+        instructions=Prompt(
             "You are a deep research agent with expertise across multiple domains. "
             "Your task is to explore topics thoroughly and provide comprehensive, accurate information.\n\n"
 
