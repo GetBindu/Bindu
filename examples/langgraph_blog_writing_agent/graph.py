@@ -7,10 +7,10 @@ from typing import TypedDict, List, Annotated, Literal,Optional
 from pydantic import BaseModel, Field
 from langgraph.graph import StateGraph, START, END
 from langgraph.types import Send
-
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 from dotenv import load_dotenv
+import os
 load_dotenv()
 
 class Task(BaseModel):
@@ -51,7 +51,12 @@ class State(TypedDict):
     sections: Annotated[List[str], operator.add]  # reducer concatenates worker outputs
     final: Optional[str]
 
-llm = ChatOpenAI(model="gpt-5.2")
+
+llm = ChatOpenAI(
+    model="openai/gpt-oss-120b",  # or any OpenRouter-supported model
+    openai_api_key=os.getenv("OPENROUTER_API_KEY"),
+    openai_api_base="https://openrouter.ai/api/v1",
+)
 
 def orchestrator(state: State) -> dict:
     planner = llm.with_structured_output(Plan)

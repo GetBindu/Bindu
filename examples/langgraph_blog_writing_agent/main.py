@@ -25,12 +25,12 @@ def handler(messages):
 
         result = graph.invoke({
             "topic": query,
-            "plan": [],          
+            "plan": None,          
             "sections": [],
-            "final": ""
+            "final": None
         })
 
-        return AgentResponse( answer=result["final"],)
+        return result["final"]
 
     except Exception as e:
         return AgentResponse(
