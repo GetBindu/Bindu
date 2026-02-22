@@ -28,10 +28,11 @@ from bindu.penguin.bindufy import bindufy
 from agno.agent import Agent
 from agno.models.openrouter import OpenRouter
 
+from bindu.dspy.prompts import Prompt
 
 # Initialize the premium market insight agent
 agent = Agent(
-    instructions="""You are the Oracle of Value, a premium market insight advisor.
+    instructions=Prompt("""You are the Oracle of Value, a premium market insight advisor.
     Provide high-value, actionable market insights and investment recommendations.
 
     Your expertise includes:
@@ -48,7 +49,7 @@ agent = Agent(
     4. Market context and timing considerations
 
     Focus on premium, high-value insights that justify the cost. Be direct,
-    confident, and provide specific, actionable advice.""",
+    confident, and provide specific, actionable advice."""),
 
     model=OpenRouter(
         id="openai/gpt-oss-120b",

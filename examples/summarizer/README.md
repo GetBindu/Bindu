@@ -5,6 +5,7 @@ A professional Bindu agent that creates concise, coherent summaries of any input
 ## What is This?
 
 This is a **text summarization agent** that:
+
 - Creates clear, concise summaries of any input text
 - Preserves key information and context
 - Uses OpenRouter's advanced `openai/gpt-oss-120b` model
@@ -22,6 +23,7 @@ This is a **text summarization agent** that:
 ## Quick Start
 
 ### Prerequisites
+
 - Python 3.12+
 - OpenRouter API key
 - uv package manager
@@ -86,7 +88,7 @@ curl -X POST http://localhost:3774/ \
 
 ### File Structure
 
-```
+```text
 examples/summarizer/
 ├── summarizer_agent.py              # Main Agno agent with OpenRouter
 ├── skills/
@@ -99,8 +101,10 @@ examples/summarizer/
 ### Agent Configuration
 
 ```python
+from bindu.dspy.prompts import Prompt
+
 agent = Agent(
-    instructions="You are a professional summarization assistant...",
+    instructions=Prompt("You are a professional summarization assistant..."),
     model=OpenRouter(id="openai/gpt-oss-120b")
 )
 ```
@@ -124,12 +128,14 @@ The summarizer includes a Bindu skill definition with:
 ## Example Interactions
 
 ### Sample Input
-```
+
+```text
 "Climate change refers to long-term shifts in global temperatures and weather patterns. While climate variations are natural, human activities have been the main driver of climate change since the mid-20th century, primarily due to fossil fuel burning, which increases heat-trapping greenhouse gas levels in Earth's atmosphere. This is raising average temperatures and causing more frequent and intense extreme weather events."
 ```
 
 ### Sample Output
-```
+
+```text
 "Climate change involves long-term shifts in global temperatures and weather patterns, with human activities becoming the primary driver since the mid-20th century through fossil fuel burning. This has increased greenhouse gas levels in Earth's atmosphere, leading to rising temperatures and more frequent extreme weather events."
 ```
 
@@ -145,34 +151,40 @@ The summarizer includes a Bindu skill definition with:
 ### Example Customization
 
 ```python
+from bindu.dspy.prompts import Prompt
+
 # For longer summaries
-instructions="Create detailed 4-5 sentence summaries that preserve important details..."
+instructions=Prompt("Create detailed 4-5 sentence summaries that preserve important details...")
 
 # For bullet-point summaries
-instructions="Summarize the text using bullet points for key information..."
+instructions=Prompt("Summarize the text using bullet points for key information...")
 
 # For specific domain summarization
-instructions="You are a scientific summarizer. Create summaries suitable for academic papers..."
+instructions=Prompt("You are a scientific summarizer. Create summaries suitable for academic papers...")
 ```
 
 ## Use Cases
 
 ### Academic & Research
+
 - Research paper summarization
 - Literature review condensation
 - Abstract generation
 
 ### Business & Professional
+
 - Report summarization
 - Meeting transcript condensation
 - Email thread summaries
 
 ### Content & Media
+
 - Article summarization
 - Document analysis
 - Content curation
 
 ### Personal Productivity
+
 - Reading assistance
 - Information processing
 - Study aid
@@ -192,11 +204,13 @@ python-dotenv>=1.1.0
 ## Performance
 
 ### Typical Processing Time
+
 - **Short texts** (< 500 words): 1-2 seconds
 - **Medium texts** (500-1000 words): 2-4 seconds
 - **Long texts** (> 1000 words): 4-8 seconds
 
 ### Quality Metrics
+
 - **Coherence**: High - maintains logical flow
 - **Accuracy**: Excellent - preserves key information
 - **Conciseness**: Optimized - 2-3 sentence summaries

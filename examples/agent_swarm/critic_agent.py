@@ -1,5 +1,6 @@
 from agno.agent import Agent
 from agno.models.openrouter import OpenRouter
+from bindu.dspy.prompts import Prompt
 import os
 
 def build_critic_agent():
@@ -10,7 +11,7 @@ def build_critic_agent():
             api_key=os.getenv("OPENROUTER_API_KEY"),
             temperature=0.1
         ),
-        description=(
+        instructions=Prompt(
             "You are a critical reviewer and quality assurance expert.\n\n"
 
             "⚠️ CRITICAL OUTPUT RULE ⚠️\n"

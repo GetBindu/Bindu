@@ -25,9 +25,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from bindu.dspy.prompts import Prompt
+
 # Define your agent
 agent = Agent(
-    instructions="You are a research assistant that finds and summarizes information.",
+    instructions=Prompt("You are a research assistant that finds and summarizes information."),
     model=OpenRouter(id="openai/gpt-5-mini", api_key=os.getenv("OPENROUTER_API_KEY")),
     tools=[DuckDuckGoTools()],
 )
