@@ -42,7 +42,7 @@ dependencies = [
     "opentelemetry-instrumentation-httpx==0.56b0",
     "sentry-sdk==2.41.0",
     # x402 payments
-    "x402==0.2.1",
+    "x402==2.2.0",
     "web3==7.13.0",
     "eth-account==0.13.7",
     "cdp-sdk==0.21.0",
