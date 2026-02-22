@@ -352,6 +352,14 @@ class AgentSettings(BaseSettings):
         extra="allow",
     )
 
+    # A2A middleware pipeline (fully qualified class paths)
+    a2a_middlewares: list[str] = [
+        "bindu.server.middleware.a2a.CorrelationIdMiddleware",
+        "bindu.server.middleware.a2a.TraceIdMiddleware",
+        "bindu.server.middleware.a2a.RateLimitMiddleware",
+        "bindu.server.middleware.a2a.StructuredLoggingMiddleware",
+    ]
+
     # A2A Protocol Method Handlers
     # Maps JSON-RPC method names to task_manager handler method names
     method_handlers: dict[str, str] = {
