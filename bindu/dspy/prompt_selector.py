@@ -25,17 +25,13 @@ from bindu.utils.logging import get_logger
 logger = get_logger("bindu.dspy.prompt_selector")
 
 
-async def select_prompt_with_canary(storage: Storage | None = None, did: str | None = None) -> dict[str, Any] | None:
+async def select_prompt_with_canary() -> dict[str, Any] | None:
     """Select a prompt using weighted random selection based on traffic allocation.
 
     This function implements canary deployment by:
     1. Fetching active and candidate prompts from database
     2. Using traffic percentages as weights for random selection
     3. Returning the selected prompt with its metadata
-
-    Args:
-        storage: Ignored (kept for compatibility)
-        did: Ignored (kept for compatibility)
 
     Returns:
         Selected prompt dict with keys: id, prompt_text, status, traffic,
