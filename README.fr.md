@@ -85,12 +85,12 @@ uv --version
 
 Sur certains systèmes Windows, git peut ne pas être reconnu dans l'invite de commande même après l'installation – en raison de problèmes de configuration PATH.
 
-Si vous rencontrez ce problème, vous pouvez utiliser *GitHub Desktop* comme alternative :
+Si vous rencontrez ce problème, vous pouvez utiliser _GitHub Desktop_ comme alternative :
 
-1. Installez GitHub Desktop depuis https://desktop.github.com/
+1. Installez GitHub Desktop depuis <https://desktop.github.com/>
 2. Connectez-vous avec votre compte GitHub
 3. Clonez en utilisant l'URL du dépôt :
-   https://github.com/getbindu/Bindu.git
+   <https://github.com/getbindu/Bindu.git>
 
 GitHub Desktop vous permet de cloner des dépôts, gérer des branches, valider des modifications et ouvrir des pull requests sans la ligne de commande.
 
@@ -164,9 +164,11 @@ from agno.agent import Agent
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.models.openai import OpenAIChat
 
+from bindu.dspy.prompts import Prompt
+
 # Définir votre agent
 agent = Agent(
-    instructions="Vous êtes un assistant de recherche qui trouve et résume des informations.",
+    instructions=Prompt("Vous êtes un assistant de recherche qui trouve et résume des informations."),
     model=OpenAIChat(id="gpt-4o"),
     tools=[DuckDuckGoTools()],
 )
@@ -242,6 +244,7 @@ python examples/echo_agent.py
 <br/>
 
 Entrée :
+
 ```bash
 curl --location 'http://localhost:3773/' \
 --header 'Content-Type: application/json' \
@@ -273,6 +276,7 @@ curl --location 'http://localhost:3773/' \
 ```
 
 Sortie :
+
 ```bash
 {
     "jsonrpc": "2.0",
@@ -305,6 +309,7 @@ Sortie :
 ```
 
 Vérifier l'état de la tâche
+
 ```bash
 curl --location 'http://localhost:3773/' \
 --header 'Content-Type: application/json' \
@@ -319,6 +324,7 @@ curl --location 'http://localhost:3773/' \
 ```
 
 Sortie :
+
 ```bash
 {
     "jsonrpc": "2.0",
@@ -559,27 +565,30 @@ Le Bindu Skills System fournit une publicité riche des capacités d'agents pour
 
 Dans Bindu, les Skills agissent comme des **métadonnées de publicité riches** qui aident les orchestrateurs à :
 
-* 🔍 **Découvrir** le bon agent pour une tâche
-* 📖 **Comprendre** les capacités et limitations détaillées
-* ✅ **Vérifier** les exigences avant l'exécution
-* 📊 **Estimer** les performances et les besoins en ressources
-* 🔗 **Enchaîner** plusieurs agents intelligemment
+- 🔍 **Découvrir** le bon agent pour une tâche
+- 📖 **Comprendre** les capacités et limitations détaillées
+- ✅ **Vérifier** les exigences avant l'exécution
+- 📊 **Estimer** les performances et les besoins en ressources
+- 🔗 **Enchaîner** plusieurs agents intelligemment
 
 > **Note** : Les Skills ne sont pas du code exécutable—ce sont des métadonnées structurées qui décrivent ce que votre agent peut faire.
 
 ### 🔌 Endpoints API
 
 **Lister toutes les Skills** :
+
 ```bash
 GET /agent/skills
 ```
 
 **Obtenir les détails d'une Skill** :
+
 ```bash
 GET /agent/skills/{skill_id}
 ```
 
 **Obtenir la documentation d'une Skill** :
+
 ```bash
 GET /agent/skills/{skill_id}/documentation
 ```
@@ -613,6 +622,7 @@ POST /agent/negotiation
 ```
 
 **Requête :**
+
 ```json
 {
   "task_summary": "Extraire des tableaux de factures PDF",
@@ -633,6 +643,7 @@ POST /agent/negotiation
 ```
 
 **Réponse :**
+
 ```json
 {
   "accepted": true,
@@ -742,6 +753,7 @@ Bindu prend en charge les **notifications webhook en temps réel** pour les tâc
 
 1. **Démarrez le récepteur webhook :** `python examples/webhook_client_example.py`
 2. **Configurez l'agent** dans `examples/echo_agent_with_webhooks.py` :
+
    ```python
    manifest = {
        "capabilities": {"push_notifications": True},
@@ -749,6 +761,7 @@ Bindu prend en charge les **notifications webhook en temps réel** pour les tâc
        "global_webhook_token": "secret_abc123",
    }
    ```
+
 3. **Exécutez l'agent :** `python examples/echo_agent_with_webhooks.py`
 4. **Envoyez des tâches** - les notifications webhook arrivent automatiquement
 
@@ -873,6 +886,7 @@ pytest -n auto --cov=bindu --cov-report= && coverage report --skip-covered --fai
 | `Permission denied` (macOS) | Exécutez `xattr -cr .` pour effacer les attributs étendus |
 
 **Réinitialiser l'environnement :**
+
 ```bash
 rm -rf .venv
 uv venv --python 3.12.9
@@ -880,6 +894,7 @@ uv sync --dev
 ```
 
 **Windows PowerShell :**
+
 ```bash
 Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```

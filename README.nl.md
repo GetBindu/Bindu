@@ -85,12 +85,12 @@ uv --version
 
 Op sommige Windows-systemen wordt git mogelijk niet herkend in de Command Prompt, zelfs na installatie – vanwege PATH-configuratieproblemen.
 
-Als je dit probleem tegenkomt, kun je *GitHub Desktop* als alternatief gebruiken:
+Als je dit probleem tegenkomt, kun je _GitHub Desktop_ als alternatief gebruiken:
 
-1. Installeer GitHub Desktop van https://desktop.github.com/
+1. Installeer GitHub Desktop van <https://desktop.github.com/>
 2. Log in met je GitHub-account
 3. Kloon met de repository URL:
-   https://github.com/getbindu/Bindu.git
+   <https://github.com/getbindu/Bindu.git>
 
 GitHub Desktop stelt je in staat om repositories te klonen, branches te beheren, wijzigingen te committen en pull requests te openen zonder de command line.
 
@@ -164,9 +164,11 @@ from agno.agent import Agent
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.models.openai import OpenAIChat
 
+from bindu.dspy.prompts import Prompt
+
 # Definieer je agent
 agent = Agent(
-    instructions="Je bent een onderzoeksassistent die informatie vindt en samenvat.",
+    instructions=Prompt("Je bent een onderzoeksassistent die informatie vindt en samenvat."),
     model=OpenAIChat(id="gpt-4o"),
     tools=[DuckDuckGoTools()],
 )
@@ -242,6 +244,7 @@ python examples/echo_agent.py
 <br/>
 
 Input:
+
 ```bash
 curl --location 'http://localhost:3773/' \
 --header 'Content-Type: application/json' \
@@ -273,6 +276,7 @@ curl --location 'http://localhost:3773/' \
 ```
 
 Output:
+
 ```bash
 {
     "jsonrpc": "2.0",
@@ -305,6 +309,7 @@ Output:
 ```
 
 Controleer task status
+
 ```bash
 curl --location 'http://localhost:3773/' \
 --header 'Content-Type: application/json' \
@@ -319,6 +324,7 @@ curl --location 'http://localhost:3773/' \
 ```
 
 Output:
+
 ```bash
 {
     "jsonrpc": "2.0",
@@ -559,27 +565,30 @@ Het Bindu Skills System biedt rijke agent capability advertisement voor intellig
 
 In Bindu fungeren Skills als **rijke advertisement metadata** die orchestrators helpen:
 
-* 🔍 **Ontdekken** van de juiste agent voor een taak
-* 📖 **Begrijpen** van gedetailleerde mogelijkheden en beperkingen
-* ✅ **Verifiëren** van vereisten vóór uitvoering
-* 📊 **Schatten** van prestaties en resource-behoeften
-* 🔗 **Koppelen** van meerdere agents intelligent
+- 🔍 **Ontdekken** van de juiste agent voor een taak
+- 📖 **Begrijpen** van gedetailleerde mogelijkheden en beperkingen
+- ✅ **Verifiëren** van vereisten vóór uitvoering
+- 📊 **Schatten** van prestaties en resource-behoeften
+- 🔗 **Koppelen** van meerdere agents intelligent
 
 > **Opmerking**: Skills zijn geen uitvoerbare code—het is gestructureerde metadata die beschrijft wat je agent kan doen.
 
 ### 🔌 API Endpoints
 
 **Lijst alle Skills**:
+
 ```bash
 GET /agent/skills
 ```
 
 **Verkrijg Skill details**:
+
 ```bash
 GET /agent/skills/{skill_id}
 ```
 
 **Verkrijg Skill documentatie**:
+
 ```bash
 GET /agent/skills/{skill_id}/documentation
 ```
@@ -613,6 +622,7 @@ POST /agent/negotiation
 ```
 
 **Request:**
+
 ```json
 {
   "task_summary": "Extraheer tabellen uit PDF facturen",
@@ -633,6 +643,7 @@ POST /agent/negotiation
 ```
 
 **Response:**
+
 ```json
 {
   "accepted": true,
@@ -742,6 +753,7 @@ Bindu ondersteunt **real-time webhook notifications** voor langlopende taken, vo
 
 1. **Start webhook receiver:** `python examples/webhook_client_example.py`
 2. **Configureer agent** in `examples/echo_agent_with_webhooks.py`:
+
    ```python
    manifest = {
        "capabilities": {"push_notifications": True},
@@ -749,6 +761,7 @@ Bindu ondersteunt **real-time webhook notifications** voor langlopende taken, vo
        "global_webhook_token": "secret_abc123",
    }
    ```
+
 3. **Voer agent uit:** `python examples/echo_agent_with_webhooks.py`
 4. **Verstuur tasks** - webhook notifications komen automatisch binnen
 
@@ -873,6 +886,7 @@ pytest -n auto --cov=bindu --cov-report= && coverage report --skip-covered --fai
 | `Permission denied` (macOS) | Voer `xattr -cr .` uit om extended attributes te wissen |
 
 **Reset omgeving:**
+
 ```bash
 rm -rf .venv
 uv venv --python 3.12.9
@@ -880,6 +894,7 @@ uv sync --dev
 ```
 
 **Windows PowerShell:**
+
 ```bash
 Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
