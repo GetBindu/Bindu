@@ -45,7 +45,6 @@ Built with a distributed architecture (Task Manager, scheduler, storage), Bindu 
   <strong>🌟 <a href="https://bindus.directory">Register your agent</a> • 🌻 <a href="https://docs.getbindu.com">Documentation</a> • 💬 <a href="https://discord.gg/3w5zuYUuwt">Discord Community</a></strong>
 </p>
 
-
 ---
 
 <br/>
@@ -68,7 +67,6 @@ Before installing Bindu, ensure you have:
 - **UV package manager** - [Installation guide](https://github.com/astral-sh/uv)
 - **API Key Required**: Set `OPENROUTER_API_KEY` or `OPENAI_API_KEY` in your environment variables. Free OpenRouter models are available for testing.
 
-
 ### Verify Your Setup
 
 ```bash
@@ -84,17 +82,18 @@ uv --version
 <br/>
 
 ## 📦 Installation
+
 <details>
 <summary><b>Users note (Git & GitHub Desktop)</b></summary>
 
 On some Windows systems, git may not be recognized in Command Prompt even after installation due to PATH configuration issues.
 
-If you face this issue, you can use *GitHub Desktop* as an alternative:
+If you face this issue, you can use _GitHub Desktop_ as an alternative:
 
-1. Install GitHub Desktop from https://desktop.github.com/
+1. Install GitHub Desktop from <https://desktop.github.com/>
 2. Sign in with your GitHub account
 3. Clone the repository using the repository URL:
-   https://github.com/getbindu/Bindu.git
+   <https://github.com/getbindu/Bindu.git>
 
 GitHub Desktop allows you to clone, manage branches, commit changes, and open pull requests without using the command line.
 
@@ -168,9 +167,11 @@ from agno.agent import Agent
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.models.openai import OpenAIChat
 
+from bindu.dspy.prompts import Prompt
+
 # Define your agent
 agent = Agent(
-    instructions="You are a research assistant that finds and summarizes information.",
+    instructions=Prompt("You are a research assistant that finds and summarizes information."),
     model=OpenAIChat(id="gpt-4o"),
     tools=[DuckDuckGoTools()],
 )
@@ -231,7 +232,6 @@ Try Bindu without setting up Postgres, Redis, or any cloud services. Runs entire
 python examples/beginner_zero_config_agent.py
 ```
 
-
 ### Option 4: Minimal Echo Agent (Testing)
 
 <details>
@@ -279,6 +279,7 @@ python examples/echo_agent.py
 <br/>
 
 Input:
+
 ```bash
 curl --location 'http://localhost:3773/' \
 --header 'Content-Type: application/json' \
@@ -310,6 +311,7 @@ curl --location 'http://localhost:3773/' \
 ```
 
 Output:
+
 ```bash
 {
     "jsonrpc": "2.0",
@@ -342,6 +344,7 @@ Output:
 ```
 
 Check the status of the task
+
 ```bash
 curl --location 'http://localhost:3773/' \
 --header 'Content-Type: application/json' \
@@ -356,6 +359,7 @@ curl --location 'http://localhost:3773/' \
 ```
 
 Output:
+
 ```bash
 {
     "jsonrpc": "2.0",
@@ -417,11 +421,7 @@ Output:
 
 </details>
 
- 
-
 ---
-
- 
 
 ## 🚀 Core Features
 
@@ -560,6 +560,7 @@ uv run coverage report --skip-covered --fail-under=70
 | `Permission denied` (macOS) | Run `xattr -cr .` to clear extended attributes |
 
 **Reset environment:**
+
 ```bash
 rm -rf .venv
 uv venv --python 3.12.9
@@ -567,6 +568,7 @@ uv sync --dev
 ```
 
 **Windows PowerShell:**
+
 ```bash
 Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
