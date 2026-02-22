@@ -123,9 +123,11 @@ from agno.agent import Agent
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.models.openai import OpenAIChat
 
+from bindu.dspy.prompts import Prompt
+
 # உங்கள் ஏஜென்ட்டை வரையறுக்கவும்
 agent = Agent(
-    instructions="நீங்கள் ஒரு ஆராய்ச்சி உதவியாளர், தகவல்களைக் கண்டுபிடித்து சுருக்கமாகக் கூறுபவர்.",
+    instructions=Prompt("நீங்கள் ஒரு ஆராய்ச்சி உதவியாளர், தகவல்களைக் கண்டுபிடித்து சுருக்கமாகக் கூறுபவர்."),
     model=OpenAIChat(id="gpt-4o"),
     tools=[DuckDuckGoTools()],
 )
