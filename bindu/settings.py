@@ -724,6 +724,36 @@ class RetrySettings(BaseSettings):
     api_max_wait: float = 15.0  # seconds
 
 
+class CircuitBreakerSettings(BaseSettings):
+    """Circuit breaker configuration for failure isolation.
+
+    Prevents retry storms by temporarily blocking calls to operations
+    that have failed repeatedly. Integrates with the Tenacity-based
+    retry system as an outer guard.
+
+    When ``enabled`` is False (default), the circuit breaker is a
+    transparent no-op and all behavior is identical to before.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="BINDU_CB_",
+        extra="allow",
+    )
+
+    # Master switch — opt-in to avoid breaking existing deployments
+    enabled: bool = False
+
+    # Number of consecutive failures before the circuit opens
+    failure_threshold: int = 3
+
+    # Seconds the circuit stays OPEN before probing with HALF_OPEN
+    recovery_timeout: float = 30.0
+
+    # Consecutive successes in HALF_OPEN required to close the circuit
+    success_threshold: int = 1
+
+
 class NegotiationSettings(BaseSettings):
     """Negotiation and capability assessment configuration settings.
 
@@ -947,6 +977,7 @@ class Settings(BaseSettings):
     storage: StorageSettings = StorageSettings()
     scheduler: SchedulerSettings = SchedulerSettings()
     retry: RetrySettings = RetrySettings()
+    circuit_breaker: CircuitBreakerSettings = CircuitBreakerSettings()
     negotiation: NegotiationSettings = NegotiationSettings()
     sentry: SentrySettings = SentrySettings()
 
