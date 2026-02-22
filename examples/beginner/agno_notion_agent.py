@@ -71,12 +71,13 @@ def search_notion(query: str):
         }
     )
 
+from bindu.dspy.prompts import Prompt
 
 # -----------------------------
 # Agent Definition
 # -----------------------------
 agent = Agent(
-    instructions="You are a Notion assistant. Use tools to create and search Notion pages.",
+    instructions=Prompt("You are a Notion assistant. Use tools to create and search Notion pages."),
     model=OpenRouter(
         id="openai/gpt-oss-120b",
         api_key=OPENROUTER_API_KEY,

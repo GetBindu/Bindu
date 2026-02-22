@@ -5,6 +5,7 @@ A premium Bindu agent that provides high-value market insights and financial ana
 ## What is This?
 
 This is a **premium market insight advisor** that:
+
 - Provides proprietary deep-chain market analysis
 - Offers investment recommendations and risk assessments
 - Requires X402 payment (0.01 USDC) per interaction
@@ -23,6 +24,7 @@ This is a **premium market insight advisor** that:
 ## Quick Start
 
 ### Prerequisites
+
 - Python 3.12+
 - OpenRouter API key
 - uv package manager
@@ -159,12 +161,14 @@ The agent includes a Bindu skill definition with:
 ## Example Interactions
 
 ### Sample Query
-```
+
+```text
 "What's your outlook for DeFi projects this quarter?"
 ```
 
 ### Premium Response
-```
+
+```text
 🔮 **Quarterly DeFi Outlook** 🔮
 
 Based on deep-chain analysis:
@@ -208,8 +212,10 @@ def analyze_token(token_address: str) -> str:
     # Your analysis logic here
     return analysis_result
 
+from bindu.dspy.prompts import Prompt
+
 agent = Agent(
-    instructions="...",
+    instructions=Prompt("..."),
     model=OpenRouter(id="openai/gpt-oss-120b"),
     tools=[analyze_token],
 )
