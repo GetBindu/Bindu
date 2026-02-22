@@ -45,7 +45,7 @@ dependencies = [
     "x402==0.2.1",
     "web3==7.13.0",
     "eth-account==0.13.7",
-    "cdp-sdk==0.21.0",
+    "cdp-sdk==1.39.1",
     "coinbase-advanced-py==1.8.2",
     # Database storage
     "sqlalchemy[asyncio]==2.0.44",
