@@ -1,0 +1,13 @@
+skill_id: "secret-finder-v1"
+name: "Secret Finder"
+version: "1.0.0"
+description: "Scans files for any accidental inclusion of API keys, passwords, or secrets."
+
+capabilities_detail:
+  search_secrets: {supported: true}
+  security_audit: {supported: true}
+
+tags:
+  - security
+  - scan
+  - secrets
