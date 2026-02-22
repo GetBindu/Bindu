@@ -1,7 +1,7 @@
 # |---------------------------------------------------------|
 # |                                                         |
 # |                 Give Feedback / Get Help                |
-# | https://github.com/getbindu/Bindu/issues/new/choose    |
+# | https://github.com/getbindu/Bindu/issues/new/choose     |
 # |                                                         |
 # |---------------------------------------------------------|
 #

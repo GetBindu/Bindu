@@ -1,7 +1,16 @@
+# |---------------------------------------------------------|
+# |                                                         |
+# |                 Give Feedback / Get Help                |
+# | https://github.com/getbindu/Bindu/issues/new/choose     |
+# |                                                         |
+# |---------------------------------------------------------|
+#
+#  Thank you users! We ❤️ you! - 🌻
+
 """Prompt storage implementation using JSON file.
 
-This module provides storage for agent prompts in a JSON file, replacing the
-PostgreSQL implementation. It supports both synchronous and asynchronous access,
+This module provides storage for agent prompts in a JSON file. 
+It supports both synchronous and asynchronous access,
 handling concurrent writes with atomic operations and file locking.
 """
 
