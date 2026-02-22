@@ -692,6 +692,16 @@ class SchedulerSettings(BaseSettings):
         description="Timeout in seconds for Redis blpop operations. Higher values reduce API calls but increase task start latency.",
     )
 
+    # Error backoff settings for receive loop resilience
+    error_backoff_base: float = Field(
+        default=0.1,
+        description="Base delay in seconds for exponential backoff on receive errors.",
+    )
+    error_backoff_max: float = Field(
+        default=30.0,
+        description="Maximum backoff delay in seconds during sustained Redis failures.",
+    )
+
 
 class RetrySettings(BaseSettings):
     """Retry mechanism configuration settings using Tenacity.

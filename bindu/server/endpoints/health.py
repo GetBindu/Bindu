@@ -54,6 +54,20 @@ async def health_endpoint(app: BinduApplication, request: Request) -> JSONRespon
     ):
         agent_did = app.manifest.did_extension.did
 
+    # Probe scheduler health if it supports structured reporting
+    scheduler_health = None
+    if app._scheduler and hasattr(app._scheduler, "get_health_status"):
+        try:
+            scheduler_health = await app._scheduler.get_health_status()
+        except Exception as e:
+            logger.warning(f"Scheduler health check failed: {e}")
+            scheduler_health = {"status": "error", "error": str(e)}
+
+    # Incorporate scheduler degradation into overall health
+    overall_health = "healthy" if strict_ready else "degraded"
+    if scheduler_health and scheduler_health.get("status") != "healthy":
+        overall_health = "degraded"
+
     payload = {
         # --- ORIGINAL FIELDS (DO NOT CHANGE BEHAVIOR) ---
         "status": "ok",
@@ -61,7 +75,7 @@ async def health_endpoint(app: BinduApplication, request: Request) -> JSONRespon
         "uptime_seconds": uptime,
         "version": __version__,
         # --- NEW EXTENDED FIELDS ---
-        "health": "healthy" if strict_ready else "degraded",
+        "health": overall_health,
         "runtime": {
             "storage_backend": storage_type,
             "scheduler_backend": scheduler_type,
@@ -79,5 +93,8 @@ async def health_endpoint(app: BinduApplication, request: Request) -> JSONRespon
             "environment": os.getenv("ENV", "development"),
         },
     }
+
+    if scheduler_health is not None:
+        payload["scheduler"] = scheduler_health
 
     return JSONResponse(payload)
