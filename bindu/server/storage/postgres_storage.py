@@ -323,7 +323,12 @@ class PostgresStorage(Storage[ContextT]):
 
         return await self._retry_on_connection_error(_load)
 
-    async def submit_task(self, context_id: UUID, message: Message) -> Task:
+    async def submit_task(
+        self,
+        context_id: UUID,
+        message: Message,
+        fingerprint: str | None = None,
+    ) -> Task:
         """Create a new task or continue an existing non-terminal task.
 
         Task-First Pattern (Bindu):
@@ -414,6 +419,7 @@ class PostgresStorage(Storage[ContextT]):
                             history=[serialized_message],
                             artifacts=[],
                             metadata={},
+                            fingerprint=fingerprint,
                         )
                         .returning(tasks_table)
                     )
@@ -423,6 +429,30 @@ class PostgresStorage(Storage[ContextT]):
                     return self._row_to_task(new_row)
 
         return await self._retry_on_connection_error(_submit)
+
+    async def load_task_by_fingerprint(self, fingerprint: str) -> Task | None:
+        """Load a task by its deterministic request fingerprint.
+
+        Args:
+            fingerprint: SHA256 hex digest for deduplication lookup.
+
+        Returns:
+            Task object if found, None otherwise.
+        """
+        self._ensure_connected()
+
+        async def _load():
+            async with self._get_session_with_schema() as session:
+                stmt = select(tasks_table).where(
+                    tasks_table.c.fingerprint == fingerprint
+                )
+                result = await session.execute(stmt)
+                row = result.first()
+                if row is None:
+                    return None
+                return self._row_to_task(row)
+
+        return await self._retry_on_connection_error(_load)
 
     async def update_task(
         self,

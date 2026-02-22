@@ -56,16 +56,41 @@ class Storage(ABC, Generic[ContextT]):
         """
 
     @abstractmethod
-    async def submit_task(self, context_id: UUID, message: Message) -> Task:
+    async def submit_task(
+        self,
+        context_id: UUID,
+        message: Message,
+        fingerprint: str | None = None,
+    ) -> Task:
         """Create and store a new task.
 
         Args:
             context_id: Context to associate the task with
             message: Initial message containing task request
+            fingerprint: Optional deterministic request fingerprint for deduplication.
+                If provided, stored alongside the task so future calls to
+                load_task_by_fingerprint() can find it.
 
         Returns:
             Newly created task in 'submitted' state
         """
+
+    async def load_task_by_fingerprint(self, fingerprint: str) -> Task | None:
+        """Load a task by its deterministic request fingerprint.
+
+        Used for safe retry semantics: if the same logical request is sent
+        multiple times, this returns the existing task instead of creating
+        a duplicate.
+
+        Args:
+            fingerprint: SHA256 hex digest computed from sender identity,
+                context_id, and normalized message JSON.
+
+        Returns:
+            Task object if a matching fingerprint exists, None otherwise.
+        """
+        # Default: no fingerprint support. Subclasses override to enable.
+        return None
 
     @abstractmethod
     async def update_task(

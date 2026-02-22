@@ -57,6 +57,8 @@ tasks_table = Table(
     Column("history", JSONB, nullable=False, server_default="[]"),
     Column("artifacts", JSONB, nullable=True, server_default="[]"),
     Column("metadata", JSONB, nullable=True, server_default="{}"),
+    # Deduplication fingerprint (SHA256 hex digest)
+    Column("fingerprint", String(64), nullable=True, unique=True),
     # Timestamps
     Column(
         "created_at",
@@ -76,6 +78,7 @@ tasks_table = Table(
     Index("idx_tasks_state", "state"),
     Index("idx_tasks_created_at", "created_at"),
     Index("idx_tasks_updated_at", "updated_at"),
+    Index("idx_tasks_fingerprint", "fingerprint", unique=True, postgresql_where="fingerprint IS NOT NULL"),
     Index("idx_tasks_history_gin", "history", postgresql_using="gin"),
     Index("idx_tasks_metadata_gin", "metadata", postgresql_using="gin"),
     Index("idx_tasks_artifacts_gin", "artifacts", postgresql_using="gin"),
