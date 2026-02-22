@@ -1,5 +1,6 @@
 from agno.agent import Agent
 from agno.models.openrouter import OpenRouter
+from bindu.dspy.prompts import Prompt
 import os
 
 
@@ -11,7 +12,7 @@ def build_planner_agent():
             api_key=os.getenv("OPENROUTER_API_KEY"),
             temperature=0
         ),
-        description="""You are a strict JSON-only planning agent.
+        instructions=Prompt("""You are a strict JSON-only planning agent.
 
 CRITICAL RULES:
 1. Output ONLY valid JSON - no markdown, no explanations, no text before or after
@@ -31,5 +32,5 @@ Available agents:
 Example input: "What is quantum computing?"
 Example output: {"steps":[{"agent":"researcher","task":"Research quantum computing fundamentals, applications, and current state"},{"agent":"summarizer","task":"Summarize the research findings into key points"},{"agent":"critic","task":"Evaluate the completeness and accuracy of the summary"}]}
 
-Remember: ONLY output the JSON object, nothing else.""",
+Remember: ONLY output the JSON object, nothing else."""),
     )

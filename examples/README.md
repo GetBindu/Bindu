@@ -5,6 +5,7 @@ Example agents demonstrating Bindu's capabilities - from simple bots to multi-ag
 ## Quick Start
 
 ### Prerequisites
+
 - Python 3.12+
 - uv package manager
 - OpenRouter API key
@@ -29,6 +30,7 @@ Agents run on ports 3773-3780 with UI at `http://localhost:[port]/docs`
 ## Examples
 
 ### Beginner
+
 - `beginner/echo_simple_agent.py` - Minimal echo bot
 - `beginner/beginner_zero_config_agent.py` - Zero-config agent with web search
 - `beginner/agno_simple_example.py` - Joke generator
@@ -37,15 +39,18 @@ Agents run on ports 3773-3780 with UI at `http://localhost:[port]/docs`
 - `beginner/agno_notion_agent.py` - Notion integration
 
 ### Specialized
+
 - `summarizer/` - Text summarization agent
 - `weather-research/` - Weather intelligence agent
 - `premium-advisor/` - Paid agent with X402 payments (0.01 USDC per query)
 
 ### Advanced
+
 - `agent_swarm/` - Multi-agent collaboration system
 - `cerina_bindu/cbt/` - CBT therapy protocol generator
 
 ### Components
+
 - `skills/` - Reusable agent capabilities
 
 ## Environment Variables
@@ -74,12 +79,14 @@ Users must pay 0.01 USDC before the agent responds.
 ## Testing
 
 ### Web UI
+
 ```bash
 cd frontend
 npm run dev
 ```
 
 ### API
+
 ```bash
 curl -X POST http://localhost:3773/ \
   -H "Content-Type: application/json" \
@@ -89,18 +96,28 @@ curl -X POST http://localhost:3773/ \
 ## Building Your Own
 
 ```python
-from bindu import Agent
+from agno.agent import Agent
+from bindu.dspy.prompts import Prompt
+from bindu.penguin.bindufy import bindufy
 
 agent = Agent(
     name="My Agent",
-    description="What it does",
+    instructions=Prompt("Behavior guidelines"),
     model="openai/gpt-4o",
 )
 
-agent.instructions = ["Behavior guidelines"]
+config = {
+    "name": "my_agent",
+    "author": "your.email@example.com",
+    "description": "What it does",
+    "deployment": {"url": "http://localhost:3773", "expose": True}
+}
 
 if __name__ == "__main__":
-    agent.serve(port=3773)
+    def handler(messages):
+        return agent.run(input=messages)
+
+    bindufy(config, handler)
 ```
 
 ## Documentation
