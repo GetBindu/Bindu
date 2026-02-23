@@ -1,0 +1,40 @@
+id: research-report-skill
+name: Research Report Skill
+version: 1.0.0
+author: your.email@example.com
+
+description: |
+  A research assistant skill that generates structured research reports
+  on any given topic using web search and AI analysis.
+
+  It gathers recent information, extracts key insights, and presents
+  results in a clear structured format including introduction, findings,
+  analysis, and conclusion.
+
+tags:
+  - research
+  - report-generation
+  - web-search
+  - analysis
+  - information-extraction
+
+input_modes:
+  - text/plain
+
+output_modes:
+  - text/plain
+  - application/json
+
+examples:
+  - "Write a research report on AI in healthcare."
+  - "Generate a structured report on climate change impact."
+  - "Research the future of quantum computing."
+
+capabilities_detail:
+  research:
+    supported: true
+    features:
+      - Web search integration
+      - Insight extraction
+      - Structured report formatting
+      - Analytical summarization
