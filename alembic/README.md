@@ -217,6 +217,9 @@ alembic upgrade head
    # Staging
    DATABASE_URL=postgresql://staging alembic upgrade head
 
+   # Neon
+   DATABASE_URL=postgresql://<user>:<Password>@<host>:<port>/<database> uv run alembic upgrade head
+
    # Production (after testing)
    DATABASE_URL=postgresql://production alembic upgrade head
    ```

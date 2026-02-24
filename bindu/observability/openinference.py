@@ -71,22 +71,6 @@ SUPPORTED_FRAMEWORKS = [
 ]
 
 
-def _get_package_manager() -> tuple[list[str], str]:
-    """Detect available package manager and return install command prefix.
-
-    Returns:
-        Tuple of (command_prefix, package_manager_name)
-    """
-    current_directory = Path.cwd()
-    has_uv = (current_directory / "uv.lock").exists() or (
-        current_directory / "pyproject.toml"
-    ).exists()
-
-    if has_uv:
-        return ["uv", "add"], "uv"
-    return [sys.executable, "-m", "pip", "install"], "pip"
-
-
 def _instrument_framework(framework: str, tracer_provider: Any) -> None:
     """Dynamically import and instrument a framework.
 
@@ -112,36 +96,6 @@ def _instrument_framework(framework: str, tracer_provider: Any) -> None:
             class_name=class_name,
             error=str(e),
         )
-
-
-def _detect_framework(installed_dists: dict[str, Any]) -> AgentFrameworkSpec | None:
-    """Detect the first matching supported framework from installed packages.
-
-    Args:
-        installed_dists: Dictionary of installed package distributions
-
-    Returns:
-        AgentFrameworkSpec if found, None otherwise
-    """
-    return next(
-        (spec for spec in SUPPORTED_FRAMEWORKS if spec.framework in installed_dists),
-        None,
-    )
-
-
-def _validate_framework_version(
-    framework_spec: AgentFrameworkSpec, installed_version: str
-) -> bool:
-    """Validate that installed framework version meets minimum requirements.
-
-    Args:
-        framework_spec: Framework specification with minimum version
-        installed_version: Currently installed version
-
-    Returns:
-        True if version is valid, False otherwise
-    """
-    return version.parse(installed_version) >= version.parse(framework_spec.min_version)
 
 
 def _check_missing_packages(
@@ -381,7 +335,10 @@ def setup(
 
     # Step 1: Detect installed framework for optional instrumentation
     installed_dists = {dist.name: dist for dist in distributions()}
-    framework_spec = _detect_framework(installed_dists)
+    framework_spec = next(
+        (spec for spec in SUPPORTED_FRAMEWORKS if spec.framework in installed_dists),
+        None,
+    )
 
     if not framework_spec:
         if verbose_logging:
@@ -394,7 +351,7 @@ def setup(
     # Step 2: Validate framework version
     installed_version = installed_dists[framework_spec.framework].version
 
-    if not _validate_framework_version(framework_spec, installed_version):
+    if version.parse(installed_version) < version.parse(framework_spec.min_version):
         if verbose_logging:
             logger.warning(
                 "OpenInference framework instrumentation skipped - framework version below minimum",
@@ -416,7 +373,14 @@ def setup(
     missing_packages = _check_missing_packages(framework_spec, installed_dists)
 
     if missing_packages:
-        cmd_prefix, package_manager = _get_package_manager()
+        # Detect package manager
+        current_directory = Path.cwd()
+        has_uv = (current_directory / "uv.lock").exists() or (
+            current_directory / "pyproject.toml"
+        ).exists()
+        cmd_prefix = (
+            ["uv", "add"] if has_uv else [sys.executable, "-m", "pip", "install"]
+        )
         install_cmd = " ".join(cmd_prefix + missing_packages)
 
         logger.warning(

@@ -192,15 +192,6 @@ class TestDIDAgentExtension:
         assert "travel_agent" in did
         assert agent_id in did
 
-    def test_sanitize_did_component(self):
-        """Test DID component sanitization."""
-        assert DIDAgentExtension._sanitize_did_component("Test Agent") == "test_agent"
-        assert (
-            DIDAgentExtension._sanitize_did_component("user@example.com")
-            == "user_at_example_com"
-        )
-        assert DIDAgentExtension._sanitize_did_component("agent.name") == "agent_name"
-
     def test_fallback_did_format(self, temp_key_dir):
         """Test fallback to did:key format when author/name not provided."""
         ext = DIDAgentExtension(

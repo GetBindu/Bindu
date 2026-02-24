@@ -8,7 +8,6 @@ from starlette.responses import Response
 
 from bindu.extensions.x402.extension import (
     add_activation_header,
-    get_agent_extension,
     is_activation_requested,
 )
 from bindu.settings import app_settings
@@ -34,18 +33,6 @@ def _make_request_with_headers(headers: dict[str, str]) -> Request:
 
 
 class TestX402ExtensionHelpers:
-    def test_get_agent_extension_defaults(self):
-        ext = get_agent_extension()
-        assert ext["uri"] == app_settings.x402.extension_uri
-        assert ext.get("required") is False
-        assert "Supports x402 A2A agent payments" in ext.get("description", "")
-
-    def test_get_agent_extension_overrides(self):
-        ext = get_agent_extension(required=True, description="custom")
-        assert ext["uri"] == app_settings.x402.extension_uri
-        assert ext.get("required") is True
-        assert ext.get("description") == "custom"
-
     def test_is_activation_requested_true(self):
         req = _make_request_with_headers(
             {

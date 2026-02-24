@@ -14,9 +14,26 @@ curl http://localhost:3773/health
 ```json
 {
     "status": "ok",
-    "uptime_seconds": 2504.32,
+    "ready": true,
+    "uptime_seconds": 37.56,
     "version": "2026.6.7.dev65+g6742cd6eb.d20260210",
-    "ready": true
+    "health": "healthy",
+    "runtime": {
+        "storage_backend": "PostgresStorage",
+        "scheduler_backend": "RedisScheduler",
+        "task_manager_running": true,
+        "strict_ready": true
+    },
+    "application": {
+        "penguin_id": "<penguin_id>",
+        "agent_did": "<agent_did>"
+    },
+    "system": {
+        "python_version": "<python_version>",
+        "platform": "<platform>",
+        "platform_release": "<platform_release>",
+        "environment": "<environment>"
+    }
 }
 ```
 
