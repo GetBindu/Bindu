@@ -1,8 +1,10 @@
 """Unit tests for TaskManager."""
 
+import uuid
 from uuid import uuid4
 
 import pytest
+from unittest.mock import MagicMock
 
 from bindu.common.protocol.types import (
     CancelTaskRequest,
@@ -362,3 +364,85 @@ async def test_push_not_supported():
             # Should return PushNotificationNotSupportedError (-32005)
             if not tm._push_manager.is_push_supported():
                 assert_jsonrpc_error(response, -32005)
+
+@pytest.mark.asyncio
+async def test_parse_context_id_fallback():
+    """Test that malformed UUID strings safely generate a new UUID (DoS protection)."""
+    storage = InMemoryStorage()
+    async with InMemoryScheduler() as scheduler:
+        async with TaskManager(
+            scheduler=scheduler, storage=storage, manifest=None
+        ) as tm:
+            # 1. Valid UUID string should parse correctly
+            valid_uuid = uuid.uuid4()
+            result_valid = tm._parse_context_id(str(valid_uuid))
+            assert result_valid == valid_uuid
+
+            # 2. Malformed string (DoS vector fallback) should not crash the server
+            result_invalid = tm._parse_context_id("invalid-garbage-string")
+            assert isinstance(result_invalid, uuid.UUID)
+            assert result_invalid != "invalid-garbage-string"
+            
+            # 3. None input should generate a fresh UUID
+            result_none = tm._parse_context_id(None)
+            assert isinstance(result_none, uuid.UUID)
+
+
+@pytest.mark.asyncio
+async def test_getattr_security_and_missing_methods():
+    """Test that __getattr__ prevents recursion and raises correct AttributeErrors."""
+    storage = InMemoryStorage()
+    async with InMemoryScheduler() as scheduler:
+        async with TaskManager(
+            scheduler=scheduler, storage=storage, manifest=None
+        ) as tm:
+            # Test recursion guard (accessing non-existent private attributes)
+            with pytest.raises(AttributeError, match="has no attribute '_fake_private'"):
+                _ = tm._fake_private
+                
+            # Test missing public methods
+            with pytest.raises(AttributeError, match="has no attribute 'make_me_a_sandwich'"):
+                _ = tm.make_me_a_sandwich
+
+
+@pytest.mark.asyncio
+async def test_task_manager_lifecycle():
+    """Test is_running state and proper AsyncExitStack initialization."""
+    storage = InMemoryStorage()
+    scheduler = InMemoryScheduler()
+    
+    # 1. State should be False before context is entered
+    tm = TaskManager(scheduler=scheduler, storage=storage, manifest=None)
+    assert not tm.is_running
+    
+    # 2. State should be True inside the context
+    async with tm:
+        assert tm.is_running
+        
+    # 3. State should revert to False after exiting
+    assert not tm.is_running
+    
+    # 4. Attempting to exit an uninitialized manager should raise a RuntimeError
+    uninitialized_tm = TaskManager(scheduler=scheduler, storage=storage, manifest=None)
+    with pytest.raises(RuntimeError, match="TaskManager was not properly initialized"):
+        await uninitialized_tm.__aexit__(None, None, None)
+
+
+@pytest.mark.asyncio
+async def test_manifest_worker_initialization():
+    """Test that a ManifestWorker is created when a manifest is provided."""
+    storage = InMemoryStorage()
+    async with InMemoryScheduler() as scheduler:
+        # Create a mock manifest to trigger the worker initialization block
+        mock_manifest = MagicMock()
+        tm = TaskManager(scheduler=scheduler, storage=storage, manifest=mock_manifest)
+        
+        # Before entering context, no workers should exist
+        assert len(tm._workers) == 0
+        
+        async with tm:
+            # Inside context, the worker should be initialized and added to the list
+            assert len(tm._workers) == 1
+            # Verify the worker got the correct manifest attached
+            assert tm._workers[0].manifest == mock_manifest
+            
