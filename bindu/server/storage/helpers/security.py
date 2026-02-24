@@ -1,7 +1,5 @@
 """Security utilities for storage operations."""
 
-import re
-
 
 def mask_database_url(url: str) -> str:
     """Mask password in database URL for safe logging.
@@ -26,9 +24,13 @@ def mask_database_url(url: str) -> str:
 
 
 def sanitize_identifier(identifier: str) -> str:
-    """Sanitize SQL identifier to prevent SQL injection.
+    """
+    Sanitize SQL identifier to prevent SQL injection.
 
-    Validates that identifier contains only alphanumeric characters and underscores.
+    Performs sanitization in a clear, step-by-step manner:
+    - Strips leading/trailing whitespace
+    - Checks for allowed characters (alphanumeric, underscore)
+    - Raises ValueError if any invalid characters remain
 
     Args:
         identifier: SQL identifier to sanitize (e.g., schema name, table name)
@@ -39,8 +41,22 @@ def sanitize_identifier(identifier: str) -> str:
     Raises:
         ValueError: If identifier contains invalid characters
     """
-    if not re.match(r"^[a-zA-Z0-9_]+$", identifier):
+    # Step 1: Remove leading and trailing whitespace
+    sanitized = identifier.strip()
+
+    # Step 2: Disallow empty identifiers after stripping
+    if not sanitized:
+        raise ValueError("Identifier cannot be empty or only whitespace.")
+
+    # Step 3: Check for invalid characters (allow only letters, digits, underscores)
+    invalid_chars = [c for c in sanitized if not (c.isalnum() or c == "_")]
+    if invalid_chars:
+        invalid_str = "".join(sorted(set(invalid_chars)))
         raise ValueError(
-            f"Invalid identifier: {identifier}. Must contain only alphanumeric characters and underscores."
+            f"Invalid identifier: {identifier}. "
+            f"Contains invalid characters: '{invalid_str}'. "
+            "Identifier must contain only alphanumeric characters and underscores."
         )
-    return identifier
+
+    # Step 4: Return sanitized identifier
+    return sanitized

@@ -165,23 +165,25 @@ class TaskManager:
 
     def _parse_context_id(self, context_id: Any) -> uuid.UUID:
         """Parse and validate context_id, generating a new one if needed.
-        
+
         Fix applied: Handles malformed UUID strings to prevent server crashes (DoS vector).
         """
         if context_id is None:
             return uuid.uuid4()
-            
+
         if isinstance(context_id, uuid.UUID):
             return context_id
-            
+
         if isinstance(context_id, str):
             try:
                 return uuid.UUID(context_id)
             except ValueError:
                 # Log the issue so we know bad data is coming in, but don't crash
-                logger.warning(f"Received malformed context_id: '{context_id}'. Generating new UUID fallback.")
+                logger.warning(
+                    f"Received malformed context_id: '{context_id}'. Generating new UUID fallback."
+                )
                 pass
-                
+
         return uuid.uuid4()
 
     def _jsonrpc_error(
@@ -197,7 +199,7 @@ class TaskManager:
         This DRY approach routes method calls to the correct handler based on method name.
         """
         # --- FIX: Recursion Guard ---
-        # Prevent infinite recursion when accessing internal attributes 
+        # Prevent infinite recursion when accessing internal attributes
         # (like _message_handlers) before they are initialized in __aenter__.
         if name.startswith("_"):
             raise AttributeError(

@@ -1,0 +1,73 @@
+Release: Bug Fixes and Community Contributions
+Version: 2026.8.7
+Date: February 21, 2026
+
+OVERVIEW
+--------
+This release includes important bug fixes for schema management, type checking improvements,
+dependency updates, and several community-contributed example agents. Focus on stability,
+code quality, and expanding the example library.
+
+CHANGES
+-------
+
+Bug Fixes:
+- Fixed schema name truncation logic for DID-based multi-tenancy
+- Fixed type checker error for sys.stdout.reconfigure call
+- Fixed docstring formatting to comply with pydocstyle D209
+- Stabilized task_manager.py
+
+Features & Enhancements:
+- Added paywall example agent demonstrating x402 payment integration
+- Added news summarizer agent with local Ollama and DuckDuckGo integration
+- Added cybersecurity newsletter agent with security hardening
+- Added lightweight in-memory delivery metrics to NotificationService
+- Enhanced health endpoint observability
+- Added early validation for required author field
+- Updated release workflow to use week-based versioning (YYYY.W.D)
+
+Code Quality:
+- Added feedback header to sentry.py
+- Cleaned up whitespace and formatting across multiple files
+- Updated secrets baseline with new line numbers
+- Enhanced PR template with comprehensive review checklist
+- Removed trailing whitespace and sanitized credentials in documentation
+
+Dependency Updates:
+- Updated pydantic: 2.11.3 → 2.12.5 (resolves fastmcp compatibility)
+- Updated requests: 2.32.3 → 2.32.5 (resolves langchain-community compatibility)
+- Updated sqlalchemy: 2.0.44 → 2.0.46
+- Updated tenacity: 8.5.0 → 9.1.4
+- Updated rich: 13.9.4 → 14.3.2
+- Updated uvx requirement: <2.0 → <4.0
+
+Community:
+- Added GitHub Sponsors funding page
+- Multiple community contributions merged (PRs #172, #195, #210, #211, #212, #215)
+
+TESTING
+-------
+✅ All tests passing
+✅ Pre-commit hooks passing
+✅ Schema truncation test fixed and verified
+✅ Type checking errors resolved
+
+CONTRIBUTORS
+------------
+- Raahul Dutta
+- rautsoham03
+- ssjgit08
+- Krushna
+- AseemPrasad
+- Sharda2004196
+- ssjgit08
+- Krushna56
+
+BREAKING CHANGES
+----------------
+None
+
+MIGRATION NOTES
+---------------
+- If upgrading from versions with exact dependency pins, run: uv sync
+- Schema names now correctly truncate to 63 characters (PostgreSQL limit)

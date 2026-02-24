@@ -500,16 +500,12 @@ class AuthSettings(BaseSettings):
         "/.well-known/*",
         "/did/resolve",
         "/agent/info",
+        "/agent/negotiation",
         "/agent/skills",
         "/agent/skills/*",
         "/health",
         "/metrics",
-        "/agent.html",
-        "/chat.html",
-        "/storage.html",
         "/payment-capture",  # x402 payment capture page (browser-based)
-        "/js/*",
-        "/css/*",
     ]
 
     # Permission-based access control
@@ -601,17 +597,12 @@ class HydraSettings(BaseSettings):
         "/.well-known/*",
         "/did/resolve",
         "/agent/info",
+        "/agent/negotiation",
         "/agent/skills",
         "/agent/skills/*",
         "/health",
         "/metrics",
-        "/agent.html",
-        "/chat.html",
-        "/storage.html",
         "/payment-capture",
-        "/js/*",
-        "/css/*",
-        "/docs",
         "/favicon.ico",
         "/oauth/*",  # OAuth callback endpoints
     ]

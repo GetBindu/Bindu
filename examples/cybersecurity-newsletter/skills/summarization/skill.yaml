@@ -1,0 +1,44 @@
+# Summarization Skill
+# Provides text summarization capabilities for cybersecurity news and reports
+
+id: summarization-v1
+name: summarization
+version: 1.0.0
+author: your.email@example.com
+
+description: |
+  Provides intelligent summarization of cybersecurity news, threat reports, and CVE advisories.
+  Use when users need concise summaries of long security documents or news articles.
+
+tags:
+  - summarization
+  - cybersecurity
+  - nlp
+
+input_modes:
+  - text/plain
+  - application/json
+
+output_modes:
+  - text/plain
+  - application/json
+
+examples:
+  - "Summarize the latest ransomware threat report"
+  - "Give me a brief overview of this CVE advisory"
+  - "What are the key takeaways from this security incident?"
+
+requirements:
+  packages: []
+  system: []
+  min_memory_mb: 100
+
+assessment:
+  keywords:
+    - summarize
+    - summary
+    - brief
+    - overview
+    - digest
+    - tldr
+    - key points

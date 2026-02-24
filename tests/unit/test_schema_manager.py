@@ -1,4 +1,3 @@
-import pytest
 from bindu.utils.schema_manager import sanitize_did_for_schema
 
 

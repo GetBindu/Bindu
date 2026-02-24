@@ -1,0 +1,241 @@
+Release: Code Minimization & Observability Refactor
+====================================================
+
+Version: 2026.8.5
+Date: February 19, 2026
+Author: Raahul Dutta
+
+OVERVIEW
+--------
+Major code minimization release focused on removing unused code across the
+codebase, particularly in the observability and extensions modules.
+
+BREAKING CHANGES
+----------------
+⚠️ Removed Sentry wrapper functions from public API
+  - bindu.observability.capture_exception() removed
+  - bindu.observability.capture_message() removed
+  - bindu.observability.set_user() removed
+  - bindu.observability.set_context() removed
+  - bindu.observability.add_breadcrumb() removed
+  - bindu.observability.start_transaction() removed
+
+  Migration: Use sentry_sdk directly if needed:
+    from sentry_sdk import capture_exception, set_user, etc.
+
+⚠️ Removed x402 constants file
+  - bindu/extensions/x402/constants.py deleted
+  - All constants moved to bindu.settings.X402Settings
+
+  Migration: Use app_settings.x402.* instead:
+    from bindu.settings import app_settings
+    app_settings.x402.extension_uri
+    app_settings.x402.meta_status_key
+    app_settings.x402.status_required
+
+⚠️ Removed internal helper methods
+  - DIDAgentExtension._sanitize_did_component() (inlined)
+  - DIDAgentExtension._get_key_paths() (inlined)
+  - DIDAgentExtension._encode_text() (inlined)
+
+  Migration: These were internal methods - no action needed
+
+IMPROVEMENTS
+------------
+🧹 Observability Module Cleanup (~212 lines removed)
+  - Removed 6 unused Sentry wrapper functions (176 lines)
+  - Inlined 3 small helper functions in openinference.py (36 lines)
+  - Simplified __init__.py exports (8 exports → 2 exports)
+  - Kept only production-used functions: setup(), init_sentry()
+
+🔧 X402 Extension Cleanup (~72 lines removed)
+  - Deleted bindu/extensions/x402/constants.py (31 lines)
+  - Removed 3 unused utility functions from utils.py (23 lines):
+    * build_payment_required_metadata()
+    * build_payment_verified_metadata()
+    * merge_task_metadata()
+  - Removed get_agent_extension() from extension.py (18 lines)
+  - Kept production functions: build_payment_completed_metadata(), build_payment_failed_metadata()
+
+⚡ DID Extension Optimization (~13 lines removed)
+  - Inlined _get_key_paths() helper method
+  - Inlined _encode_text() helper method
+  - Inlined _sanitize_did_component() helper method
+  - Simplified get_did_document() implementation
+  - Cleaner, more direct code flow
+
+🧪 Test Suite Cleanup (~232 lines removed)
+  - Deleted tests/unit/test_x402_constants.py (40 lines)
+  - Removed unused function tests from test_x402_utils.py (35 lines)
+  - Removed unused function tests from test_x402_extension.py (11 lines)
+  - Removed Sentry wrapper tests from test_sentry.py (137 lines)
+  - Removed _sanitize_did_component test from test_did_extension.py (9 lines)
+  - All remaining tests passing ✅
+
+🔧 Database Migration Improvements
+  - Fixed Alembic async migration support
+  - Auto-converts postgresql:// to postgresql+asyncpg://
+  - Supports both sync and async PostgreSQL URLs
+  - Better error handling for driver mismatches
+
+📦 Project Cleanup
+  - Removed /postman directory (unused API collection)
+  - Updated .secrets.baseline for code changes
+  - All pre-commit hooks passing
+
+TECHNICAL DETAILS
+-----------------
+Files Modified: 11 files
+  - bindu/observability/sentry.py (176 lines removed)
+  - bindu/observability/openinference.py (36 lines removed)
+  - bindu/observability/__init__.py (simplified exports)
+  - bindu/extensions/x402/utils.py (23 lines removed)
+  - bindu/extensions/x402/extension.py (18 lines removed)
+  - bindu/extensions/did/did_agent_extension.py (13 lines removed)
+  - tests/unit/test_sentry.py (137 lines removed)
+  - tests/unit/test_x402_utils.py (35 lines removed)
+  - tests/unit/test_x402_extension.py (11 lines removed)
+  - tests/unit/test_did_extension.py (9 lines removed)
+  - alembic/env.py (added URL conversion logic)
+
+Files Deleted: 2 files
+  - bindu/extensions/x402/constants.py
+  - tests/unit/test_x402_constants.py
+
+Directories Removed: 1 directory
+  - postman/ (entire directory with API collections)
+
+Code Metrics:
+  Total Lines Removed: ~590+ lines
+  Files Modified: 11
+  Files Deleted: 2
+  Directories Removed: 1
+  Production Functionality: 100% preserved
+  Test Coverage: Maintained
+  Breaking Changes: 3 (all with migration paths)
+
+Observability Module Changes:
+  Before: 8 exports (setup, init_sentry, 6 wrapper functions)
+  After: 2 exports (setup, init_sentry)
+
+  Removed Functions (use sentry_sdk directly if needed):
+    - capture_exception(error, **kwargs)
+    - capture_message(message, level, **kwargs)
+    - set_user(user_id, **kwargs)
+    - set_context(name, data)
+    - add_breadcrumb(message, category, level, data)
+    - start_transaction(name, op)
+
+X402 Settings Migration:
+  Old (constants.py):
+    from bindu.extensions.x402.constants import X402_EXTENSION_URI
+    from bindu.extensions.x402.constants import X402Metadata, X402Status
+
+  New (settings.py):
+    from bindu.settings import app_settings
+    app_settings.x402.extension_uri
+    app_settings.x402.meta_status_key
+    app_settings.x402.status_required
+
+TESTING
+-------
+✅ All unit tests passing
+✅ All integration tests passing
+✅ Pre-commit hooks passing:
+   - pytest (66% coverage maintained)
+   - bandit (security checks)
+   - detect-secrets (baseline updated)
+   - pydocstyle (documentation style)
+   - ruff (linting)
+✅ No regression in existing functionality
+✅ Database migrations working correctly
+
+MIGRATION GUIDE
+---------------
+For applications using removed Sentry wrappers:
+
+1. Replace bindu.observability imports:
+   # Old
+   from bindu.observability import capture_exception, set_user
+
+   # New
+   import sentry_sdk
+   sentry_sdk.capture_exception(error)
+   sentry_sdk.set_user({"id": user_id})
+
+2. Update x402 constants usage:
+   # Old
+   from bindu.extensions.x402.constants import X402_EXTENSION_URI
+
+   # New
+   from bindu.settings import app_settings
+   uri = app_settings.x402.extension_uri
+
+3. No changes needed for:
+   - OpenInference setup (still available)
+   - Sentry initialization (still available)
+   - DID extension (internal changes only)
+   - Database migrations (auto-converts URLs)
+
+For database migrations:
+   # Both formats now work automatically
+   DATABASE_URL=postgresql://<user_id>:<password>@host/db alembic upgrade head
+   DATABASE_URL=postgresql+asyncpg://<user_id>:<password>@host/db alembic upgrade head
+
+COMMIT DETAILS
+--------------
+Key Commits:
+  - 94c850c: refactor: inline helper methods and remove unused Sentry capture functions
+  - d359497: refactor: remove unused helper methods and inline simple operations in DID and x402 extensions
+  - c3f0d8f: chore: update secrets baseline with new line number and generation timestamp
+  - 7faf41e: chore: remove OpenAPI specification file
+  - 5011f38: chore: ignore postman directory and apply code formatting fixes
+
+Related Pull Requests:
+  - #152: Add schema manager tests (RachitU)
+  - #156: Speech-to-text agent example (mandeepsingh2007)
+  - #179: Require author validation (sakeena-7878)
+  - #187: Task manager stabilization (chandan-1427)
+
+BENEFITS
+--------
+✨ Cleaner Codebase
+  - 590+ lines of unused code removed
+  - Simpler module interfaces
+  - Reduced maintenance burden
+
+⚡ Better Performance
+  - Fewer function calls (inlined helpers)
+  - Reduced import overhead
+  - Smaller module footprint
+
+📚 Improved Maintainability
+  - Less code to understand and maintain
+  - Clearer separation of concerns
+  - Better alignment with actual usage
+
+🔒 Enhanced Security
+  - Fewer unused code paths
+  - Reduced attack surface
+  - Updated secrets baseline
+
+USAGE WITH GIT
+--------------
+# Create an annotated tag
+git tag -a 2026.7.4 -F release-notes/2026.7.4.txt
+
+# Create a GitHub release
+gh release create 2026.7.4 \
+  --notes-file release-notes/2026.7.4.txt \
+  --title "2026.7.4: Code Minimization & Observability Refactor"
+
+# View this release
+git show 2026.7.4
+
+# Push tag to remote
+git push origin 2026.7.4
+
+ACKNOWLEDGMENTS
+---------------
+Thanks to all contributors who helped identify unused code and improve
+the codebase quality through testing and code reviews.
