@@ -270,6 +270,48 @@ class InMemoryStorage(Storage[ContextT]):
 
         return task
 
+    async def append_artifact_chunk(
+        self, task_id: UUID, artifact: Artifact
+    ) -> None:
+        """Append an artifact chunk during streaming.
+
+        If an artifact with the same artifact_id already exists,
+        appends the new parts to it. Otherwise, creates a new artifact entry.
+
+        Args:
+            task_id: Task to append the artifact chunk to
+            artifact: Artifact chunk with parts to append
+
+        Raises:
+            TypeError: If task_id is not UUID
+            KeyError: If task not found
+        """
+        if not isinstance(task_id, UUID):
+            raise TypeError(f"task_id must be UUID, got {type(task_id).__name__}")
+
+        if task_id not in self.tasks:
+            raise KeyError(f"Task {task_id} not found")
+
+        task = self.tasks[task_id]
+        if "artifacts" not in task:
+            task["artifacts"] = []
+
+        # Find existing artifact with same artifact_id
+        existing = None
+        for a in task["artifacts"]:
+            if a.get("artifact_id") == artifact.get("artifact_id"):
+                existing = a
+                break
+
+        if existing is not None:
+            # Append parts to existing artifact
+            if "parts" not in existing:
+                existing["parts"] = []
+            existing["parts"].extend(artifact.get("parts", []))
+        else:
+            # Create new artifact entry
+            task["artifacts"].append(dict(artifact))
+
     async def update_context(self, context_id: UUID, context: ContextT) -> None:
         """Store or update context metadata.
 

@@ -191,7 +191,7 @@ def track_active_task(func: F) -> F:
         operation = getattr(func, "__name__", "unknown")
 
         # Increment active tasks for creation operations
-        if operation in ["send_message"]:
+        if operation in ["send_message", "stream_message"]:
             active_tasks.add(1, {"operation": "create"})
 
         try:
@@ -205,7 +205,7 @@ def track_active_task(func: F) -> F:
 
         except Exception:
             # Decrement on error for creation operations
-            if operation in ["send_message"]:
+            if operation in ["send_message", "stream_message"]:
                 active_tasks.add(-1, {"operation": "error"})
             raise
 
