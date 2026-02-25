@@ -33,6 +33,12 @@ class MemoryBackend(RateLimitBackend):
     """
 
     def __init__(self, cleanup_interval: int = 512) -> None:
+        """Initialize an in-memory counter store.
+
+        Args:
+            cleanup_interval: Number of increment operations between
+                opportunistic cleanup passes for expired keys.
+        """
         self._counters: dict[str, tuple[int, int]] = {}
         self._lock = asyncio.Lock()
         # Opportunistically clear expired keys to avoid unbounded map growth.
@@ -47,6 +53,15 @@ class MemoryBackend(RateLimitBackend):
             self._counters.pop(key, None)
 
     async def increment(self, key: str, window_seconds: int) -> tuple[int, int]:
+        """Increment a counter and return current count with reset timestamp.
+
+        Args:
+            key: Counter key scoped by policy and client identifier.
+            window_seconds: Duration of the fixed window.
+
+        Returns:
+            Tuple of `(count, reset_at_epoch_seconds)`.
+        """
         now = int(time.time())
         async with self._lock:
             self._ops_since_cleanup += 1
@@ -68,11 +83,13 @@ class RedisBackend(RateLimitBackend):
     """Redis-backed rate limit backend for distributed deployments."""
 
     def __init__(self, redis_url: str) -> None:
+        """Create a Redis client for distributed rate limit counters."""
         import redis.asyncio as redis
 
         self._redis = redis.from_url(redis_url, encoding="utf-8", decode_responses=True)
 
     async def increment(self, key: str, window_seconds: int) -> tuple[int, int]:
+        """Increment a Redis counter and return count with reset timestamp."""
         now = int(time.time())
         count = int(await self._redis.incr(key))
         if count == 1:
@@ -90,6 +107,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     """HTTP rate limiter with endpoint-specific policies."""
 
     def __init__(self, app) -> None:
+        """Initialize middleware and select backend from app settings."""
         super().__init__(app)
         self._config = app_settings.rate_limit
         self._backend = self._create_backend() if self._config.enabled else None
@@ -163,6 +181,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         )
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        """Apply per-endpoint rate limits and continue request processing."""
         if not self._config.enabled or self._backend is None:
             return await call_next(request)
 
