@@ -534,6 +534,15 @@ class BinduApplication(Starlette):
             middleware_list.insert(0, cors_middleware)
             logger.info("CORS middleware added to position 0 in middleware chain")
 
+        # Add rate limit middleware near the edge to reject abusive traffic early
+        if app_settings.rate_limit.enabled:
+            from .middleware import RateLimitMiddleware
+
+            rate_limit_middleware = Middleware(RateLimitMiddleware)
+            insert_index = 1 if cors_origins else 0
+            middleware_list.insert(insert_index, rate_limit_middleware)
+            logger.info("Rate limiting middleware enabled")
+
         # Add X402 middleware if configured
         if x402_ext and payment_requirements:
             from .middleware import X402Middleware

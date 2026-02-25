@@ -934,6 +934,44 @@ class SentrySettings(BaseSettings):
     debug: bool = False
 
 
+class RateLimitSettings(BaseSettings):
+    """HTTP rate limiting configuration settings."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="RATE_LIMIT__",
+        extra="allow",
+    )
+
+    # Enable/disable rate limiting middleware
+    enabled: bool = False
+
+    # Backend: memory (single-process) or redis (multi-process)
+    backend: Literal["memory", "redis"] = "memory"
+    redis_url: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("RATE_LIMIT__REDIS_URL", "REDIS_URL"),
+    )
+
+    # Shared window configuration
+    window_seconds: int = 60
+
+    # Endpoint-specific limits (requests per window)
+    default_limit: int = 120
+    a2a_limit: int = 30
+    negotiation_limit: int = 20
+    payment_session_limit: int = 10
+    payment_status_limit: int = 30
+    health_limit: int = 120
+    metrics_limit: int = 60
+
+    # If true, use first IP in X-Forwarded-For instead of request.client.host
+    trust_x_forwarded_for: bool = False
+
+    # If backend is unavailable, allow request to proceed
+    fail_open: bool = True
+
+
 class Settings(BaseSettings):
     """Main settings class that aggregates all configuration components."""
 
@@ -961,6 +999,7 @@ class Settings(BaseSettings):
     retry: RetrySettings = RetrySettings()
     negotiation: NegotiationSettings = NegotiationSettings()
     sentry: SentrySettings = SentrySettings()
+    rate_limit: RateLimitSettings = RateLimitSettings()
 
 
 app_settings = Settings()

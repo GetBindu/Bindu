@@ -22,6 +22,7 @@ from bindu.common.models import (
     SchedulerConfig,
     TelemetryConfig,
 )
+from bindu.settings import app_settings
 
 
 class TestBinduApplicationInit:
@@ -104,6 +105,17 @@ class TestBinduApplicationInit:
         app = BinduApplication(debug=True, manifest=mock_manifest)
 
         assert app.debug is True
+
+    def test_init_with_rate_limit_enabled(self, mock_manifest):
+        """Test initialization when rate limiting is enabled."""
+        original_enabled = app_settings.rate_limit.enabled
+        app_settings.rate_limit.enabled = True
+        try:
+            app = BinduApplication(manifest=mock_manifest)
+            middleware_names = [m.cls.__name__ for m in app.user_middleware]
+            assert "RateLimitMiddleware" in middleware_names
+        finally:
+            app_settings.rate_limit.enabled = original_enabled
 
 
 class TestBinduApplicationRoutes:
