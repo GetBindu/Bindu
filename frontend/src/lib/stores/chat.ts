@@ -131,7 +131,6 @@ export async function loadContexts() {
 export async function switchContext(ctxId: string) {
   try {
     console.log('=== SWITCH CONTEXT START ===', ctxId);
-    clearMessages();
     contextId.set(ctxId);
     console.log('Context ID set to:', ctxId);
 
@@ -141,6 +140,7 @@ export async function switchContext(ctxId: string) {
 
     if (!selectedContext || !selectedContext.taskIds || selectedContext.taskIds.length === 0) {
       console.log('No context or no tasks found');
+      clearMessages();
       return;
     }
 
@@ -164,8 +164,9 @@ export async function switchContext(ctxId: string) {
       return timeA - timeB;
     });
 
+    // Build new messages array first
+    const newMessages: DisplayMessage[] = [];
     console.log('Processing task history into messages...');
-    let messageCount = 0;
     for (const task of contextTasks) {
       const history = task.history || [];
       for (const msg of history) {
@@ -178,14 +179,21 @@ export async function switchContext(ctxId: string) {
           const text = textParts.join('\n');
           const sender = msg.role === 'user' ? 'user' : 'assistant';
           const state = sender === 'assistant' ? task.status.state : undefined;
-          addMessage(text, sender, task.id, state);
-          messageCount++;
+          newMessages.push({
+            id: generateUUID(),
+            text,
+            role: sender,
+            taskId: task.id,
+            state,
+            timestamp: Date.now()
+          });
         }
       }
     }
 
-    console.log('Added', messageCount, 'messages to display');
-    console.log('Current messages store length:', get(messages).length);
+    // Replace all messages at once to avoid flicker
+    messages.set(newMessages);
+    console.log('Set', newMessages.length, 'messages to display');
 
     if (contextTasks.length > 0) {
       const lastTask = contextTasks[contextTasks.length - 1];
