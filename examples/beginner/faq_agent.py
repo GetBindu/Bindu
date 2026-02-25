@@ -54,6 +54,10 @@ def handler(messages: list[dict[str, str]]):
     """
     result = agent.run(input=messages)
     return result
+
+# Get port from environment variable, default to 3773
+port = os.getenv("PORT", "3773")
+
 # ---------------------------------------------------------------------------
 # Bindu config
 # ---------------------------------------------------------------------------
@@ -62,7 +66,7 @@ config = {
     "name": "bindu_docs_agent",
     "description": "Answers questions about Bindu documentation",
     "deployment": {
-        "url": "http://localhost:3773",
+        "url": f"http://localhost:{port}",
         "expose": True,
         "cors_origins": ["http://localhost:5173"]
     },
