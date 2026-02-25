@@ -203,3 +203,5 @@ bindu/penguin/.bindu/public.pem
 .bindu/
 
 postman/*
+
+.vscode/
