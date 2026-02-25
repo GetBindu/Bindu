@@ -45,6 +45,10 @@ class ConfigValidator:
         "oltp_batch_schedule_delay_millis": 5000,
         "oltp_batch_max_export_batch_size": 512,
         "oltp_batch_export_timeout_millis": 30000,
+        "security": {
+            "mtls_enabled": False,
+            "require_client_cert": False
+        },
     }
 
     # Required fields that must be present
@@ -109,10 +113,13 @@ class ConfigValidator:
         if config.get("auth"):
             cls._validate_auth_config(config["auth"])
 
-        # Process OLTP configuration only if telemetry is enabled
         if config.get("telemetry"):
             cls._process_oltp_config(config)
 
+        # Validate security configuration
+        if config.get("security"):
+            cls._validate_security_config(config["security"])
+            
         return config
 
     @classmethod
@@ -282,6 +289,26 @@ class ConfigValidator:
                     f"Invalid Hydra agent_client_prefix: '{prefix}'. "
                     f"Expected non-empty string"
                 )
+
+            if not isinstance(prefix, str) or not prefix:
+                raise ValueError(
+                    f"Invalid Hydra agent_client_prefix: '{prefix}'. "
+                    f"Expected non-empty string"
+                )
+
+    @classmethod
+    def _validate_security_config(cls, sec_config: Dict[str, Any]) -> None:
+        """Validate security configuration."""
+        if not isinstance(sec_config, dict):
+            raise ValueError("Field 'security' must be a dictionary")
+            
+        if "mtls_enabled" in sec_config:
+            if not isinstance(sec_config["mtls_enabled"], bool):
+                raise ValueError("security.mtls_enabled must be a boolean")
+                
+        if "require_client_cert" in sec_config:
+            if not isinstance(sec_config["require_client_cert"], bool):
+                raise ValueError("security.require_client_cert must be a boolean")
 
     @classmethod
     def _process_oltp_config(cls, config: Dict[str, Any]) -> None:
