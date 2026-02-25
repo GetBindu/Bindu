@@ -14,6 +14,7 @@ Usage:
 
 Environment:
     Requires OPENROUTER_API_KEY in .env file
+    PORT: Agent server port (default: 3773)
 """
 
 import os
@@ -42,6 +43,8 @@ agent = Agent(
     tools=[DuckDuckGoTools()],  # optional: for topical or trending jokes
 )
 
+# Get port from environment variable, default to 3773
+port = os.getenv("PORT", "3773")
 
 # Configuration
 # Note: Infrastructure configs (storage, scheduler, sentry, API keys) are now
@@ -51,7 +54,7 @@ config = {
     "name": "joke_agent",
     "description": "A research assistant agent",
     "deployment": {
-            "url": "http://localhost:3773",
+            "url": f"http://localhost:{port}",
             "expose": True,
             "cors_origins": ["http://localhost:5173"]
         },
