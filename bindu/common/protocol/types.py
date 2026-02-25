@@ -1417,6 +1417,25 @@ TaskImmutableError = JSONRPCError[
     ],
 ]
 
+# Pause/Resume errors (-32040 to -32041)
+# Bindu extension for task suspension and resumption
+TaskNotPausableError = JSONRPCError[
+    Literal[-32040],
+    Literal[
+        "This task cannot be paused in its current state. "
+        "Only tasks in 'submitted', 'working', or 'input-required' state can be paused. "
+        "See task lifecycle: /docs/tasks"
+    ],
+]
+TaskNotResumableError = JSONRPCError[
+    Literal[-32041],
+    Literal[
+        "This task cannot be resumed in its current state. "
+        "Only tasks in 'suspended' state can be resumed. "
+        "See task lifecycle: /docs/tasks"
+    ],
+]
+
 # Authentication errors (-32009 to -32015)
 # Bindu-specific authentication extensions
 AuthenticationRequiredError = JSONRPCError[
@@ -1499,6 +1518,16 @@ CancelTaskResponse = JSONRPCResponse[
     Task, Union[TaskNotCancelableError, TaskNotFoundError]
 ]
 
+PauseTaskRequest = JSONRPCRequest[Literal["tasks/pause"], TaskIdParams]
+PauseTaskResponse = JSONRPCResponse[
+    Task, Union[TaskNotPausableError, TaskNotFoundError]
+]
+
+ResumeTaskRequest = JSONRPCRequest[Literal["tasks/resume"], TaskIdParams]
+ResumeTaskResponse = JSONRPCResponse[
+    Task, Union[TaskNotResumableError, TaskNotFoundError]
+]
+
 ListTasksRequest = JSONRPCRequest[Literal["tasks/list"], ListTasksParams]
 ListTasksResponse = JSONRPCResponse[
     List[Task], Union[TaskNotFoundError, TaskNotCancelableError]
@@ -1557,6 +1586,8 @@ A2ARequest = Annotated[
         StreamMessageRequest,
         GetTaskRequest,
         CancelTaskRequest,
+        PauseTaskRequest,
+        ResumeTaskRequest,
         ListTasksRequest,
         TaskFeedbackRequest,
         ListContextsRequest,
@@ -1575,6 +1606,8 @@ A2AResponse: TypeAlias = Union[
     StreamMessageResponse,
     GetTaskResponse,
     CancelTaskResponse,
+    PauseTaskResponse,
+    ResumeTaskResponse,
     ListTasksResponse,
     TaskFeedbackResponse,
     ListContextsResponse,
