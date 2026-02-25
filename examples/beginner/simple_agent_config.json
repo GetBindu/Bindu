@@ -37,6 +37,7 @@
     "enabled": false
   },
   "deployment": {
+    "_comment": "Port can be configured via PORT environment variable (default: 3773)",
     "url": "http://localhost:3773",
     "expose": true,
     "protocol_version": "1.0.0",
