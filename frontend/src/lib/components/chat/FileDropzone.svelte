@@ -62,7 +62,7 @@
 
 						// if file is bigger than 10MB abort
 						if (file.size > 10 * 1024 * 1024) {
-							setErrorMsg("Some file is too big. (10MB max)");
+							setErrorMsg("File too large. Maximum size is 10 MB.");
 							files = [];
 							return;
 						}
