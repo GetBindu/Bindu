@@ -8,7 +8,7 @@ Example agents demonstrating Bindu's capabilities - from simple bots to multi-ag
 - Python 3.12+
 - uv package manager
 - OpenRouter API key (required for cloud-model examples)
-- Ollama (optional, for local examples like `ollama-llama3-local/`)
+- Ollama (optional, for local examples like `news-summarizer/`)
 
 ### Setup
 
@@ -45,7 +45,7 @@ Agents run on ports 3773-3780 with UI at `http://localhost:[port]/docs`
 
 ### Specialized
 - `summarizer/` - Text summarization agent
-- `ollama-llama3-local/` - Local Llama 3 agent via Ollama + Bindu JSON-RPC
+- `openrouter-meeting-brief/` - OpenRouter meeting-brief agent with structured action extraction
 - `weather-research/` - Weather intelligence agent
 - `premium-advisor/` - Paid agent with X402 payments (0.01 USDC per query)
 

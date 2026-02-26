@@ -1,0 +1,34 @@
+id: meeting-briefing-skill
+name: Meeting Briefing Skill
+version: 1.0.0
+author: your.email@example.com
+description: |
+  Converts raw meeting notes into clear operational outputs:
+  summary, action items, risks, and recommended next steps.
+tags:
+  - meetings
+  - summarization
+  - action-items
+  - project-management
+input_modes:
+  - application/json
+  - text/plain
+output_modes:
+  - application/json
+  - text/plain
+examples:
+  - "Summarize these sprint planning notes and list action items."
+  - "Extract owners and due dates from this meeting transcript."
+capabilities_detail:
+  meeting_summary:
+    supported: true
+    description: "Produces concise 3-5 bullet summaries."
+  action_item_extraction:
+    supported: true
+    description: "Extracts tasks with owner and due date."
+  risk_identification:
+    supported: true
+    description: "Flags blockers, dependencies, and delivery risks."
+  next_step_recommendations:
+    supported: true
+    description: "Suggests immediate practical next steps."

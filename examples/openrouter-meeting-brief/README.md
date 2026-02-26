@@ -1,27 +1,22 @@
-# Local Llama 3 Agent (Ollama + Bindu)
+# Meeting Brief Agent (OpenRouter + Bindu)
 
-This example runs a **locally hosted Llama 3 model** via Ollama and exposes it as a **Bindu-compatible JSON-RPC agent**.
+This example uses **OpenRouter** and exposes a focused, Bindu-compatible JSON-RPC agent that turns meeting notes into practical outputs.
 
 ## Why this example
 
-- Uses local inference (`ollama`) instead of cloud APIs
-- Integrates with Bindu's protocol surface (`message/send`, `tasks/get`)
-- Demonstrates structured JSON-RPC requests (not plain text prompts)
+- Uses `OPENROUTER_API_KEY`
+- Produces useful structured output (summary, actions, risks, next steps)
+- Uses Bindu JSON-RPC methods (`message/send`, `tasks/get`)
 
 ## Prerequisites
 
 - Python 3.12+
-- [Ollama](https://ollama.com/) installed and running
-- Llama 3 model pulled locally
+- OpenRouter API key
+
+Create env file:
 
 ```bash
-ollama pull llama3
-```
-
-Optional environment overrides:
-
-```bash
-cp examples/ollama-llama3-local/.env.example .env
+cp examples/openrouter-meeting-brief/.env.example .env
 ```
 
 ## Run
@@ -29,7 +24,7 @@ cp examples/ollama-llama3-local/.env.example .env
 From repository root:
 
 ```bash
-uv run python examples/ollama-llama3-local/llama3_ollama_agent.py
+uv run python examples/openrouter-meeting-brief/meeting_brief_agent.py
 ```
 
 The agent starts at `http://localhost:3773`.
@@ -47,7 +42,7 @@ curl -X POST http://localhost:3773/ \
     "params": {
       "message": {
         "role": "user",
-        "parts": [{"kind": "text", "text": "Explain retrieval-augmented generation in simple terms."}],
+        "parts": [{"kind": "text", "text": "Meeting notes: Priya will finalize dashboard copy by Friday. Arjun needs API latency data before QA sign-off. Release target is next Wednesday. Risk: staging instability."}],
         "kind": "message",
         "messageId": "msg-001",
         "contextId": "ctx-001",
