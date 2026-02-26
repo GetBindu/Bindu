@@ -51,6 +51,7 @@
 
 - **Python 3.12 或更高版本** - [在此下载](https://www.python.org/downloads/)
 - **UV Package Manager** - [安装指南](https://github.com/astral-sh/uv)
+- **需要 API Key**：请在环境变量中设置 `OPENROUTER_API_KEY` 或 `OPENAI_API_KEY`。测试可使用免费的 OpenRouter 模型。
 
 ### 验证您的设置
 

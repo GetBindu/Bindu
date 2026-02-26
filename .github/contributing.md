@@ -280,6 +280,9 @@ pytest -n auto
 
 # Run with verbose output
 pytest -v
+
+# Check localized README consistency
+python scripts/check_readme_consistency.py
 ```
 
 

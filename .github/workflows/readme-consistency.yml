@@ -1,0 +1,34 @@
+name: README Consistency
+
+on:
+  pull_request:
+    paths:
+      - "README*.md"
+      - "bindu/utils/readme_consistency.py"
+      - "scripts/check_readme_consistency.py"
+      - ".github/workflows/readme-consistency.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "README*.md"
+      - "bindu/utils/readme_consistency.py"
+      - "scripts/check_readme_consistency.py"
+      - ".github/workflows/readme-consistency.yml"
+  workflow_dispatch:
+
+jobs:
+  verify-readme-consistency:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Run README consistency checker
+        run: python scripts/check_readme_consistency.py

@@ -51,6 +51,7 @@ Antes de instalar Bindu, asegúrate de tener:
 
 - **Python 3.12 o superior** - [Descarga aquí](https://www.python.org/downloads/)
 - **UV Package Manager** - [Guía de instalación](https://github.com/astral-sh/uv)
+- **Se requiere API Key**: configura `OPENROUTER_API_KEY` o `OPENAI_API_KEY` en tus variables de entorno. Hay modelos gratuitos de OpenRouter disponibles para pruebas.
 
 ### Verifica tu configuración
 

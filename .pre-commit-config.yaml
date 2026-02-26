@@ -19,6 +19,13 @@ repos:
 
   - repo: local
     hooks:
+      - id: readme-consistency
+        name: readme consistency checker
+        entry: python scripts/check_readme_consistency.py
+        language: system
+        pass_filenames: false
+        files: ^(README.*\.md|bindu/utils/readme_consistency\.py|scripts/check_readme_consistency\.py)$
+
       - id: ty
         name: ty type checker
         entry: uv run ty check bindu/ tests/
