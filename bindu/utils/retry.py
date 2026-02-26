@@ -55,6 +55,76 @@ TRANSIENT_EXCEPTIONS = (
 )
 
 
+def _create_retry_decorator(
+    operation_type: str,
+    use_jitter: bool,
+    log_prefix: str,
+) -> Callable[[F], F]:
+    """Generic retry decorator factory.
+
+    Creates retry decorators with configurable settings and wait strategies.
+
+    Args:
+        operation_type: Type of operation (worker, storage, scheduler, api)
+        use_jitter: Whether to use random exponential backoff (jitter)
+        log_prefix: Prefix for log messages
+
+    Returns:
+        Decorator function with retry logic
+    """
+
+    def decorator(
+        max_attempts: int | None = None,
+        min_wait: float | None = None,
+        max_wait: float | None = None,
+    ) -> Callable[[F], F]:
+        def inner(func: F) -> F:
+            @wraps(func)
+            async def wrapper(*args: Any, **kwargs: Any) -> Any:
+                # Get settings from app_settings.retry
+                retry_settings = app_settings.retry
+                _max_attempts = max_attempts or getattr(
+                    retry_settings, f"{operation_type}_max_attempts"
+                )
+                _min_wait = min_wait or getattr(
+                    retry_settings, f"{operation_type}_min_wait"
+                )
+                _max_wait = max_wait or getattr(
+                    retry_settings, f"{operation_type}_max_wait"
+                )
+
+                # Choose wait strategy
+                if use_jitter:
+                    wait_strategy = wait_random_exponential(
+                        multiplier=1, min=_min_wait, max=_max_wait
+                    )
+                else:
+                    wait_strategy = wait_exponential(
+                        multiplier=1, min=_min_wait, max=_max_wait
+                    )
+
+                async for attempt in AsyncRetrying(
+                    stop=stop_after_attempt(_max_attempts),
+                    wait=wait_strategy,
+                    retry=retry_if_exception_type(TRANSIENT_EXCEPTIONS),
+                    before_sleep=before_sleep_log(logger, logging.WARNING),
+                    after=after_log(logger, logging.INFO),
+                    reraise=True,
+                ):
+                    with attempt:
+                        logger.debug(
+                            f"Executing {log_prefix} {func.__name__} "  # type: ignore[attr-defined]
+                            f"(attempt {attempt.retry_state.attempt_number}/{_max_attempts})"
+                        )
+                        return await func(*args, **kwargs)
+
+            return wrapper  # type: ignore
+
+        return inner
+
+    return decorator
+
+
 def retry_worker_operation(
     max_attempts: int | None = None,
     min_wait: float | None = None,
@@ -79,33 +149,9 @@ def retry_worker_operation(
             # Task execution logic
             pass
     """
-
-    def decorator(func: F) -> F:
-        @wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> Any:
-            _max_attempts = max_attempts or app_settings.retry.worker_max_attempts
-            _min_wait = min_wait or app_settings.retry.worker_min_wait
-            _max_wait = max_wait or app_settings.retry.worker_max_wait
-
-            async for attempt in AsyncRetrying(
-                stop=stop_after_attempt(_max_attempts),
-                wait=wait_random_exponential(
-                    multiplier=1, min=_min_wait, max=_max_wait
-                ),
-                retry=retry_if_exception_type(TRANSIENT_EXCEPTIONS),
-                before_sleep=before_sleep_log(logger, logging.WARNING),
-                after=after_log(logger, logging.INFO),
-                reraise=True,
-            ):
-                with attempt:
-                    logger.debug(
-                        f"Executing {func.__name__} (attempt {attempt.retry_state.attempt_number}/{_max_attempts})"  # type: ignore[attr-defined]
-                    )
-                    return await func(*args, **kwargs)
-
-        return wrapper  # type: ignore
-
-    return decorator
+    return _create_retry_decorator("worker", True, "")(
+        max_attempts, min_wait, max_wait
+    )
 
 
 def retry_storage_operation(
@@ -131,32 +177,9 @@ def retry_storage_operation(
             # Database update logic
             pass
     """
-
-    def decorator(func: F) -> F:
-        @wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> Any:
-            _max_attempts = max_attempts or app_settings.retry.storage_max_attempts
-            _min_wait = min_wait or app_settings.retry.storage_min_wait
-            _max_wait = max_wait or app_settings.retry.storage_max_wait
-
-            async for attempt in AsyncRetrying(
-                stop=stop_after_attempt(_max_attempts),
-                wait=wait_exponential(multiplier=1, min=_min_wait, max=_max_wait),
-                retry=retry_if_exception_type(TRANSIENT_EXCEPTIONS),
-                before_sleep=before_sleep_log(logger, logging.WARNING),
-                after=after_log(logger, logging.INFO),
-                reraise=True,
-            ):
-                with attempt:
-                    logger.debug(
-                        f"Executing storage operation {func.__name__} "  # type: ignore[attr-defined]
-                        f"(attempt {attempt.retry_state.attempt_number}/{_max_attempts})"
-                    )
-                    return await func(*args, **kwargs)
-
-        return wrapper  # type: ignore
-
-    return decorator
+    return _create_retry_decorator("storage", False, "storage operation")(
+        max_attempts, min_wait, max_wait
+    )
 
 
 def retry_scheduler_operation(
@@ -182,34 +205,9 @@ def retry_scheduler_operation(
             # Scheduler logic
             pass
     """
-
-    def decorator(func: F) -> F:
-        @wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> Any:
-            _max_attempts = max_attempts or app_settings.retry.scheduler_max_attempts
-            _min_wait = min_wait or app_settings.retry.scheduler_min_wait
-            _max_wait = max_wait or app_settings.retry.scheduler_max_wait
-
-            async for attempt in AsyncRetrying(
-                stop=stop_after_attempt(_max_attempts),
-                wait=wait_random_exponential(
-                    multiplier=1, min=_min_wait, max=_max_wait
-                ),
-                retry=retry_if_exception_type(TRANSIENT_EXCEPTIONS),
-                before_sleep=before_sleep_log(logger, logging.WARNING),
-                after=after_log(logger, logging.INFO),
-                reraise=True,
-            ):
-                with attempt:
-                    logger.debug(
-                        f"Executing scheduler operation {func.__name__} "  # type: ignore[attr-defined]
-                        f"(attempt {attempt.retry_state.attempt_number}/{_max_attempts})"
-                    )
-                    return await func(*args, **kwargs)
-
-        return wrapper  # type: ignore
-
-    return decorator
+    return _create_retry_decorator("scheduler", True, "scheduler operation")(
+        max_attempts, min_wait, max_wait
+    )
 
 
 def retry_api_call(
@@ -235,34 +233,9 @@ def retry_api_call(
             # API call logic
             pass
     """
-
-    def decorator(func: F) -> F:
-        @wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> Any:
-            _max_attempts = max_attempts or app_settings.retry.api_max_attempts
-            _min_wait = min_wait or app_settings.retry.api_min_wait
-            _max_wait = max_wait or app_settings.retry.api_max_wait
-
-            async for attempt in AsyncRetrying(
-                stop=stop_after_attempt(_max_attempts),
-                wait=wait_random_exponential(
-                    multiplier=1, min=_min_wait, max=_max_wait
-                ),
-                retry=retry_if_exception_type(TRANSIENT_EXCEPTIONS),
-                before_sleep=before_sleep_log(logger, logging.WARNING),
-                after=after_log(logger, logging.INFO),
-                reraise=True,
-            ):
-                with attempt:
-                    logger.debug(
-                        f"Executing API call {func.__name__} "  # type: ignore[attr-defined]
-                        f"(attempt {attempt.retry_state.attempt_number}/{_max_attempts})"
-                    )
-                    return await func(*args, **kwargs)
-
-        return wrapper  # type: ignore
-
-    return decorator
+    return _create_retry_decorator("api", True, "API call")(
+        max_attempts, min_wait, max_wait
+    )
 
 
 def is_retryable_error(exception: Exception) -> bool:
