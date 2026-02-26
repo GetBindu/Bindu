@@ -14,7 +14,7 @@ Example agents demonstrating Bindu's capabilities - from simple bots to multi-ag
 ```bash
 git clone https://github.com/getbindu/bindu.git
 cd bindu
-uv sync --dev
+uv sync --dev --extra agents
 export OPENROUTER_API_KEY="your-key-here"  # pragma: allowlist secret
 ```
 
