@@ -23,7 +23,7 @@
 
 	async function dropHandle(event: DragEvent) {
 		event.preventDefault();
-		if (!requireAuthUser()) {
+		if (requireAuthUser()) {
 			authError = true;
 			onerror?.("You must be signed in to upload files.");
 			return;

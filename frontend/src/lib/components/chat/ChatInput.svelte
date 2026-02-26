@@ -54,7 +54,7 @@
 	}: Props = $props();
 
 	const onFileChange = async (e: Event) => {
-		if (!requireAuthUser()) {
+		if (requireAuthUser()) {
 			onerror?.("You must be signed in to upload files.");
 			return;
 		}
