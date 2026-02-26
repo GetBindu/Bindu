@@ -48,6 +48,7 @@ config = {
     "author": "maintainer@getbindu.com",
     "name": "issue_triager",
     "description": "Automates issue triage for the Bindu repository to help manage the 7,000+ applicant influx.",
+    "skills": ["skills/issue-analyzer"],
     "deployment": {
         "url": "http://localhost:8000",
         "env_vars": {"OPENAI_API_KEY": "env"},
