@@ -33,6 +33,7 @@
 		onPaste?: (e: ClipboardEvent) => void;
 		focused?: boolean;
 		onsubmit?: () => void;
+		onerror?: (msg: string) => void;
 	}
 
 	let {
@@ -49,13 +50,43 @@
 		onPaste,
 		focused = $bindable(false),
 		onsubmit,
+		onerror,
 	}: Props = $props();
 
 	const onFileChange = async (e: Event) => {
-		if (!e.target) return;
+		if (!requireAuthUser()) {
+			onerror?.("You must be signed in to upload files.");
+			return;
+		}
 		const target = e.target as HTMLInputElement;
 		const selected = Array.from(target.files ?? []);
 		if (selected.length === 0) return;
+
+		for (const file of selected) {
+			// MIME check (same wildcard logic as FileDropzone)
+			if (
+				mimeTypes.length > 0 &&
+				!mimeTypes.some((mimeType: string) => {
+					const [type, subtype] = mimeType.split("/");
+					const [fileType, fileSubtype] = file.type.split("/");
+					return (
+						(type === "*" || type === fileType) &&
+						(subtype === "*" || subtype === fileSubtype)
+					);
+				})
+			) {
+				onerror?.(
+					`File type not supported. Allowed: ${mimeTypes.join(", ")}. Got: ${file.type}`
+				);
+				return;
+			}
+			// Size check
+			if (file.size > 10 * 1024 * 1024) {
+				onerror?.("File too large. Maximum size is 10 MB.");
+				return;
+			}
+		}
+
 		files = [...files, ...selected];
 		await tick();
 		void focusTextarea();
