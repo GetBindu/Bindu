@@ -8,6 +8,7 @@
 		mimeTypes?: string[];
 		onDrag?: boolean;
 		onDragInner?: boolean;
+		onerror?: (msg: string) => void;
 	}
 
 	let {
@@ -15,11 +16,19 @@
 		mimeTypes = [],
 		onDrag = $bindable(false),
 		onDragInner = $bindable(false),
+		onerror,
 	}: Props = $props();
+
+	let authError = $state(false);
 
 	async function dropHandle(event: DragEvent) {
 		event.preventDefault();
-		if (!requireAuthUser() && event.dataTransfer && event.dataTransfer.items) {
+		if (!requireAuthUser()) {
+			authError = true;
+			return;
+		}
+		authError = false;
+		if (event.dataTransfer && event.dataTransfer.items) {
 			// Use DataTransferItemList interface to access the file(s)
 			if (files.length > 0) {
 				files = [];
@@ -70,7 +79,7 @@
 
 	function setErrorMsg(errorMsg: string) {
 		onDrag = false;
-		alert(errorMsg);
+		onerror?.(errorMsg);
 	}
 </script>
 
@@ -89,4 +98,7 @@
 >
 	<CarbonImage class="text-xl" />
 	<p>Drop File to add to chat</p>
+	{#if authError}
+		<p class="mt-1 text-xs text-red-500">You must be signed in to upload files.</p>
+	{/if}
 </div>
