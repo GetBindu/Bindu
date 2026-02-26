@@ -25,6 +25,7 @@
 		event.preventDefault();
 		if (!requireAuthUser()) {
 			authError = true;
+			onerror?.("You must be signed in to upload files.");
 			return;
 		}
 		authError = false;
@@ -88,7 +89,7 @@
 	role="form"
 	ondrop={dropHandle}
 	ondragenter={() => (onDragInner = true)}
-	ondragleave={() => (onDragInner = false)}
+	ondragleave={() => { onDragInner = false; authError = false; }}
 	ondragover={(e) => {
 		e.preventDefault();
 	}}
