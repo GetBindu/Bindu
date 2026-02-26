@@ -66,27 +66,27 @@ Three ready-to-use middleware components:
 
 ## Key Features
 
-### ✅ Production-Ready
+### Production-Ready
 - Comprehensive error handling
 - Memory-safe with cleanup mechanisms
 - Configurable for different scales
 
-### ✅ Per-Agent Rate Limiting
+### Per-Agent Rate Limiting
 - Extracts identifier from X-Agent-ID header
 - Falls back to Bearer token or IP address
 - Prevents one agent from affecting others
 
-### ✅ Proper HTTP Status Codes
+### Proper HTTP Status Codes
 - 429 Too Many Requests when rate limited
 - Standard X-RateLimit-* headers
 - Clear error messages
 
-### ✅ Thread-Safe & Async-Safe
+### Thread-Safe & Async-Safe
 - Uses asyncio.Lock for shared state
 - Works with async handlers
 - Safe for concurrent requests
 
-### ✅ Memory Efficient
+### Memory Efficient
 - Automatic cleanup of expired entries
 - Configurable max cache sizes
 - LRU eviction when cache full
@@ -108,14 +108,14 @@ Three ready-to-use middleware components:
    - Cache statistics and cleanup
 
 ### Integration Layer
-3. **`bindu/server/middleware/rate_limit.py`** (280 lines)
+3. `bindu/server/middleware/rate_limit.py` (280 lines)
    - RateLimitMiddleware
    - RequestDeduplicationMiddleware
    - IdempotencyMiddleware
    - Proper HTTP header handling
 
 ### Tests
-4. **`tests/unit/test_rate_limiting_and_deduplication.py`** (450+ lines)
+4. `tests/unit/test_rate_limiting_and_deduplication.py` (450+ lines)
    - 25+ test cases covering:
      - All three rate limiting strategies
      - Concurrent request handling
@@ -151,7 +151,7 @@ app = BinduApplication(middleware=middleware)
 curl -X POST /api/payment \
   -H "Idempotency-Key: tx-123" \
   -d '{"amount": 100}'
-# Retry with same key → same response, no duplicate charge
+# Retry with same key - same response, no duplicate charge
 ```
 
 ### Adaptive Load Scaling
@@ -185,12 +185,12 @@ pytest tests/unit/test_rate_limiting_and_deduplication.py -v
 ```
 
 Coverage includes:
-- ✅ All rate limiting strategies
-- ✅ Concurrent request scenarios
-- ✅ Cache expiration and cleanup
-- ✅ Edge cases and error handling
-- ✅ Idempotency key management
-- ✅ Signature generation consistency
+- All rate limiting strategies
+- Concurrent request scenarios
+- Cache expiration and cleanup
+- Edge cases and error handling
+- Idempotency key management
+- Signature generation consistency
 
 ## Benefits for Bindu
 
@@ -222,11 +222,11 @@ Coverage includes:
 
 ## Integration with Existing Code
 
-- ✅ Uses existing logging system (`bindu.utils.logging`)
-- ✅ Compatible with current middleware architecture
-- ✅ No breaking changes to existing APIs
-- ✅ Optional: Can be added incrementally
-- ✅ Works with auth, telemetry, metrics
+- Uses existing logging system (`bindu.utils.logging`)
+- Compatible with current middleware architecture
+- No breaking changes to existing APIs
+- Optional: Can be added incrementally
+- Works with auth, telemetry, metrics
 
 ## Future Enhancements
 
@@ -266,32 +266,32 @@ cat docs/RATE_LIMITING_AND_DEDUPLICATION.md
 - None (all new files)
 
 ## Backward Compatibility
-- ✅ 100% backward compatible
-- ✅ All new optional features
-- ✅ No changes to existing APIs
-- ✅ Can be adopted incrementally
+- 100% backward compatible
+- All new optional features
+- No changes to existing APIs
+- Can be adopted incrementally
 
 ## Code Quality
 
 ### Standards Followed
-- ✅ PEP 8 compliant
-- ✅ Type hints throughout
-- ✅ Comprehensive docstrings
-- ✅ Clear error messages
-- ✅ No hardcoded values
+- PEP 8 compliant
+- Type hints throughout
+- Comprehensive docstrings
+- Clear error messages
+- No hardcoded values
 
 ### Testing
-- ✅ 25+ unit tests
-- ✅ 90%+ code coverage
-- ✅ Async/await testing
-- ✅ Edge case coverage
+- 25+ unit tests
+- 90%+ code coverage
+- Async/await testing
+- Edge case coverage
 
 ### Documentation
-- ✅ Module docstrings
-- ✅ Function docstrings
-- ✅ Usage examples
-- ✅ API reference
-- ✅ Troubleshooting guide
+- Module docstrings
+- Function docstrings
+- Usage examples
+- API reference
+- Troubleshooting guide
 
 ## Why This Contribution?
 
@@ -346,9 +346,9 @@ Key design decisions are documented in docstrings. For questions about specific 
 This PR introduces a **complete, tested, documented, production-ready rate limiting and request deduplication system** that significantly improves Bindu's robustness and reliability. It demonstrates strong software engineering practices and deep understanding of distributed systems challenges.
 
 The contribution is:
-- ✅ Well-tested (25+ tests)
-- ✅ Well-documented (400+ lines of docs)
-- ✅ Production-ready
-- ✅ Backward compatible
-- ✅ Performance-optimized
-- ✅ User-friendly
+- Well-tested (25+ tests)
+- Well-documented (400+ lines of docs)
+- Production-ready
+- Backward compatible
+- Performance-optimized
+- User-friendly
