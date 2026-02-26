@@ -70,7 +70,10 @@ agents = [
     "duckduckgo-search>=8.1.1",
     "openrouter>=0.6.0",
     "ddgs>=9.10.0",
-    "dotenv>=0.9.9",
+    "python-dotenv>=1.0.0",
+    "pycryptodome>=3.20.0",
+    "web3>=7.0.0",
+    "eth-utils>=5.0.0",
 ]
 
 # Minimal core only (use: pip install bindu[core] --only-deps)
