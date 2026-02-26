@@ -135,6 +135,12 @@ async def agent_run_endpoint(app: BinduApplication, request: Request) -> Respons
 
         logger.debug(f"A2A response to {client_ip}: method={method}, id={request_id}")
 
+        # Streaming handlers return a Starlette Response directly
+        if isinstance(jsonrpc_response, Response):
+            if x402_is_requested(request):
+                jsonrpc_response = x402_add_header(jsonrpc_response)
+            return jsonrpc_response
+
         resp = Response(
             content=a2a_response_ta.dump_json(
                 jsonrpc_response, by_alias=True, serialize_as_any=True

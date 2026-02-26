@@ -15,12 +15,12 @@ sending messages and streaming responses.
 
 from __future__ import annotations
 
-import inspect
+import anyio
 import json
-import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
+from uuid import UUID
 
 from bindu.common.protocol.types import (
     SendMessageRequest,
@@ -29,11 +29,15 @@ from bindu.common.protocol.types import (
     Task,
     TaskSendParams,
 )
+from bindu.settings import app_settings
 
+from bindu.utils.logging import get_logger
 from bindu.utils.task_telemetry import trace_task_operation, track_active_task
 
 from bindu.server.scheduler import Scheduler
 from bindu.server.storage import Storage
+
+logger = get_logger("bindu.server.handlers.message_handlers")
 
 
 @dataclass
@@ -47,6 +51,56 @@ class MessageHandlers:
     context_id_parser: Any = None
     push_manager: Any | None = None
 
+    async def _submit_and_schedule_task(
+        self, request_params: dict[str, Any]
+    ) -> tuple[Task, UUID]:
+        """Submit task to storage and schedule it with shared send/stream logic."""
+        message = request_params["message"]
+        context_id = self.context_id_parser(message.get("context_id"))
+
+        task: Task = await self.storage.submit_task(context_id, message)
+
+        scheduler_params: TaskSendParams = TaskSendParams(
+            task_id=task["id"],
+            context_id=context_id,
+            message=message,
+        )
+
+        config = request_params.get("configuration", {})
+        if history_length := config.get("history_length"):
+            scheduler_params["history_length"] = history_length
+
+        push_config = config.get("push_notification_config")
+        if push_config and self.push_manager:
+            is_long_running = config.get("long_running", False)
+            await self.push_manager.register_push_config(
+                task["id"], push_config, persist=is_long_running
+            )
+
+        message_metadata = message.get("metadata", {})
+        if isinstance(message_metadata, dict) and "_payment_context" in message_metadata:
+            scheduler_params["payment_context"] = message_metadata["_payment_context"]
+            del message_metadata["_payment_context"]
+
+        await self.scheduler.run_task(scheduler_params)
+        return task, context_id
+
+    @staticmethod
+    def _to_jsonable(value: Any) -> Any:
+        """Convert UUID-rich protocol objects into JSON-serializable values."""
+        if isinstance(value, UUID):
+            return str(value)
+        if isinstance(value, dict):
+            return {k: MessageHandlers._to_jsonable(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [MessageHandlers._to_jsonable(v) for v in value]
+        return value
+
+    @staticmethod
+    def _sse_event(payload: dict[str, Any]) -> str:
+        """Serialize an SSE event payload."""
+        return f"data: {json.dumps(MessageHandlers._to_jsonable(payload))}\n\n"
+
     @trace_task_operation("send_message")
     @track_active_task
     async def send_message(self, request: SendMessageRequest) -> SendMessageResponse:
@@ -56,162 +110,122 @@ class MessageHandlers:
         If the request reaches here, payment has already been verified.
         Settlement will be handled by ManifestWorker when task completes.
         """
-        message = request["params"]["message"]
-        context_id = self.context_id_parser(message.get("context_id"))
-
-        # Submit task to storage
-        task: Task = await self.storage.submit_task(context_id, message)
-
-        # Schedule task for execution
-        scheduler_params: TaskSendParams = TaskSendParams(
-            task_id=task["id"],
-            context_id=context_id,
-            message=message,
-        )
-
-        # Add optional configuration parameters
-        config = request["params"].get("configuration", {})
-        if history_length := config.get("history_length"):
-            scheduler_params["history_length"] = history_length
-
-        # A2A Protocol: Register push notification config if provided inline
-        # Supports both inline (in message/send) and separate RPC registration
-        push_config = config.get("push_notification_config")
-        if push_config and self.push_manager:
-            # Use long_running flag to determine if config should be persisted
-            is_long_running = config.get("long_running", False)
-            await self.push_manager.register_push_config(
-                task["id"], push_config, persist=is_long_running
-            )
-
-        # Pass payment context from message metadata to worker if available
-        # This is injected by the endpoint when x402 middleware verifies payment
-        message_metadata = message.get("metadata", {})
-        if "_payment_context" in message_metadata:
-            scheduler_params["payment_context"] = message_metadata["_payment_context"]
-            # Remove from message metadata to keep it clean (internal use only)
-            del message["metadata"]["_payment_context"]
-
-        await self.scheduler.run_task(scheduler_params)
+        task, _ = await self._submit_and_schedule_task(request["params"])
         return SendMessageResponse(jsonrpc="2.0", id=request["id"], result=task)
 
+    @trace_task_operation("stream_message")
     async def stream_message(self, request: StreamMessageRequest):
         """Stream messages using Server-Sent Events.
 
-        This method returns a StreamingResponse directly to support SSE,
-        which will be handled at the application layer.
-
-        Note: Not fully implemented yet. #TODO
+        Uses the same submit + scheduler execution path as message/send to keep
+        lifecycle and error handling consistent.
         """
         from starlette.responses import StreamingResponse
 
-        message = request["params"]["message"]
-        context_id = self.context_id_parser(message.get("context_id"))
-
-        # similar to the "messages/send flow submit the task to the configured storage"
-        task: Task = await self.storage.submit_task(context_id, message)
+        task, context_id = await self._submit_and_schedule_task(request["params"])
 
         async def stream_generator():
-            """Generate a consumable stream based on the function which was decorated using pebblify."""
+            """Stream task status and artifact events from storage updates."""
+            seen_status = task["status"]["state"]
+            seen_artifact_ids: set[str] = set()
+            cancelled_exc = anyio.get_cancelled_exc_class()
+
+            submitted_event = {
+                "kind": "status-update",
+                "task_id": str(task["id"]),
+                "context_id": str(context_id),
+                "status": task["status"],
+                "final": False,
+            }
+            yield self._sse_event(submitted_event)
+
             try:
-                await self.storage.update_task(task["id"], state="working")
-                # yield the initial status update event to indicate processing of the task has started
-                status_event = {
-                    "kind": "status-update",
-                    "task_id": str(task["id"]),
-                    "context_id": str(context_id),
-                    "status": {
-                        "state": "working",
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                    },
-                    "final": False,
-                }
-                yield f"data: {json.dumps(status_event)}\n\n"
+                while True:
+                    loaded_task = await self.storage.load_task(task["id"])
+                    if loaded_task is None:
+                        missing_event = {
+                            "kind": "status-update",
+                            "task_id": str(task["id"]),
+                            "context_id": str(context_id),
+                            "status": {
+                                "state": "failed",
+                                "timestamp": datetime.now(timezone.utc).isoformat(),
+                            },
+                            "final": True,
+                            "error": f"Task {task['id']} not found while streaming",
+                        }
+                        yield self._sse_event(missing_event)
+                        return
 
-                if self.workers and self.manifest:
-                    worker = self.workers[0]
-                    message_history = await worker._build_complete_message_history(task)
-                    manifest_result = self.manifest.run(message_history)
+                    status = loaded_task["status"]["state"]
+                    if status != seen_status:
+                        status_event = {
+                            "kind": "status-update",
+                            "task_id": str(task["id"]),
+                            "context_id": str(context_id),
+                            "status": loaded_task["status"],
+                            "final": status in app_settings.agent.terminal_states,
+                        }
+                        yield self._sse_event(status_event)
+                        seen_status = status
 
-                    if inspect.isasyncgen(manifest_result):
-                        async for chunk in manifest_result:
-                            if chunk:
-                                artifact_event = {
-                                    "kind": "artifact-update",
-                                    "task_id": str(task["id"]),
-                                    "context_id": str(context_id),
-                                    "artifact": {
-                                        "artifact_id": str(uuid.uuid4()),
-                                        "name": "streaming_response",
-                                        "parts": [{"kind": "text", "text": str(chunk)}],
-                                    },
-                                    "append": True,
-                                    "last_chunk": False,
-                                }
-                                yield f"data: {json.dumps(artifact_event)}\n\n"
+                    for artifact in loaded_task.get("artifacts", []):
+                        artifact_id = str(artifact["artifact_id"])
+                        if artifact_id in seen_artifact_ids:
+                            continue
+                        seen_artifact_ids.add(artifact_id)
 
-                    elif inspect.isgenerator(manifest_result):
-                        for chunk in manifest_result:
-                            if chunk:
-                                artifact_event = {
-                                    "kind": "artifact-update",
-                                    "task_id": str(task["id"]),
-                                    "context_id": str(context_id),
-                                    "artifact": {
-                                        "artifact_id": str(uuid.uuid4()),
-                                        "name": "streaming_response",
-                                        "parts": [{"kind": "text", "text": str(chunk)}],
-                                    },
-                                    "append": True,
-                                    "last_chunk": False,
-                                }
-                                yield f"data: {json.dumps(artifact_event)}\n\n"
+                        artifact_event = {
+                            "kind": "artifact-update",
+                            "task_id": str(task["id"]),
+                            "context_id": str(context_id),
+                            "artifact": artifact,
+                            "append": artifact.get("append", False),
+                            "last_chunk": artifact.get("last_chunk", False),
+                        }
+                        yield self._sse_event(artifact_event)
 
-                    else:
-                        if manifest_result:
-                            artifact_event = {
-                                "kind": "artifact-update",
-                                "task_id": str(task["id"]),
-                                "context_id": str(context_id),
-                                "artifact": {
-                                    "artifact_id": str(uuid.uuid4()),
-                                    "name": "response",
-                                    "parts": [
-                                        {"kind": "text", "text": str(manifest_result)}
-                                    ],
-                                },
-                                "last_chunk": True,
-                            }
-                            yield f"data: {json.dumps(artifact_event)}\n\n"
+                    if status in app_settings.agent.terminal_states:
+                        return
 
-                # Send completion status
-                completion_event = {
-                    "kind": "status-update",
-                    "task_id": str(task["id"]),
-                    "context_id": str(context_id),
-                    "status": {
-                        "state": "completed",
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                    },
-                    "final": True,
-                }
-                yield f"data: {json.dumps(completion_event)}\n\n"
+                    if status in ("input-required", "auth-required"):
+                        return
 
-                # Update task state in storage
-                await self.storage.update_task(task["id"], state="completed")
+                    await anyio.sleep(0.1)
+            except cancelled_exc:
+                logger.debug(f"Streaming client disconnected for task {task['id']}")
+                return
             except Exception as e:
+                logger.error(
+                    f"Unhandled stream error for task {task['id']}: {e}", exc_info=True
+                )
+                timestamp = datetime.now(timezone.utc).isoformat()
+                current_state = "failed"
+                loaded_task = await self.storage.load_task(task["id"])
+
+                if loaded_task:
+                    current_state = loaded_task["status"]["state"]
+                    timestamp = loaded_task["status"]["timestamp"]
+                    if current_state not in app_settings.agent.terminal_states:
+                        updated = await self.storage.update_task(task["id"], state="failed")
+                        current_state = updated["status"]["state"]
+                        timestamp = updated["status"]["timestamp"]
+
                 error_event = {
                     "kind": "status-update",
                     "task_id": str(task["id"]),
                     "context_id": str(context_id),
                     "status": {
-                        "state": "failed",
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "state": current_state,
+                        "timestamp": timestamp,
                     },
-                    "final": True,
+                    "final": current_state in app_settings.agent.terminal_states,
                     "error": str(e),
                 }
-                yield f"data: {json.dumps(error_event)}\n\n"
-                await self.storage.update_task(task["id"], state="failed")
+                yield self._sse_event(error_event)
 
-        return StreamingResponse(stream_generator(), media_type="text/event-stream")
+        return StreamingResponse(
+            stream_generator(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache"},
+        )
