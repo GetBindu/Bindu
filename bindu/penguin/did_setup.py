@@ -84,6 +84,16 @@ def initialize_did_extension(
         # Generate and save key pair (will skip if keys already exist and recreate_keys=False)
         did_extension.generate_and_save_key_pair()
 
+        # Perform integrity checks after keys are available
+        try:
+             did_extension.check_integrity()
+             logger.info("✅ DID configuration and keys pass integrity check")
+        except ValueError as e:
+             logger.error(f"❌ DID integrity check failed: {e}")
+             # We might want to raise here to stop startup, or just log
+             # For now, let's raise to enforce security
+             raise
+
         # Backup keys to Vault if enabled and keys were newly generated
         if app_settings.vault.enabled:
             from bindu.utils.vault_client import backup_did_keys_to_vault

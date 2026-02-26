@@ -17,7 +17,8 @@ class DIDValidation:
 
     # Regex patterns for DID validation (compiled once for performance)
     _DID_PATTERN = re.compile(r"^did:[a-z0-9]+:.+$", re.IGNORECASE)
-    _BINDU_DID_PATTERN = re.compile(r"^did:bindu:[^:]+:[^:]+$", re.IGNORECASE)
+    # Updated to support did:bindu:author:agent_name:agent_id
+    _BINDU_DID_PATTERN = re.compile(r"^did:bindu:[^:]+:[^:]+(:[^:]+)?$", re.IGNORECASE)
 
     @staticmethod
     def _validate_empty(did: str) -> tuple[bool, str | None]:
@@ -166,5 +167,34 @@ class DIDValidation:
 
         # Validate authentication if present
         DIDValidation._validate_authentication(did_doc, errors)
+        
+        # New Feature: Validate service endpoints match configuration
+        if "service" in did_doc:
+            DIDValidation._validate_service_endpoints(did_doc["service"], errors)
 
         return len(errors) == 0, errors
+
+    @staticmethod
+    def _validate_service_endpoints(services: list[dict[str, Any]], errors: list[str]) -> None:
+        """Validate service endpoints match configured URL."""
+        try:
+            from bindu.settings import app_settings
+
+            configured_url = app_settings.network.default_url
+
+            if configured_url:
+                configured_url = configured_url.rstrip('/')
+                
+                for service in services:
+                    if "serviceEndpoint" in service:
+                        endpoint = service.get("serviceEndpoint")
+                        if isinstance(endpoint, str) and endpoint.rstrip('/') != configured_url:
+                            errors.append(f"Service endpoint {endpoint} does not match configured URL {configured_url}")
+                        elif isinstance(endpoint, list):
+                            for ep in endpoint:
+                                if isinstance(ep, str) and ep.rstrip('/') != configured_url:
+                                     errors.append(f"Service endpoint {ep} does not match configured URL {configured_url}")
+
+        except Exception as e:
+            errors.append(f"Service endpoint validation error: {str(e)}")
+
