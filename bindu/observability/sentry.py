@@ -108,7 +108,8 @@ def init_sentry() -> bool:
         if not server_name:
             try:
                 server_name = socket.gethostname()
-            except Exception:
+            except OSError as error:
+                logger.warning("Failed to detect hostname", error=str(error))
                 server_name = "unknown"
 
         # Build default tags
@@ -149,11 +150,11 @@ def init_sentry() -> bool:
 
         return True
 
-    except ImportError as e:
-        logger.error("Failed to import Sentry SDK", error=str(e))
+    except ImportError as error:
+        logger.error("Failed to import Sentry SDK", error=str(error))
         return False
-    except Exception as e:
-        logger.error("Failed to initialize Sentry", error=str(e))
+    except (RuntimeError, ValueError, TypeError, OSError) as error:
+        logger.error("Failed to initialize Sentry", error=str(error))
         return False
 
 

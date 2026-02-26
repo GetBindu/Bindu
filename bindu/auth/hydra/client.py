@@ -5,8 +5,11 @@ This client handles communication with Ory Hydra's Admin API for token operation
 
 from __future__ import annotations as _annotations
 
+import asyncio
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
+
+import aiohttp
 
 from bindu.utils.http_client import AsyncHTTPClient
 from bindu.utils.logging import get_logger
@@ -107,9 +110,9 @@ class HydraClient:
 
             return result_data
 
-        except Exception as e:
-            logger.error(f"Error during token introspection: {e}")
-            raise ValueError(f"Failed to introspect token: {str(e)}")
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as error:
+            logger.error(f"Error during token introspection: {error}")
+            raise ValueError(f"Failed to introspect token: {str(error)}")
 
     async def create_oauth_client(self, client_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new OAuth2 client in Hydra.
@@ -129,8 +132,8 @@ class HydraClient:
 
             return await response.json()
 
-        except Exception as e:
-            logger.error(f"Failed to create OAuth client: {e}")
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as error:
+            logger.error(f"Failed to create OAuth client: {error}")
             raise
 
     async def get_oauth_client(self, client_id: str) -> Optional[Dict[str, Any]]:
@@ -157,10 +160,10 @@ class HydraClient:
                 error_text = await response.text()
                 raise ValueError(f"Failed to get OAuth client: {error_text}")
 
-        except Exception as e:
-            if hasattr(e, "status") and e.status == 404:
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as error:
+            if isinstance(error, aiohttp.ClientResponseError) and error.status == 404:
                 return None
-            logger.error(f"Failed to get OAuth client: {e}")
+            logger.error(f"Failed to get OAuth client: {error}")
             raise
 
     async def list_oauth_clients(
@@ -186,8 +189,8 @@ class HydraClient:
 
             return await response.json()
 
-        except Exception as e:
-            logger.error(f"Failed to list OAuth clients: {e}")
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as error:
+            logger.error(f"Failed to list OAuth clients: {error}")
             raise
 
     async def delete_oauth_client(self, client_id: str) -> bool:
@@ -214,10 +217,10 @@ class HydraClient:
                 error_text = await response.text()
                 raise ValueError(f"Failed to delete OAuth client: {error_text}")
 
-        except Exception as e:
-            if hasattr(e, "status") and e.status == 404:
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as error:
+            if isinstance(error, aiohttp.ClientResponseError) and error.status == 404:
                 return False
-            logger.error(f"Failed to delete OAuth client: {e}")
+            logger.error(f"Failed to delete OAuth client: {error}")
             raise
 
     async def health_check(self) -> bool:
@@ -229,7 +232,8 @@ class HydraClient:
         try:
             response = await self._http_client.get("/admin/health/ready")
             return response.status == 200
-        except Exception:
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as error:
+            logger.warning(f"Hydra health check failed: {error}")
             return False
 
     async def get_jwks(self) -> Dict[str, Any]:
@@ -247,8 +251,8 @@ class HydraClient:
 
             return await response.json()
 
-        except Exception as e:
-            logger.error(f"Failed to get JWKS: {e}")
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as error:
+            logger.error(f"Failed to get JWKS: {error}")
             raise
 
     async def revoke_token(self, token: str) -> bool:
@@ -267,6 +271,6 @@ class HydraClient:
 
             return response.status in (200, 204)
 
-        except Exception as e:
-            logger.error(f"Failed to revoke token: {e}")
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as error:
+            logger.error(f"Failed to revoke token: {error}")
             return False

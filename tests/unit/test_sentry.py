@@ -67,7 +67,7 @@ class TestSentryInit:
     def test_init_sentry_general_error(self):
         """Test Sentry initialization handles general errors."""
         with (
-            patch("sentry_sdk.init", side_effect=Exception("Unexpected error")),
+            patch("sentry_sdk.init", side_effect=ValueError("Unexpected error")),
             patch.object(app_settings.sentry, "enabled", True),
             patch.object(app_settings.sentry, "dsn", "https://test@sentry.io/123"),
         ):

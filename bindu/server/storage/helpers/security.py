@@ -1,5 +1,9 @@
 """Security utilities for storage operations."""
 
+from bindu.utils.logging import get_logger
+
+logger = get_logger("bindu.storage.security")
+
 
 def mask_database_url(url: str) -> str:
     """Mask password in database URL for safe logging.
@@ -19,7 +23,8 @@ def mask_database_url(url: str) -> str:
                     user, _ = auth.split(":", 1)
                     return f"{scheme}://{user}:***@{host_part}"
         return url
-    except Exception:
+    except (AttributeError, TypeError, ValueError) as error:
+        logger.warning("Failed to mask database URL", error=str(error))
         return url
 
 
