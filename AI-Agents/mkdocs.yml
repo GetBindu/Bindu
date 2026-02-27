@@ -1,0 +1,52 @@
+site_name: multilingual-collab-agent-v2
+repo_url: https://github.com/Subhajitdas99/multilingual-collab-agent-v2
+site_url: https://Subhajitdas99.github.io/multilingual-collab-agent-v2
+site_description: Identity-aware multilingual research and collaboration agent built on Bindu
+site_author: Subhajit Das
+edit_uri: edit/main/docs/
+repo_name: Subhajitdas99/multilingual-collab-agent-v2
+copyright: Maintained by <a href="https://Subhajitdas99.com">Subhajitdas99</a>.
+
+nav:
+  - Home: index.md
+  - Modules: modules.md
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: ["src/multilingual_collab_agent_v2"]
+theme:
+  name: material
+  feature:
+    tabs: true
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: white
+      accent: deep orange
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      accent: deep orange
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  icon:
+    repo: fontawesome/brands/github
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/Subhajitdas99/multilingual-collab-agent-v2
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/multilingual-collab-agent-v2
+
+markdown_extensions:
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true

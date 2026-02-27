@@ -1,0 +1,116 @@
+name: Build and Push to Docker Hub
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'Dockerfile.agent'
+      - 'multilingual_collab_agent_v2/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.version'
+      - '.github/workflows/build-and-push.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: subhajitdas99
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Read version
+        id: version
+        run: |
+          echo "version=$(cat .version | tr -d '\n')" >> $GITHUB_OUTPUT
+
+      - name: Build and push
+        id: docker_build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.agent
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            subhajitdas99/multilingual-collab-agent-v2:latest
+            subhajitdas99/multilingual-collab-agent-v2:${{ steps.version.outputs.version }}
+            subhajitdas99/multilingual-collab-agent-v2:build-${{ github.run_number }}
+            subhajitdas99/multilingual-collab-agent-v2:${{ github.sha }}
+          cache-from: type=registry,ref=subhajitdas99/multilingual-collab-agent-v2:buildcache
+          cache-to: type=registry,ref=subhajitdas99/multilingual-collab-agent-v2:buildcache,mode=max
+
+      - name: Read agent config
+        id: agent_config
+        run: |
+          echo "config=$(cat multilingual_collab_agent_v2/agent_config.json | jq -c .)" >> $GITHUB_OUTPUT
+          echo "version=$(cat .version | tr -d '\n')" >> $GITHUB_OUTPUT
+          
+          # Read all skills from the skills folder
+          skills_array="[]"
+          for skill_dir in multilingual_collab_agent_v2/skills/*/; do
+            if [ -f "${skill_dir}skill.yaml" ]; then
+              skill_json=$(cat "${skill_dir}skill.yaml" | yq -o=json | jq -c .)
+              skills_array=$(echo "$skills_array" | jq --argjson skill "$skill_json" '. += [$skill]')
+            fi
+          done
+          echo "skills=$(echo $skills_array | jq -c .)" >> $GITHUB_OUTPUT
+
+      - name: Log to backend service
+        run: |
+          curl --location 'https://bindus.getbindu.com/bindu-register' \
+            --header 'accept: application/json' \
+            --header 'X-Bindu-CI: true' \
+            --header 'X-API-Token: ${{ secrets.BINDU_API_TOKEN }}' \
+            --header 'Content-Type: application/json' \
+            --data @- <<EOF
+          {
+              "agent": {
+                "name": "${{ fromJson(steps.agent_config.outputs.config).name }}",
+                "author": "${{ fromJson(steps.agent_config.outputs.config).author }}",
+                "description": "${{ fromJson(steps.agent_config.outputs.config).description }}",
+                "version": "${{ steps.agent_config.outputs.version }}",
+                "agent_trust": "${{ fromJson(steps.agent_config.outputs.config).agent_trust }}",
+                "type": "research"
+              },
+              "skills": ${{ toJson(fromJson(steps.agent_config.outputs.skills)) }},
+              "framework": {
+                "name": "agno",
+                "version": "1.0.0"
+              },
+              "environment_variables": ${{ toJson(fromJson(steps.agent_config.outputs.config).environment_variables) }},
+              "execution_cost": ${{ toJson(fromJson(steps.agent_config.outputs.config).execution_cost || fromJson('{}')) }},
+              "auth": ${{ toJson(fromJson(steps.agent_config.outputs.config).auth || fromJson('{}')) }},
+              "deployment": {
+                "url": "${{ fromJson(steps.agent_config.outputs.config).deployment.url }}",
+                "protocol_version": "${{ fromJson(steps.agent_config.outputs.config).deployment.protocol_version }}",
+                "docker_image": "subhajitdas99/multilingual-collab-agent-v2:latest",
+                "docker_digest": "${{ steps.docker_build.outputs.digest }}",
+                "platforms": ["linux/amd64", "linux/arm64"]
+              },
+              "repository": {
+                "url": "https://github.com/${{ github.repository }}",
+                "commit_sha": "${{ github.sha }}",
+                "build_number": "${{ github.run_number }}"
+              },
+              "metadata": {
+                "documentation_url": "https://Subhajitdas99.github.io/multilingual-collab-agent-v2/",
+                "domain": "${{ fromJson(steps.agent_config.outputs.config).metadata.domain || 'general' }}",
+                "specialization": "${{ fromJson(steps.agent_config.outputs.config).metadata.specialization || 'multi-purpose' }}",
+                "last_updated": "${{ github.event.head_commit.timestamp }}"
+              }
+            }
+          EOF

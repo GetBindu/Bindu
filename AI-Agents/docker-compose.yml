@@ -1,0 +1,48 @@
+services:
+  multilingual_collab_agent_v2:
+    build:
+      context: .
+      dockerfile: Dockerfile.agent
+    container_name: multilingual_collab_agent_v2
+    ports:
+      - "3773:3773"
+    environment:
+      # OpenRouter API Configuration
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      
+      # Mem0 Memory Configuration
+      - MEM0_API_KEY=${MEM0_API_KEY}
+      
+      # Database Configuration
+      - STORAGE_TYPE=${STORAGE_TYPE:-memory}
+      - DATABASE_URL=${DATABASE_URL}
+      
+      # Redis Scheduler Configuration
+      - SCHEDULER_TYPE=${SCHEDULER_TYPE:-memory}
+      - REDIS_URL=${REDIS_URL}
+      
+      # Sentry Error Tracking
+      - SENTRY_ENABLED=${SENTRY_ENABLED:-false}
+      - SENTRY_DSN=${SENTRY_DSN}
+      
+      # Telemetry & Observability
+      - TELEMETRY_ENABLED=${TELEMETRY_ENABLED:-false}
+      - OLTP_VERBOSE_LOGGING=${OLTP_VERBOSE_LOGGING:-false}
+      - OLTP_ENDPOINT=${OLTP_ENDPOINT}
+      - OLTP_SERVICE_NAME=${OLTP_SERVICE_NAME:-multilingual_collab_agent_v2}
+      - OLTP_HEADERS=${OLTP_HEADERS}
+    env_file:
+      - .env
+    restart: unless-stopped
+    networks:
+      - multilingual_collab_agent_v2-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3773/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  multilingual_collab_agent_v2-network:
+    driver: bridge

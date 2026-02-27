@@ -16,6 +16,8 @@ Usage:
 
 from __future__ import annotations as _annotations
 
+import os
+
 from bindu.settings import app_settings
 from bindu.utils.logging import get_logger
 
@@ -28,47 +30,43 @@ try:
 
     POSTGRES_AVAILABLE = True
 except ImportError:
-    PostgresStorage = None  # type: ignore[assignment]  # SQLAlchemy not installed
+    PostgresStorage = None  # type: ignore[assignment]
     POSTGRES_AVAILABLE = False
 
 logger = get_logger("bindu.server.storage.factory")
 
 
 async def create_storage(did: str | None = None) -> Storage:
-    """Create storage backend based on configuration.
+    """Create storage backend based on configuration."""
 
-    Reads the storage backend type from app_settings.storage.backend and
-    creates the appropriate storage instance.
-
-    Supported backends:
-    - "memory": InMemoryStorage (default, non-persistent)
-    - "postgres": PostgresStorage (persistent)
-
-    Args:
-        did: Optional DID for schema-based multi-tenancy (PostgreSQL only)
-
-    Returns:
-        Storage instance ready to use
-
-    Raises:
-        ValueError: If unknown storage backend is specified
-        ConnectionError: If unable to connect to storage backend
-
-    Example:
-        >>> storage = await create_storage()
-        >>> task = await storage.load_task(task_id)
-        >>>
-        >>> # With DID for schema isolation
-        >>> storage = await create_storage(did="did:bindu:alice:agent1:abc123")
-    """
     backend = app_settings.storage.backend.lower()
+
+    # Detect explicit environment variables
+    storage_type_env = os.getenv("STORAGE_TYPE")
+    database_url_env = os.getenv("DATABASE_URL")
+
+    # Smart auto-detection (safe & test-friendly)
+    if (
+        storage_type_env is None
+        and backend == "memory"
+        and database_url_env is not None
+        and POSTGRES_AVAILABLE
+    ):
+        logger.warning(
+            "DATABASE_URL detected but STORAGE_TYPE not set. "
+            "Auto-switching storage backend to 'postgres'. "
+            "Set STORAGE_TYPE=memory to override."
+        )
+        backend = "postgres"
 
     logger.info(f"Creating storage backend: {backend}")
 
+    # Memory backend
     if backend == "memory":
         logger.info("Using in-memory storage (non-persistent)")
         return InMemoryStorage()
 
+    # PostgreSQL backend
     elif backend == "postgres":
         if not POSTGRES_AVAILABLE or PostgresStorage is None:
             raise ValueError(
@@ -76,7 +74,6 @@ async def create_storage(did: str | None = None) -> Storage:
                 "Install with: pip install sqlalchemy[asyncio] asyncpg"
             )
 
-        # Validate postgres_url is provided
         if not app_settings.storage.postgres_url:
             raise ValueError(
                 "PostgreSQL storage requires a database URL. "
@@ -84,6 +81,7 @@ async def create_storage(did: str | None = None) -> Storage:
             )
 
         logger.info("Using PostgreSQL storage with SQLAlchemy (persistent)")
+
         storage = PostgresStorage(
             database_url=app_settings.storage.postgres_url,
             pool_min=app_settings.storage.postgres_pool_min,
@@ -93,28 +91,19 @@ async def create_storage(did: str | None = None) -> Storage:
             did=did,
         )
 
-        # Connect to database
         await storage.connect()
-
         return storage
 
     else:
         raise ValueError(
-            f"Unknown storage backend: {backend}. Supported backends: memory, postgres"
+            f"Unknown storage backend: {backend}. "
+            "Supported backends: memory, postgres"
         )
 
 
 async def close_storage(storage: Storage) -> None:
-    """Close storage connection gracefully.
+    """Close storage connection gracefully."""
 
-    Args:
-        storage: Storage instance to close
-
-    Example:
-        >>> storage = await create_storage()
-        >>> # ... use storage ...
-        >>> await close_storage(storage)
-    """
     if (
         POSTGRES_AVAILABLE
         and PostgresStorage is not None
