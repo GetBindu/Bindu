@@ -123,7 +123,7 @@ def load_skills(
                 skills.append(skill)
             else:
                 logger.warning(f"Invalid skill configuration: {skill_item}")
-        except Exception as e:
+        except (FileNotFoundError, ValueError) as e:
             logger.error(f"Failed to load skill {skill_item}: {e}")
             raise
 
