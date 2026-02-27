@@ -30,6 +30,7 @@ from uuid import UUID
 
 from sqlalchemy import delete, func, select, update, cast
 from sqlalchemy.dialects.postgresql import insert, JSONB, JSON
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from typing_extensions import TypeVar
 
@@ -195,7 +196,7 @@ class PostgresStorage(Storage[ContextT]):
                 + (f" using schema '{self.schema_name}'" if self.schema_name else "")
             )
 
-        except Exception as e:
+        except (SQLAlchemyError, OSError) as e:
             logger.error(f"Failed to connect to PostgreSQL: {e}")
             raise ConnectionError(f"Failed to connect to PostgreSQL: {e}") from e
 
