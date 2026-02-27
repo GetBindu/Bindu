@@ -21,30 +21,30 @@ process.env.PUBLIC_APP_ASSETS ??= "chatui";
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
-	// Consult https://kit.svelte.dev/docs/integrations#preprocessors
-	// for more information about preprocessors
-	preprocess: vitePreprocess(),
+  // Consult https://kit.svelte.dev/docs/integrations#preprocessors
+  // for more information about preprocessors
+  preprocess: vitePreprocess(),
 
-	kit: {
-		adapter: adapter(),
+  kit: {
+    adapter: adapter(),
 
-		paths: {
-			base: process.env.APP_BASE || "",
-			relative: false,
-		},
-		csrf: {
-			// handled in hooks.server.ts, because we can have multiple valid origins
-			checkOrigin: false,
-		},
-		csp: {
-			directives: {
-				...(process.env.ALLOW_IFRAME === "true"
-					? {}
-					: { "frame-ancestors": ["https://huggingface.co"] }),
-			},
-		},
-		alias: {},
-	},
+    paths: {
+      base: process.env.APP_BASE || "",
+      relative: false,
+    },
+    // The csrf checkOrigin property was deprecated. 
+    // CSRF origin validation is manually handled in hooks.server.ts
+    // using the validOrigins array to support dynamic environments.
+    
+    csp: {
+      directives: {
+        ...(process.env.ALLOW_IFRAME === "true"
+          ? {}
+          : { "frame-ancestors": ["https://huggingface.co"] }),
+      },
+    },
+    alias: {},
+  },
 };
 
 export default config;
