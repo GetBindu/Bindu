@@ -157,7 +157,7 @@ class RedisScheduler(Scheduler):
                 # Log deserialization errors but continue
                 logger.error(f"Failed to deserialize task operation: {e}")
                 continue
-            except Exception as e:
+            except (RuntimeError, AttributeError) as e:
                 # Log unexpected errors
                 logger.error(f"Unexpected error in receive_task_operations: {e}")
                 continue
@@ -178,7 +178,7 @@ class RedisScheduler(Scheduler):
         except redis.RedisError as e:
             logger.error(f"Failed to push task operation to Redis: {e}")
             raise
-        except Exception as e:
+        except (TypeError, ValueError) as e:
             logger.error(f"Failed to serialize task operation: {e}")
             raise
 
@@ -204,7 +204,7 @@ class RedisScheduler(Scheduler):
                 span_context = span._context
                 span_id = span_context.span_id
                 trace_id = span_context.trace_id
-        except Exception:
+        except AttributeError:
             # If we can't get span context, just use None values
             pass
 
@@ -306,6 +306,6 @@ class RedisScheduler(Scheduler):
                 return False
             await self._redis_client.ping()
             return True
-        except Exception as e:
+        except redis.RedisError as e:
             logger.warning(f"Redis health check failed: {e}")
             return False
