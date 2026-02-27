@@ -20,7 +20,7 @@ class ConfigValidator:
         "name": "bindu-agent",
         "description": "A Bindu agent",
         "version": __version__,
-        "recreate_keys": True,
+        "recreate_keys": False,
         "skills": [],
         "capabilities": {},
         "storage": {"type": "memory"},

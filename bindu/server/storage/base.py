@@ -100,6 +100,21 @@ class Storage(ABC, Generic[ContextT]):
             List of tasks
         """
 
+    async def count_tasks(self, status: str | None = None) -> int:
+        """Count number of tasks, optionally filtered by status.
+
+        Args:
+            status: Optional status to filter by (e.g. 'submitted', 'working')
+
+        Returns:
+            Count of matching tasks
+        """
+        # Default inefficient implementation - override in subclasses
+        tasks = await self.list_tasks()
+        if status:
+            return sum(1 for t in tasks if t["status"]["state"] == status)
+        return len(tasks)
+
     @abstractmethod
     async def list_tasks_by_context(
         self, context_id: UUID, length: int | None = None

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from time import time
+from time import monotonic
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -18,7 +18,7 @@ import sys
 
 logger = get_logger("bindu.server.endpoints.health")
 
-_start_time = time()
+_start_time = monotonic()
 
 
 @handle_endpoint_errors("health check")
@@ -30,7 +30,7 @@ async def health_endpoint(app: BinduApplication, request: Request) -> JSONRespon
     client_ip = get_client_ip(request)
     logger.debug(f"Health check from {client_ip}")
 
-    uptime = round(time() - _start_time, 2)
+    uptime = round(monotonic() - _start_time, 2)
 
     storage_type = type(app._storage).__name__ if app._storage else None
     scheduler_type = type(app._scheduler).__name__ if app._scheduler else None

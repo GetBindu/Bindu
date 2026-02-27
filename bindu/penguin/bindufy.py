@@ -15,7 +15,7 @@ import os
 from pathlib import Path
 from typing import Any, Callable, Dict
 from urllib.parse import urlparse
-from uuid import uuid4
+from uuid import UUID
 
 from bindu.common.models import (
     AgentManifest,
@@ -32,8 +32,10 @@ from bindu.utils.config_loader import (
     create_storage_config_from_env,
     create_scheduler_config_from_env,
     create_sentry_config_from_env,
+    create_vault_config_from_env,
     load_config_from_env,
     update_auth_settings,
+    update_vault_settings,
 )
 from bindu.utils.display import prepare_server_display
 from bindu.utils.logging import get_logger
@@ -176,14 +178,35 @@ def bindufy(
         raise ValueError("'author' is required in config and cannot be empty.")
 
     # Generate agent_id if not provided
-    agent_id = validated_config.get("id", uuid4().hex)
+    # Use deterministic ID based on author + agent_name to ensure same DID across restarts
+    if "id" not in validated_config:
+        import hashlib
+
+        author = validated_config.get("author", "")
+        agent_name = validated_config.get("name", "")
+
+        # Create deterministic ID from author + agent_name
+        deterministic_string = f"{author}:{agent_name}"
+        agent_id_hex = hashlib.sha256(deterministic_string.encode()).hexdigest()[:32]
+        # Convert to UUID for type compatibility
+        agent_id = UUID(agent_id_hex)
+        logger.info(f"Generated deterministic agent_id from author+name: {agent_id}")
+    else:
+        # Convert string ID to UUID if needed
+        id_value = validated_config["id"]
+        agent_id = UUID(id_value) if isinstance(id_value, str) else id_value
 
     # Create config objects directly from environment and validated config
     deployment_config = _create_deployment_config(validated_config)
     storage_config = create_storage_config_from_env(validated_config)
     scheduler_config = create_scheduler_config_from_env(validated_config)
     sentry_config = create_sentry_config_from_env(validated_config)
+    vault_config = create_vault_config_from_env(validated_config)
     auth_config = create_auth_config_from_env(validated_config)
+
+    # Update vault settings before DID initialization (needed for key restoration)
+    if vault_config:
+        update_vault_settings(vault_config)
 
     # Create tunnel config only if launch parameter is True
     tunnel_config = None
@@ -433,7 +456,7 @@ def bindufy(
         prepare_server_display(
             host=host,
             port=port,
-            agent_id=agent_id,
+            agent_id=str(agent_id),
             agent_did=did_extension.did,
             client_id=credentials.client_id if credentials else None,
             client_secret=credentials.client_secret if credentials else None,

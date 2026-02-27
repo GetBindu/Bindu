@@ -33,6 +33,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 import base58
+from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
@@ -272,7 +273,8 @@ class DIDAgentExtension:
             signature_bytes = base58.b58decode(signature)
             self.public_key.verify(signature_bytes, text_bytes)
             return True
-        except Exception:
+        except (InvalidSignature, ValueError, TypeError, UnicodeEncodeError) as error:
+            logger.debug("Signature verification failed", error=str(error))
             return False
 
     @cached_property

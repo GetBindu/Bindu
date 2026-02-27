@@ -294,6 +294,7 @@ class PrometheusMetrics:
 
 # Global metrics instance
 _metrics_instance: PrometheusMetrics | None = None
+_metrics_init_lock = Lock()
 
 
 def get_metrics() -> PrometheusMetrics:
@@ -304,5 +305,7 @@ def get_metrics() -> PrometheusMetrics:
     """
     global _metrics_instance
     if _metrics_instance is None:
-        _metrics_instance = PrometheusMetrics()
+        with _metrics_init_lock:
+            if _metrics_instance is None:
+                _metrics_instance = PrometheusMetrics()
     return cast(PrometheusMetrics, _metrics_instance)

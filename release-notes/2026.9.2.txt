@@ -1,0 +1,65 @@
+Release: Dependency Optimization and Auth Configuration
+Version: 2026.9.2
+Date: February 23, 2026
+
+OVERVIEW
+--------
+This release focuses on reducing installation footprint by making heavy agent frameworks
+optional dependencies, and improving authentication configuration for public endpoints.
+
+CHANGES
+-------
+
+Dependency Optimization:
+- Moved agent frameworks to optional [agents] extra
+  - agno, langchain, langgraph, ollama, duckduckgo-search now optional
+  - Install with: uv pip install bindu[agents]
+  - Reduces default installation size significantly
+- Core Bindu functionality remains in base installation
+- Blockchain/payment features (x402, web3) still included by default
+
+Authentication & Security:
+- Added /agent/negotiation to public endpoints (no auth required)
+- Cleaned up public endpoints configuration
+- Removed unnecessary static file routes from auth bypass list
+- Improved auth middleware configuration clarity
+
+Release Process:
+- Updated release workflow to use week-based CalVer (YYYY.W.D)
+- Enhanced create-release skill with new versioning format
+
+Code Quality:
+- Removed static file paths from public endpoints configuration
+- Updated secrets baseline
+
+INSTALLATION OPTIONS
+--------------------
+# Minimal installation (core only)
+uv pip install bindu
+
+# With agent frameworks (for examples)
+uv pip install bindu[agents]
+
+# Development installation
+uv pip install -e ".[agents]"
+
+BREAKING CHANGES
+----------------
+None - Agent frameworks are still available, just optional
+
+MIGRATION NOTES
+---------------
+- If you use agno, langchain, or ollama: install bindu[agents]
+- If you only run custom agents: base installation is sufficient
+- Existing installations will continue to work
+
+TESTING
+-------
+✅ All tests passing
+✅ Pre-commit hooks passing
+✅ Dependency resolution verified
+✅ Public endpoint authentication bypass confirmed
+
+CONTRIBUTORS
+------------
+- Raahul Dutta

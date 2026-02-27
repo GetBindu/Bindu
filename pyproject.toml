@@ -17,11 +17,11 @@ classifiers = [
 ]
 dependencies = [
     # Core runtime
-    "uvicorn==0.34.1",
+    "uvicorn>=0.35",
     "starlette==0.48.0",
-    "pydantic==2.11.3",
+    "pydantic>=2.11.7",
     "loguru==0.7.3",
-    "rich==13.9.4",
+    "rich==14.3.2",
     "orjson==3.10.18",
     "cryptography==44.0.2",
     "base58==2.1.1",
@@ -30,7 +30,7 @@ dependencies = [
     "aiofiles==24.1.0",
     "pyyaml==6.0.2",
     "requests==2.32.3",
-    "tenacity==8.5.0",
+    "tenacity==9.1.4",
     "pynacl==1.5.0",
     "numpy==2.3.5",
     # Telemetry
@@ -46,7 +46,6 @@ dependencies = [
     "web3==7.13.0",
     "eth-account==0.13.7",
     "cdp-sdk==0.21.0",
-    "coinbase-advanced-py==1.8.2",
     # Database storage
     "sqlalchemy[asyncio]==2.0.44",
     "asyncpg==0.31.0",
@@ -57,24 +56,31 @@ dependencies = [
     "pyperclip==1.11.0",
     # Security
     "detect-secrets==1.5.0",
-    "dotenv>=0.9.9",
-    "ddgs>=9.10.0",
-    "openrouter>=0.6.0",
-    "langchain>=1.2.9",
-    "langchain-openai>=1.1.8",
-    "langgraph>=1.0.8",
     "python-dotenv>=1.1.0",
     "agno>=2.5.2",
 ]
 
 [project.optional-dependencies]
+# Agent frameworks and tools for examples (use: pip install bindu[agents])
+agents = [
+    "agno>=2.5.2",
+    "langchain>=1.2.9",
+    "langchain-openai>=1.1.8",
+    "langgraph>=1.0.8",
+    "ollama>=0.6.1",
+    "duckduckgo-search>=8.1.1",
+    "openrouter>=0.6.0",
+    "ddgs>=9.10.0",
+    "dotenv>=0.9.9",
+]
+
 # Minimal core only (use: pip install bindu[core] --only-deps)
 core = [
-    "uvicorn==0.34.1",
+    "uvicorn>=0.35",
     "starlette==0.48.0",
-    "pydantic==2.11.3",
+    "pydantic>=2.11.7",
     "loguru==0.7.3",
-    "rich==13.9.4",
+    "rich==14.3.2",
     "orjson==3.10.18",
     "cryptography==44.0.2",
     "base58==2.1.1",
@@ -83,7 +89,7 @@ core = [
     "aiofiles==24.1.0",
     "pyyaml==6.0.2",
     "requests==2.32.3",
-    "tenacity==8.5.0",
+    "tenacity==9.1.4",
     "pynacl==1.5.0",
 ]
 
@@ -110,7 +116,7 @@ dev = [
     "types-requests>=2.32.0.20250328",
     "pipreqs>=0.5.0",
     "twine>=6.1.0",
-    "uvx<2.0",
+    "uvx<4.0",
     "ruff>=0.15.0",
 ]
 

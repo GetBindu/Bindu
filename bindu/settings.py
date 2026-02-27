@@ -500,16 +500,12 @@ class AuthSettings(BaseSettings):
         "/.well-known/*",
         "/did/resolve",
         "/agent/info",
+        "/agent/negotiation",
         "/agent/skills",
         "/agent/skills/*",
         "/health",
         "/metrics",
-        "/agent.html",
-        "/chat.html",
-        "/storage.html",
         "/payment-capture",  # x402 payment capture page (browser-based)
-        "/js/*",
-        "/css/*",
     ]
 
     # Permission-based access control
@@ -601,17 +597,12 @@ class HydraSettings(BaseSettings):
         "/.well-known/*",
         "/did/resolve",
         "/agent/info",
+        "/agent/negotiation",
         "/agent/skills",
         "/agent/skills/*",
         "/health",
         "/metrics",
-        "/agent.html",
-        "/chat.html",
-        "/storage.html",
         "/payment-capture",
-        "/js/*",
-        "/css/*",
-        "/docs",
         "/favicon.ico",
         "/oauth/*",  # OAuth callback endpoints
     ]
@@ -776,7 +767,14 @@ class NegotiationSettings(BaseSettings):
 
 
 class VaultSettings(BaseSettings):
-    """HashiCorp Vault configuration for OAuth token storage."""
+    """HashiCorp Vault configuration for DID keys and Hydra credentials storage.
+
+    When enabled, Vault provides persistent storage for:
+    - DID private/public keys (ensures same DID across pod restarts)
+    - Hydra OAuth2 client credentials (prevents duplicate client registrations)
+
+    This is critical for Kubernetes deployments where pods are ephemeral.
+    """
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -788,14 +786,19 @@ class VaultSettings(BaseSettings):
     url: str = Field(
         default="http://localhost:8200",
         validation_alias=AliasChoices("VAULT__URL", "VAULT_ADDR"),
+        description="Vault server URL (e.g., https://vault.example.com:8200)",
     )
     token: str = Field(
         default="",
         validation_alias=AliasChoices("VAULT__TOKEN", "VAULT_TOKEN"),
+        description="Vault authentication token for API access",
     )
 
     # Enable/disable Vault
-    enabled: bool = False
+    enabled: bool = Field(
+        default=False,
+        description="Enable Vault integration for persistent credential storage",
+    )
 
 
 class OAuthSettings(BaseSettings):

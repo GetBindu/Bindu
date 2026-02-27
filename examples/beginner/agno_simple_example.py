@@ -67,7 +67,7 @@ def handler(messages: list[dict[str, str]]):
 if __name__ == "__main__":
     # Disable auth for local development - frontend can connect without OAuth
     import os
-    os.environ["AUTH_ENABLED"] = "false"
+    #os.environ["AUTH_ENABLED"] = "false"
     bindufy(config, handler)
 
 # if you want to use tunnel to expose your agent to the internet, use the following command

@@ -1,0 +1,76 @@
+id: langgraph-structured-blog-writer
+name: LangGraph Structured Technical Blog Agent
+version: 1.0.0
+author: amritanshu9973@gmail.com
+description: |
+  A production-grade technical blog generation agent built with LangGraph
+  and OpenAI (gpt-5.2).
+
+  Architecture:
+  - Orchestrator: Generates a strictly validated blog outline using a Pydantic schema (Plan + Task).
+  - Worker Nodes: Independently generate detailed Markdown sections based on structured goals.
+  - Reducer: Combines all generated sections into a cohesive final blog post.
+
+  Core Capabilities:
+  - Schema-enforced structured planning
+  - 5–7 section automatic decomposition
+  - Map-reduce parallel section writing
+  - Developer-focused technical precision
+  - Markdown-first clean formatting
+  - Explicit inclusion of edge cases, trade-offs, and implementation details
+
+  This agent ensures deterministic, high-quality, engineering-grade blog posts.
+
+tags:
+  - langgraph
+  - openai
+  - gpt-5.2
+  - technical-writing
+  - structured-output
+  - pydantic
+  - map-reduce
+  - markdown
+  - blog-generation
+  - orchestration
+
+input_modes:
+  - application/json
+
+output_modes:
+  - application/json
+
+examples:
+  - "How does Retrieval-Augmented Generation (RAG) work?"
+  - "Design a production-ready microservices architecture"
+  - "Deep dive into Kubernetes scheduling"
+  - "How to implement distributed tracing in Python"
+  - "Understanding vector databases in AI systems"
+
+capabilities_detail:
+  structured_planning:
+    supported: true
+    description: "Uses strict Pydantic schema (Plan + Task) for deterministic outline generation."
+
+  section_schema_validation:
+    supported: true
+    description: "Each section includes goal, 3–5 actionable bullets, target word count, and type constraints."
+
+  map_reduce_execution:
+    supported: true
+    description: "Uses LangGraph fan-out workers to generate sections and reducer to merge outputs."
+
+  markdown_output:
+    supported: true
+    description: "Produces clean, production-ready Markdown with headings and code blocks."
+
+  technical_depth_enforcement:
+    supported: true
+    description: "Requires implementation-level detail, trade-offs, edge cases, and debugging insights."
+
+  openai_backend:
+    supported: true
+    description: "Powered by OpenAI gpt-5.2 via ChatOpenAI."
+
+  deterministic_structure:
+    supported: true
+    description: "Ensures exactly one 'common_mistakes' section and 5–7 total sections."

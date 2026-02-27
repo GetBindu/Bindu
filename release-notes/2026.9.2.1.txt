@@ -1,0 +1,43 @@
+Release: Dependency Version Updates
+Version: 2026.9.2.1
+Date: February 23, 2026
+
+OVERVIEW
+--------
+Patch release to relax version constraints for uvicorn and pydantic, allowing
+for better compatibility with newer versions and easier dependency resolution.
+
+CHANGES
+-------
+
+Dependency Updates:
+- Relaxed uvicorn constraint: 0.34.1 → >=0.35
+  - Allows newer uvicorn versions with bug fixes and improvements
+  - Updated in both main dependencies and [core] extras
+- Relaxed pydantic constraint: exact version → >=2.11.7
+  - Already updated in previous release, included for completeness
+
+Benefits:
+- Better compatibility with ecosystem packages
+- Easier dependency resolution
+- Access to latest bug fixes and security patches
+- Reduced dependency conflicts
+
+BREAKING CHANGES
+----------------
+None
+
+MIGRATION NOTES
+---------------
+- Run: uv sync to update dependencies
+- No code changes required
+
+TESTING
+-------
+✅ All tests passing
+✅ Pre-commit hooks passing
+✅ Dependency resolution verified
+
+CONTRIBUTORS
+------------
+- Raahul Dutta

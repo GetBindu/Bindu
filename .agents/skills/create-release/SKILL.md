@@ -11,7 +11,7 @@ Create a new Bindu release with CalVer versioning, comprehensive release notes, 
 
 ## Inputs
 
-- Optional: Version number (defaults to current date in YYYY.M.D format)
+- Optional: Version number (defaults to current date in YYYY.Week.Day format)
 - Optional: Release title
 
 ## Safety
@@ -68,7 +68,7 @@ git pull origin main
 ```bash
 # Use provided version or generate from date
 if [ -z "$1" ]; then
-    VERSION=$(date +%Y.%-m.%-d)
+    VERSION=$(date +%Y.%W.%-d)
 else
     VERSION=$1
 fi
@@ -325,8 +325,8 @@ Create `.local/release.json`:
 /skill create-release
 
 # Create release with specific version
-/skill create-release 2026.8.10
+/skill create-release 2026.8.1
 
 # Create release with title
-/skill create-release 2026.8.10 "Major Feature Release"
+/skill create-release 2026.8.1 "Major Feature Release"
 ```

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sys
+
 from rich.align import Align
 from rich.console import Console, Group
 from rich.panel import Panel
@@ -30,6 +32,14 @@ def prepare_server_display(
         client_secret: OAuth client secret for token retrieval
         tunnel_url: Public tunnel URL if tunneling is enabled
     """
+    # Force UTF-8 output on Windows to avoid cp1252 UnicodeEncodeError when
+    # rich renders emoji (e.g. in Panel titles). reconfigure() changes the
+    # encoding in-place without closing stdout.
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[call-non-callable]
+        except Exception:
+            pass
     console = Console()
 
     # ASCII art with gradient colors

@@ -31,11 +31,20 @@ class NotificationDeliveryError(Exception):
 
 @dataclass
 class NotificationService:
-    """Deliver push notification events to configured HTTP endpoints."""
+    """Deliver push notification events to configured HTTP endpoints.
+
+    Includes lightweight in-memory delivery metrics for observability.
+    """
 
     timeout: float = 5.0
     max_retries: int = 2
     base_backoff: float = 0.5
+
+    # --- Metrics ---
+    total_sent: int = 0
+    total_success: int = 0
+    total_failures: int = 0
+    total_retries: int = 0
 
     async def send_event(
         self, config: PushNotificationConfig, event: dict[str, Any]
@@ -59,6 +68,9 @@ class NotificationService:
     async def _post_with_retries(
         self, url: str, headers: dict[str, str], payload: bytes, event: dict[str, Any]
     ) -> None:
+        # --- Metrics: count total attempts to send ---
+        self.total_sent += 1
+
         attempt = 0
         backoff = self.base_backoff
         last_error: NotificationDeliveryError | None = None
@@ -72,6 +84,8 @@ class NotificationService:
                     task_id=event.get("task_id"),
                     status=status,
                 )
+
+                self.total_success += 1
                 return
             except NotificationDeliveryError as exc:
                 last_error = exc
@@ -99,6 +113,7 @@ class NotificationService:
                 task_id=event.get("task_id"),
                 attempt=attempt,
             )
+            self.total_retries += 1
             await asyncio.sleep(backoff)
             backoff *= 2
 
@@ -112,6 +127,8 @@ class NotificationService:
             status=last_error.status,
             message=str(last_error),
         )
+        self.total_failures += 1
+
         raise last_error
 
     def _post_once(self, url: str, headers: dict[str, str], payload: bytes) -> int:
@@ -150,3 +167,13 @@ class NotificationService:
         if token:
             headers["Authorization"] = f"Bearer {token}"
         return headers
+
+    # --- NEW METHOD ---
+    def get_metrics(self) -> dict[str, int]:
+        """Return delivery metrics for observability."""
+        return {
+            "total_sent": self.total_sent,
+            "total_success": self.total_success,
+            "total_failures": self.total_failures,
+            "total_retries": self.total_retries,
+        }
