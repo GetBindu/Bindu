@@ -391,6 +391,11 @@ class AgentSettings(BaseSettings):
         }
     )
 
+    # message/stream polling behavior
+    stream_poll_interval_seconds: float = 0.1
+    stream_missing_task_retries: int = 2
+    stream_missing_task_retry_delay_seconds: float = 0.05
+
     # Structured Response System Prompt
     # This prompt instructs LLMs to return structured JSON responses for state transitions
     # following the A2A Protocol hybrid agent pattern

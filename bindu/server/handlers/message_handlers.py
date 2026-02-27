@@ -114,6 +114,7 @@ class MessageHandlers:
         return SendMessageResponse(jsonrpc="2.0", id=request["id"], result=task)
 
     @trace_task_operation("stream_message")
+    @track_active_task
     async def stream_message(self, request: StreamMessageRequest):
         """Stream messages using Server-Sent Events.
 
@@ -129,6 +130,12 @@ class MessageHandlers:
             seen_status = task["status"]["state"]
             seen_artifact_ids: set[str] = set()
             cancelled_exc = anyio.get_cancelled_exc_class()
+            poll_interval = max(app_settings.agent.stream_poll_interval_seconds, 0.01)
+            missing_retries = max(app_settings.agent.stream_missing_task_retries, 0)
+            missing_retry_delay = max(
+                app_settings.agent.stream_missing_task_retry_delay_seconds,
+                0.0,
+            )
 
             submitted_event = {
                 "kind": "status-update",
@@ -142,6 +149,12 @@ class MessageHandlers:
             try:
                 while True:
                     loaded_task = await self.storage.load_task(task["id"])
+                    if loaded_task is None:
+                        for _ in range(missing_retries):
+                            await anyio.sleep(missing_retry_delay)
+                            loaded_task = await self.storage.load_task(task["id"])
+                            if loaded_task is not None:
+                                break
                     if loaded_task is None:
                         missing_event = {
                             "kind": "status-update",
@@ -189,9 +202,28 @@ class MessageHandlers:
                         return
 
                     if status in ("input-required", "auth-required"):
+                        # Re-check once before returning to avoid missing a quick
+                        # transition into a terminal state.
+                        latest_task = await self.storage.load_task(task["id"])
+                        if latest_task:
+                            latest_status = latest_task["status"]["state"]
+                            if latest_status != seen_status:
+                                yield self._sse_event(
+                                    {
+                                        "kind": "status-update",
+                                        "task_id": str(task["id"]),
+                                        "context_id": str(context_id),
+                                        "status": latest_task["status"],
+                                        "final": latest_status
+                                        in app_settings.agent.terminal_states,
+                                    }
+                                )
+                                seen_status = latest_status
+                                if latest_status in app_settings.agent.terminal_states:
+                                    return
                         return
 
-                    await anyio.sleep(0.1)
+                    await anyio.sleep(poll_interval)
             except cancelled_exc:
                 logger.debug(f"Streaming client disconnected for task {task['id']}")
                 return
@@ -201,15 +233,31 @@ class MessageHandlers:
                 )
                 timestamp = datetime.now(timezone.utc).isoformat()
                 current_state = "failed"
-                loaded_task = await self.storage.load_task(task["id"])
+                try:
+                    loaded_task = await self.storage.load_task(task["id"])
+                except Exception as load_err:
+                    loaded_task = None
+                    logger.error(
+                        f"Failed to load task {task['id']} during stream error handling: {load_err}",
+                        exc_info=True,
+                    )
 
                 if loaded_task:
                     current_state = loaded_task["status"]["state"]
                     timestamp = loaded_task["status"]["timestamp"]
                     if current_state not in app_settings.agent.terminal_states:
-                        updated = await self.storage.update_task(task["id"], state="failed")
-                        current_state = updated["status"]["state"]
-                        timestamp = updated["status"]["timestamp"]
+                        try:
+                            updated = await self.storage.update_task(
+                                task["id"], state="failed"
+                            )
+                            if updated and "status" in updated:
+                                current_state = updated["status"]["state"]
+                                timestamp = updated["status"]["timestamp"]
+                        except Exception as update_err:
+                            logger.error(
+                                f"Failed to update task {task['id']} to failed state during error handling: {update_err}",
+                                exc_info=True,
+                            )
 
                 error_event = {
                     "kind": "status-update",

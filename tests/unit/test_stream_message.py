@@ -118,23 +118,21 @@ async def test_stream_message_follows_task_lifecycle():
             assert isinstance(response, StreamingResponse)
             events = await asyncio.wait_for(_read_sse_events(response), timeout=3)
             status_events = [e for e in events if e.get("kind") == "status-update"]
+            artifact_events = [e for e in events if e.get("kind") == "artifact-update"]
 
             assert status_events
-            assert status_events[0]["status"]["state"] == "submitted"
-            assert any(
-                e["status"]["state"]
-                in {
-                    "working",
-                    "completed",
-                    "failed",
-                    "canceled",
-                    "input-required",
-                    "auth-required",
-                }
-                for e in status_events[1:]
+            states = [e["status"]["state"] for e in status_events]
+            assert states[0] == "submitted"
+            assert "working" in states[1:]
+            assert "completed" in states[1:]
+            assert states.index("working") < states.index("completed")
+
+            assert artifact_events
+            assert all(
+                e.get("artifact", {}).get("artifact_id") is not None
+                for e in artifact_events
             )
 
             task = await storage.load_task(message["task_id"])
             assert task is not None
             assert task["status"]["state"] == "completed"
-
