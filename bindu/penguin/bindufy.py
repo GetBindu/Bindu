@@ -170,12 +170,8 @@ def bindufy(
 
     validated_config = ConfigValidator.validate_and_process(config)
 
-    # Early validation for required author field
-    if (
-        not validated_config.get("author")
-        or not str(validated_config["author"]).strip()
-    ):
-        raise ValueError("'author' is required in config and cannot be empty.")
+ 
+
 
     # Generate agent_id if not provided
     # Use deterministic ID based on author + agent_name to ensure same DID across restarts
