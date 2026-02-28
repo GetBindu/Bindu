@@ -16,6 +16,7 @@ that serves AI agents following the A2A (Agent-to-Agent) protocol.
 """
 
 from __future__ import annotations as _annotations
+from bindu.server.middleware.kill_switch import KillSwitchMiddleware
 
 from contextlib import asynccontextmanager
 from functools import partial
@@ -565,6 +566,9 @@ class BinduApplication(Starlette):
         metrics_middleware = Middleware(MetricsMiddleware)
         middleware_list.append(metrics_middleware)
         logger.info("Metrics middleware enabled for Prometheus monitoring")
+        
+        kill_switch_middleware = Middleware(KillSwitchMiddleware)
+        middleware_list.insert(0, kill_switch_middleware)
 
         return middleware_list
 
