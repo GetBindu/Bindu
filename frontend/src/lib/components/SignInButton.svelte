@@ -33,55 +33,8 @@
 			errorStore.set(OAUTH_ERROR_MESSAGES[errorCode]);
 		} else if (errorCode) {
 			// Unknown error code — show a generic message
-			errorStore.set(OAUTH_ERROR_MESSAGES["OAUTH_PROVIDER_ERROR"]);
-		}
-	});
-
-	async function handleSignIn() {
-		try {
-			const response = await fetch(`${base}/login`);
-
-			let data: any = null;
-			try {
-				data = await response.json();
-			} catch {
-				// Response is not JSON; leave `data` as null.
-			}
-
-			if (!response.ok) {
-				const errorCode = data?.error ?? data?.code;
-				if (errorCode && errorCode in OAUTH_ERROR_MESSAGES) {
-					errorStore.set(OAUTH_ERROR_MESSAGES[errorCode]);
-				} else if (data?.message && typeof data.message === "string") {
-					errorStore.set(data.message);
-				} else {
-					errorStore.set(OAUTH_ERROR_MESSAGES["OAUTH_PROVIDER_ERROR"]);
-				}
-				return;
-			}
-
-			const redirectUrl =
-				(typeof data?.redirectUrl === "string" && data.redirectUrl) ||
-				(typeof data?.url === "string" && data.url);
-
-			if (redirectUrl) {
-				window.location.href = redirectUrl;
-			} else {
-				// Fallback to existing behavior if no URL is provided in the JSON.
-				window.location.href = `${base}/login`;
-			}
-		} catch {
-			// Network or unexpected error — treat as provider unavailable.
-			errorStore.set(OAUTH_ERROR_MESSAGES["OAUTH_PROVIDER_UNAVAILABLE"]);
-		}
-	}
-</script>
-
-<button
-	id="sign-in-btn"
-	type="button"
-	class="flex items-center gap-2 rounded-full border border-gray-200 bg-white/90 px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-200 dark:hover:bg-gray-700 {classNames}"
-	onclick={handleSignIn}
->
-	{label}
-</button>
+<!--
+	SignInButton component removed because it was not referenced anywhere in the app.
+	If a dedicated sign-in button is needed in the future, reintroduce it and wire it
+	into the appropriate page or layout so its behavior is exercised.
+-->
