@@ -150,7 +150,7 @@ class NotificationService:
             body = b""
             try:
                 body = exc.read() or b""
-            except Exception:
+            except OSError:
                 body = b""
             message = body.decode("utf-8", errors="ignore").strip()
             raise NotificationDeliveryError(

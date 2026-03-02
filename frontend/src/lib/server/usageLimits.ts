@@ -14,6 +14,7 @@ export const usageLimitsSchema = z
 		conversations: z.coerce.number().optional(), // how many conversations
 		messages: z.coerce.number().optional(), // how many messages in a conversation
 		messageLength: z.coerce.number().optional(), // how long can a message be before we cut it off
+		messageFileSize: z.coerce.number().optional(), // max uploaded file size in bytes
 		messagesPerMinute: z
 			.preprocess((val) => {
 				if (val === undefined) {

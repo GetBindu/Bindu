@@ -333,6 +333,12 @@
 		? 'md:grid-cols-[290px,1fr]'
 		: 'md:grid-cols-[0px,1fr]'} transition-[300ms] [transition-property:grid-template-columns] dark:text-gray-300 md:grid-rows-[1fr]"
 >
+	<a
+		href="#main-content"
+		class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-white focus:px-4 focus:py-2 focus:rounded-md focus:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+	>
+		Skip to main content
+	</a>
 	<ExpandNavigation
 		isCollapsed={isNavCollapsed}
 		onClick={() => (isNavCollapsed = !isNavCollapsed)}
@@ -375,7 +381,9 @@
 	{#if currentError}
 		<Toast message={currentError} />
 	{/if}
-	{@render children?.()}
+	<main id="main-content" tabindex="-1" class="relative flex h-full flex-col overflow-hidden">
+		{@render children?.()}
+	</main>
 
 	<Footer />
 

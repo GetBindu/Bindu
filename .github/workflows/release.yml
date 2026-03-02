@@ -42,6 +42,7 @@ jobs:
 
       - name: Upload coverage to Coveralls
         uses: coverallsapp/github-action@v2
+        continue-on-error: true  # Don't block release if Coveralls is down
         with:
           file: coverage.xml
           format: cobertura

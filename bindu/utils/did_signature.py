@@ -121,7 +121,8 @@ def verify_signature(
             # Verify the signature
             verify_key.verify(payload_str.encode("utf-8"), signature_bytes)
             is_valid = True
-        except (BadSignatureError, Exception):
+        except (BadSignatureError, ValueError, TypeError, Exception) as e:
+            logger.debug(f"Signature verification failed: {e}")
             is_valid = False
 
         if not is_valid:
@@ -129,7 +130,7 @@ def verify_signature(
 
         return is_valid
 
-    except Exception as e:
+    except (ImportError, UnicodeEncodeError, ValueError, TypeError) as e:
         logger.error(f"Failed to verify DID signature: {e}")
         return False
 
@@ -202,7 +203,7 @@ async def get_public_key_from_hydra(client_did: str, hydra_client) -> Optional[s
 
         return public_key
 
-    except Exception as e:
+    except (ValueError, TypeError, KeyError, ConnectionError, Exception) as e:
         logger.error(f"Failed to get public key from Hydra: {e}")
         return None
 

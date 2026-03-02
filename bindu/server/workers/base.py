@@ -137,7 +137,7 @@ class Worker(ABC):
                         logger.warning(
                             f"Unknown operation: {task_operation['operation']}"
                         )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - intentionally broad: any unhandled worker failure must mark the task as failed
             # Update task status to failed on any exception
             from uuid import UUID
 

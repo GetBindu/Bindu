@@ -3,7 +3,7 @@ import type { Cookies } from "@sveltejs/kit";
 import { collections } from "$lib/server/database";
 import { updateUser } from "./updateUser";
 import ObjectId from "bson-objectid";
-import { DEFAULT_SETTINGS } from "$lib/types/Settings";
+import { DEFAULT_SETTINGS } from "$lib/constants/settings";
 import { defaultModel } from "$lib/server/models";
 import { findUser } from "$lib/server/auth";
 import type { TokenSet } from "openid-client";

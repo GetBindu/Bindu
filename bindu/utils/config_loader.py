@@ -417,6 +417,23 @@ def load_config_from_env(config: Dict[str, Any]) -> Dict[str, Any]:
                     enriched_config["auth"]["agent_client_prefix"] = hydra_client_prefix
                     logger.debug("Loaded HYDRA__AGENT_CLIENT_PREFIX from environment")
 
+    # Vault configuration - load from env if not in user config
+    if "vault" not in enriched_config:
+        vault_enabled = os.getenv("VAULT__ENABLED", "").lower() in ("true", "1", "yes")
+        vault_url = os.getenv("VAULT__URL") or os.getenv("VAULT_ADDR")
+        vault_token = os.getenv("VAULT__TOKEN") or os.getenv("VAULT_TOKEN")
+
+        if vault_enabled or vault_url or vault_token:
+            enriched_config["vault"] = {
+                "enabled": vault_enabled,
+            }
+            if vault_url:
+                enriched_config["vault"]["url"] = vault_url
+                logger.debug(f"Loaded Vault URL from environment: {vault_url}")
+            if vault_token:
+                enriched_config["vault"]["token"] = vault_token
+                logger.debug("Loaded Vault token from environment")
+
     return enriched_config
 
 
@@ -433,6 +450,21 @@ def create_auth_config_from_env(user_config: Dict[str, Any]) -> Dict[str, Any] |
         Auth configuration dictionary or None if not configured
     """
     return user_config.get("auth")
+
+
+def create_vault_config_from_env(user_config: Dict[str, Any]) -> Dict[str, Any] | None:
+    """Create vault configuration from validated config.
+
+    Vault config is already enriched by load_config_from_env() and validated.
+    This function simply extracts it from the validated config.
+
+    Args:
+        user_config: Validated configuration dictionary (already enriched)
+
+    Returns:
+        Vault configuration dictionary or None if not configured
+    """
+    return user_config.get("vault")
 
 
 def update_auth_settings(auth_config: Dict[str, Any]) -> None:
@@ -482,14 +514,26 @@ def update_auth_settings(auth_config: Dict[str, Any]) -> None:
             app_settings.hydra.agent_client_prefix = auth_config.get(
                 "agent_client_prefix", app_settings.hydra.agent_client_prefix
             )
+        else:
+            logger.warning(f"Unknown authentication provider: {provider}")
 
-            logger.info(
-                f"Hydra authentication configured: admin_url={auth_config.get('admin_url')}, "
-                f"auto_register={auth_config.get('auto_register_agents')}"
-            )
 
-    else:
-        # Auth is not provided or disabled - ensure it's disabled
-        app_settings.auth.enabled = False
-        app_settings.hydra.enabled = False
-        logger.info("Authentication disabled")
+def update_vault_settings(vault_config: Dict[str, Any]) -> None:
+    """Update global vault settings from configuration.
+
+    Args:
+        vault_config: Vault configuration dictionary
+    """
+    from bindu.settings import app_settings
+
+    if vault_config:
+        app_settings.vault.enabled = vault_config.get(
+            "enabled", app_settings.vault.enabled
+        )
+        app_settings.vault.url = vault_config.get("url", app_settings.vault.url)
+        app_settings.vault.token = vault_config.get("token", app_settings.vault.token)
+
+        if app_settings.vault.enabled:
+            logger.info(f"Vault integration enabled: {app_settings.vault.url}")
+        else:
+            logger.debug("Vault integration disabled")
