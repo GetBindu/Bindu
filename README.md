@@ -510,7 +510,7 @@ Want integration with your favorite framework? [Let us know on Discord](https://
 
 ## 🧪 Testing
 
-Bindu maintains **64%+ test coverage**:
+Bindu currently enforces a **64% minimum test coverage in CI**, with an aspirational target of **80%+** coverage for new contributions.
 
 ```bash
 uv run pytest -n auto --cov=bindu --cov-report= && coverage report --skip-covered --fail-under=64

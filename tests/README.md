@@ -12,7 +12,6 @@ tests/
 │   ├── test_scheduler.py           # Task scheduler tests
 │   ├── test_manifest_worker.py     # Worker & hybrid pattern tests
 │   └── test_task_manager.py        # TaskManager tests
-├── integration/                    # Integration tests
 │   └── test_postman_scenarios.py   # Postman collection scenarios
 ├── e2e/                            # End-to-end tests
 ├── conftest.py                     # Pytest fixtures
@@ -32,8 +31,6 @@ pytest
 # Unit tests only
 pytest tests/unit/
 
-# Integration tests only
-pytest tests/integration/
 
 # Specific test file
 pytest tests/unit/test_protocol_types.py
@@ -62,8 +59,6 @@ open htmlcov/index.html
 # Run only unit tests
 pytest -m unit
 
-# Run only integration tests
-pytest -m integration
 
 # Run only asyncio tests
 pytest -m asyncio
@@ -213,6 +208,5 @@ pytest --timeout=10
 When adding new features:
 1. Write tests first (TDD)
 2. Ensure all tests pass
-3. Maintain >90% coverage for new code
-4. Add integration tests for new endpoints
+3. Maintain CI minimum coverage (64%) and aim for 80%+ on new or updated code.
 5. Update this README if needed
