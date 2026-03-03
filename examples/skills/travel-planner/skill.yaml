@@ -1,0 +1,265 @@
+id: travel-planner-v1
+name: travel-planner
+version: 1.0.0
+author: paras@getbindu.com
+
+# Description
+description: |
+  Travel planning agent that creates detailed itineraries with accommodations, activities,
+  logistics, and local insights. Uses Exa search for destination research. Optional MCP
+  tools for Airbnb and Google Maps integration (may fail to initialize). Optional Mem0
+  for conversation memory.
+
+# Tags and Modes
+tags:
+  - travel
+  - planner
+  - itinerary
+  - tourism
+  - vacation
+  - trip
+  - exa
+  - budget
+
+input_modes:
+  - text/plain
+  - application/json
+
+output_modes:
+  - text/markdown
+
+# Example Queries
+examples:
+  - "Plan a 5-day trip to Goa including itinerary, accommodation suggestions, and must-visit places"
+  - "Plan a 3-day trip to Jaipur including itinerary, hotel recommendations, and local transportation details"
+  - "Create a romantic weekend getaway in Paris with a $2000 budget"
+  - "Organize a 7-day adventure trip to New Zealand for solo travel"
+  - "Plan a luxury honeymoon in Maldives for 10 days"
+
+# Requirements
+requirements:
+  packages:
+    - agno>=2.2.0
+    - openai>=2.11.0
+    - exa-py>=2.0.0
+    - python-dotenv>=1.0.1
+    - bindu
+  system:
+    - npx (for MCP tools, optional)
+  min_memory_mb: 512
+  external_services:
+    - OpenRouter API (required for LLM)
+    - Exa API (required for destination research)
+    - Mem0 API (optional for conversation memory)
+    - MCP servers via npx (optional, may fail silently)
+
+# Performance Metrics
+performance:
+  avg_processing_time_ms: 20000
+  max_concurrent_requests: 1
+  memory_per_request_mb: 512
+  scalability: vertical
+
+# Tool Restrictions
+allowed_tools:
+  - ExaTools
+  - MultiMCPTools
+  - Mem0Tools
+
+# Rich Documentation
+documentation:
+  overview: |
+    Travel planning agent that generates markdown-formatted itineraries. Uses Exa search
+    to research destinations. Attempts to initialize MCP tools for Airbnb and Google Maps
+    but continues if they fail. Outputs detailed day-by-day schedules with accommodations,
+    activities, budget breakdowns, and local tips.
+
+  use_cases:
+    when_to_use:
+      - Planning multi-day trips with detailed itineraries
+      - Researching destinations and attractions
+      - Getting accommodation recommendations
+      - Budget estimation for trips
+      - Local transportation and logistics planning
+      - Cultural insights and dining recommendations
+
+    when_not_to_use:
+      - Real-time flight booking or purchasing
+      - Live transportation tracking
+      - Visa applications
+      - Travel insurance purchase
+      - Currency exchange
+      - Emergency assistance
+      - Actual reservations or bookings
+
+  input_structure: |
+    Accepts natural language travel planning requests via JSON-RPC:
+
+    {
+      "jsonrpc": "2.0",
+      "method": "message/send",
+      "params": {
+        "message": {
+          "role": "user",
+          "parts": [{"kind": "text", "text": "Plan a 5-day trip to Goa..."}],
+          "kind": "message",
+          "messageId": "uuid",
+          "contextId": "uuid",
+          "taskId": "uuid"
+        },
+        "skillId": "travel-planner-v1",
+        "configuration": {"acceptedOutputModes": ["application/json"]}
+      },
+      "id": "uuid"
+    }
+
+    The agent extracts trip details from natural language including:
+    - Destination
+    - Duration (number of days)
+    - Group size (if mentioned)
+    - Budget (if mentioned)
+    - Travel style (cultural, adventure, luxury, etc.)
+    - Special requirements
+
+  output_format: |
+    Returns markdown-formatted itinerary via JSON-RPC task response:
+
+    {
+      "jsonrpc": "2.0",
+      "result": {
+        "kind": "task",
+        "status": {"state": "completed"},
+        "history": [
+          {
+            "role": "assistant",
+            "parts": [{"kind": "text", "text": "# Destination Travel Itinerary..."}]
+          }
+        ],
+        "artifacts": [
+          {
+            "artifact_id": "uuid",
+            "name": "result",
+            "parts": [{"kind": "text", "text": "# Destination Travel Itinerary..."}]
+          }
+        ]
+      }
+    }
+
+    Markdown structure includes:
+    - Trip Overview (dates, duration, group size, budget range, travel style)
+    - Accommodation Options (recommended stay with details, alternatives)
+    - Daily Itinerary (day-by-day schedule with times, activities, locations, costs)
+    - Budget Breakdown (accommodation, transport, activities, food, misc, total)
+    - Logistics & Transportation (getting there, local transport, tips)
+    - Booking Requirements & Timeline (immediate, 1 month, 2 weeks)
+    - Local Tips & Cultural Insights (etiquette, dining, safety, language)
+    - Important Considerations (weather, health, contingencies)
+
+  error_handling:
+    - "MCP tools initialization failure: Agent continues without Airbnb/Google Maps integration"
+    - "Mem0 initialization failure: Agent continues without conversation memory"
+    - "Exa API failure: Agent cannot function (required dependency)"
+    - "Missing API keys: Agent fails to initialize with clear error message"
+
+  examples:
+    - title: "5-Day Goa Trip"
+      input:
+        query: "Plan a 5-day trip to Goa including itinerary, accommodation suggestions, and must-visit places"
+      output:
+        format: "Markdown itinerary with trip overview, accommodations (Little Palm Grove at Ashvem Beach), 5-day schedule, budget breakdown, local tips"
+        processing_time_ms: 26000
+
+    - title: "3-Day Jaipur Trip"
+      input:
+        query: "Plan a 3-day trip to Jaipur including itinerary, hotel recommendations, and local transportation details"
+      output:
+        format: "Markdown itinerary with heritage hotel recommendations (Rambagh Palace), 3-day schedule covering forts and palaces, budget breakdown, transportation details"
+        processing_time_ms: 17000
+
+  best_practices:
+    for_developers:
+      - "Ensure OPENROUTER_API_KEY and EXA_API_KEY are set before initialization"
+      - "MCP tools are optional and may fail - agent handles gracefully"
+      - "Agent uses OpenRouter model: openai/gpt-4o by default (configurable via MODEL_NAME)"
+      - "Agent runs on http://127.0.0.1:3773 by default"
+      - "Uses bindufy() for JSON-RPC server setup"
+      - "Lazy initialization on first message to reduce startup time"
+
+    for_orchestrators:
+      - "Route travel planning and itinerary requests to this skill"
+      - "Expect 15-30 second response times for complex itineraries"
+      - "Agent returns markdown in message parts and artifacts"
+      - "Task status transitions: submitted -> completed"
+      - "Agent does not support streaming responses"
+      - "Agent includes datetime context automatically"
+
+  installation: |
+    Required packages:
+    pip install agno openai exa-py python-dotenv bindu-penguin
+
+    Optional system dependencies:
+    npm install -g npx  # For MCP tools (Airbnb, Google Maps)
+
+    Required environment variables:
+    OPENROUTER_API_KEY=your_openrouter_api_key  # Required
+    EXA_API_KEY=your_exa_api_key                # Required
+
+    Optional environment variables:
+    MODEL_NAME=openai/gpt-4o                    # Default model
+    MEM0_API_KEY=your_mem0_api_key              # Optional memory
+
+    Start agent:
+    python -m travel_agent.main
+
+  versioning:
+    - version: "1.0.0"
+      date: "2026-02-27"
+      changes: "Initial release with Exa search, optional MCP tools, markdown output via JSON-RPC"
+
+# Assessment fields for skill negotiation
+assessment:
+  keywords:
+    - travel
+    - trip
+    - vacation
+    - holiday
+    - itinerary
+    - plan
+    - destination
+    - hotel
+    - accommodation
+    - budget
+    - visit
+    - explore
+    - tour
+
+  specializations:
+    - domain: travel_planning
+      confidence_boost: 0.4
+    - domain: itinerary_creation
+      confidence_boost: 0.3
+    - domain: destination_research
+      confidence_boost: 0.2
+
+  anti_patterns:
+    - "book flight"
+    - "buy ticket"
+    - "visa"
+    - "insurance"
+    - "emergency"
+    - "real-time"
+    - "track"
+
+  complexity_indicators:
+    simple:
+      - "weekend trip"
+      - "things to do"
+      - "places to visit"
+    medium:
+      - "3-day trip"
+      - "5-day trip"
+      - "week-long vacation"
+    complex:
+      - "multi-city tour"
+      - "corporate retreat"
+      - "group of 20+"
