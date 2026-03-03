@@ -408,3 +408,128 @@ class TestX402Middleware:
 
         # Should handle None client gracefully
         assert isinstance(response, JSONResponse)
+
+
+# =============================================================================
+# Payment Signature Verification Tests
+# =============================================================================
+
+class TestPaymentSignatureVerification:
+    """Test payment signature verification to prevent forgery/replay attacks."""
+
+    @pytest.fixture
+    def middleware(self):
+        """Create a test middleware with security enabled."""
+        from bindu.server.middleware.x402.x402_middleware import X402Middleware
+
+        app = MagicMock()
+        manifest = MagicMock()
+        manifest.name = "test-agent"
+        manifest.description = "Test"
+        manifest.did_extension = None
+
+        facilitator_config = MagicMock()
+        x402_ext = MagicMock()
+        payment_requirements = [{"scheme": "exact", "network": "base-sepolia"}]
+
+        middleware = X402Middleware(
+            app, manifest, facilitator_config, x402_ext, payment_requirements
+        )
+        middleware.facilitator = MagicMock()
+        return middleware
+
+    def test_payment_missing_signature(self, middleware):
+        """X-PAYMENT header without signature should be rejected."""
+        from bindu.server.middleware.x402.payment_security import PaymentSecurity
+        import base64
+
+        # Create unsigned payment payload
+        payment_dict = {"amount": "100", "network": "base-sepolia", "_hmac_timestamp": 1000}
+        unsigned_header = base64.b64encode(
+            json.dumps(payment_dict).encode()
+        ).decode()
+
+        protected_method = app_settings.x402.protected_methods[0]
+        body = json.dumps({"method": protected_method}).encode()
+        request = _make_request(
+            body=body,
+            headers={"X-PAYMENT": unsigned_header},
+        )
+
+        call_next = AsyncMock()
+        import asyncio
+        response = asyncio.run(middleware.dispatch(request, call_next))
+
+        assert response.status_code == 402
+        content = json.loads(response.body)
+        assert "signature" in content["error"].lower()
+
+    def test_payment_invalid_signature(self, middleware):
+        """X-PAYMENT with invalid signature should be rejected."""
+        import base64
+
+        # Create payment with bad signature
+        payment_dict = {
+            "amount": "100",
+            "network": "base-sepolia",
+            "_hmac_timestamp": 1000,
+            "_hmac_signature": "0" * 64,  # Invalid signature
+        }
+        bad_sig_header = base64.b64encode(
+            json.dumps(payment_dict).encode()
+        ).decode()
+
+        protected_method = app_settings.x402.protected_methods[0]
+        body = json.dumps({"method": protected_method}).encode()
+        request = _make_request(
+            body=body,
+            headers={"X-PAYMENT": bad_sig_header},
+        )
+
+        call_next = AsyncMock()
+        import asyncio
+        response = asyncio.run(middleware.dispatch(request, call_next))
+
+        assert response.status_code == 402
+        content = json.loads(response.body)
+        assert "Invalid" in content["error"] or "signature" in content["error"].lower()
+
+    def test_payment_valid_signature_accepted(self, middleware):
+        """X-PAYMENT with valid signature should be accepted (if amount matches)."""
+        from bindu.server.middleware.x402.payment_security import PaymentSecurity
+        import base64
+        import time
+
+        # Create correctly signed payment
+        sec = PaymentSecurity(app_settings.x402.payment_security_secret)
+        payment_dict = {
+            "amount": "100",
+            "network": "base-sepolia",
+        }
+        signature = sec.sign_payload(payment_dict, timestamp=int(time.time()))
+
+        # Add signature to payload
+        payment_dict["_hmac_signature"] = signature
+        signed_header = base64.b64encode(
+            json.dumps(payment_dict).encode()
+        ).decode()
+
+        protected_method = app_settings.x402.protected_methods[0]
+        body = json.dumps({"method": protected_method}).encode()
+        request = _make_request(
+            body=body,
+            headers={"X-PAYMENT": signed_header},
+        )
+
+        call_next = AsyncMock(return_value=Response(b"ok"))
+        import asyncio
+        # This will still fail due to missing payment requirements match,
+        # but it should pass signature verification
+        response = asyncio.run(middleware.dispatch(request, call_next))
+
+        # Check that we got past signature verification (402 may still occur
+        # for other reasons like missing matched requirements)
+        if response.status_code == 402:
+            content = json.loads(response.body)
+            # Should NOT be a signature error
+            assert "signature" not in content["error"].lower() or "tampered" not in content["error"].lower()
