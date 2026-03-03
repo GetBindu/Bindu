@@ -1,0 +1,304 @@
+id: legal-consultant-v1
+name: legal-consultant
+version: 1.0.0
+author: paras@getbindu.com
+
+# Description
+description: |
+  AI legal information assistant providing general legal education with mandatory disclaimers.
+  Uses Agno framework with OpenAI GPT-4o or OpenRouter models.
+  Optional Mem0 memory system and PostgreSQL knowledge base support.
+
+# Tags and Modes
+tags:
+  - legal
+  - education
+  - information
+  - consultant
+
+input_modes:
+  - application/json
+
+output_modes:
+  - application/json
+
+# Example Queries
+examples:
+  - "Explain the legal implications of terminating an employee for poor performance in India."
+  - "What are the basic elements of a valid contract?"
+  - "How does the statute of limitations work for personal injury cases?"
+
+# Detailed Capabilities
+capabilities_detail:
+  primary_capability:
+    supported: true
+    description: "Provides general legal information for educational purposes with mandatory disclaimers"
+    features:
+      - "Educational legal content with exact disclaimer text"
+      - "Attorney referral guidance"
+      - "General legal concepts explanation"
+      - "Legal process descriptions"
+    limitations: "Not legal advice, not a licensed attorney, no specific legal strategies or predictions"
+
+  secondary_capability:
+    supported: false
+    planned_version: "2.0.0"
+    description: "Not supported by code"
+
+# Requirements
+requirements:
+  packages:
+    - "agno"
+    - "python-dotenv"
+    - "bindu"
+  system:
+    - "Python 3.12+"
+  api_keys:
+    - "OPENAI_API_KEY or OPENROUTER_API_KEY (required)"
+    - "MEM0_API_KEY (optional)"
+    - "DATABASE_URL (optional, PostgreSQL with pgvector)"
+  min_memory_mb: 256
+
+# Performance Metrics
+performance:
+  avg_processing_time_ms: 8000
+  max_concurrent_requests: 5
+  memory_per_request_mb: 256
+  scalability: horizontal
+
+# Tool Restrictions
+allowed_tools:
+  - Mem0Tools
+# Rich Documentation
+documentation:
+  overview: |
+    AI legal information assistant providing general legal education.
+    Uses Agno framework with OpenAI GPT-4o or OpenRouter models.
+    Supports optional Mem0 memory system for conversation context.
+    Supports optional PostgreSQL with pgvector for knowledge base.
+    All responses include mandatory legal disclaimers.
+
+  use_cases:
+    when_to_use:
+      - "Learning basic legal concepts and terminology"
+      - "Understanding general legal procedures"
+      - "Getting educational information about legal topics"
+
+    when_not_to_use:
+      - "Specific legal advice"
+      - "Legal document review"
+      - "Legal strategy recommendations"
+      - "Predicting legal outcomes"
+
+  input_structure: |
+    JSON-RPC 2.0 message with user query in parts array.
+
+    Example:
+    {
+      "jsonrpc": "2.0",
+      "method": "message/send",
+      "params": {
+        "message": {
+          "role": "user",
+          "parts": [
+            {
+              "kind": "text",
+              "text": "Explain the legal implications of terminating an employee for poor performance in India."
+            }
+          ],
+          "kind": "message",
+          "messageId": "550e8400-e29b-41d4-a716-446655440038",
+          "contextId": "550e8400-e29b-41d4-a716-446655440038",
+          "taskId": "550e8400-e29b-41d4-a716-446655440077"
+        },
+        "configuration": {
+          "acceptedOutputModes": [
+            "application/json"
+          ]
+        }
+      },
+      "id": "550e8400-e29b-41d4-a716-446655440024"
+    }
+
+  output_format: |
+    JSON-RPC 2.0 result with task status and history.
+
+    Submit Response (state: submitted):
+    {
+      "jsonrpc": "2.0",
+      "id": "550e8400-e29b-41d4-a716-446655440024",
+      "result": {
+        "id": "550e8400-e29b-41d4-a716-446655440077",
+        "context_id": "550e8400-e29b-41d4-a716-446655440038",
+        "kind": "task",
+        "status": {
+          "state": "submitted",
+          "timestamp": "2026-02-26T10:23:40.564965+00:00"
+        },
+        "history": [
+          {
+            "message_id": "550e8400-e29b-41d4-a716-446655440038",
+            "context_id": "550e8400-e29b-41d4-a716-446655440038",
+            "task_id": "550e8400-e29b-41d4-a716-446655440077",
+            "kind": "message",
+            "parts": [
+              {
+                "kind": "text",
+                "text": "Explain the legal implications of terminating an employee for poor performance in India."
+              }
+            ],
+            "role": "user"
+          }
+        ]
+      }
+    }
+
+    Completed Response (state: completed, via tasks/get):
+    {
+      "jsonrpc": "2.0",
+      "id": "550e8400-e29b-41d4-a716-446655440014",
+      "result": {
+        "id": "550e8400-e29b-41d4-a716-446655440077",
+        "context_id": "550e8400-e29b-41d4-a716-446655440038",
+        "kind": "task",
+        "status": {
+          "state": "completed",
+          "timestamp": "2026-02-26T10:23:52.479504+00:00"
+        },
+        "history": [
+          {
+            "message_id": "550e8400-e29b-41d4-a716-446655440038",
+            "context_id": "550e8400-e29b-41d4-a716-446655440038",
+            "task_id": "550e8400-e29b-41d4-a716-446655440077",
+            "kind": "message",
+            "parts": [
+              {
+                "kind": "text",
+                "text": "Explain the legal implications of terminating an employee for poor performance in India."
+              }
+            ],
+            "role": "user"
+          },
+          {
+            "role": "assistant",
+            "parts": [
+              {
+                "kind": "text",
+                "text": "**Legal Information Disclaimer**: I am an AI assistant providing general legal information for educational purposes. I am not a lawyer, this is not legal advice, and no attorney-client relationship is formed. Laws vary by jurisdiction and change frequently. Always consult with a qualified attorney for legal advice.\n\nIn India, terminating an employee for poor performance involves several legal implications..."
+              }
+            ],
+            "kind": "message",
+            "message_id": "6bfffa9c-0cbb-407f-9f8a-601bbe41d1df",
+            "task_id": "550e8400-e29b-41d4-a716-446655440077",
+            "context_id": "550e8400-e29b-41d4-a716-446655440038"
+          }
+        ],
+        "artifacts": [
+          {
+            "artifact_id": "537ae7a4-4865-4ca3-8746-171714a94bb3",
+            "name": "result",
+            "parts": [
+              {
+                "kind": "text",
+                "text": "**Legal Information Disclaimer**: I am an AI assistant providing general legal information for educational purposes. I am not a lawyer, this is not legal advice, and no attorney-client relationship is formed. Laws vary by jurisdiction and change frequently. Always consult with a qualified attorney for legal advice.\n\nIn India, terminating an employee for poor performance involves several legal implications...",
+                "metadata": {
+                  "did.message.signature": "48W3UchLbRYpUUmV39v6z7zcG4HcEUdFCsZwx5omJYCsHQrFYm5VvMBRRNb2wMFLa2aZ9XhrnBopKkjqE65geoTw"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+
+  error_handling:
+    - "Missing API keys: Raises APIKeyError if neither OPENAI_API_KEY nor OPENROUTER_API_KEY is set"
+    - "Agent not initialized: Raises RuntimeError if handler called before initialization"
+    - "Specific legal advice requests: Agent declines and refers to attorneys per instructions"
+    - "Complex case analysis: Agent acknowledges limitations per instructions"
+
+  examples:
+    - title: "Employee Termination Legal Implications"
+      input:
+        text: "Explain the legal implications of terminating an employee for poor performance in India."
+      output:
+        disclaimer: "**Legal Information Disclaimer**: I am an AI assistant providing general legal information for educational purposes. I am not a lawyer, this is not legal advice, and no attorney-client relationship is formed. Laws vary by jurisdiction and change frequently. Always consult with a qualified attorney for legal advice."
+        content: "Educational information about employment termination laws in India, including general legal framework, performance management processes, notice periods, and recommendations to consult employment lawyers."
+
+  best_practices:
+    for_developers:
+      - "Ensure either OPENAI_API_KEY or OPENROUTER_API_KEY is set"
+      - "Optional: Set MEM0_API_KEY for conversation memory"
+      - "Optional: Set DATABASE_URL for PostgreSQL knowledge base"
+      - "Agent includes mandatory disclaimer in all responses"
+
+    for_orchestrators:
+      - "Route general legal education queries to this skill"
+      - "Use JSON-RPC 2.0 protocol via bindufy"
+      - "Task returns 'submitted' state immediately, poll with tasks/get for completion"
+      - "Expect async task processing pattern"
+
+  installation: |
+    Install dependencies:
+    pip install agno python-dotenv bindu
+
+    Required environment variables (one of):
+    OPENAI_API_KEY=<your-openai-key>
+    OPENROUTER_API_KEY=<your-openrouter-key>
+
+    Optional environment variables:
+    MEM0_API_KEY=<your-mem0-key>
+    DATABASE_URL=<postgresql-url-with-pgvector>
+    MODEL_NAME=<openrouter-model-id>  # default: openai/gpt-4o
+
+    Run:
+    python -m legal_consultant_agent
+
+    Or with arguments:
+    python -m legal_consultant_agent --openai-api-key <key> --mem0-api-key <key>
+
+    Default server URL: http://127.0.0.1:3773
+
+  versioning:
+    - version: "1.0.0"
+      date: "2026-01-11"
+      changes: "Initial release with Agno framework, OpenAI/OpenRouter support, optional Mem0 memory, optional PostgreSQL knowledge base, mandatory disclaimers"
+
+# Assessment fields for skill negotiation
+assessment:
+  keywords:
+    - "legal"
+    - "law"
+    - "contract"
+    - "employee"
+    - "termination"
+    - "statute"
+    - "rights"
+    - "liability"
+
+  specializations:
+    - domain: "legal_education"
+      confidence_boost: 0.8
+    - domain: "general_legal_information"
+      confidence_boost: 0.7
+
+  anti_patterns:
+    - "Specific legal advice"
+    - "Legal document preparation"
+    - "Legal document review"
+    - "Case outcome prediction"
+    - "Legal strategy recommendation"
+
+  complexity_indicators:
+    simple:
+      - "Explain basic legal term"
+      - "What is a contract"
+      - "General legal concept"
+    medium:
+      - "Legal implications of"
+      - "How does statute work"
+      - "Legal procedures for"
+    complex:
+      - "Specific case analysis"
+      - "Multi-jurisdiction comparison"
+      - "Detailed legal strategy"
