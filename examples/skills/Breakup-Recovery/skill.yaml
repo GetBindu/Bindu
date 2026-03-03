@@ -1,0 +1,246 @@
+id: breakup-recovery-v1
+name: Breakup-Recovery
+version: 1.0.0
+author: paras@getbindu.com
+
+# Description
+description: |
+  Text-based breakup recovery support using four AI agents that run concurrently.
+  Agents:
+  - Therapist: Emotional validation and support (90-140 words)
+  - Closure Specialist: Unsent message drafts (max 250 words)
+  - Recovery Planner: 3/5/7-day plans based on severity
+  - Brutal Honesty: Direct feedback with DuckDuckGo web search
+
+  Routing logic:
+  - Messages <20 words: Therapist only
+  - Messages containing "plan" or "recovery": Full 4-agent report
+  - All other messages: Full 4-agent report
+
+# Tags and Modes
+tags:
+  - breakup-recovery
+  - emotional-support
+  - therapy
+  - mental-health
+  - self-care
+  - closure
+  - healing
+  - relationship-advice
+
+input_modes:
+  - text/plain
+  - application/json
+
+output_modes:
+  - text/plain
+  - text/markdown
+
+# Example Queries
+examples:
+  - "I just went through a breakup and feel completely lost. Can you help me?"
+  - "I need to write a closure message to my ex"
+  - "Create a recovery plan for me"
+  - "Why did my relationship fail? Give honest feedback"
+  - "I'm feeling angry and sad"
+
+# Detailed Capabilities
+capabilities_detail:
+  primary_capability:
+    supported: true
+    description: "Concurrent execution of four text-based agents"
+    features:
+      - "Therapist agent: 90-140 word empathetic responses"
+      - "Closure agent: Unsent message templates (max 250 words)"
+      - "Planner agent: 3/5/7-day recovery plans"
+      - "Honesty agent: Direct feedback with web search via DuckDuckGo"
+    limitations: "Text-only input; no image analysis; not a replacement for professional therapy"
+
+  secondary_capability:
+    supported: false
+    description: "Image analysis not supported by code"
+    features: []
+    limitations: "No vision capabilities in current implementation"
+
+  vision_analysis:
+    supported: false
+    description: "Not supported by code"
+    features: []
+    limitations: "Code does not implement image processing or vision models"
+
+# Requirements
+requirements:
+  packages:
+    - "agno>=2.2.0"
+    - "python-dotenv>=1.0.0"
+    - "duckduckgo-search>=7.1.0"
+    - "bindu>=2026.7.3"
+  system:
+    - "Internet connection for DuckDuckGo search"
+  min_memory_mb: 256
+  external_services:
+    - "OpenRouter API (meta-llama/llama-3-8b-instruct)"
+
+# Performance Metrics
+performance:
+  avg_processing_time_ms: 8000
+  max_concurrent_requests: 5
+  memory_per_request_mb: 256
+  timeout_seconds: 120
+  scalability: horizontal
+
+# Tool Restrictions
+allowed_tools:
+  - DuckDuckGoTools
+
+# Rich Documentation
+documentation:
+  overview: |
+    Breakup recovery agent that coordinates four specialized agents running concurrently via asyncio.gather.
+    Uses OpenRouter with meta-llama/llama-3-8b-instruct model. Agents are initialized lazily on first request
+    and cached in module-level dict. Short messages (<20 words) trigger therapist-only response; longer messages
+    or those containing "plan"/"recovery" trigger full 4-agent report.
+
+  use_cases:
+    when_to_use:
+      - "Emotional distress after a breakup"
+      - "Need for closure message drafts"
+      - "Structured recovery planning (3/5/7 days)"
+      - "Direct relationship feedback"
+
+    when_not_to_use:
+      - "Crisis situations or suicidal thoughts"
+      - "Professional medical advice"
+      - "Image or screenshot analysis"
+      - "Multi-turn conversational therapy"
+      - "Legal advice"
+
+  input_structure: |
+    Accepts text messages via Bindu protocol.
+
+    Handler expects:
+    - List of message dicts with "content" key
+    - Uses last message content for processing
+
+    Routing:
+    - <20 words: Therapist agent only
+    - Contains "plan" or "recovery": Full report
+    - Default: Full report
+
+    No mode selection, no image support, no JSON configuration.
+
+  output_format: |
+    Returns markdown-formatted text with four sections:
+
+    # 💔 Breakup Recovery Plan
+
+    ## 🧠 Emotional Analysis
+    [Therapist response: 90-140 words]
+
+    ## ✍️ Closure Draft
+    [Closure message: max 250 words]
+
+    ## 📅 Recovery Plan
+    [Bullet-point plan: 3/5/7 days based on severity]
+
+    ## ⚖️ Hard Truth
+    [Direct feedback with web search results]
+
+  error_handling:
+    - "Missing OPENROUTER_API_KEY: Raises ValueError"
+    - "Empty message list: Returns 'Please tell me what happened.'"
+    - "Agent exceptions: Returns '⚠️ Agent Error' in that section"
+    - "No retry logic or exponential backoff"
+    - "No partial result handling beyond exception catching"
+
+  examples:
+    - title: "Short Message (Therapist Only)"
+      input:
+        text: "I'm sad"
+      output:
+        response: "[90-140 word empathetic response from Therapist agent]"
+
+    - title: "Recovery Plan Request"
+      input:
+        text: "Create a recovery plan for me after my breakup"
+      output:
+        response: "# 💔 Breakup Recovery Plan\n\n## 🧠 Emotional Analysis\n[...]\n\n## ✍️ Closure Draft\n[...]\n\n## 📅 Recovery Plan\n[...]\n\n## ⚖️ Hard Truth\n[...]"
+
+    - title: "Long Message (Full Report)"
+      input:
+        text: "I went through a breakup 3 weeks ago after a 2-year relationship. My ex said they needed space but are already posting pictures with someone new."
+      output:
+        response: "# 💔 Breakup Recovery Plan\n[Four sections as above]"
+
+  best_practices:
+    for_developers:
+      - "Set OPENROUTER_API_KEY environment variable"
+      - "Agent initialization is lazy and cached"
+      - "Agents run concurrently via asyncio.gather"
+      - "No conversation history is maintained"
+      - "Each request is stateless"
+
+    for_orchestrators:
+      - "Route breakup-related text queries to this skill"
+      - "Do not send image data (not supported)"
+      - "Expect 5-10 second response times for full reports"
+      - "No mode selection available"
+      - "Skill returns plain markdown text"
+
+  installation: |
+    Environment variables:
+    - OPENROUTER_API_KEY (required)
+
+    Quick start:
+    1. Set OPENROUTER_API_KEY in .env
+    2. uv sync
+    3. python -m ai_breakup_recovery_agent.main
+    4. Server runs on http://127.0.0.1:3773
+
+  versioning:
+    - version: "1.0.0"
+      date: "2026-02-27"
+      changes: "Initial release with four text-based agents using OpenRouter"
+
+# Assessment fields for skill negotiation
+assessment:
+  keywords:
+    - "breakup"
+    - "heartbreak"
+    - "ex"
+    - "relationship"
+    - "sad"
+    - "hurt"
+    - "pain"
+    - "healing"
+    - "recovery"
+    - "closure"
+    - "move on"
+    - "emotional support"
+
+  specializations:
+    - domain: "emotional_support"
+      confidence_boost: 0.4
+    - domain: "relationship_advice"
+      confidence_boost: 0.4
+
+  anti_patterns:
+    - "image analysis"
+    - "screenshot analysis"
+    - "vision tasks"
+    - "mathematical calculation"
+    - "code generation"
+    - "technical support"
+
+  complexity_indicators:
+    simple:
+      - "feeling sad"
+      - "need comfort"
+      - "missing them"
+    medium:
+      - "how to move on"
+      - "closure message"
+      - "recovery plan"
+    complex:
+      - "trauma from relationship"
+      - "complicated breakup situation"
