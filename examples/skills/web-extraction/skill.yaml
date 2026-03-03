@@ -1,0 +1,239 @@
+id: web-extraction-v1
+name: web-extraction
+version: 1.0.0
+author: paras@getbindu.com
+
+# Description
+description: |
+  Extracts web page content using Exa and optionally Firecrawl, then structures it
+  into JSON format using OpenRouter LLM. Returns PageInformation schema with url,
+  title, description, features, content_sections, links, contact_info, and metadata.
+
+# Tags and Modes
+tags:
+  - web
+  - extraction
+  - structured-data
+  - scraping
+  - content-analysis
+
+input_modes:
+  - text/plain
+  - application/json
+
+output_modes:
+  - application/json
+
+# Example Queries
+examples:
+  - "Extract information from https://en.wikipedia.org/wiki/Python_(programming_language)"
+  - "Extract information from https://www.mozilla.org/en-US/"
+  - "Get product details from this page"
+  - "Scrape article content from this link"
+
+# Detailed Capabilities
+capabilities_detail:
+  primary_capability:
+    supported: true
+    description: "Web content extraction using Exa and Firecrawl tools with LLM-based structuring"
+    features:
+      - "Uses ExaTools for web content retrieval (required)"
+      - "Uses FirecrawlTools for scraping and crawling (optional, enabled by default)"
+      - "LLM processes raw content into PageInformation JSON schema"
+      - "Extracts title, description, features, content_sections, links, contact_info, metadata"
+      - "Returns structured JSON output only"
+    limitations: |
+      Depends on Exa API for content retrieval.
+      Firecrawl is optional but enabled by default if API key provided.
+      No retry logic visible in code.
+      No explicit rate limiting in code.
+      No explicit authentication/paywall bypass.
+
+  secondary_capability:
+    supported: false
+    description: "Not supported by code"
+    features: []
+
+# Requirements
+requirements:
+  packages:
+    - "agno"
+    - "exa (required)"
+    - "firecrawl (optional)"
+    - "openrouter (required)"
+    - "mem0 (optional)"
+    - "bindu"
+    - "pydantic"
+  environment_variables:
+    - "OPENROUTER_API_KEY (required)"
+    - "EXA_API_KEY (required)"
+    - "FIRECRAWL_API_KEY (optional)"
+    - "MEM0_API_KEY (optional)"
+    - "MODEL_NAME (optional, default: openai/gpt-4o)"
+  system:
+    - "Internet access for API calls"
+  min_memory_mb: 512
+
+# Performance Metrics
+performance:
+  avg_processing_time_ms: 15000
+  max_concurrent_requests: "Not specified in code"
+  memory_per_request_mb: "Not specified in code"
+  scalability: "Not specified in code"
+
+# Tool Restrictions
+allowed_tools:
+  - "ExaTools (search, find_similar, get_contents)"
+  - "FirecrawlTools (scrape, crawl) - optional"
+  - "Mem0Tools (memory operations) - optional"
+
+# Rich Documentation
+documentation:
+  overview: |
+    Agent built on Agno framework that fetches web content via Exa API (required)
+    and optionally Firecrawl API, then uses OpenRouter LLM to structure the content
+    into a PageInformation JSON schema.
+
+    The agent uses lazy initialization and runs on port 3773 by default.
+    Mem0 can be enabled for conversation memory if API key is provided.
+
+  use_cases:
+    when_to_use:
+      - "Extracting structured information from publicly accessible URLs"
+      - "Converting web pages to JSON format"
+      - "Collecting page metadata, links, and contact information"
+
+    when_not_to_use:
+      - "Bypassing authentication or paywalls (not supported by code)"
+      - "High-frequency scraping (no rate limiting visible)"
+      - "Multi-page crawling (single URL per request based on examples)"
+      - "Visual or image content analysis (text-based only)"
+
+  input_structure: |
+    Accepts natural language text containing a URL.
+
+    Example:
+    "Extract information from https://www.example.com"
+
+    The agent extracts the URL from the message and processes it.
+    No structured JSON input parameters are enforced by the code.
+
+  output_format: |
+    Returns JSON matching PageInformation Pydantic schema:
+
+    {
+      "url": "string",
+      "title": "string",
+      "description": "string | null",
+      "features": ["string"] | null,
+      "content_sections": [
+        {
+          "heading": "string | null",
+          "content": "string"
+        }
+      ] | null,
+      "links": {"link_name": "url"} | null,
+      "contact_info": {"type": "value"} | null,
+      "metadata": {"key": "value"} | null
+    }
+
+    Agent instructions specify markdown=False and structured_outputs=True.
+    Output is wrapped in JSON code block in response.
+
+  error_handling:
+    - "APIKeyError raised if OPENROUTER_API_KEY or EXA_API_KEY missing"
+    - "RuntimeError if agent not initialized"
+    - "Tool initialization failures logged but may continue without optional tools"
+    - "No explicit retry logic in code"
+    - "No explicit timeout handling in code"
+
+  examples:
+    - title: "Wikipedia Page Extraction"
+      input:
+        text: "Extract information from https://en.wikipedia.org/wiki/Python_(programming_language)"
+      output:
+        url: "https://en.wikipedia.org/wiki/Python_(programming_language)"
+        title: "Python (programming language)"
+        description: null
+        features: null
+        content_sections: [{"heading": null, "content": "Python (programming language) - Wikipedia..."}]
+
+    - title: "Company Website Extraction"
+      input:
+        text: "Extract information from https://www.mozilla.org/en-US/"
+      output:
+        url: "https://www.mozilla.org/"
+        title: "Welcome to Mozilla"
+        description: "Mozilla - Internet for people, not profit (US)"
+        features: ["Trustworthy tech solutions", "Policy advocacy for digital rights", "Safer, private internet experience"]
+        content_sections: [{"heading": "Welcome to Mozilla", "content": "..."}]
+        links: {"Learn about us": "https://www.mozilla.org/en-US/about/", ...}
+        metadata: {"language": "en-US", "region": "US"}
+
+  best_practices:
+    for_developers:
+      - "Set OPENROUTER_API_KEY and EXA_API_KEY environment variables"
+      - "Optionally set FIRECRAWL_API_KEY for advanced scraping"
+      - "Optionally set MEM0_API_KEY for conversation memory"
+      - "Use MODEL_NAME to specify OpenRouter model (default: openai/gpt-4o)"
+
+    for_orchestrators:
+      - "Send messages to http://127.0.0.1:3773 using JSON-RPC 2.0"
+      - "Use message/send method with skillId: web-extraction-v1"
+      - "Poll tasks/get to retrieve completed results"
+      - "Expect JSON output in artifacts with name 'result'"
+      - "Agent initializes lazily on first request"
+
+  installation: |
+    Installation based on code:
+
+    1. Install dependencies: uv sync
+    2. Set environment variables:
+       - OPENROUTER_API_KEY (required)
+       - EXA_API_KEY (required)
+       - FIRECRAWL_API_KEY (optional)
+       - MEM0_API_KEY (optional)
+       - MODEL_NAME (optional, default: openai/gpt-4o)
+    3. Run: python -m web_extraction_agent.main
+    4. Server starts on http://127.0.0.1:3773
+
+  versioning:
+    - version: "1.0.0"
+      date: "2026-01-12"
+      changes: "Initial implementation with Exa, Firecrawl, OpenRouter, and Mem0 integration"
+
+# Assessment fields for skill negotiation
+assessment:
+  keywords:
+    - "extract information from"
+    - "web extraction"
+    - "scrape website"
+    - "extract content"
+    - "get information from url"
+    - "extract from https"
+
+  specializations:
+    - domain: "web content extraction"
+      confidence_boost: 0.4
+    - domain: "url-based data retrieval"
+      confidence_boost: 0.3
+
+  anti_patterns:
+    - "real-time chat"
+    - "video processing"
+    - "image generation"
+    - "audio transcription"
+    - "code writing"
+    - "mathematical solving"
+    - "multi-page crawling"
+    - "authenticated content"
+
+  complexity_indicators:
+    simple:
+      - "extract from url"
+      - "get page information"
+    medium:
+      - "extract information from https"
+      - "scrape website content"
+    complex:
+      - "Not supported by code"
