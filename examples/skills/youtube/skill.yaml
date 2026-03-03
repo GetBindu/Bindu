@@ -1,0 +1,311 @@
+id: youtube-v1
+name: youtube
+version: 1.0.0
+author: paras@getbindu.com
+
+# Description
+description: |
+  Analyzes YouTube videos by extracting transcripts using YouTubeTools and generating
+  structured summaries via OpenRouter LLM. Creates timestamped sections, identifies
+  video metadata, and organizes content into hierarchical breakdowns. Agent uses
+  Agno framework with optional Mem0 for conversation memory.
+
+# Tags and Modes
+tags:
+  - youtube
+  - video-analysis
+  - transcript
+  - summary
+  - timestamps
+  - education
+  - tutorial
+  - lecture
+  - structured-content
+
+input_modes:
+  - text/plain
+  - application/json
+
+output_modes:
+  - text/plain
+  - application/json
+
+# Example Queries
+examples:
+  - "Analyze this video: https://www.youtube.com/watch?v=zjkBMFhNj_g"
+  - "Create a study guide from this lecture video"
+  - "Extract key points from this tutorial with timestamps"
+  - "Break down this educational video into structured sections"
+
+# Detailed Capabilities
+capabilities_detail:
+  primary_capability:
+    supported: true
+    description: "Transcript-based video analysis using YouTubeTools and OpenRouter LLM"
+    features:
+      - "Extracts transcript via youtube-transcript-api (through YouTubeTools)"
+      - "Extracts video metadata: title, duration, upload date"
+      - "Generates topic segmentation using LLM analysis"
+      - "Creates HH:MM:SS timestamps for major transitions"
+      - "Produces hierarchical summaries with chapters and sections"
+      - "Identifies video type, difficulty level, and target audience"
+    limitations: |
+      Requires publicly accessible videos with available transcripts.
+      Does not perform visual frame analysis, video editing, or live-stream processing.
+      Depends on YouTube transcript availability and OpenRouter API.
+
+  secondary_capability:
+    supported: true
+    description: "Optional conversation memory via Mem0Tools"
+    features:
+      - "Maintains conversation context across requests (if MEM0_API_KEY provided)"
+      - "Enables follow-up questions about previously analyzed videos"
+    limitations: |
+      Mem0 integration is optional and requires MEM0_API_KEY environment variable.
+
+# Requirements
+requirements:
+  packages:
+    - "agno" # Agent framework
+    - "youtube-transcript-api" # Via YouTubeTools
+    - "openrouter" # LLM provider via OpenRouter model
+    - "mem0" # Optional for conversation memory
+    - "bindu" # Agent server wrapper
+    - "dotenv" # Environment variable loading
+  environment_variables:
+    - name: "OPENROUTER_API_KEY"
+      required: true
+      description: "OpenRouter API key for LLM processing"
+    - name: "MEM0_API_KEY"
+      required: false
+      description: "Mem0 API key for conversation memory"
+  system:
+    - "Internet access for transcript retrieval and OpenRouter API"
+  min_memory_mb: 512
+
+# Performance Metrics
+performance:
+  avg_processing_time_ms: 15000-60000
+  max_concurrent_requests: "Not limited by code (async handler supports multiple)"
+  memory_per_request_mb: 512
+  scalability: horizontal
+  notes: "Processing time varies by video length and transcript size. Agent uses lazy initialization on first request."
+
+# Agent Tools
+tools:
+  - name: "YouTubeTools"
+    source: "agno.tools.youtube"
+    purpose: "Transcript extraction and video metadata retrieval"
+    required: true
+  - name: "Mem0Tools"
+    source: "agno.tools.mem0"
+    purpose: "Conversation memory and context retention"
+    required: false
+
+# Rich Documentation
+documentation:
+  overview: |
+    This agent analyzes YouTube videos by extracting transcripts via YouTubeTools
+    and generating structured summaries using OpenRouter LLM (default: openai/gpt-4o).
+
+    Built on Agno framework with:
+    - YouTubeTools for transcript extraction (youtube-transcript-api)
+    - OpenRouter for LLM inference with response caching
+    - Optional Mem0Tools for conversation memory
+    - bindufy wrapper for JSON-RPC 2.0 server
+
+    Agent uses lazy initialization (initializes on first request) and supports
+    async task processing. Markdown output enabled by default.
+
+  use_cases:
+    when_to_use:
+      - "Summarizing educational videos"
+      - "Creating study guides from lectures"
+      - "Breaking down programming tutorials"
+      - "Extracting procedural steps from demonstrations"
+      - "Generating timestamped chapter breakdowns"
+      - "Indexing long-form video content for searchability"
+
+    when_not_to_use:
+      - "Live stream monitoring"
+      - "Video editing or manipulation"
+      - "Visual recognition or object detection"
+      - "Private or restricted videos"
+      - "Mass content downloading or archival"
+      - "Videos without available transcripts"
+
+  input_structure: |
+    Accepts natural language text containing YouTube URLs via JSON-RPC 2.0 protocol.
+
+    Protocol: JSON-RPC 2.0
+    Method: message/send
+    Endpoint: http://127.0.0.1:3773 (default, configurable)
+
+    Example Request:
+    {
+      "jsonrpc": "2.0",
+      "method": "message/send",
+      "params": {
+        "message": {
+          "role": "user",
+          "parts": [{
+            "kind": "text",
+            "text": "Analyze this video: https://www.youtube.com/watch?v=zjkBMFhNj_g"
+          }],
+          "messageId": "<uuid>",
+          "contextId": "<uuid>",
+          "taskId": "<uuid>"
+        }
+      }
+    }
+
+    Constraints:
+    - Must contain a valid YouTube URL in natural language text
+    - Video must be publicly accessible with available transcript
+    - Recommended video duration: < 4 hours
+
+  output_format: |
+    Returns markdown-formatted analysis via JSON-RPC 2.0 response.
+
+    Protocol Response:
+    - Task submitted with state: "submitted"
+    - Poll tasks/get method until state: "completed"
+    - Result in history array and artifacts array
+
+    Content Structure (Markdown):
+    ### Video Overview 📋
+    - Title, Author, Duration, Upload Date
+    - Video Type, Target Audience, Content Difficulty
+    - Presenter's Style
+
+    ### Content Extraction 🎬
+    - Themes
+    - Key Examples
+    - Resources Mentioned
+
+    ### Timestamps Creation ⏱️
+    [Numbered list with HH:MM:SS - HH:MM:SS format]
+    - Section summaries and key points
+
+    ### Structured Organization 🏗️
+    - Chapters (hierarchical breakdown)
+    - Learning Points
+    - Educational Insights
+    - Practical Takeaways
+
+    Note: Actual output structure determined by LLM following agent instructions.
+    Agent uses markdown=True and add_datetime_to_context=True.
+
+  error_handling:
+    - "Missing OPENROUTER_API_KEY: Raises APIKeyError with instructions"
+    - "Agent not initialized: Raises RuntimeError"
+    - "YouTubeTools initialization failure: Raises exception and stops"
+    - "Transcript unavailable: Handled by YouTubeTools, may return error message"
+    - "Invalid URL: Handled by LLM or YouTubeTools"
+    - "Mem0 initialization failure: Logs warning, continues without memory"
+
+  error_handling_notes: |
+    Error handling primarily delegated to YouTubeTools and LLM.
+    Agent uses lazy initialization with asyncio lock for thread safety.
+
+  examples:
+    - title: "Educational Video Breakdown"
+      input:
+        text: "Break down this educational video into structured sections: https://www.youtube.com/watch?v=zjkBMFhNj_g"
+      output:
+        format: "Markdown with Video Overview, Chapters, Timestamps, Learning Points"
+        processing_time: "~15-20 seconds"
+        state_flow: "submitted → completed"
+
+    - title: "Simple Video Analysis"
+      input:
+        text: "Analyze this video: https://www.youtube.com/watch?v=zjkBMFhNj_g"
+      output:
+        format: "Markdown with Video Overview, Content Extraction, Timestamps, Structured Organization"
+        processing_time: "~15-20 seconds"
+        state_flow: "submitted → completed"
+
+  best_practices:
+    for_orchestrators:
+      - "Route requests containing YouTube URLs to this agent"
+      - "Agent supports async processing - no artificial concurrency limit in code"
+      - "Allow 15-60 seconds for processing depending on video length"
+      - "Agent uses lazy initialization - first request may take slightly longer"
+      - "Do not route visual analysis, video editing, or live stream tasks"
+      - "Agent returns markdown by default - parse accordingly"
+
+    for_deployment:
+      - "Set OPENROUTER_API_KEY environment variable (required)"
+      - "Optionally set MODEL_NAME (default: openai/gpt-4o)"
+      - "Optionally set MEM0_API_KEY for conversation memory"
+      - "Default server: http://127.0.0.1:3773 (configurable via agent_config.json)"
+      - "Agent uses bindufy wrapper for JSON-RPC 2.0 protocol"
+
+  installation: |
+    Installation and deployment instructions.
+
+    Prerequisites:
+    - Python 3.12+
+    - uv package manager
+
+    Setup:
+    1. Clone repository
+    2. Create virtual environment: uv venv --python 3.12
+    3. Activate: source .venv/bin/activate
+    4. Install dependencies: uv sync
+    5. Set environment variables:
+       export OPENROUTER_API_KEY="your_key_here"
+       export MODEL_NAME="openai/gpt-4o"  # Optional
+       export MEM0_API_KEY="your_mem0_key"  # Optional
+    6. Start agent: python -m youtube_agent.main
+
+    Server runs on http://127.0.0.1:3773 by default.
+    Configuration via agent_config.json (optional).
+
+  versioning:
+    - version: "1.0.0"
+      date: "Not found"
+      changes: "Initial release with YouTubeTools integration, OpenRouter LLM, optional Mem0 memory, and JSON-RPC 2.0 protocol via bindufy"
+
+# Assessment fields for skill negotiation
+assessment:
+  keywords:
+    - "youtube"
+    - "video analysis"
+    - "transcript"
+    - "timestamp"
+    - "lecture breakdown"
+    - "tutorial summary"
+    - "study guide"
+    - "video segmentation"
+    - "content structuring"
+
+  specializations:
+    - domain: "educational videos"
+      confidence_boost: 0.4
+    - domain: "tutorial content"
+      confidence_boost: 0.3
+    - domain: "lecture analysis"
+      confidence_boost: 0.3
+
+  anti_patterns:
+    - "summarize this document"
+    - "write a blog post"
+    - "edit this video"
+    - "generate creative script"
+    - "image recognition"
+    - "live stream monitoring"
+
+  complexity_indicators:
+    simple:
+      - "single video analysis"
+      - "basic summary with timestamps"
+    medium:
+      - "detailed chapter breakdown"
+      - "study guide generation"
+    complex:
+      - "Not supported: multi-video analysis"
+      - "Not supported: learning path creation"
+      - "Not supported: comparative analysis"
+
+    note: "Agent processes one video per request. Multi-video tasks not implemented."
