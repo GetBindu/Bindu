@@ -106,33 +106,30 @@ async def agent_run_endpoint(app: BinduApplication, request: Request) -> Respons
 
         # Pass payment details from middleware to handler if available
         # Payment context is passed through the metadata field in params
-        if hasattr(request.state, "payment_payload") and method == "message/send":
-            # Inject payment context into message metadata
-            if "params" in a2a_request and "message" in a2a_request["params"]:
-                message = a2a_request["params"]["message"]
-                if "metadata" not in message:
-                    message["metadata"] = {}
+        if method == "message/send":
+            payment_payload = getattr(request.state, "payment_payload", None)
+            payment_requirements = getattr(request.state, "payment_requirements", None)
+            verify_response = getattr(request.state, "verify_response", None)
 
-                # Add payment context to message metadata (internal use only)
-                # Serialize Pydantic models and dataclasses to dicts for JSON compatibility
-                from dataclasses import asdict, is_dataclass
+            if payment_payload and payment_requirements and verify_response:
+                if "params" in a2a_request and "message" in a2a_request["params"]:
+                    message = a2a_request["params"]["message"]
+                    message.setdefault("metadata", {})
 
-                def serialize_to_dict(obj):
-                    """Serialize Pydantic models or dataclasses to dict."""
-                    if hasattr(obj, "model_dump"):
-                        return obj.model_dump()
-                    elif is_dataclass(obj):
-                        return asdict(obj)
-                    else:
+                    from dataclasses import asdict, is_dataclass
+
+                    def serialize_to_dict(obj):
+                        if hasattr(obj, "model_dump"):
+                            return obj.model_dump()
+                        elif is_dataclass(obj):
+                            return asdict(obj)
                         return dict(obj)
 
-                message["metadata"]["_payment_context"] = {
-                    "payment_payload": serialize_to_dict(request.state.payment_payload),
-                    "payment_requirements": serialize_to_dict(
-                        request.state.payment_requirements
-                    ),
-                    "verify_response": serialize_to_dict(request.state.verify_response),
-                }
+                    message["metadata"]["_payment_context"] = {
+                        "payment_payload": serialize_to_dict(payment_payload),
+                        "payment_requirements": serialize_to_dict(payment_requirements),
+                        "verify_response": serialize_to_dict(verify_response),
+                    }
 
         jsonrpc_response = await handler(a2a_request)
 
