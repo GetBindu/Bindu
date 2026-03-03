@@ -1,0 +1,273 @@
+id: competitor-analysis-v1
+name: competitor-analysis
+version: 1.0.0
+author: paras@getbindu.com
+
+# Description
+description: |
+  Performs competitive intelligence and market research using web search, website scraping,
+  and academic research. Uses Firecrawl for web data extraction, ArxivTools for research papers,
+  and reasoning capabilities to generate structured competitive analysis reports with SWOT analysis,
+  feature comparisons, and strategic recommendations.
+
+# Tags and Modes
+tags:
+  - competitor-analysis
+  - business-intelligence
+  - swot-analysis
+
+input_modes:
+  - text/plain
+  - application/json
+
+output_modes:
+  - text/plain
+  - application/json
+
+# Example Queries
+examples:
+  - "Analyze the competitive landscape for Stripe in the payments industry"
+  - "Research competitors to Shopify in the e-commerce platform market"
+  - "Compare Salesforce with its main competitors in the CRM market"
+  - "Perform SWOT analysis on Apple's competitors in the smartphone market"
+
+# Detailed Capabilities
+capabilities_detail:
+  primary_capability:
+    supported: true
+    description: "Web-based competitive intelligence using Firecrawl search, crawl, and mapping"
+    features:
+      - "Web search for competitor discovery (Firecrawl search with limit 2)"
+      - "Website scraping for product and pricing information (Firecrawl crawl, limit 5)"
+      - "Site structure mapping (Firecrawl mapping)"
+      - "Academic research paper analysis (ArxivTools)"
+      - "Reasoning-based analysis and synthesis (ReasoningTools with think/analyze)"
+      - "SWOT analysis generation"
+      - "Feature and pricing comparison matrices"
+      - "Strategic recommendations (0-3 months, 3-12 months, 12+ months)"
+    limitations: "Limited to publicly accessible web content; Firecrawl search limited to 2 results, crawl limited to 5 pages; dependent on Firecrawl API availability"
+
+  secondary_capability:
+    supported: true
+    description: "Optional memory and MCP tool integration"
+    features:
+      - "Mem0 memory for context retention across sessions (if MEM0_API_KEY provided)"
+      - "MCP server integration (if configured in code)"
+    limitations: "Memory and MCP features require additional API keys and configuration"
+
+# Requirements
+requirements:
+  packages:
+    - "agno>=2.2.0"
+    - "firecrawl-py>=1.0.0"
+    - "openai>=2.11.0"
+    - "python-dotenv>=1.0.1"
+    - "bindu"
+  system:
+    - "Internet access for Firecrawl API"
+  min_memory_mb: 512
+  external_services:
+    - "Firecrawl API (required)"
+    - "OpenAI API or OpenRouter API (required, uses gpt-4o)"
+    - "Mem0 API (optional)"
+    - "Arxiv (public, no key required)"
+
+# Performance Metrics
+performance:
+  avg_processing_time_ms: 8000
+  max_concurrent_requests: 3
+  memory_per_request_mb: 512
+  scalability: horizontal
+
+# Tool Restrictions
+allowed_tools:
+  - firecrawl_search
+  - firecrawl_crawl
+  - firecrawl_map
+  - arxiv_search
+  - reasoning_think
+  - reasoning_analyze
+  - mem0_add
+  - mem0_search
+  - mcp_tools
+
+# Rich Documentation
+documentation:
+  overview: |
+    This agent performs competitive intelligence by searching the web for competitors,
+    scraping their websites, analyzing research papers, and synthesizing findings into
+    structured reports. Uses GPT-4o for analysis, Firecrawl for web data extraction,
+    ArxivTools for academic research, and reasoning tools for structured thinking.
+
+  use_cases:
+    when_to_use:
+      - "Competitive landscape analysis requiring web research"
+      - "Product feature and pricing comparisons"
+      - "SWOT analysis of competitors"
+      - "Market positioning analysis"
+      - "Strategic planning with competitive context"
+      - "Research-backed competitive intelligence"
+
+    when_not_to_use:
+      - "Real-time financial data analysis"
+      - "Private/proprietary data access"
+      - "Legal or compliance analysis"
+      - "Creative content generation"
+      - "Simple web searches without analysis"
+
+  input_structure: |
+    Accepts natural language requests mentioning target company and analysis type.
+    Plain text or JSON format supported.
+
+    Example plain text:
+    "Analyze the competitive landscape for Stripe in the payments industry"
+
+    Example JSON:
+    {
+      "role": "user",
+      "parts": [{"kind": "text", "text": "Compare Shopify with competitors"}]
+    }
+
+    Constraints:
+    - Must specify target company or industry
+    - Analysis depth depends on available web content
+    - Firecrawl limits: 2 search results, 5 crawled pages per request
+
+  output_format: |
+    Returns markdown-formatted competitive analysis report with:
+
+    - EXECUTIVE SUMMARY: High-level findings
+    - RESEARCH METHODOLOGY: Search queries, websites analyzed, sources
+    - MARKET OVERVIEW:
+        - Industry context
+        - Competitive landscape
+        - Research paper insights (if applicable)
+    - COMPETITOR ANALYSIS (per competitor):
+        - Company overview (website, location, size if available)
+        - Products and services
+        - Digital presence analysis
+        - SWOT analysis
+    - COMPARATIVE ANALYSIS:
+        - Feature comparison matrix (table format)
+        - Pricing comparison (table format)
+        - Market positioning
+    - STRATEGIC INSIGHTS:
+        - Key findings
+        - Competitive advantages
+        - Competitive risks
+    - STRATEGIC RECOMMENDATIONS:
+        - Immediate actions (0-3 months)
+        - Short-term strategy (3-12 months)
+        - Long-term strategy (12+ months)
+    - CONCLUSION: Strategic positioning summary
+    - REFERENCES: Websites and papers cited
+
+  error_handling:
+    - "Missing FIRECRAWL_API_KEY: Agent fails to initialize with FirecrawlKeyError"
+    - "Missing LLM API key: Agent boots but fails at runtime"
+    - "Firecrawl API errors: Reported in response with partial results"
+    - "No competitors found: Returns analysis with documented limitations"
+    - "MCP connection failures: Continues without MCP tools (allow_partial_failure=True)"
+
+  examples:
+    - title: "Fintech Competitive Analysis"
+      input:
+        parts:
+          - kind: "text"
+            text: "Produce Phase 1 of a competitive intelligence report (maximum 2,000 words). Focus only on: (1) executive summary; (2) product feature comparison across Chime, SoFi, and Current (checking, savings, credit-building, investing, early wage access, AI insights); (3) pricing and monetization comparison including interchange, subscriptions, lending spreads; and (4) ICP segmentation and brand positioning."
+      output:
+        sections_included: ["Executive Summary", "Product Feature Comparison", "Pricing and Monetization Comparison", "ICP Segmentation and Brand Positioning"]
+        format: "Markdown with comparison tables"
+        processing_time_ms: 12000
+
+    - title: "Comprehensive Strategic Report"
+      input:
+        parts:
+          - kind: "text"
+            text: "Produce a Detailed 25+ page equivalent executive-level strategic report (minimum 6,000 words). Include executive summary, market context, feature comparison tables, pricing comparison tables, SWOT for each competitor, competitive positioning matrices, growth and funding analysis, strategic gap analysis, and a 12-month competitive action roadmap."
+      output:
+        sections_included: ["All standard sections plus extended analysis"]
+        format: "Markdown with structured headings and tables"
+        processing_time_ms: 15000
+
+  best_practices:
+    for_developers:
+      - "Provide clear target company and industry context"
+      - "Allow 10-20 seconds for comprehensive analysis"
+      - "Firecrawl limits may restrict depth - request focused analysis"
+      - "Mem0 API key enables cross-session context retention"
+
+    for_orchestrators:
+      - "Route competitive intelligence and market research requests here"
+      - "Ensure FIRECRAWL_API_KEY is configured before routing"
+      - "Limit concurrent requests to 3 due to API rate limits"
+      - "Expect 8-15 second response times for comprehensive reports"
+      - "Monitor Firecrawl API usage and costs"
+
+  installation: |
+    Required packages:
+    uv sync
+
+    Environment variables required:
+    - FIRECRAWL_API_KEY (required)
+    - OPENAI_API_KEY or OPENROUTER_API_KEY (required)
+    - MEM0_API_KEY (optional, enables memory)
+
+    Quick start:
+    1. Clone repository
+    2. Configure environment variables in .env file
+    3. Run: uv venv --python 3.12.9 && source .venv/bin/activate
+    4. Run: uv sync
+    5. Start agent: python -m competitor_analysis_agent.main
+    6. Server runs on http://0.0.0.0:3773 by default
+
+  versioning:
+    - version: "1.0.0"
+      date: "2026-01-10"
+      changes: "Initial release with Firecrawl integration, ArxivTools, ReasoningTools, optional Mem0 and MCP support"
+
+# Assessment fields for skill negotiation
+assessment:
+  keywords:
+    - "competitor"
+    - "competitive"
+    - "market research"
+    - "swot"
+    - "strategy"
+    - "positioning"
+    - "benchmark"
+    - "industry landscape"
+    - "business intelligence"
+    - "competitive analysis"
+    - "market analysis"
+
+  specializations:
+    - domain: "competitive intelligence"
+      confidence_boost: 0.8
+    - domain: "market research"
+      confidence_boost: 0.6
+    - domain: "strategic analysis"
+      confidence_boost: 0.5
+    - domain: "business strategy"
+      confidence_boost: 0.4
+
+  anti_patterns:
+    - "summarize this document"
+    - "translate text"
+    - "write marketing copy"
+    - "creative writing"
+    - "pure financial modeling"
+    - "real-time stock data"
+    - "legal analysis"
+
+  complexity_indicators:
+    simple:
+      - "basic competitor lookup"
+      - "company overview"
+    medium:
+      - "standard competitor comparison"
+      - "feature matrix"
+    complex:
+      - "comprehensive industry analysis"
+      - "multi-competitor SWOT analysis"
+      - "strategic roadmap recommendations"
