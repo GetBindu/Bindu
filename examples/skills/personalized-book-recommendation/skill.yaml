@@ -1,0 +1,227 @@
+id: personalized-book-recommendation-v1
+name: personalized-book-recommendation
+version: 1.0.0
+author: raahul@getbindu.com
+
+# Description
+description: |
+  Provides personalized book recommendations using Exa search to discover books based on reader preferences,
+  favorite titles, genres, ratings, and reviews. Delivers detailed metadata including author, genre, plot summaries,
+  ratings, content warnings, and series information.
+
+# Tags and Modes
+tags:
+  - personalized-book-recommendation
+  - books
+  - literature
+  - recommendations
+  - exa-search
+
+input_modes:
+  - text/plain
+  - application/json
+
+output_modes:
+  - text/plain
+  - application/json
+
+# Example Queries
+examples:
+  - "I loved The Night Circus and The Invisible Life of Addie LaRue. Can you recommend similar books?"
+  - "Recommend 5 fantasy books with strong female protagonists published in the last 2 years"
+  - "I enjoy literary fiction with magical realism elements, around 300-400 pages"
+
+# Detailed Capabilities
+capabilities_detail:
+  primary_capability:
+    supported: true
+    description: "Personalized book discovery and recommendation using Exa search"
+    features:
+      - "Exa-powered book search and discovery"
+      - "Goodreads/StoryGraph rating integration"
+      - "Detailed metadata with content warnings"
+      - "Series information and similar author suggestions"
+      - "Markdown-formatted output with emoji indicators"
+    limitations: "Limited to books available in Exa search index; ratings depend on external sources"
+
+  secondary_capability:
+    supported: false
+    planned_version: "2.0.0"
+    description: "Direct integration with library APIs for availability checking"
+
+# Requirements
+requirements:
+  packages:
+    - "agno"
+    - "exa-py"
+  system:
+    - "Python 3.10+"
+  min_memory_mb: 256
+
+# Performance Metrics
+performance:
+  avg_processing_time_ms: 1000
+  max_concurrent_requests: 10
+  memory_per_request_mb: 256
+  scalability: horizontal
+
+# Tool Restrictions
+allowed_tools:
+  - ExaTools
+
+# Rich Documentation
+documentation:
+  overview: |
+    The personalized-book-recommendation skill acts as Shelfie, a literary curator that helps readers
+    discover their next favorite books. It uses Exa search to find books matching reader preferences,
+    analyzes themes and styles from favorite titles, and provides comprehensive book information including
+    ratings, reviews, content warnings, and series details. The skill combines deep literary knowledge
+    with current data to suggest books that truly resonate with each reader.
+
+  use_cases:
+    when_to_use:
+      - "Finding books similar to favorites"
+      - "Genre-specific recommendations with filters"
+      - "Discovering new authors and diverse perspectives"
+      - "Getting detailed book information with ratings and reviews"
+
+    when_not_to_use:
+      - "Academic paper or research document recommendations"
+      - "Technical documentation or programming book searches"
+      - "Non-book media recommendations (movies, TV shows, podcasts)"
+
+  input_structure: |
+    Accepts natural language queries about book preferences.
+
+    Example:
+    {
+      "role": "user",
+      "content": "I'm looking for mystery novels similar to Agatha Christie with modern settings"
+    }
+
+    Constraints:
+    - Accepts text/plain or application/json formats
+    - Query should mention books, genres, authors, or reading preferences
+    - Can include specific requirements (length, publication date, content warnings)
+
+  output_format: |
+    Returns markdown-formatted book recommendations with detailed information.
+
+    Success Response:
+    - Book title and author
+    - Publication year and genre
+    - Goodreads/StoryGraph rating
+    - Page count
+    - Engaging plot summary
+    - Content advisories
+    - Awards and recognition
+    - Series information if applicable
+    - Similar author suggestions
+    - Audiobook availability
+
+    Error Response:
+    {
+      "error": "Unable to find books matching criteria",
+      "suggestion": "Try broader search terms or different genres"
+    }
+
+  error_handling:
+    - "Exa search failures: Falls back to broader search terms"
+    - "No results found: Suggests alternative genres or authors"
+    - "Timeout behavior: Returns partial results with explanation"
+    - "Invalid queries: Prompts for clarification on preferences"
+    - "Rate limits: Queues requests and notifies user of delay"
+
+  examples:
+    - title: "Similar Book Recommendations"
+      input:
+        content: "I loved The Night Circus. What should I read next?"
+      output:
+        recommendations:
+          - "The Starless Sea by Erin Morgenstern"
+          - "The Invisible Life of Addie LaRue by V.E. Schwab"
+          - "The Ten Thousand Doors of January by Alix E. Harrow"
+        metadata:
+          processing_time_ms: 1200
+
+    - title: "Genre-Specific Search"
+      input:
+        content: "Recommend fantasy books with strong female protagonists"
+      output:
+        recommendations:
+          - "The Priory of the Orange Tree by Samantha Shannon"
+          - "The Poppy War by R.F. Kuang"
+          - "Circe by Madeline Miller"
+        metadata:
+          processing_time_ms: 950
+
+  best_practices:
+    for_developers:
+      - "Cache Exa search results to reduce API calls"
+      - "Implement graceful degradation when external rating sources are unavailable"
+      - "Use async operations for parallel book data fetching"
+      - "Validate user queries before making external API calls"
+
+    for_orchestrators:
+      - "Route book-related queries containing titles, authors, or genres to this skill"
+      - "Chain with reading list management or library availability skills"
+      - "Consider rate limits when handling multiple concurrent requests"
+      - "Implement retry logic with exponential backoff for Exa API failures"
+      - "Monitor response times and cache hit rates for optimization"
+
+  installation: |
+    Install using uv package manager:
+
+    Required packages:
+    uv sync
+
+    Environment variables:
+    OPENROUTER_API_KEY=<your-openrouter-key>
+    EXA_API_KEY=<your-exa-key>
+
+    No platform-specific dependencies required.
+
+  versioning:
+    - version: "1.0.0"
+      date: "2026-01-13"
+      changes: "Initial release with Exa search integration and personalized recommendations"
+    - version: "1.1.0"
+      status: "planned"
+      changes: "Add library availability checking and reading list management"
+
+# Assessment fields for skill negotiation
+assessment:
+  keywords:
+    - "book"
+    - "recommend"
+    - "read"
+    - "author"
+    - "genre"
+    - "novel"
+    - "fiction"
+    - "literature"
+
+  specializations:
+    - domain: "literature"
+      confidence_boost: 0.4
+    - domain: "book-recommendations"
+      confidence_boost: 0.3
+    - domain: "reading"
+      confidence_boost: 0.2
+
+  anti_patterns:
+    - "academic papers or research documents"
+    - "technical documentation or programming books"
+    - "movie or TV show recommendations"
+    - "music or podcast suggestions"
+
+  complexity_indicators:
+    simple:
+      - "recommend a book"
+      - "what should I read next"
+    medium:
+      - "books similar to [specific title]"
+      - "genre-specific with filters"
+    complex:
+      - "curated list with multiple criteria and constraints"
+      - "comparative analysis of multiple books or series"
