@@ -1,0 +1,258 @@
+id: hackernews-analysis-v1
+name: hackernews-analysis
+version: 1.0.0
+author: raahul@getbindu.com
+
+# Description
+description: |
+  Multi-agent system that aggregates and analyzes HackerNews stories.
+  Coordinates specialized agents to fetch top posts, read articles, and enrich with web research.
+
+# Tags and Modes
+tags:
+  - hackernews-analysis
+  - news-aggregation
+  - content-curation
+  - web-research
+
+input_modes:
+  - text/plain
+  - application/json
+
+output_modes:
+  - text/plain
+  - application/json
+
+# Example Queries
+examples:
+  - "What are the top AI stories on HackerNews today?"
+  - "Summarize the top 5 trending stories on HackerNews"
+  - "Get the latest HackerNews posts about machine learning"
+
+# Detailed Capabilities
+capabilities_detail:
+  primary_capability:
+    supported: true
+    description: "Aggregates and analyzes HackerNews stories using multi-agent coordination"
+    features:
+      - "Real-time HackerNews API integration"
+      - "Full article content extraction"
+      - "Web search enrichment"
+      - "Structured output with Article model"
+    limitations: "Focused on HackerNews content only, processing time depends on story count"
+
+  secondary_capability:
+    supported: false
+    planned_version: "2.0.0"
+    description: "Historical trend analysis and sentiment tracking"
+
+# Requirements
+requirements:
+  packages:
+    - "agno"
+    - "newspaper4k"
+    - "pydantic"
+    - "bindu"
+  system:
+    - "Python 3.12+"
+  min_memory_mb: 256
+
+# Performance Metrics
+performance:
+  avg_processing_time_ms: 15000
+  max_concurrent_requests: 10
+  memory_per_request_mb: 256
+  scalability: horizontal
+
+# Tool Restrictions
+allowed_tools:
+  - Read
+  - Write
+  - Execute
+
+# Rich Documentation
+documentation:
+  overview: |
+    Multi-agent team that coordinates HackerNews story analysis.
+    Uses three specialized agents: HackerNews Researcher (fetches top stories),
+    Article Reader (extracts full content), and Web Searcher (enriches with research).
+    Built on Agno framework with OpenRouter models and structured output.
+
+  use_cases:
+    when_to_use:
+      - "News aggregation and curation platforms"
+      - "Trend analysis and monitoring"
+      - "Automated newsletter generation"
+      - "Content research and summarization"
+
+    when_not_to_use:
+      - "Real-time chat or conversational interfaces"
+      - "Non-HackerNews content analysis"
+      - "Low-latency requirements (< 5 seconds)"
+
+  input_structure: |
+    JSON-RPC 2.0 message with user query in parts array.
+
+    Example:
+    {
+      "jsonrpc": "2.0",
+      "method": "message/send",
+      "params": {
+        "message": {
+          "role": "user",
+          "parts": [
+            {
+              "kind": "text",
+              "text": "Summarize the top 5 trending stories on HackerNews"
+            }
+          ],
+          "kind": "message",
+          "messageId": "550e8400-e29b-41d4-a716-446655440038",
+          "contextId": "550e8400-e29b-41d4-a716-446655440038",
+          "taskId": "550e8400-e29b-41d4-a716-446655440078"
+        },
+        "configuration": {
+          "acceptedOutputModes": ["application/json"]
+        }
+      },
+      "id": "550e8400-e29b-41d4-a716-446655440024"
+    }
+
+  output_format: |
+    JSON-RPC 2.0 result with task history and artifacts containing markdown summary.
+
+    Success Response:
+    {
+      "jsonrpc": "2.0",
+      "id": "550e8400-e29b-41d4-a716-446655440014",
+      "result": {
+        "id": "550e8400-e29b-41d4-a716-446655440078",
+        "context_id": "550e8400-e29b-41d4-a716-446655440038",
+        "kind": "task",
+        "status": {
+          "state": "completed",
+          "timestamp": "2026-02-24T11:04:18.445630+00:00"
+        },
+        "history": [
+          {
+            "kind": "message",
+            "role": "user",
+            "parts": [{"kind": "text", "text": "Summarize the top 5 trending stories on HackerNews"}]
+          },
+          {
+            "kind": "message",
+            "role": "assistant",
+            "parts": [{"kind": "text", "text": "Here's a summary of the current top 5 trending stories..."}]
+          }
+        ],
+        "artifacts": [
+          {
+            "name": "result",
+            "parts": [{"kind": "text", "text": "Markdown formatted summary with numbered list of stories"}]
+          }
+        ]
+      }
+    }
+
+  error_handling:
+    - "API failures: Graceful degradation with partial results"
+    - "Article extraction errors: Skip unavailable content"
+    - "Timeout: 30-second limit per agent operation"
+    - "Invalid queries: Return error message with guidance"
+    - "Rate limits: Automatic retry with exponential backoff"
+
+  examples:
+    - title: "Top 5 Trending Stories"
+      input:
+        parts:
+          - kind: "text"
+            text: "Summarize the top 5 trending stories on HackerNews"
+      output:
+        text: |
+          Here's a summary of the current top 5 trending stories on HackerNews:
+
+          1. **Terence Tao at 8 Years Old (1984)**
+             - Historical document about mathematical prodigy Terence Tao
+             - Currently trending with 281 points
+
+          2. **Firefox 148's New AI Kill Switch Feature**
+             - Browser update introducing user control over AI features
+             - Allows disabling AI functionalities like chatbot prompts
+
+          3. **enveil - Security Tool for .env Files**
+             - Tool to protect environment variables from AI coding assistants
+             - Uses AES-256-GCM encryption
+
+          4. **Diode - Hardware Building Platform**
+             - Platform for building, programming, and simulating hardware
+
+          5. **Distributed Queue in JSON File**
+             - Technical article about implementing distributed queue system
+
+  best_practices:
+    for_developers:
+      - "Use async/await for all agent operations"
+      - "Implement graceful degradation for partial failures"
+      - "Cache API responses to reduce latency"
+      - "Test with various query types and edge cases"
+
+    for_orchestrators:
+      - "Route HackerNews-related queries to this skill"
+      - "Chain with content summarization or sentiment analysis skills"
+      - "Expect 10-30 second processing time per request"
+      - "Implement retry logic with exponential backoff"
+      - "Monitor agent response times and API rate limits"
+
+  installation: |
+    Install via uv package manager.
+
+    Required packages:
+    uv sync
+
+    Environment variables:
+    OPENROUTER_API_KEY=<your-key>
+    MEM0_API_KEY=<your-key>
+    EXA_API_KEY=<your-key>
+
+    Run:
+    uv run python -m hackernews_team_agent
+
+  versioning:
+    - version: "1.0.0"
+      date: "2026-01-12"
+      changes: "Initial release with multi-agent HackerNews analysis"
+    - version: "1.1.0"
+      status: "planned"
+      changes: "Add historical trend analysis and sentiment tracking"
+
+# Assessment fields for skill negotiation
+assessment:
+  keywords:
+    - "hackernews"
+    - "news"
+    - "stories"
+    - "trending"
+    - "articles"
+    - "aggregation"
+
+  specializations:
+    - domain: "news-aggregation"
+      confidence_boost: 0.3
+    - domain: "content-curation"
+      confidence_boost: 0.2
+
+  anti_patterns:
+    - "Real-time chat conversations"
+    - "Non-HackerNews content analysis"
+    - "Image or video processing"
+
+  complexity_indicators:
+    simple:
+      - "Get top HackerNews stories"
+      - "Fetch latest posts"
+    medium:
+      - "Summarize top 5 stories with details"
+      - "Analyze trending topics"
+    complex:
+      - "Deep analysis with web research enrichment"
+      - "Multi-topic trend comparison"
