@@ -1,0 +1,324 @@
+id: deep-research-v1
+name: deep-research
+version: 1.0.0
+author: paras@getbindu.com
+
+# Description
+description: |
+  Deep research agent using Exa web research tools and reasoning capabilities. Performs web-based research with citation tracking and structured markdown output.
+
+# Tags and Modes
+tags:
+  - deep-research
+  - web-research
+  - citations
+
+input_modes:
+  - text/plain
+  - application/json
+
+output_modes:
+  - text/markdown
+  - application/json
+
+# Example Queries
+examples:
+  - "Conduct deep research on mRNA vaccine technology developments with academic citations"
+  - "Analyze market trends in renewable energy storage technologies with citation tracking"
+  - "Research GPU market forecast for the next 5 years"
+
+# Detailed Capabilities
+capabilities_detail:
+  primary_capability:
+    supported: true
+    description: "Web-based research using Exa tools with reasoning and citation tracking"
+    features:
+      - "Web research via ExaTools (search, find_similar, get_contents)"
+      - "Reasoning tools for planning and analysis"
+      - "Markdown-formatted research reports with citations"
+      - "Optional JSON schema support for structured output"
+    limitations: "Web-based research only, requires EXA_API_KEY, processing time varies by query complexity"
+
+  secondary_capability:
+    supported: false
+    planned_version: "Not planned"
+    description: "Not supported by code"
+
+# Requirements
+requirements:
+  packages:
+    - "agno"
+    - "exa-py"
+    - "bindu"
+    - "python-dotenv"
+  system:
+    - "Python 3.12+"
+  min_memory_mb: 256
+  api_keys:
+    - name: "EXA_API_KEY"
+      required: true
+      description: "Exa API key from https://exa.ai"
+    - name: "OPENAI_API_KEY or OPENROUTER_API_KEY"
+      required: true
+      description: "LLM provider API key"
+
+# Performance Metrics
+performance:
+  avg_processing_time_ms: 15000
+  max_concurrent_requests: 10
+  memory_per_request_mb: 256
+  scalability: horizontal
+
+# Tool Restrictions
+allowed_tools:
+  - ExaTools
+  - ReasoningTools
+
+# Rich Documentation
+documentation:
+  overview: |
+    Deep research agent built on Agno framework. Uses ExaTools for web research and ReasoningTools for planning/analysis.
+    Supports OpenAI GPT-4o or OpenRouter models. Returns markdown-formatted research reports with citations.
+    Deployed via Bindu platform with JSON-RPC 2.0 protocol.
+
+  use_cases:
+    when_to_use:
+      - Web-based research requiring multiple sources
+      - Research with citation requirements
+      - Market analysis and trend research
+      - Technology research with evidence-based conclusions
+      - Academic or professional research topics
+
+    when_not_to_use:
+      - Non-research queries
+      - Real-time data processing
+      - Code generation
+      - Mathematical calculations
+      - File or database operations
+
+  input_structure: |
+    JSON-RPC 2.0 message with user query in parts array.
+
+    Example:
+    {
+      "jsonrpc": "2.0",
+      "method": "message/send",
+      "params": {
+        "message": {
+          "role": "user",
+          "parts": [
+            {
+              "kind": "text",
+              "text": "Conduct deep research on mRNA vaccine technology developments with academic citations"
+            }
+          ],
+          "kind": "message",
+          "messageId": "550e8400-e29b-41d4-a716-446655440038",
+          "contextId": "550e8400-e29b-41d4-a716-446655440038",
+          "taskId": "550e8400-e29b-41d4-a716-446655440078"
+        },
+        "configuration": {
+          "acceptedOutputModes": [
+            "application/json"
+          ]
+        }
+      },
+      "id": "550e8400-e29b-41d4-a716-446655440024"
+    }
+
+  output_format: |
+    JSON-RPC 2.0 result with task status, history, and artifacts.
+
+    Submit Response (state: submitted):
+    {
+      "jsonrpc": "2.0",
+      "id": "550e8400-e29b-41d4-a716-446655440024",
+      "result": {
+        "id": "550e8400-e29b-41d4-a716-446655440077",
+        "context_id": "550e8400-e29b-41d4-a716-446655440038",
+        "kind": "task",
+        "status": {
+          "state": "submitted",
+          "timestamp": "2026-02-26T10:23:40.564965+00:00"
+        },
+        "history": [
+          {
+            "message_id": "550e8400-e29b-41d4-a716-446655440038",
+            "context_id": "550e8400-e29b-41d4-a716-446655440038",
+            "task_id": "550e8400-e29b-41d4-a716-446655440077",
+            "kind": "message",
+            "parts": [{"kind": "text", "text": "Conduct deep research on..."}],
+            "role": "user"
+          }
+        ]
+      }
+    }
+
+    Completed Response (state: completed):
+    {
+      "jsonrpc": "2.0",
+      "id": "550e8400-e29b-41d4-a716-446655440014",
+      "result": {
+        "id": "550e8400-e29b-41d4-a716-446655440078",
+        "context_id": "550e8400-e29b-41d4-a716-446655440038",
+        "kind": "task",
+        "status": {
+          "state": "completed",
+          "timestamp": "2026-02-26T10:47:25.924886+00:00"
+        },
+        "history": [
+          {
+            "message_id": "550e8400-e29b-41d4-a716-446655440038",
+            "context_id": "550e8400-e29b-41d4-a716-446655440038",
+            "task_id": "550e8400-e29b-41d4-a716-446655440078",
+            "kind": "message",
+            "parts": [{"kind": "text", "text": "Conduct deep research on..."}],
+            "role": "user"
+          },
+          {
+            "role": "assistant",
+            "parts": [{"kind": "text", "text": "# Research Report: ...\n\n## Executive Summary\n..."}],
+            "kind": "message",
+            "message_id": "3dcf967c-5c55-4c8d-bb0e-62ce5b7ce058",
+            "task_id": "550e8400-e29b-41d4-a716-446655440078",
+            "context_id": "550e8400-e29b-41d4-a716-446655440038"
+          }
+        ],
+        "artifacts": [
+          {
+            "artifact_id": "cad87815-0c60-4e04-8bb5-448ec0b0b2b4",
+            "name": "result",
+            "parts": [{"kind": "text", "text": "# Research Report: ...\n\n..."}]
+          }
+        ]
+      }
+    }
+
+  error_handling:
+    - "Missing EXA_API_KEY: Raises ExaKeyError with setup instructions"
+    - "Missing LLM API key: Raises ValueError with provider instructions"
+    - "Agent not initialized: Raises RuntimeError"
+    - "Tool errors: Handled by Agno framework"
+
+  examples:
+    - title: "mRNA Vaccine Research"
+      input:
+        parts:
+          - kind: "text"
+            text: "Conduct deep research on mRNA vaccine technology developments with academic citations"
+      output:
+        text: |
+          # Research Report: mRNA Vaccine Technology Developments
+
+          ## Executive Summary
+          Recent advancements in mRNA vaccine technology are transforming disease prevention and treatment...
+
+          ## Research Methodology
+          - Search Queries Used: "mRNA vaccine technology developments with academic citations"
+          - Sources Analyzed: EMBO Molecular Medicine, Nature Reviews Drug Discovery, Frontiers in Immunology...
+          - Research Parameters: Focused on recent advancements in mRNA vaccine technology, delivery systems, and applications
+          - Date Range Covered: 2024-2026
+
+          ## Detailed Findings
+          ...
+
+          ## Citations
+          [1] EMBO Molecular Medicine - https://link.springer.com/article/10.1038/s44321-026-00390-z
+          [2] Nature Reviews Drug Discovery - https://www.nature.com/articles/s41573-024-01042-y
+          ...
+
+    - title: "GPU Market Forecast"
+      input:
+        parts:
+          - kind: "text"
+            text: "Conduct deep research on gpu market next 5 years"
+      output:
+        text: |
+          # Research Report: GPU Market Forecast 2026
+
+          ## Executive Summary
+          The GPU market is expected to undergo significant transformations over the next five years...
+
+          ## Research Methodology
+          - Search queries focused on GPU market trends, technological advancements, and economic forecasts
+          - Sources analyzed include industry reports, expert opinions, and market analyses
+          ...
+
+          ## Citations
+          [1] CarbonCredits.com - https://carboncredits.com/ai-demand-to-drive-600b...
+          [2] Deloitte Insights - https://www2.deloitte.com/us/en/insights/industry/technology...
+          ...
+
+  best_practices:
+    for_developers:
+      - "Set EXA_API_KEY and OPENAI_API_KEY or OPENROUTER_API_KEY environment variables"
+      - "Agent initializes lazily on first request"
+      - "Async handler function processes messages"
+      - "Uses Agno framework for agent orchestration"
+
+    for_orchestrators:
+      - "Route web research queries to this agent"
+      - "Expect async task processing with submitted/completed states"
+      - "Processing time typically 10-30 seconds depending on query complexity"
+      - "Agent returns markdown-formatted reports in artifacts"
+      - "Use tasks/get endpoint to poll for completion"
+
+  installation: |
+    Install dependencies:
+    uv sync
+
+    Required environment variables:
+    EXA_API_KEY=<your-exa-key>
+    OPENAI_API_KEY=<your-openai-key>  # or OPENROUTER_API_KEY
+
+    Optional environment variables:
+    MODEL_NAME=openai/gpt-4o  # for OpenRouter
+
+    Run agent server:
+    uv run python -m deep_research_agent
+
+    Default server URL: http://127.0.0.1:3773
+
+  versioning:
+    - version: "1.0.0"
+      date: "2026-01-11"
+      changes: "Initial release with ExaTools and ReasoningTools integration"
+
+# Assessment fields for skill negotiation
+assessment:
+  keywords:
+    - "research"
+    - "deep research"
+    - "web research"
+    - "citation"
+    - "citations"
+    - "analyze"
+    - "analysis"
+    - "market trends"
+    - "forecast"
+
+  specializations:
+    - domain: "web_research"
+      confidence_boost: 1.0
+    - domain: "citation_tracking"
+      confidence_boost: 0.9
+
+  anti_patterns:
+    - "code generation"
+    - "mathematical calculations"
+    - "real-time data"
+    - "file operations"
+    - "database queries"
+
+  complexity_indicators:
+    simple:
+      - "Single topic research"
+      - "Few sources needed"
+    medium:
+      - "Multi-faceted research"
+      - "Multiple sources required"
+      - "Citation tracking needed"
+    complex:
+      - "Comprehensive research across multiple domains"
+      - "Extensive citation requirements"
+      - "Structured output with custom schema"
