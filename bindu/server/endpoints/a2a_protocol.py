@@ -54,6 +54,46 @@ async def agent_run_endpoint(app: BinduApplication, request: Request) -> Respons
 
         logger.debug(f"A2A request from {client_ip}: method={method}, id={request_id}")
 
+        # ---------------------------------------------------------------------
+        # Authentication / Authorization guard
+        # ---------------------------------------------------------------------
+        if app_settings.auth.enabled:
+            # verify middleware has attached user context (if middleware was used)
+            user_info = getattr(request.state, "user_info", None)
+            if not user_info:
+                # no authentication data, reject immediately
+                logger.warning(f"Unauthenticated request for {method} from {client_ip}")
+                from bindu.common.protocol.types import AuthenticationRequiredError
+
+                code, message = extract_error_fields(AuthenticationRequiredError)
+                return jsonrpc_error(
+                    code,
+                    message,
+                    "Authentication required for agent execution",
+                    request_id,
+                    401,
+                )
+
+            # if permission checks are enabled, ensure the token has required scope
+            if app_settings.auth.require_permissions:
+                required_scopes = app_settings.auth.permissions.get(method, [])
+                if required_scopes:
+                    token_scopes = user_info.get("scope", []) or []
+                    if not any(scope in token_scopes for scope in required_scopes):
+                        logger.warning(
+                            f"Insufficient permissions for method {method} from {client_ip}"
+                        )
+                        from bindu.common.protocol.types import InsufficientPermissionsError
+
+                        code, message = extract_error_fields(InsufficientPermissionsError)
+                        return jsonrpc_error(
+                            code,
+                            message,
+                            f"Missing required permissions: {required_scopes}",
+                            request_id,
+                            403,
+                        )
+        
         handler_name = app_settings.agent.method_handlers.get(method)
         if handler_name is None:
             logger.warning(f"Unsupported A2A method '{method}' from {client_ip}")

@@ -27,7 +27,7 @@ from bindu.server.negotiation.capability_calculator import (
     CapabilityCalculator,
     ScoringWeights,
 )
-from bindu.utils.request_utils import handle_endpoint_errors, get_client_ip
+from bindu.utils.request_utils import handle_endpoint_errors, get_client_ip, extract_error_fields, jsonrpc_error
 from bindu.utils.logging import get_logger
 from bindu.utils.capabilities import get_x402_extension_from_capabilities
 from bindu.settings import app_settings
@@ -87,6 +87,23 @@ async def negotiation_endpoint(app: BinduApplication, request: Request) -> Respo
     """
     client_ip = get_client_ip(request)
     logger.debug(f"Negotiation request from {client_ip}")
+
+    # -----------------------------------------------------------------
+    # Authentication guard (protect negotiation when enabled)
+    # -----------------------------------------------------------------
+    if app_settings.auth.enabled:
+        user_info = getattr(request.state, "user_info", None)
+        if not user_info:
+            logger.warning(f"Unauthenticated negotiation request from {client_ip}")
+            from bindu.common.protocol.types import AuthenticationRequiredError
+
+            code, message = extract_error_fields(AuthenticationRequiredError)
+            return jsonrpc_error(
+                code,
+                message,
+                "Authentication required for negotiation",
+                status=401,
+            )
 
     # Early validation: manifest exists
     if app.manifest is None:
