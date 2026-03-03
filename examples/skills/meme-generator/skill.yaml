@@ -1,0 +1,229 @@
+id: meme-generator-v1
+name: meme-generator
+version: 1.0.0
+author: paras@getbindu.com
+
+# Description
+description: |
+  Generates memes using browser automation on ImgFlip. Takes a text prompt,
+  searches for a meme template using action verbs from the prompt, fills in
+  top and bottom text fields, and returns a link to the generated meme.
+
+# Tags and Modes
+tags:
+  - meme-generation
+  - browser-automation
+  - imgflip
+  - content-creation
+
+input_modes:
+  - text/plain
+
+output_modes:
+  - text/markdown
+
+# Example Queries
+examples:
+  - "Create a meme about procrastination and deadlines"
+  - "Generate a meme showing the struggle of learning to code"
+  - "Make a meme about Monday morning coffee addiction"
+  - "Create a meme about when your code finally works after 100 attempts"
+  - "Generate a meme about expectations vs reality in programming"
+
+# Detailed Capabilities
+capabilities_detail:
+  primary_capability:
+    supported: true
+    description: "Generates memes using browser automation on ImgFlip"
+    features:
+      - "Navigates to ImgFlip meme template search"
+      - "Searches for templates using action verbs extracted from user prompt"
+      - "Fills top and bottom text fields on selected template"
+      - "Generates meme and extracts image URL"
+      - "Returns markdown-formatted response with image link"
+    limitations: "Requires stable internet connection; browser automation may fail on network issues or site changes; no template scoring or optimization"
+
+  secondary_capability:
+    supported: false
+    description: "Not supported by code"
+    features: []
+    limitations: "No template intelligence, humor scoring, or multi-attempt generation"
+
+# Requirements
+requirements:
+  packages:
+    - bindu
+    - browser-use
+    - langchain-openai
+    - playwright
+    - python-dotenv
+  system:
+    - Chrome/Chromium browser
+    - Stable internet connection
+  min_memory_mb: 512
+  external_services:
+    - ImgFlip website (no API key required)
+    - OpenAI API or OpenRouter API for LLM
+    - Playwright browser automation
+
+# Performance Metrics
+performance:
+  avg_processing_time_ms: 60000
+  max_concurrent_requests: 1
+  memory_per_request_mb: 256
+  timeout_seconds: 180
+  scalability: limited
+  success_rate: unknown
+  template_load_time_ms: unknown
+
+# Tool Restrictions
+allowed_tools:
+  - BrowserAgent
+
+# Rich Documentation
+documentation:
+  overview: |
+    Generates memes by automating ImgFlip website interaction. Extracts action verbs from user prompt,
+    searches for matching templates, fills text fields, and returns generated meme URL. Uses browser
+    automation with vision-enabled LLM for navigation and interaction.
+
+  use_cases:
+    when_to_use:
+      - "Simple meme generation from text prompts"
+      - "Social media content creation"
+      - "Humor content for presentations"
+
+    when_not_to_use:
+      - "High-volume batch meme generation"
+      - "Precise template selection requirements"
+      - "Custom template uploads"
+      - "Memes requiring specific text formatting or styling"
+      - "Time-critical generation (browser automation is slow)"
+
+  input_structure: |
+    Accepts plain text meme generation prompts.
+
+    Example:
+    "Generate a meme using the 'Drake Hotline Bling' format. Top panel text: 'Writing code without testing'. Bottom panel text: 'Writing tests before deploying to production'."
+
+    Constraints:
+    - Input: Plain text only (no JSON structure support)
+    - Processing time: 60-180 seconds (browser automation)
+    - Language: English
+    - Template selection: Based on action verb extraction from prompt
+    - No style, tone, or formatting options
+
+  output_format: |
+    Markdown-formatted text with embedded image and link:
+
+    ### Here is your meme:
+
+    ![Generated Meme](https://i.imgflip.com/xxxxx.jpg)
+
+    [View on ImgFlip](https://imgflip.com/i/xxxxx)
+
+    No JSON output. No metadata. No scoring.
+
+  error_handling:
+    - "Browser automation failure: Returns error message"
+    - "No API key: Returns initialization error"
+    - "URL extraction failure: Returns fallback message with raw result"
+    - "Network issues: Browser agent may timeout"
+    - "ImgFlip site changes: May break automation workflow"
+
+  examples:
+    - title: "Drake Hotline Bling Meme"
+      input: "Generate a meme using the 'Drake Hotline Bling' format. Top panel text: 'Writing code without testing'. Bottom panel text: 'Writing tests before deploying to production'."
+      output: |
+        ### Here is your meme:
+
+        ![Generated Meme](https://i.imgflip.com/albgis.jpg)
+
+        [View on ImgFlip](https://imgflip.com/i/albgis)
+
+    - title: "Distracted Boyfriend Meme"
+      input: "Generate a meme using the 'Distracted Boyfriend' format. Label the boyfriend as 'Me starting a new project', the girlfriend as 'My existing unfinished projects', and the other girl as 'A new shiny tech stack I just discovered'."
+      output: |
+        ### Here is your meme:
+
+        ![Generated Meme](https://i.imgflip.com/albh2k.jpg)
+
+        [View on ImgFlip](https://imgflip.com/i/albh2k)
+
+  best_practices:
+    for_developers:
+      - "Provide clear, descriptive prompts"
+      - "Include template name if specific template desired"
+      - "Expect 60-180 second processing time"
+      - "Handle browser automation failures gracefully"
+      - "Set appropriate timeout values (180s+)"
+
+    for_orchestrators:
+      - "Route simple meme generation requests here"
+      - "Do not use for batch or high-volume requests"
+      - "No template intelligence or scoring available"
+      - "Browser automation is slow and may fail"
+      - "Single concurrent request recommended"
+
+  installation: |
+    Required packages:
+    pip install bindu browser-use langchain-openai playwright python-dotenv
+
+    Environment variables:
+    OPENAI_API_KEY=your_openai_api_key
+    or
+    OPENROUTER_API_KEY=your_openrouter_api_key
+    MODEL_NAME=gpt-4o (optional, default: gpt-4o)
+
+    Browser setup:
+    playwright install chromium
+
+    Disable telemetry (already set in code):
+    ANONYMIZED_TELEMETRY=false
+    BROWSER_USE_TELEMETRY=false
+
+  versioning:
+    - version: "1.0.0"
+      date: "2026-02-27"
+      changes: "Initial release with ImgFlip browser automation"
+
+# Assessment fields for skill negotiation
+assessment:
+  keywords:
+    - meme
+    - generate meme
+    - create meme
+    - imgflip
+    - funny image
+    - meme template
+
+  specializations:
+    - domain: meme_generation
+      confidence_boost: 0.5
+    - domain: programming_memes
+      confidence_boost: 0.4
+    - domain: social_media_content
+      confidence_boost: 0.2
+
+  anti_patterns:
+    - "serious content"
+    - "formal document"
+    - "academic paper"
+    - "technical documentation"
+    - "data visualization"
+    - "news reporting"
+
+  complexity_indicators:
+    simple:
+      - "create meme"
+      - "generate meme"
+      - "make meme"
+    medium:
+      - "meme about [topic]"
+      - "meme using [template name]"
+      - "funny meme for [context]"
+    complex:
+      - "Not supported: intelligent template selection"
+      - "Not supported: humor optimization"
+      - "Not supported: multi-template analysis"
+      - "Not supported: custom template uploads"
