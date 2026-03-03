@@ -1,0 +1,385 @@
+id: recipe-creator-v1
+name: recipe-creator
+version: 1.0.0
+author: paras@getbindu.com
+
+# Description
+description: |
+  Generates personalized recipes, meal plans, and step-by-step cooking instructions.
+  Adapts to available ingredients, dietary preferences, cuisine types, cooking time, skill level, and health goals.
+  Provides ingredient substitutions, nutritional guidance, and tips for efficient, creative cooking.
+
+# Tags and Modes
+tags:
+  - recipe
+  - cooking
+  - culinary
+  - meal-planning
+  - ingredients
+  - dietary-restrictions
+  - nutrition
+  - food
+  - kitchen
+  - chef
+
+input_modes:
+  - text/plain
+  - application/json
+
+output_modes:
+  - text/markdown
+
+# Example Queries
+examples:
+  - "I have chicken, rice, and vegetables. What can I make in 30 minutes?"
+  - "Create a vegetarian pasta recipe with mushrooms and spinach"
+  - "Suggest healthy breakfast options with oats and fruits"
+  - "What can I make with leftover turkey and potatoes?"
+  - "Need a quick dessert recipe using chocolate and bananas"
+  - "Give me a gluten-free dinner recipe using salmon and asparagus"
+  - "Plan a weekly meal prep for keto diet with shopping list"
+
+# Detailed Capabilities
+capabilities_detail:
+  recipe_generation:
+    supported: true
+    description: "Generate personalized recipes based on available ingredients and preferences"
+    features:
+      - "Ingredient-based recipe suggestions"
+      - "Dietary restriction adaptation (vegetarian, vegan, gluten-free, keto, etc.)"
+      - "Cuisine-specific recipe creation"
+      - "Skill level adjustment (beginner, intermediate, advanced)"
+      - "Time-constrained meal planning"
+      - "Health goal optimization"
+    limitations: "Requires internet access for recipe search; may not have real-time ingredient availability"
+
+  recipe_customization:
+    supported: true
+    description: "Create comprehensive meal plans and shopping lists"
+    features:
+      - "Weekly meal plan generation"
+      - "Nutritional balance optimization"
+      - "Grocery shopping list creation"
+      - "Leftover utilization planning"
+      - "Seasonal ingredient suggestions"
+      - "Budget-conscious meal options"
+    limitations: "Nutritional calculations are estimates; individual dietary needs may vary"
+
+  cooking_guidance:
+    supported: true
+    description: "Provide detailed cooking instructions and culinary advice"
+    features:
+      - "Step-by-step cooking instructions"
+      - "Ingredient substitution suggestions"
+      - "Cooking technique explanations"
+      - "Common mistake avoidance"
+      - "Equipment recommendations"
+      - "Plating and presentation tips"
+    limitations: "Cannot physically demonstrate techniques; relies on descriptive instructions"
+
+# Requirements
+requirements:
+  packages:
+    - "agno>=2.2.0"
+    - "exa-py>=1.1.0"
+    - "mem0ai>=1.0.1"
+    - "openai>=2.11.0"
+  system:
+    - "Python 3.12+"
+  min_memory_mb: 512
+  external_services:
+    - "OpenRouter API for LLM access"
+    - "Exa API for recipe search and ingredient lookup"
+    - "Mem0 AI for memory operations"
+
+# Performance Metrics
+performance:
+  avg_processing_time_ms: 9000
+  max_concurrent_requests: 1
+  memory_per_request_mb: 256
+  timeout_seconds: 60
+  scalability: "single-threaded async"
+
+# Tool Restrictions
+allowed_tools:
+  - ExaTools
+  - Mem0Tools
+
+# Rich Documentation
+documentation:
+  overview: |
+    The Recipe Creator skill transforms raw ingredients into delicious, personalized meals.
+    It combines culinary expertise with AI intelligence to help users discover new recipes,
+    adapt existing ones to their needs, and become more confident cooks. Whether you're
+    dealing with limited ingredients, specific dietary needs, or time constraints, this
+    skill provides practical, creative cooking solutions.
+
+  use_cases:
+    when_to_use:
+      - "User has specific ingredients and needs recipe ideas"
+      - "Planning meals for dietary restrictions or health goals"
+      - "Looking for quick and easy meal solutions"
+      - "Meal prep and weekly planning assistance"
+      - "Learning new cooking techniques and recipes"
+      - "Adapting recipes to available ingredients"
+      - "Nutritional planning and balanced meal creation"
+
+    when_not_to_use:
+      - "Real-time cooking assistance (use cooking assistant)"
+      - "Restaurant recommendations (use food guide)"
+      - "Grocery delivery services (use shopping assistant)"
+      - "Food safety questions (use food safety expert)"
+      - "Professional chef consultation (use culinary expert)"
+      - "Calorie counting or diet tracking (use nutrition tracker)"
+
+  input_structure: |
+    Accepts recipe requests with optional parameters:
+
+    Text format:
+    "Recipe request with ingredient list and preferences"
+
+    JSON format:
+    {
+      "ingredients": ["chicken", "rice", "broccoli", "garlic"],
+      "dietary_preferences": ["vegetarian", "gluten-free"],
+      "cuisine_type": "italian",
+      "cooking_time_minutes": 45,
+      "skill_level": "beginner",
+      "servings": 4,
+      "health_goals": ["high-protein", "low-carb"],
+      "exclude_ingredients": ["onions", "mushrooms"]
+    }
+
+    Constraints:
+    - Max ingredients: 15
+    - Max cooking time: 240 minutes
+    - Max servings: 20
+    - Supported dietary preferences: vegetarian, vegan, gluten-free, keto, paleo, dairy-free, nut-free
+    - Timeout: 60 seconds
+
+  output_format: |
+    Standard Recipe Output:
+
+    {
+      "success": true,
+      "recipe": {
+        "title": "Generated recipe title",
+        "description": "Brief description of the dish",
+        "cuisine": "Cuisine type",
+        "prep_time_minutes": 15,
+        "cook_time_minutes": 30,
+        "total_time_minutes": 45,
+        "difficulty": "beginner/intermediate/advanced",
+        "servings": 4,
+        "dietary_tags": ["vegetarian", "gluten-free"],
+        "ingredients": [
+          {
+            "name": "ingredient_name",
+            "quantity": "1 cup",
+            "notes": "optional notes or substitutions"
+          }
+        ],
+        "instructions": [
+          {
+            "step": 1,
+            "description": "Detailed instruction",
+            "time_minutes": 5,
+            "tips": ["optional tips"]
+          }
+        ],
+        "nutrition_per_serving": {
+          "calories": 350,
+          "protein_g": 25,
+          "carbohydrates_g": 30,
+          "fat_g": 15,
+          "fiber_g": 5
+        },
+        "tips_and_variations": [
+          "Substitution suggestion",
+          "Time-saving tip",
+          "Variation idea"
+        ],
+        "pairing_suggestions": [
+          "Side dish recommendation",
+          "Beverage pairing"
+        ]
+      },
+      "shopping_list": {
+        "ingredients_to_buy": [
+          {
+            "name": "ingredient",
+            "quantity": "amount needed",
+            "category": "produce/dairy/etc"
+          }
+        ],
+        "estimated_cost": 25.50
+      },
+      "metadata": {
+        "processing_time_ms": 2500,
+        "ingredients_used": ["chicken", "rice"],
+        "ingredients_missing": ["optional_ingredient"],
+        "confidence_score": 0.92,
+        "source_attribution": "Based on popular recipes from..."
+      }
+    }
+
+    Error Response:
+    {
+      "success": false,
+      "error": {
+        "code": "NO_RECIPES_FOUND",
+        "message": "No recipes found for the given ingredients",
+        "suggestions": ["Try broader ingredient categories", "Remove some constraints"]
+      }
+    }
+
+  error_handling:
+    - "No recipes found: Suggests alternative ingredients or broader categories"
+    - "Ingredient conflicts: Identifies incompatible dietary requirements"
+    - "Timeout: Returns best available results with completion status"
+    - "Invalid input: Provides clear error messages and format examples"
+    - "API limits: Queues requests or suggests simplified queries"
+    - "Unclear preferences: Asks for clarification or provides options"
+
+  examples:
+    - title: "30-Minute Chicken Dinner"
+      input:
+        ingredients: ["chicken breast", "broccoli", "garlic", "rice"]
+        cooking_time_minutes: 30
+        servings: 2
+      output:
+        success: true
+        recipe:
+          title: "Garlic Herb Chicken with Steamed Broccoli and Rice"
+          prep_time_minutes: 10
+          cook_time_minutes: 20
+          difficulty: "beginner"
+        metadata:
+          processing_time_ms: 1800
+          confidence_score: 0.95
+
+    - title: "Vegetarian Pasta"
+      input:
+        ingredients: ["pasta", "mushrooms", "spinach", "tomatoes"]
+        dietary_preferences: ["vegetarian"]
+        cuisine_type: "italian"
+      output:
+        success: true
+        recipe:
+          title: "Creamy Mushroom and Spinach Pasta"
+          cuisine: "Italian"
+          dietary_tags: ["vegetarian"]
+        metadata:
+          processing_time_ms: 2200
+          confidence_score: 0.88
+
+    - title: "Healthy Breakfast"
+      input:
+        ingredients: ["oats", "bananas", "almonds", "honey"]
+        health_goals: ["high-fiber", "low-sugar"]
+      output:
+        success: true
+        recipe:
+          title: "Banana Almond Overnight Oats"
+          dietary_tags: ["vegetarian", "gluten-free"]
+        metadata:
+          processing_time_ms: 1500
+          confidence_score: 0.90
+
+  best_practices:
+    for_developers:
+      - "Cache frequently requested ingredient combinations"
+      - "Validate dietary preference combinations"
+      - "Provide clear ingredient substitution options"
+      - "Include nutritional information when available"
+      - "Offer multiple difficulty levels for the same recipe"
+      - "Implement progressive disclosure for complex recipes"
+
+    for_orchestrators:
+      - "Route cooking and recipe-related queries to this skill"
+      - "Chain with nutrition analysis for health-focused users"
+      - "Combine with shopping list generators for meal planning"
+      - "Consider user's time constraints when selecting recipes"
+      - "Use dietary preferences for personalized recommendations"
+      - "Monitor seasonal ingredient availability"
+
+  installation: |
+    Required packages:
+    pip install agno>=2.2.0 exa-py>=1.1.0 mem0ai>=1.0.1 openai>=2.11.0 python-dotenv
+
+    Environment variables:
+    OPENROUTER_API_KEY=your_openrouter_api_key
+    EXA_API_KEY=your_exa_api_key
+    MEM0_API_KEY=your_mem0_api_key
+
+    System requirements:
+    # Python 3.12 or higher
+    # Internet connection for recipe search
+
+  versioning:
+    - version: "1.0.0"
+      date: "2026-02-27"
+      changes: "Initial release with Exa search, OpenRouter LLM, Mem0 memory"
+
+# Assessment fields for skill negotiation
+assessment:
+  keywords:
+    - recipe
+    - cook
+    - meal
+    - food
+    - ingredients
+    - breakfast
+    - lunch
+    - dinner
+    - vegetarian
+    - vegan
+    - gluten-free
+    - keto
+    - healthy
+    - quick
+    - easy
+    - chef
+    - kitchen
+    - cooking
+    - bake
+    - baking
+
+  specializations:
+    - domain: home_cooking
+      confidence_boost: 0.4
+    - domain: meal_planning
+      confidence_boost: 0.3
+    - domain: dietary_restrictions
+      confidence_boost: 0.3
+
+  anti_patterns:
+    - restaurant review
+    - food delivery
+    - nutrition tracker
+    - exercise plan
+    - weight loss
+    - medical advice
+    - food safety
+    - restaurant booking
+
+  complexity_indicators:
+    simple:
+      - "recipe for"
+      - "how to cook"
+      - "meal idea"
+      - "ingredients"
+      - "quick dinner"
+    medium:
+      - "meal plan"
+      - "weekly recipes"
+      - "dietary restrictions"
+      - "cooking instructions"
+      - "shopping list"
+    complex:
+      - "nutritional analysis"
+      - "multi-course menu"
+      - "special diet planning"
+      - "ingredient substitutions"
+      - "advanced techniques"
+      - "meal prep for week"
