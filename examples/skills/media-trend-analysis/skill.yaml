@@ -1,0 +1,280 @@
+# Media Trend Analysis Skill
+# Agent for analyzing media trends using Exa search and Firecrawl content extraction.
+
+# Basic Metadata
+id: media-trend-analysis-agent-v1
+name: media-trend-analysis
+version: 1.0.0
+author: paras@getbindu.com
+
+# Description
+description: |
+  Agent that analyzes media trends using Exa semantic search and Firecrawl content extraction.
+  Searches recent content (configurable lookback period, default 30 days), extracts key themes,
+  identifies sources, and generates structured markdown reports.
+
+# Tags and Modes
+tags:
+  - media-trend-analysis
+  - trend-tracking
+  - content-analysis
+
+input_modes:
+  - application/json
+
+output_modes:
+  - application/json
+
+# Example Queries
+examples:
+  - "Analyze the current media trends around generative AI over the past 7 days."
+  - "Track and analyze emerging media trends related to electric vehicle companies in the last 5 days."
+  - "What are the top emerging topics in technology sector this week?"
+
+# Detailed Capabilities
+capabilities_detail:
+  primary_capability:
+    supported: true
+    description: "Searches and analyzes media content using Exa and Firecrawl"
+    features:
+      - "Semantic search via ExaTools with configurable date range"
+      - "Content extraction via FirecrawlTools when search results are insufficient"
+      - "Structured markdown report generation with sections: Executive Summary, Trend Analysis, Source Analysis, Actionable Insights, Future Predictions, References"
+      - "Datetime context included in analysis"
+    limitations: "Date range limited by DAYS_BACK environment variable (default 30 days). Firecrawl scraping only triggered when fewer than 2 sources found. No built-in sentiment scoring or virality metrics."
+
+  secondary_capability:
+    supported: false
+    planned_version: null
+    description: "Not supported by code"
+
+# Requirements
+requirements:
+  packages:
+    - "agno"
+    - "exa-py"
+    - "firecrawl-py"
+    - "bindu"
+    - "python-dotenv"
+  system:
+    - "Python 3.12+"
+  min_memory_mb: 512
+
+# Performance Metrics
+performance:
+  avg_processing_time_ms: null
+  max_concurrent_requests: null
+  memory_per_request_mb: null
+  scalability: null
+
+# Tool Restrictions
+allowed_tools:
+  - ExaTools
+  - FirecrawlTools
+
+# Rich Documentation
+documentation:
+  overview: |
+    Agent that analyzes media trends using Exa semantic search and Firecrawl content extraction.
+    Uses Agno framework with OpenAI GPT-4o or OpenRouter models.
+    Generates structured markdown reports with trend analysis, source identification, and insights.
+    Supports configurable lookback period via DAYS_BACK environment variable (default 30 days).
+
+  use_cases:
+    when_to_use:
+      - "Analyzing recent media trends on specific topics"
+      - "Identifying key sources and themes in media coverage"
+      - "Generating structured trend reports with actionable insights"
+
+    when_not_to_use:
+      - "Real-time streaming analysis"
+      - "Historical data beyond configured lookback period"
+      - "Automated sentiment scoring (agent provides qualitative analysis only)"
+
+  input_structure: |
+    JSON-RPC 2.0 message with user query in parts array.
+
+    Example:
+    {
+      "jsonrpc": "2.0",
+      "method": "message/send",
+      "params": {
+        "message": {
+          "role": "user",
+          "parts": [
+            {
+              "kind": "text",
+              "text": "Analyze emerging media trends related to electric vehicles over the past 7 days."
+            }
+          ],
+          "kind": "message",
+          "messageId": "0c3e9e4f-57a9-41e8-b187-d93cb1e40401",
+          "contextId": "0c3e9e4f-57a9-41e8-b187-d93cb1e40402",
+          "taskId": "0c3e9e4f-57a9-41e8-b187-d93cb1e40403"
+        },
+        "skillId": "media-trend-analysis-agent-v1",
+        "configuration": {
+          "acceptedOutputModes": [
+            "application/json"
+          ]
+        }
+      },
+      "id": "0c3e9e4f-57a9-41e8-b187-d93cb1e40404"
+    }
+
+  output_format: |
+    JSON-RPC 2.0 result with task history and artifacts containing markdown summary.
+
+    Success Response:
+    {
+      "jsonrpc": "2.0",
+      "id": "0c3e9e4f-57a9-41e8-b187-d93cb1e40404",
+      "result": {
+        "id": "0c3e9e4f-57a9-41e8-b187-d93cb1e40403",
+        "context_id": "0c3e9e4f-57a9-41e8-b187-d93cb1e40402",
+        "kind": "task",
+        "status": {
+          "state": "completed",
+          "timestamp": "2026-02-25T17:59:47.889596+00:00"
+        },
+        "history": [
+          {
+            "kind": "message",
+            "role": "user",
+            "parts": [{"kind": "text", "text": "Analyze emerging media trends related to electric vehicles over the past 7 days."}]
+          },
+          {
+            "kind": "message",
+            "role": "assistant",
+            "parts": [{"kind": "text", "text": "# Media Trend Analysis Report..."}]
+          }
+        ],
+        "artifacts": [
+          {
+            "artifact_id": "unique_id",
+            "name": "result",
+            "parts": [{"kind": "text", "text": "Markdown formatted analysis report"}]
+          }
+        ]
+      }
+    }
+
+  error_handling:
+    - "Missing EXA_API_KEY: Raises ExaKeyError with message directing to https://exa.ai"
+    - "Missing FIRECRAWL_API_KEY: Raises FirecrawlKeyError with message directing to https://firecrawl.dev"
+    - "Missing LLM API key: Raises ValueError if neither OPENAI_API_KEY nor OPENROUTER_API_KEY provided"
+    - "Agent errors: Propagated from Agno framework and underlying tools"
+
+  examples:
+    - title: "Electric Vehicles Trend Analysis"
+      input:
+        parts:
+          - kind: "text"
+            text: "Analyze emerging media trends related to electric vehicles over the past 7 days."
+      output:
+        text: |
+          # Media Trend Analysis Report
+
+          ## Executive Summary
+          Over the past 7 days, electric vehicle (EV) media coverage has focused on declining growth, top brand mentions, shifts in consumer sentiment, and geographic variances in market performance. The analysis reveals a slowdown in EV registrations but owner satisfaction remains high, with Tesla leading the sentiment metrics.
+
+          ## Trend Analysis
+          ### Volume Metrics
+          - Peak discussion periods: February 13 - February 20, 2026
+          - Growth rate: Not available
+
+          ## Source Analysis
+          ### Top Sources
+          1. [EV Volumes](https://ev-volumes.com/)
+          2. [The EV Network](https://www.theevnetwork.com/news/february-shows-a-growing-car-market-overall-but-evs-fall-away-versus-last-year/)
+          3. [Carscoops](https://www.carscoops.com/2026/02/ev-sales-fall-2025-tesla-rivian-slowdown/)
+
+          ## Actionable Insights
+          1. Sentiment towards EVs remains positive despite a sales dip.
+             - Evidence: JD Power reports indicate highest satisfaction among BEV owners since 2021.
+             - Recommended action: PR campaigns should emphasize user satisfaction and future advancements to bolster confidence.
+
+          2. Geographic distribution indicates diversified performance.
+             - Evidence: Europe has shown growth while North America and China markets have slowed.
+             - Recommended action: Target marketing strategies regionally to align with local performance.
+
+          ## Future Predictions
+          1. Growth stabilization expected as infrastructure expands and new models launch.
+             - Supporting evidence: S&P Global noted the potential for a market rebound with infrastructure growth and new vehicle releases anticipated in 2026.
+
+          ## References
+          1. [EV Volumes - 2026 EV Statistics](https://ev-volumes.com/)
+          2. [The EV Network's February Market Report](https://www.theevnetwork.com/news/february-shows-a-growing-car-market-overall-but-evs-fall-away-versus-last-year/)
+          3. [AOL - EV Registrations Data](https://www.aol.com/lifestyle/ev-registrations-slip-first-time-144500444.html)
+          4. [Carscoops - US EV Market Analysis](https://www.carscoops.com/2026/02/ev-sales-fall-2025-tesla-rivian-slowdown/)
+          5. [JD Power - EVX Ownership Study](https://www.jdpower.com/business/press-releases/2026-us-electric-vehicle-experience-evx-ownership-study)
+
+  best_practices:
+    for_developers:
+      - "Agent uses async initialization with lock to prevent race conditions"
+      - "Handler function performs lazy initialization on first call"
+      - "Set DAYS_BACK environment variable to control lookback period (default 30 days)"
+      - "Choose LLM provider via OPENAI_API_KEY or OPENROUTER_API_KEY + MODEL_NAME"
+
+    for_orchestrators:
+      - "Route media trend analysis queries to this skill"
+      - "Task follows async pattern: submit returns 'submitted' state, poll with tasks/get until 'completed'"
+      - "Ensure EXA_API_KEY and FIRECRAWL_API_KEY are provided"
+      - "Monitor API usage for Exa and Firecrawl services"
+
+  installation: |
+    Install dependencies and run agent.
+
+    Required environment variables:
+    - EXA_API_KEY (required)
+    - FIRECRAWL_API_KEY (required)
+    - OPENAI_API_KEY or OPENROUTER_API_KEY (one required)
+    - MODEL_NAME (optional, default: openai/gpt-4o)
+    - DAYS_BACK (optional, default: 30)
+
+    Run:
+    python -m media_trend_analysis_agent
+
+    Server runs on http://127.0.0.1:3773 by default (configurable via agent_config.json)
+
+  versioning:
+    - version: "1.0.0"
+      date: "2026-01-11"
+      changes: "Initial release with Exa and Firecrawl integration"
+
+# Assessment fields for skill negotiation
+assessment:
+  keywords:
+    - "media"
+    - "trend"
+    - "analysis"
+    - "emerging"
+    - "coverage"
+    - "sources"
+
+  specializations:
+    - domain: "media-analysis"
+      confidence_boost: 0.8
+    - domain: "trend-tracking"
+      confidence_boost: 0.7
+
+  anti_patterns:
+    - "Real-time streaming or chat"
+    - "Historical data beyond DAYS_BACK period"
+    - "Image or video content analysis"
+    - "Code generation or debugging"
+    - "Mathematical calculations"
+    - "Automated sentiment scoring (provides qualitative analysis only)"
+
+  complexity_indicators:
+    simple:
+      - "Analyze media trends on [topic]"
+      - "What are emerging trends in [domain]"
+      - "Identify key sources discussing [topic]"
+    medium:
+      - "Track media trends across multiple platforms"
+      - "Compare coverage between different topics"
+      - "Identify influencers and authoritative sources"
+    complex:
+      - "Multi-topic correlation analysis (agent attempts but may require multiple queries)"
+      - "Long-term trend forecasting (limited by lookback period)"
