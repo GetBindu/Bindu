@@ -1,0 +1,387 @@
+id: biomni-v1
+name: biomni-agent
+version: 1.0.0
+author: paras@getbindu.com
+
+# Description
+description: |
+  Biomedical AI agent that combines LLM reasoning with four specialized tools:
+  BLAST sequence alignment, scRNA-seq clustering analysis, ChEMBL ADMET queries,
+  and PDF report generation.Designed for computational research workflows,
+  experimental planning, and biomedical hypothesis generation.
+
+# Tags and Modes
+tags:
+  - biomedical-ai
+  - sequence-alignment
+  - scrna-seq
+  - admet-query
+  - research-planning
+  - bioinformatics
+
+input_modes:
+  - text/plain
+  - application/json
+
+output_modes:
+  - text/plain
+  - application/json
+  - text/markdown
+
+# Example Queries
+examples:
+  - "Run BLAST alignment for this DNA sequence: ACGTACGTACGTACGTACGT..."
+  - "Analyze scRNA-seq data from file /path/to/data.h5ad and identify clusters"
+  - "Query ChEMBL for ADMET properties of SMILES: CC(=O)Nc1ccc(O)cc1"
+  - "Design a computational workflow for identifying drug targets in TNBC"
+  - "Generate a PDF report summarizing my analysis results"
+
+# Detailed Capabilities
+capabilities_detail:
+  sequence_alignment:
+    supported: true
+    method: ncbi_blast_api
+    programs:
+      - blastn
+      - blastp
+      - blastx
+      - tblastn
+    databases:
+      - nr
+      - nt
+      - refseq_protein
+    constraints:
+      - minimum_sequence_length: 20
+      - timeout_seconds: 180
+      - max_hits_returned: 5
+
+  scrna_analysis:
+    supported: true
+    library: scanpy
+    analysis_steps:
+      - quality_filtering
+      - normalization_log1p
+      - pca
+      - neighbor_graph
+      - leiden_clustering
+    outputs:
+      - cluster_counts
+      - cell_gene_statistics
+    limitations:
+      - requires_h5ad_or_scanpy_compatible_file
+      - no_visualization_export
+      - clustering_only
+
+  admet_query:
+    supported: true
+    data_source: chembl_webresource_client
+    query_method: smiles_flexmatch
+    returns:
+      - molecule_name
+      - chembl_id
+      - bioactivity_count
+    constraints:
+      - timeout_seconds: 60
+      - max_activities: 20
+      - requires_valid_smiles
+
+  pdf_generation:
+    supported: true
+    library: reportlab
+    format: basic_text_layout
+    features:
+      - title_page
+      - timestamp
+      - multi_page_support
+    limitations:
+      - no_figures_or_tables
+      - no_complex_formatting
+      - text_only
+
+  not_supported:
+    crispr_design: "No CRISPR guide RNA design tools"
+    differential_expression: "Clustering only, no DE analysis"
+    admet_prediction: "ChEMBL lookup only, no de novo prediction"
+    pdf_parsing: "Generation only, no extraction"
+    visualization_export: "Descriptions only, no figure rendering"
+
+# Requirements
+requirements:
+  packages:
+    - agno>=0.1.0
+    - biopython>=1.80
+    - scanpy>=1.9.0
+    - chembl-webresource-client>=0.10.0
+    - reportlab>=4.0.0
+    - bindu
+    - python-dotenv>=1.0.1
+  system: []
+  min_memory_mb: 1024
+  external_services:
+    - NCBI BLAST API (public, no key required)
+    - ChEMBL Web Services (public, no key required)
+    - OpenRouter API (required) OR OpenAI API (required)
+  environment_variables:
+    - OPENROUTER_API_KEY (required if using OpenRouter)
+    - OPENAI_API_KEY (required if using OpenAI directly)
+    - MEM0_API_KEY (optional, for memory features)
+    - MODEL_NAME (optional, defaults to openai/gpt-4o)
+
+# Performance Metrics
+performance:
+  avg_processing_time_seconds: 60-180
+  blast_timeout: 180
+  chembl_timeout: 60
+  async_execution: true
+  max_concurrent_tools: 4
+  memory_enabled: false
+  notes: "BLAST queries can take 1-3 minutes depending on NCBI server load"
+
+# Agent Configuration
+agents:
+  llm_capabilities:
+    - experimental_design
+    - hypothesis_generation
+    - workflow_planning
+    - result_interpretation
+    - literature_synthesis
+  tool_capabilities:
+    - sequence_homology_search
+    - single_cell_clustering
+    - compound_bioactivity_lookup
+    - report_formatting
+
+# Rich Documentation
+documentation:
+  overview: |
+    BioOmni is a biomedical AI agent that combines GPT-4 reasoning with four specialized
+    bioinformatics tools. It accepts natural language requests for sequence analysis,
+    scRNA-seq clustering, compound queries, and research planning. The agent uses async
+    execution for tool calls and returns structured results with biological interpretations.
+
+    Tools are implemented using BioPython (BLAST), Scanpy (scRNA-seq), ChEMBL client (ADMET),
+    and ReportLab (PDF). The LLM handles parameter extraction, workflow design, and result
+    interpretation.
+
+  use_cases:
+    when_to_use:
+      - User needs BLAST sequence alignment for gene/protein identification
+      - User has scRNA-seq data in h5ad format and needs clustering
+      - User wants to query ChEMBL for known compound bioactivity
+      - User needs computational research workflow design
+      - User wants experimental planning or hypothesis generation
+      - User needs a text-based PDF report
+
+    when_not_to_use:
+      - User needs CRISPR guide RNA design (no specialized tool)
+      - User needs differential expression analysis (clustering only)
+      - User needs de novo ADMET prediction (ChEMBL lookup only)
+      - User needs PDF parsing or data extraction (generation only)
+      - User needs actual visualization files (descriptions only)
+      - User needs laboratory execution or wet-lab protocols
+      - User needs medical diagnosis or clinical advice
+
+  input_structure: |
+    Accepts natural language text or JSON describing biomedical tasks.
+
+    Example inputs:
+    - "Run BLAST for this sequence: ACGTACGTACGTACGTACGT..."
+    - "Analyze scRNA-seq file at /data/pbmc.h5ad"
+    - "Query ChEMBL for aspirin: CC(=O)Oc1ccccc1C(=O)O"
+    - "Design a workflow to identify drug targets in triple-negative breast cancer"
+
+    Tool-specific constraints:
+    - BLAST: Sequences must be ≥20 characters, valid DNA/RNA/protein alphabet
+    - scRNA-seq: Requires h5ad or scanpy-compatible file path
+    - ADMET: Requires valid SMILES string
+    - PDF: Accepts title and text content
+
+    Max input length: No hard limit, but LLM context window applies
+
+  output_format: |
+    Returns JSON with tool results and LLM interpretation:
+
+    {
+      "success": true,
+      "tool_results": {
+        "blast": {"hits": [...], "num_hits": 5},
+        "scrna": {"n_clusters": 8, "cluster_sizes": {...}},
+        "admet": {"chembl_id": "CHEMBL25", "activities_found": 15},
+        "pdf": {"size_bytes": 2048, "summary": "PDF generated"}
+      },
+      "interpretation": "LLM-generated biological context and next steps"
+    }
+
+    For planning tasks, returns structured markdown workflows.
+
+  error_handling:
+    - "Agent not initialized: Returns error requesting API keys"
+    - "BLAST timeout (>180s): Returns timeout error"
+    - "ChEMBL timeout (>60s): Returns timeout error"
+    - "Invalid sequence: Returns validation error with details"
+    - "Invalid SMILES: Returns validation error"
+    - "File not found (scRNA-seq): Returns file error"
+    - "Tool execution failed: Returns error with exception details"
+
+  examples:
+    - title: "BLAST Sequence Alignment"
+      input: "Run BLAST for this DNA sequence: ACGTACGTACGTACGTACGTACGTACGT"
+      output_sample: |
+        {
+          "success": true,
+          "query_length": 28,
+          "num_hits": 5,
+          "hits": [
+            {
+              "title": "Homo sapiens chromosome 1",
+              "e_value": 0.001,
+              "identity_percent": 96.4,
+              "score": 52.0
+            }
+          ],
+          "summary": "Found 5 BLAST hits."
+        }
+
+    - title: "scRNA-seq Clustering"
+      input: "Analyze scRNA-seq data from /data/pbmc3k.h5ad"
+      output_sample: |
+        {
+          "success": true,
+          "n_cells": 2638,
+          "n_genes": 1838,
+          "n_clusters": 8,
+          "cluster_sizes": {"0": 458, "1": 392, "2": 341, ...},
+          "summary": "Identified 8 clusters."
+        }
+
+    - title: "ChEMBL ADMET Query"
+      input: "Query ChEMBL for SMILES: CC(=O)Oc1ccccc1C(=O)O"
+      output_sample: |
+        {
+          "success": true,
+          "molecule": "ASPIRIN",
+          "chembl_id": "CHEMBL25",
+          "activities_found": 18
+        }
+
+  best_practices:
+    for_users:
+      - "Provide sequences ≥20 characters for BLAST"
+      - "Use scanpy-compatible h5ad files for scRNA-seq"
+      - "Validate SMILES strings before ADMET queries"
+      - "Specify clear research objectives for planning tasks"
+      - "Request PDF reports only for text-based summaries"
+      - "Be patient with BLAST queries (1-3 minute timeout)"
+
+    for_orchestrators:
+      - "Route sequence alignment requests to this agent"
+      - "Route scRNA-seq clustering requests to this agent"
+      - "Route ChEMBL compound queries to this agent"
+      - "Route biomedical workflow planning to this agent"
+      - "Do NOT route CRISPR design (no tool support)"
+      - "Do NOT route differential expression (clustering only)"
+      - "Do NOT route de novo ADMET prediction (lookup only)"
+      - "Do NOT route PDF parsing (generation only)"
+      - "Expect 1-3 minute processing for BLAST queries"
+      - "Expect 15-60 seconds for other tools"
+
+  installation: |
+    Required packages:
+    pip install agno biopython scanpy chembl-webresource-client reportlab bindu python-dotenv
+
+    Environment variables (one required):
+    OPENROUTER_API_KEY=your_openrouter_api_key
+    OR
+    OPENAI_API_KEY=your_openai_api_key
+
+    Optional:
+    MEM0_API_KEY=your_mem0_api_key  # For memory features
+    MODEL_NAME=openai/gpt-4o  # Default model
+
+  versioning:
+    - version: "1.0.0"
+      date: "2026-03-02"
+      changes: "Initial release with BLAST, scRNA-seq, ChEMBL, and PDF tools"
+
+# Assessment fields for skill negotiation
+assessment:
+  keywords:
+    - blast
+    - sequence
+    - alignment
+    - dna
+    - rna
+    - protein
+    - scrna
+    - single-cell
+    - clustering
+    - scanpy
+    - admet
+    - chembl
+    - smiles
+    - compound
+    - molecule
+    - bioactivity
+    - research
+    - workflow
+    - experimental
+    - hypothesis
+    - biomedical
+    - bioinformatics
+    - genomics
+    - transcriptomics
+    - drug
+    - target
+
+  specializations:
+    - domain: sequence_alignment
+      confidence_boost: 0.5
+    - domain: scrna_seq_analysis
+      confidence_boost: 0.5
+    - domain: compound_queries
+      confidence_boost: 0.4
+    - domain: research_planning
+      confidence_boost: 0.3
+    - domain: biomedical_workflows
+      confidence_boost: 0.3
+
+  anti_patterns:
+    - "crispr guide design"
+    - "differential expression"
+    - "de novo admet"
+    - "admet prediction from structure"
+    - "pdf parsing"
+    - "pdf extraction"
+    - "visualization export"
+    - "figure generation"
+    - "wet lab"
+    - "laboratory execution"
+    - "medical diagnosis"
+    - "clinical advice"
+    - "patient treatment"
+    - "drug prescription"
+    - "genome assembly"
+    - "variant calling"
+    - "pathway enrichment"
+    - "protein structure prediction"
+
+  complexity_indicators:
+    simple:
+      - "blast search"
+      - "sequence alignment"
+      - "chembl query"
+      - "single tool use"
+    medium:
+      - "scrna-seq clustering"
+      - "workflow design"
+      - "hypothesis generation"
+      - "multi-step planning"
+    complex:
+      - "multi-omics workflow"
+      - "drug discovery pipeline"
+      - "target identification strategy"
+    not_supported:
+      - "crispr design"
+      - "differential expression"
+      - "de novo prediction"
+      - "actual bookings or execution"
