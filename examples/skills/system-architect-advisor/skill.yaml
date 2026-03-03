@@ -1,0 +1,229 @@
+# System Architect Advisor Skill
+# AI-powered system design and architecture planning assistant
+
+# Basic Metadata
+id: system-architect-advisor-agent-v1
+name: system-architect-advisor-agent
+version: 1.0.0
+author: paras@getbindu.com
+
+# Description
+description: |
+  Transforms natural language project requirements into structured technical design documents.
+  Uses a two-phase pipeline: DeepSeek R1 for structured JSON analysis, Claude 3.5 Sonnet for
+  markdown report generation. Outputs include architecture decisions, infrastructure specs,
+  security measures, database choices, tech stack, risk assessment, and implementation roadmap.
+
+# Tags and Modes
+tags:
+  - system-architecture
+  - technical-design
+  - architecture-recommendations
+  - technical-documentation
+
+input_modes:
+  - text/plain
+
+output_modes:
+  - text/markdown
+
+# Example Queries
+examples:
+  - "Design a scalable system architecture for a multi-tenant SaaS analytics platform handling 50K users and 10TB monthly data"
+  - "Create a system design for a fintech payment processing platform with PCI-DSS compliance and 5K TPS"
+  - "Design a real-time chat application architecture for 100K concurrent users"
+
+# Detailed Capabilities
+capabilities_detail:
+  architecture_analysis:
+    supported: true
+    description: "Two-phase LLM pipeline that generates structured technical design documents"
+    features:
+      - "DeepSeek R1 reasoning for structured JSON analysis"
+      - "Claude 3.5 Sonnet for markdown report generation"
+      - "Architecture pattern recommendations (microservices, monolithic, serverless, event-driven, layered)"
+      - "Infrastructure resource specifications with scaling policies"
+      - "Security measures with compliance standards"
+      - "Database selection and tech stack recommendations"
+      - "Risk assessment and mitigation strategies"
+      - "Phased implementation roadmap"
+      - "Mermaid.js diagram generation"
+      - "Reasoning transparency with collapsible sections"
+    limitations: "Output quality depends on LLM capabilities, no code implementation, no validation of recommendations"
+
+  memory_integration:
+    supported: true
+    planned_version: "1.0.0"
+    description: "Optional Mem0 integration for context retention across conversations"
+
+# Requirements
+requirements:
+  packages:
+    - "agno"
+    - "openai"
+    - "bindu"
+    - "mem0 (optional)"
+  system:
+    - "Python 3.10+"
+  environment_variables:
+    - "OPENROUTER_API_KEY (required)"
+    - "MEM0_API_KEY (optional)"
+  min_memory_mb: 512
+
+# Performance Metrics
+performance:
+  avg_processing_time_ms: 60000
+  max_concurrent_requests: 5
+  memory_per_request_mb: 512
+  scalability: vertical
+
+# Tool Restrictions
+allowed_tools:
+  - Read
+  - Write
+
+# Rich Documentation
+documentation:
+  overview: |
+    Two-phase AI system that transforms project requirements into technical design documents.
+    Phase 1: DeepSeek R1 analyzes requirements and generates structured JSON with reasoning.
+    Phase 2: Claude 3.5 Sonnet converts JSON into professional markdown report with diagrams.
+    Built on Agno framework with OpenRouter models, served via Bindu JSON-RPC 2.0 protocol.
+
+  use_cases:
+    when_to_use:
+      - "System architecture design and planning"
+      - "Technical documentation generation"
+      - "Architecture decision records (ADRs)"
+      - "Infrastructure planning and recommendations"
+      - "Technology stack selection guidance"
+
+    when_not_to_use:
+      - "Code implementation or infrastructure deployment"
+      - "Real-time system validation or testing"
+      - "Direct integration with cloud providers"
+      - "Low-latency requirements (< 30 seconds)"
+
+  input_structure: |
+    JSON-RPC 2.0 message with natural language project requirements.
+
+    Example:
+    {
+      "jsonrpc": "2.0",
+      "method": "message/send",
+      "params": {
+        "message": {
+          "role": "user",
+          "parts": [
+            {
+              "kind": "text",
+              "text": "Design a scalable system architecture for a multi-tenant SaaS analytics platform..."
+            }
+          ],
+          "kind": "message",
+          "messageId": "uuid",
+          "contextId": "uuid",
+          "taskId": "uuid"
+        },
+        "skillId": "System-Architect-Advisor-v1",
+        "configuration": {
+          "acceptedOutputModes": ["application/json"]
+        }
+      },
+      "id": "uuid"
+    }
+
+  output_format: |
+    JSON-RPC 2.0 result with markdown technical design document in artifacts.
+
+    Success Response includes:
+    - Executive summary
+    - System architecture overview with Mermaid diagrams
+    - Architectural pattern selection with rationale and trade-offs
+    - Infrastructure design with resource specifications
+    - Security architecture with compliance considerations
+    - Database strategy and tech stack recommendations
+    - Risk mitigation strategies
+    - Collapsible section with DeepSeek R1 reasoning process
+
+  error_handling:
+    - "Missing API key: Returns ValueError with clear message"
+    - "Reasoning phase failure: Returns error message to user"
+    - "Agent not initialized: Returns RuntimeError"
+    - "Invalid input: Returns guidance message"
+    - "LLM API failures: Propagated to user with error details"
+
+  best_practices:
+    for_developers:
+      - "Set OPENROUTER_API_KEY environment variable before starting"
+      - "Use async/await for handler calls"
+      - "Implement lazy initialization pattern"
+      - "Extract reasoning tokens from model responses"
+
+    for_orchestrators:
+      - "Route architecture design queries to this skill"
+      - "Expect 30-90 second processing time per request"
+      - "Chain with implementation or validation skills for complete workflow"
+      - "Provide detailed requirements for better output quality"
+
+  installation: |
+    Install via uv package manager.
+
+    Required packages:
+    uv sync
+
+    Environment variables:
+    OPENROUTER_API_KEY=<your-key>
+    MEM0_API_KEY=<your-key> (optional)
+
+    Optional CLI arguments:
+    --reasoning-model (default: deepseek/deepseek-r1)
+    --drafting-model (default: anthropic/claude-3.5-sonnet)
+
+    Run:
+    uv run python -m system_architect_advisor_agent
+
+  versioning:
+    - version: "1.0.0"
+      date: "2026-03-02"
+      changes: "Initial release with two-phase architecture analysis pipeline"
+
+# Assessment fields for skill negotiation
+assessment:
+  keywords:
+    - "architecture"
+    - "system design"
+    - "infrastructure"
+    - "technical design"
+    - "scalability"
+    - "microservices"
+    - "database design"
+    - "security architecture"
+    - "compliance"
+    - "implementation roadmap"
+
+  specializations:
+    - domain: "system-architecture"
+      confidence_boost: 0.4
+    - domain: "technical-design"
+      confidence_boost: 0.3
+    - domain: "infrastructure-planning"
+      confidence_boost: 0.2
+
+  anti_patterns:
+    - "Code implementation requests"
+    - "Infrastructure deployment automation"
+    - "Real-time system monitoring"
+    - "Direct cloud provider integration"
+
+  complexity_indicators:
+    simple:
+      - "Basic architecture recommendations"
+      - "Single-service system design"
+    medium:
+      - "Multi-tier application architecture"
+      - "Microservices design with 5-10 services"
+    complex:
+      - "Large-scale distributed systems"
+      - "Multi-tenant SaaS platforms"
+      - "High-compliance fintech systems"
