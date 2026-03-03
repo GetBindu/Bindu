@@ -201,3 +201,17 @@ examples/.pebbling/*
 bindu/_version.py
 bindu/penguin/.bindu/private.pem
 bindu/penguin/.bindu/public.pem
+
+
+# Private keys 
+examples/agent_swarm/.bindu/private.pem
+examples/agent_swarm/.bindu/public.pem
+
+# Generated reports — runtime artifacts
+examples/agent_swarm/reports/
+
+# Environment files
+examples/agent_swarm/.env
+
+
+tests/redis_tests/

@@ -1,12 +1,14 @@
 from agno.agent import Agent
 from agno.models.google import Gemini
 import os
+from dotenv import load_dotenv
+load_dotenv(override=True)
 
 def build_critic_agent():
     return Agent(
         name="Critic",
         model=Gemini(
-            id="model-2.5-flash",
+            id="gemini-2.5-flash",
             api_key=os.getenv("GOOGLE_API_KEY"),
             temperature=0.1
         ),

@@ -1,7 +1,10 @@
 from agno.agent import Agent
 from agno.models.google import Gemini
-import os
+from dotenv import load_dotenv
 
+import os 
+
+load_dotenv(override=True)
 
 def build_planner_agent():
     return Agent(

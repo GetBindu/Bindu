@@ -4,6 +4,11 @@ from examples.agent_swarm.critic_agent import build_critic_agent
 from examples.agent_swarm.planner_agent import build_planner_agent
 from examples.agent_swarm.reflection_agent import build_reflection_agent
 
+# LangGraph pipeline agents
+from examples.agent_swarm.scout_agent import handler as scout_handler
+from examples.agent_swarm.analyst_agent import handler as analyst_handler
+from examples.agent_swarm.publisher_agent import handler as publisher_handler
+
 import json
 import re
 import time
@@ -118,6 +123,61 @@ class Orchestrator:
 
                 print(f"   ⚠️ {agent_name} permanently failed, returning partial context.")
                 return input_text
+            
+    def run_langgraph_pipeline(self, topic: str, agno_context: str) -> str:
+        """
+        Run the LangGraph Scout → Analyst → Publisher pipeline.
+    
+        Called after the agno swarm completes.
+        Uses Scout for fresh web research, Analyst for structured
+        analysis, Publisher for final report generation.
+
+        Args:
+            topic: Original research query
+        agno_context: Output from the agno swarm pipeline
+
+        Returns:
+            Final published markdown report
+        """
+        print(f"\n{'='*60}")
+        print("🌻 LangGraph Pipeline Starting")
+        print(f"{'='*60}")
+
+        # Step 1 — Scout: fresh web research on the topic
+        print("\n🔍 Scout Agent — web research")
+        scout_input = [{"role": "user", "content": topic}]
+        try:
+            findings = scout_handler(scout_input)
+            print(f"   ✅ Scout: {len(findings)} chars")
+        except Exception as e:
+            print(f"   ⚠️ Scout failed: {e} — using agno context as fallback")
+            findings = agno_context
+
+        # Step 2 — Analyst: structured analysis of findings
+        print("\n🧠 Analyst Agent — structured analysis")
+        analyst_input = [{"role": "user", "content": findings}]
+        try:
+            analysis = analyst_handler(analyst_input)
+            print(f"   ✅ Analyst: structured JSON returned")
+        except Exception as e:
+            print(f"   ⚠️ Analyst failed: {e} — using raw findings")
+            analysis = findings
+
+        # Step 3 — Publisher: format and save report
+        print("\n📤 Publisher Agent — generating report")
+        publisher_input = [{"role": "user", "content": analysis}]
+        try:
+            report = publisher_handler(publisher_input)
+            print(f"   ✅ Publisher: report saved")
+        except Exception as e:
+            print(f"   ⚠️ Publisher failed: {e}")
+            report = analysis
+
+        print(f"\n{'='*60}")
+        print("✅ LangGraph Pipeline Complete")
+        print(f"{'='*60}")
+
+        return report
 
 
     def run(self, query: str) -> str:
@@ -211,7 +271,7 @@ class Orchestrator:
                 print("\n" + "="*60)
                 print("✅ Output validated by reflection agent - SUCCESS!")
                 print("="*60)
-                return context
+                return self.run_langgraph_pipeline(query, context)
 
             print("\n⚠️ Output needs improvement")
             if fix_strategy:

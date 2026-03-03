@@ -20,6 +20,13 @@ import logging
 from functools import wraps
 from typing import Any, Callable, TypeVar
 
+try:
+    import redis.asyncio as redis_asyncio
+    REDIS_EXCEPTIONS = (redis_asyncio.RedisError,)
+except ImportError:
+    REDIS_EXCEPTIONS = ()
+
+
 from tenacity import (
     AsyncRetrying,
     retry_if_exception_type,
@@ -42,16 +49,14 @@ F = TypeVar("F", bound=Callable[..., Any])
 # Note: Only includes truly transient errors (network, timeout, connection)
 # Application logic errors (ValueError, KeyError, etc.) should not be retried
 TRANSIENT_EXCEPTIONS = (
-    # Network errors
     ConnectionError,
     ConnectionRefusedError,
     ConnectionResetError,
     ConnectionAbortedError,
-    # Timeout errors
     TimeoutError,
     asyncio.TimeoutError,
-    # OS errors
-    OSError,  # Covers BrokenPipeError, etc.
+    OSError,
+    *REDIS_EXCEPTIONS,  # ← Redis-specific transient errors
 )
 
 

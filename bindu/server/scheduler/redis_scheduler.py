@@ -8,6 +8,9 @@ from typing import Any
 
 import redis.asyncio as redis
 from opentelemetry.trace import get_current_span
+# # from opentelemetry.propagators.textmap import DefaultTextMapPropagator
+# from opentelemetry.propagate import inject, extract
+import asyncio
 
 from bindu.common.protocol.types import TaskIdParams, TaskSendParams
 from bindu.utils.logging import get_logger
@@ -23,7 +26,6 @@ from .base import (
 )
 
 logger = get_logger("bindu.server.scheduler.redis_scheduler")
-
 
 class RedisScheduler(Scheduler):
     """A Redis-based scheduler for distributed task operations.
@@ -82,7 +84,7 @@ class RedisScheduler(Scheduler):
             logger.info("Redis scheduler connection closed")
             self._redis_client = None
 
-    @retry_scheduler_operation()
+    @retry_scheduler_operation(max_attempts=3, min_wait=0.5, max_wait=5)
     async def run_task(self, params: TaskSendParams) -> None:
         """Send a run task operation to Redis queue."""
         logger.debug(f"Scheduling run task: {params}")
@@ -91,7 +93,7 @@ class RedisScheduler(Scheduler):
         )
         await self._push_task_operation(task_operation)
 
-    @retry_scheduler_operation()
+    @retry_scheduler_operation(max_attempts=3, min_wait=0.5, max_wait=5)
     async def cancel_task(self, params: TaskIdParams) -> None:
         """Send a cancel task operation to Redis queue."""
         logger.debug(f"Scheduling cancel task: {params}")
@@ -100,7 +102,7 @@ class RedisScheduler(Scheduler):
         )
         await self._push_task_operation(task_operation)
 
-    @retry_scheduler_operation()
+    @retry_scheduler_operation(max_attempts=3, min_wait=0.5, max_wait=5)
     async def pause_task(self, params: TaskIdParams) -> None:
         """Send a pause task operation to Redis queue."""
         logger.debug(f"Scheduling pause task: {params}")
@@ -109,7 +111,7 @@ class RedisScheduler(Scheduler):
         )
         await self._push_task_operation(task_operation)
 
-    @retry_scheduler_operation()
+    @retry_scheduler_operation(max_attempts=3, min_wait=0.5, max_wait=5)
     async def resume_task(self, params: TaskIdParams) -> None:
         """Send a resume task operation to Redis queue."""
         logger.debug(f"Scheduling resume task: {params}")
@@ -129,6 +131,8 @@ class RedisScheduler(Scheduler):
             f"Starting to receive task operations from queue: {self.queue_name}"
         )
 
+        backoff = 1.0 
+
         while True:
             try:
                 # Blocking pop with 1 second timeout
@@ -140,12 +144,14 @@ class RedisScheduler(Scheduler):
                     logger.debug(
                         f"Received task operation: {task_operation['operation']}"
                     )
+                    backoff = 1.0 
                     yield task_operation
 
             except redis.RedisError as e:
-                # Log error and continue (Redis connection issues)
                 logger.error(f"Redis error in receive_task_operations: {e}")
-                # Could add exponential backoff here for production
+                backoff = min(backoff * 2, 30.0)
+                logger.warning(f"Backing off for {backoff:.1f}s before retrying...")
+                await asyncio.sleep(backoff)
                 continue
             except json.JSONDecodeError as e:
                 # Log deserialization errors but continue
@@ -180,29 +186,14 @@ class RedisScheduler(Scheduler):
         """Serialize task operation to JSON string for Redis storage."""
         from uuid import UUID
 
-        # Convert span to string representation (spans are not JSON serializable)
-        span = task_operation["_current_span"]
-
-        # Try to get span context - handle both real spans and mocks
-        span_id = None
-        trace_id = None
-
+        # Inject W3C trace context into carrier
+        carrier: dict[str, str] = {}
         try:
-            if hasattr(span, "get_span_context"):
-                # Mock span with get_span_context method
-                span_context = span.get_span_context()
-                span_id = span_context.span_id
-                trace_id = span_context.trace_id
-            elif hasattr(span, "_context"):
-                # Real OpenTelemetry _Span object
-                span_context = span._context
-                span_id = span_context.span_id
-                trace_id = span_context.trace_id
-        except Exception:
-            # If we can't get span context, just use None values
-            pass
+            from opentelemetry.propagate import inject
+            inject(carrier)
+        except (ModuleNotFoundError, Exception):
+            pass  # Degrade gracefully if opentelemetry not available
 
-        # Convert UUIDs to strings in params
         def convert_uuids(obj):
             """Recursively convert UUIDs to strings in nested structures."""
             if isinstance(obj, UUID):
@@ -216,8 +207,7 @@ class RedisScheduler(Scheduler):
         serializable_task = {
             "operation": task_operation["operation"],
             "params": convert_uuids(task_operation["params"]),
-            "span_id": format(span_id, "016x") if span_id else None,
-            "trace_id": format(trace_id, "032x") if trace_id else None,
+            "trace_context": carrier,
         }
         return json.dumps(serializable_task)
 
@@ -227,11 +217,9 @@ class RedisScheduler(Scheduler):
 
         data = json.loads(task_data)
 
-        # Convert string UUIDs back to UUID objects in params
         def convert_strings_to_uuids(obj):
             """Recursively convert UUID strings back to UUID objects."""
             if isinstance(obj, str):
-                # Try to parse as UUID
                 try:
                     return UUID(obj)
                 except (ValueError, AttributeError):
@@ -242,35 +230,38 @@ class RedisScheduler(Scheduler):
                 return [convert_strings_to_uuids(item) for item in obj]
             return obj
 
-        # Reconstruct the task operation (span will be recreated by the worker)
-        # TODO: Properly propagate span context using trace_id/span_id
+        # Extract and restore W3C trace context
+        trace_context = data.get("trace_context", {})
+        try:
+            from opentelemetry.propagate import extract
+            from opentelemetry import context
+            ctx = extract(trace_context)
+            token = context.attach(ctx)
+            try:
+                current_span = get_current_span()
+            finally:
+                context.detach(token)
+        except (ModuleNotFoundError, Exception):
+            current_span = get_current_span()
+
         operation_type = data["operation"]
         params = convert_strings_to_uuids(data["params"])
-        current_span = get_current_span()
 
         if operation_type == "run":
             return _RunTask(
-                operation="run",
-                params=params,
-                _current_span=current_span,
+                operation="run", params=params, _current_span=current_span
             )
         elif operation_type == "cancel":
             return _CancelTask(
-                operation="cancel",
-                params=params,
-                _current_span=current_span,
+                operation="cancel", params=params, _current_span=current_span
             )
         elif operation_type == "pause":
             return _PauseTask(
-                operation="pause",
-                params=params,
-                _current_span=current_span,
+                operation="pause", params=params, _current_span=current_span
             )
         elif operation_type == "resume":
             return _ResumeTask(
-                operation="resume",
-                params=params,
-                _current_span=current_span,
+                operation="resume", params=params, _current_span=current_span
             )
         else:
             raise ValueError(f"Unknown operation type: {operation_type}")

@@ -156,9 +156,14 @@ class TestRetryUtilities:
 
     def test_is_retryable_error(self):
         """Test retryable error detection."""
+        import redis.asyncio as redis_lib
+
         assert is_retryable_error(ConnectionError("test"))
         assert is_retryable_error(TimeoutError("test"))
         assert is_retryable_error(asyncio.TimeoutError("test"))
+    # Step 2: redis.RedisError must be retryable
+        assert is_retryable_error(redis_lib.RedisError("redis failure"))
+        assert is_retryable_error(redis_lib.ConnectionError("redis connection lost"))
 
     @pytest.mark.asyncio
     async def test_execute_with_retry_success(self):

@@ -1,192 +1,114 @@
-**Welcome to the Internet of Agents. 🌐🤖🌻**
+# 🌻 Bindu NightSky Swarm
 
-# 🌻 Bindu Agent Swarm
-
-**Building a Living Society of AI Agents**
-
-A production-grade multi-agent system built on top of **Bindu — the identity, communication & payments layer for AI agents.**
-
-This project demonstrates how to design, orchestrate, and deploy a **collaborative society of autonomous AI agents** that can **plan, research, summarize, critique, reflect, and self-improve** — using a protocol-first, composable architecture.
+**A production-grade multi-agent system combining agno orchestration with LangGraph pipelines — deployed on Bindu's identity, communication & payments layer for AI agents.**
 
 ---
 
-# 🌍 Why Agent Swarms?
+## 🌍 Why This Exists
 
-Modern AI systems rely on **single LLM calls** with increasingly long prompts.
+Most AI systems are a single LLM call with a long prompt. That approach:
 
-This approach:
+- Scales poorly
+- Is brittle under failure
+- Cannot self-correct
+- Cannot coordinate complex workflows
 
-* Scales poorly
-* Is brittle
-* Lacks self-correction
-* Cannot coordinate complex workflows
+**Future AI systems will be societies of specialized agents.**
 
-**Future AI systems will be societies of agents.**
-
-Each agent:
-
-* Has an identity
-* Communicates via protocols
-* Collaborates with peers
-* Negotiates tasks
-* Reflects on performance
-* Improves collectively
-
-Bindu provides the infrastructure layer for this world.
-
-This project **proves that vision in running code.**
+This project proves that vision in running code — agents that plan, research, search the web, analyze, critique, reflect, and publish — autonomously, on a Redis-backed distributed scheduler.
 
 ---
 
-# 🧠 Core Idea
+## 🏗️ Architecture
 
-Instead of building one massive agent, we build **multiple specialized agents**, each responsible for a distinct cognitive role.
+The NightSky Swarm has two layers that run in sequence:
 
-Complex intelligence **emerges from collaboration**, not from a single model.
+### Layer 1 — agno Orchestrator (Planning + Research + Critique)
 
----
+| Agent | Framework | Role |
+|-------|-----------|------|
+| **Planner** | agno + Gemini | Decomposes user query into structured steps |
+| **Researcher** | agno + Gemini | Deep factual research on the topic |
+| **Summarizer** | agno + Gemini | Condenses research into clear explanation |
+| **Critic** | agno + Gemini | Reviews, challenges, and refines output |
+| **Reflection** | agno + Gemini | Evaluates quality, triggers retry if needed |
 
-# 🏗️ System Architecture
+### Layer 2 — LangGraph Pipeline (Scout → Analyst → Publisher)
 
-This swarm consists of **five autonomous agents + one orchestrator**:
+| Agent | Framework | Role |
+|-------|-----------|------|
+| **Scout** | LangGraph ReAct + DuckDuckGo | Live web research using ReAct reasoning loop |
+| **Analyst** | LangGraph LCEL chain | Extracts claims, scores confidence, returns structured JSON |
+| **Publisher** | LangGraph output chain | Formats clean markdown report, saves to file |
 
-| Component            | Role                                            |
-| -------------------- | ----------------------------------------------- |
-| **Planner Agent**    | Breaks a user query into structured tasks       |
-| **Research Agent**   | Performs deep factual research                  |
-| **Summarizer Agent** | Condenses research into clear explanations      |
-| **Critic Agent**     | Reviews, challenges, and refines outputs        |
-| **Reflection Agent** | Evaluates quality and triggers self-improvement |
-| **Orchestrator**     | Coordinates agent execution pipeline            |
+### Execution Flow
 
----
-
-# 🔁 Execution Flow
-
-```text
-User Query
-    ↓
-Planner → Task Decomposition
-    ↓
-Researcher → Information Gathering
-    ↓
-Summarizer → Condensed Understanding
-    ↓
-Critic → Quality Review & Refinement
-    ↓
-Reflection Agent → Self-Evaluation & Feedback
-    ↓
-Final High-Quality Answer
 ```
-
-Each stage improves the output — resulting in **self-correcting intelligence**.
-
----
-
-# 🔬 Design Philosophy
-
-### 1. Protocol-First Architecture
-
-At scale, agents communicate using **Bindu’s protocol layer**, enabling:
-
-* Identity verification
-* Message routing
-* Capability negotiation
-* Secure execution
-
-> In this example, the orchestrator directly invokes agents locally for simplicity and clarity. This models the execution flow while remaining compatible with future protocol-based inter-agent communication.
-
----
-
-### 2. Specialization > Monolith
-
-Each agent focuses on a **single cognitive responsibility**, which:
-
-* Improves reasoning quality
-* Reduces hallucination
-* Enables horizontal scalability
-* Allows dynamic agent replacement
-
----
-
-### 3. Reflection & Self-Improvement
-
-The Reflection Agent evaluates:
-
-* Factual accuracy
-* Logical coherence
-* Completeness
-
-If quality is low → it **automatically triggers refinement loops**.
-
----
-
-# 📁 Project Structure
-
-```bash
-examples/
-└── agent_swarm/
-    ├── planner_agent.py        # Task planning & decomposition
-    ├── researcher_agent.py     # Deep research agent
-    ├── summarizer_agent.py     # Summarization agent
-    ├── critic_agent.py         # Review & refinement agent
-    ├── reflection_agent.py     # Self-evaluation & improvement agent
-    ├── orchestrator.py         # Multi-agent execution pipeline
-    ├── run_swarm.py            # Local CLI runner
-    ├── test_planner.py         # Planner validation tests
-    └── bindu_super_agent.py    # Entry point – launches full swarm on Bindu
+User Query (via A2A protocol)
+    ↓
+┌─────────────────────────────────────────────┐
+│           agno Orchestrator Layer            │
+│  Planner → Researcher → Summarizer →        │
+│  Critic → Reflection Agent                  │
+│  Quality: GOOD? ✅ → continue               │
+│  Quality: LOW?  🔄 → retry (max 2x)         │
+└─────────────────────────────────────────────┘
+    ↓  (on GOOD quality)
+┌─────────────────────────────────────────────┐
+│          LangGraph Pipeline Layer            │
+│  Scout (ReAct web search)                   │
+│      ↓                                      │
+│  Analyst (claim extraction + confidence)    │
+│      ↓                                      │
+│  Publisher (markdown report + file save)    │
+└─────────────────────────────────────────────┘
+    ↓
+Final markdown report saved to reports/
 ```
 
 ---
 
-# 🛠️ Implementation Overview
+## 🔧 Infrastructure
 
-## 1️⃣ Agent Construction
+### Redis Scheduler (Production-Grade)
+- Tasks survive restarts — persistent Redis queue
+- Exponential backoff on Redis errors (2s → 4s → 8s → 30s max)
+- `redis.RedisError` treated as retryable — 3 attempts with exponential wait
+- W3C `traceparent` propagation — distributed traces connected end-to-end
 
-Each agent is built using:
+### Bindu Integration
+- Every agent gets a **unique DID** — identity-first design
+- A2A protocol endpoints — agents communicate via standard HTTP
+- OpenTelemetry spans — full observability from task submission to completion
+- Redis scheduler wired via config — no code changes needed to switch backends
 
-```python
-from agno.agent import Agent
-from agno.models.openai import OpenAIChat
+---
+
+## 📁 Project Structure
+
+```
+examples/agent_swarm/
+├── bindu_super_agent.py     # Entry point — deploys full swarm on Bindu
+├── orchestrator.py          # agno pipeline coordinator
+│
+├── planner_agent.py         # agno: task decomposition
+├── researcher_agent.py      # agno: deep research
+├── summarizer_agent.py      # agno: condensation
+├── critic_agent.py          # agno: review & refinement
+├── reflection_agent.py      # agno: self-evaluation
+│
+├── scout_agent.py           # LangGraph ReAct: live web search
+├── analyst_agent.py         # LangGraph LCEL: structured analysis
+├── publisher_agent.py       # LangGraph: markdown report generation
+│
+└── reports/                 # Auto-generated research reports (timestamped)
 ```
 
-Each agent follows:
-
-* Clear instructions
-* Focused prompts
-* Single responsibility principle
-
 ---
 
-## 2️⃣ Orchestration Pipeline
+## 🚀 How To Run
 
-The orchestrator defines:
-
-```text
-Planner → Researcher → Summarizer → Critic → Reflection → Final Output
-```
-
-This pipeline:
-
-* Converts chaos → structure
-* Turns vague ideas → production-grade outputs
-* Enables automatic self-correction
-
----
-
-## 3️⃣ Bindu Integration
-
-The swarm is deployed using **Bindu’s agent runtime**, enabling:
-
-* DID-based agent identity
-* Protocol-based communication
-* Future-ready support for economic agents
-
----
-
-# 🚀 How To Run
-
-## 1️⃣ Setup Environment
+### 1. Setup
 
 ```bash
 git clone https://github.com/getbindu/bindu.git
@@ -200,149 +122,104 @@ python -m venv .venv
 source .venv/bin/activate
 
 pip install -e .
+pip install langchain langgraph langchain-community langchain-google-genai
 ```
 
----
-
-## 2️⃣ Configure API Keys
-
-### OpenAI
+### 2. Start Redis
 
 ```bash
-# Windows
-setx OPENAI_API_KEY "your_openai_key"
-setx GOOGLE_API_KEY "your_gemini_key"
+# macOS
+brew install redis && redis-server
 
-# macOS / Linux
-export OPENAI_API_KEY="your_openai_key"
-export GOOGLE_API_KEY="your_gemini_key"
+# Windows (WSL or Docker)
+docker run -p 6379:6379 redis
 ```
 
-### OpenRouter (Optional)
+### 3. Configure environment
+
+Create `examples/agent_swarm/.env`:
 
 ```bash
-# Windows
-setx OPENAI_API_BASE "https://openrouter.ai/api/v1"
-setx OPENAI_API_KEY "your_openrouter_key"
+GOOGLE_API_KEY=your_gemini_key
+REDIS_URL=redis://localhost:6379
 
-# macOS / Linux
-export OPENAI_API_BASE="https://openrouter.ai/api/v1"
-export OPENAI_API_KEY="your_openrouter_key"
+# Optional — autonomous scheduled research
+SWARM_AUTONOMOUS_MODE=true
+SWARM_RESEARCH_TOPIC=latest developments in AI agents and multi-agent systems
+SWARM_RESEARCH_INTERVAL_HOURS=6
 ```
 
----
-
-## 3️⃣ Run the Swarm
+### 4. Run the swarm
 
 ```bash
-python examples/agent_swarm/bindu_super_agent.py
+python -m examples.agent_swarm.bindu_super_agent
 ```
 
----
+### 5. Send a query
 
-## 4️⃣ Open Interactive UI
+```bash
+curl -X POST http://localhost:3780 \
+  -H "Content-Type: application/json" \
+  -d '{"message": {"role": "user", "parts": [{"type": "text", "text": "What is agentic AI?"}]}}'
+```
 
-```text
+Or open the interactive UI:
+```
 http://localhost:3780/docs
 ```
 
-Bindu provides a **custom interactive chat UI** instead of traditional FastAPI Swagger docs.
+---
+
+## 🔬 What Makes This Different
+
+### Two frameworks, one pipeline
+agno handles planning and orchestration. LangGraph handles live web research and structured analysis. Each does what it's best at.
+
+### Self-correcting intelligence
+The Reflection Agent evaluates output quality after every cycle. If quality is low, the entire pipeline retries with a refined query — up to 2 times automatically.
+
+### Production-ready infrastructure
+- Redis scheduler with exponential backoff — survives Redis restarts
+- W3C distributed tracing — full observability across agent boundaries
+- Graceful fallbacks at every stage — one agent failing doesn't crash the pipeline
+
+### Reports on disk
+Every successful research cycle produces a timestamped markdown report in `reports/` — a permanent artifact of what the swarm discovered.
 
 ---
 
-# 🧪 Example Query
+## 📊 Protocol Endpoints
 
-```
-Research about Hyderabad, Telangana
-```
+When running, the swarm exposes:
 
-The system will:
-
-* Plan
-* Research
-* Summarize
-* Critique
-* Reflect
-* Improve
-* Respond
-
-Producing a **high-quality, self-corrected answer.**
+| Endpoint | Description |
+|----------|-------------|
+| `POST /` | Send task (A2A protocol) |
+| `GET /.well-known/agent.json` | Agent discovery |
+| `GET /agent/info` | Agent metadata |
+| `POST /did/resolve` | DID resolution |
+| `GET /docs` | Interactive UI |
 
 ---
 
-# 🌻 How This Demonstrates Bindu’s Vision
+## 🔮 Roadmap
 
-Bindu is building:
-
-> Identity + Communication + Payments for AI agents
-
-This project validates:
-
-### ✅ Identity Layer
-
-* Every agent receives a **unique DID**
-* Enables trust, authentication, and discovery
-
-### ✅ Communication Layer
-
-* Protocol-based messaging
-* Multi-agent coordination
-
-### ✅ Collaboration Layer
-
-* Dynamic role assignment
-* Agent-to-agent critique
-* Self-improving workflows
-
-### 🚀 Future Payment Layer (Ready)
-
-* Architecture supports:
-
-  * Paid agent services
-  * Usage billing
-  * Execution monetization
+- [ ] Scout, Analyst, Publisher as independent Bindu microservices (separate ports)
+- [ ] A2A inter-agent communication between all three layers
+- [ ] Trust & reputation scoring between agents
+- [ ] Payment layer — paid research tasks via Bindu X402
+- [ ] Cross-agent memory with persistent vector store
 
 ---
 
-# 🔮 Roadmap Extensions
+## 🌻 The Bigger Picture
 
-* Multi-agent negotiation protocols
-* Trust & reputation scoring
-* Economic agent marketplaces
-* Distributed agent swarms
-* Cross-agent memory systems
+Bindu is building identity, communication, and payments for AI agents.
 
----
+This swarm demonstrates all three layers working together in production:
 
-# 🧬 Philosophy
+- **Identity** — every agent has a DID, every task is traceable
+- **Communication** — A2A protocol, W3C traces, structured JSON between agents
+- **Infrastructure** — Redis scheduler, exponential backoff, graceful failure handling
 
-Most AI platforms build:
-
-> Bigger models.
-
-Bindu builds:
-
-> Better systems.
-
-This project proves:
-
-> **Intelligence emerges from collaboration — not model size.**
-
----
-
-# ⭐ Why This Example Exists
-
-To help developers:
-
-* Understand protocol-first agent design
-* Learn how to build real agent societies
-* Build production-grade agent workflows
-* Ship real multi-agent systems
-
----
-
-# 🌍 The Bigger Picture
-
-This swarm is **not a demo**.
-
-It is a **blueprint for how future AI systems will be built.**
+> Intelligence emerges from collaboration — not model size.

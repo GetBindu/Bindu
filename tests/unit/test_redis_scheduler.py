@@ -165,21 +165,13 @@ class TestRedisSchedulerSerialization:
     """Test RedisScheduler serialization and deserialization."""
 
     def test_serialize_task_operation(self, redis_url):
-        """Test task operation serialization."""
-
+        """Test task operation serialization includes W3C trace_context."""
         scheduler = RedisScheduler(redis_url=redis_url)
-
-        # Create a mock span with proper span context
-        mock_span = MagicMock()
-        mock_span_context = MagicMock()
-        mock_span_context.span_id = 0x0123456789ABCDEF
-        mock_span_context.trace_id = 0x0123456789ABCDEF0123456789ABCDEF
-        mock_span.get_span_context.return_value = mock_span_context
 
         task_op = {
             "operation": "run",
             "params": {"task_id": "test-123", "context_id": "ctx-456"},
-            "_current_span": mock_span,
+            "_current_span": MagicMock(),
         }
 
         serialized = scheduler._serialize_task_operation(task_op)
@@ -187,11 +179,14 @@ class TestRedisSchedulerSerialization:
 
         assert data["operation"] == "run"
         assert data["params"]["task_id"] == "test-123"
-        assert "span_id" in data
-        assert "trace_id" in data
+    # Step 3: span_id/trace_id replaced by W3C traceparent carrier
+        assert "trace_context" in data
+        assert isinstance(data["trace_context"], dict)
+        assert "span_id" not in data
+        assert "trace_id" not in data
 
     def test_deserialize_task_operation_run(self, redis_url):
-        """Test deserialization of run task operation."""
+        """Test deserialization of run task operation with trace_context."""
         scheduler = RedisScheduler(redis_url=redis_url)
 
         serialized = json.dumps(
@@ -202,8 +197,7 @@ class TestRedisSchedulerSerialization:
                     "context_id": "ctx-456",
                     "messages": [],
                 },
-                "span_id": "0123456789abcdef",
-                "trace_id": "0123456789abcdef0123456789abcdef",
+                "trace_context": {}, 
             }
         )
 
@@ -211,6 +205,7 @@ class TestRedisSchedulerSerialization:
 
         assert task_op["operation"] == "run"
         assert task_op["params"]["task_id"] == "test-123"
+        assert "_current_span" in task_op
 
     def test_deserialize_task_operation_cancel(self, redis_url):
         """Test deserialization of cancel task operation."""
@@ -220,8 +215,7 @@ class TestRedisSchedulerSerialization:
             {
                 "operation": "cancel",
                 "params": {"task_id": "test-123"},
-                "span_id": None,
-                "trace_id": None,
+                "trace_context": {},
             }
         )
 
@@ -238,8 +232,7 @@ class TestRedisSchedulerSerialization:
             {
                 "operation": "unknown",
                 "params": {},
-                "span_id": None,
-                "trace_id": None,
+                "trace_context": {},
             }
         )
 
@@ -296,3 +289,38 @@ class TestRedisSchedulerUtilities:
         is_healthy = await scheduler.health_check()
 
         assert is_healthy is False
+
+    @pytest.mark.asyncio
+    async def test_receive_task_operations_backs_off_on_redis_error(
+        self, redis_url, mock_redis_client
+        ):
+        """Test that receive_task_operations backs off on RedisError (Step 1)."""
+        import redis.asyncio as redis_lib
+
+        call_count = [0]
+
+        async def blpop_side_effect(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] < 3:
+                raise redis_lib.RedisError("Simulated Redis failure")
+            return ("bindu:tasks", json.dumps({
+                "operation": "run",
+                "params": {"task_id": "test-backoff"},
+                "trace_context": {},
+            }))
+
+        mock_redis_client.blpop.side_effect = blpop_side_effect
+
+        scheduler = RedisScheduler(redis_url=redis_url)
+        scheduler._redis_client = mock_redis_client
+
+        with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+            async for task in scheduler.receive_task_operations():
+                assert task["operation"] == "run"
+                break
+
+        # sleep called twice — once for each RedisError before success
+        assert mock_sleep.call_count == 2
+    # backoff doubled: first 2.0s, then 4.0s
+        calls = [c.args[0] for c in mock_sleep.call_args_list]
+        assert calls == [2.0, 4.0]

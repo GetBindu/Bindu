@@ -2,6 +2,12 @@ from agno.agent import Agent
 from agno.models.google import Gemini
 from agno.models.groq import Groq
 import os
+from dotenv import load_dotenv
+
+
+load_dotenv(override=True)
+
+
 
 def build_research_agent():
     return Agent(
