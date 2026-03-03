@@ -1,0 +1,252 @@
+id: shopping-partner-v1
+name: shopping-partner
+version: 1.0.0
+author: paras@getbindu.com
+
+# Description
+description: |
+  AI-powered product recommendation agent that searches e-commerce platforms
+  and provides structured product recommendations based on user requirements.
+  Uses LLM-based analysis with web search tools to find and compare products.
+
+# Tags and Modes
+tags:
+  - shopping
+  - product-recommendation
+  - e-commerce
+  - web-search
+
+input_modes:
+  - text/plain
+  - application/json
+
+output_modes:
+  - text/plain
+  - application/json
+
+# Example Queries
+examples:
+  - "Recommend a laptop for programming with 16GB RAM and 512GB SSD under ₹80,000"
+  - "Best smartphone with good camera under ₹40,000 in India"
+  - "Find running shoes under $150"
+  - "Compare wireless headphones under $200"
+
+# Detailed Capabilities
+capabilities_detail:
+  primary_capability:
+    supported: true
+    description: "Searches web for products and provides LLM-generated recommendations"
+    features:
+      - "Web search via DuckDuckGo or Exa API"
+      - "LLM-based product analysis and matching"
+      - "Structured markdown output with product details"
+      - "Match score calculation (percentage-based)"
+      - "Trusted source filtering (Amazon, Flipkart, Google Shopping, etc.)"
+    limitations: "Recommendations based on web search results; actual pricing and availability depend on search results quality; no direct API integration with e-commerce platforms"
+
+  secondary_capability:
+    supported: true
+    description: "Optional memory storage for user preferences"
+    features:
+      - "Mem0 integration for storing user preferences (if MEM0_API_KEY provided)"
+    limitations: "Memory features only available when MEM0_API_KEY is configured"
+
+# Requirements
+requirements:
+  packages:
+    - "agno"
+    - "openai (if using OPENAI_API_KEY) or openrouter (if using OPENROUTER_API_KEY)"
+    - "duckduckgo-search (default) or exa-py (if EXA_API_KEY provided)"
+    - "mem0 (optional, requires MEM0_API_KEY)"
+    - "bindu-penguin"
+    - "python-dotenv"
+  system:
+    - "Internet access for web search"
+  api_keys:
+    - "OPENAI_API_KEY or OPENROUTER_API_KEY (required, at least one)"
+    - "EXA_API_KEY (optional, falls back to DuckDuckGo)"
+    - "MEM0_API_KEY (optional, for memory features)"
+  min_memory_mb: 256
+
+# Performance Metrics
+performance:
+  avg_processing_time_ms: "Varies based on LLM and search API response times"
+  max_concurrent_requests: "Not enforced in code"
+  memory_per_request_mb: "Depends on LLM model"
+  scalability: "Single agent instance per deployment"
+
+# Tool Restrictions
+allowed_tools:
+  - "DuckDuckGoTools (default search)"
+  - "ExaTools (if EXA_API_KEY provided)"
+  - "Mem0Tools (if MEM0_API_KEY provided)"
+
+# Rich Documentation
+documentation:
+  overview: |
+    This agent uses an LLM (GPT-4o or OpenRouter models) combined with web search
+    tools to find and recommend products. It searches specified e-commerce platforms
+    and generates structured recommendations in markdown format.
+
+    The agent enforces a minimum 50% match threshold and prioritizes trusted sources
+    like Amazon, Flipkart, Myntra, Meesho, Google Shopping, and Nike.
+
+  use_cases:
+    when_to_use:
+      - "Product discovery based on user requirements"
+      - "Comparing products from web search results"
+      - "Getting structured product recommendations with match scores"
+      - "Finding products within budget constraints"
+
+    when_not_to_use:
+      - "Real-time inventory verification (depends on search results)"
+      - "Placing orders or processing payments"
+      - "Price tracking over time"
+      - "Customer service or order tracking"
+      - "Guaranteed pricing accuracy (search results may be outdated)"
+
+  input_structure: |
+    Accepts natural language queries via JSON-RPC message/send endpoint.
+
+    Message format:
+    {
+      "role": "user",
+      "parts": [{"kind": "text", "text": "Your shopping query"}]
+    }
+
+    The agent processes plain text queries describing product requirements,
+    budget, features, and preferences.
+
+  output_format: |
+    Returns markdown-formatted recommendations with the following structure:
+
+    # Shopping Recommendations 🛍️
+
+    ## Search Summary
+    - User Requirements
+    - Search Criteria
+    - Trusted Sources
+    - Match Threshold (minimum 50%)
+
+    ## Top Recommendations
+
+    ### Product N: {Product Name}
+    **Match Score**: XX% ✅
+    **Price**: {Price with currency}
+    **Brand**: {Brand Name}
+    **Source**: {Platform}
+
+    **Key Features:**
+    - Feature list
+
+    **Why It Matches:**
+    - Matching criteria
+
+    **Availability**: Status indicator
+    **Link**: Purchase URL
+
+    ## Alternative Options
+    - Additional suggestions if needed
+
+    ## Safety & Trust Notes
+    - Source verification notes
+    - Purchase disclaimers
+
+    ## Next Steps
+    - Suggested user actions
+
+  error_handling:
+    - "Missing API keys: Raises ValueError with setup instructions"
+    - "Agent not initialized: Raises RuntimeError"
+    - "Search failures: Depends on underlying tool error handling"
+
+  examples:
+    - title: "Laptop Search (India)"
+      input:
+        query: "Recommend the best laptop under ₹80,000 for software development and light gaming in India"
+      output:
+        format: "Markdown with 3 product recommendations, match scores, pricing, features, pros/cons"
+
+    - title: "Smartphone Search (India)"
+      input:
+        query: "Best smartphone under ₹40,000 with excellent camera, 5G, AMOLED display"
+      output:
+        format: "Markdown with 3 product recommendations, detailed feature breakdown, availability"
+
+  best_practices:
+    for_developers:
+      - "Set either OPENAI_API_KEY or OPENROUTER_API_KEY before running"
+      - "Configure EXA_API_KEY for better search results (optional)"
+      - "Enable MEM0_API_KEY for user preference memory (optional)"
+      - "Agent initializes lazily on first request"
+
+    for_orchestrators:
+      - "Route shopping and product queries to this agent"
+      - "Expect async task processing (submitted → completed states)"
+      - "Response includes markdown-formatted recommendations"
+      - "No built-in concurrency limits or rate limiting"
+
+  installation: |
+    Install dependencies:
+    pip install agno openai duckduckgo-search bindu-penguin python-dotenv
+
+    Optional:
+    pip install exa-py mem0
+
+    Required environment variables:
+    - OPENAI_API_KEY (for OpenAI GPT-4o) OR
+    - OPENROUTER_API_KEY (for OpenRouter models)
+    - MODEL_NAME (optional, default: "openai/gpt-4o")
+
+    Optional environment variables:
+    - EXA_API_KEY (for Exa search, falls back to DuckDuckGo)
+    - MEM0_API_KEY (for memory features)
+
+  versioning:
+    - version: "1.0.0"
+      date: "2026-01-13"
+      changes: "Initial implementation with Agno agent, web search tools, and markdown output"
+
+# Assessment fields for skill negotiation
+assessment:
+  keywords:
+    - "shop"
+    - "buy"
+    - "purchase"
+    - "product"
+    - "recommend"
+    - "compare"
+    - "price"
+    - "budget"
+    - "laptop"
+    - "smartphone"
+    - "gift"
+
+  specializations:
+    - domain: "general product search"
+      confidence_boost: 0.3
+    - domain: "electronics"
+      confidence_boost: 0.2
+    - domain: "budget-based recommendations"
+      confidence_boost: 0.2
+
+  anti_patterns:
+    - "process payment"
+    - "place order"
+    - "track shipment"
+    - "manage inventory"
+    - "real-time price monitoring"
+    - "guaranteed stock verification"
+
+  complexity_indicators:
+    simple:
+      - "single product search"
+      - "basic requirements"
+    medium:
+      - "product comparison"
+      - "feature-based filtering"
+      - "budget constraints"
+    complex:
+      - "multi-criteria matching"
+      - "detailed comparisons"
+      - "alternative suggestions"
