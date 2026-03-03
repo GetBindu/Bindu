@@ -1,0 +1,267 @@
+id: finance-v1
+name: finance
+version: 1.0.0
+author: paras@getbindu.com
+
+# Description
+description: |
+  Financial analysis agent that retrieves stock/ETF data via YFinance and market news via DuckDuckGo.
+  Outputs markdown-formatted tables and bullet points. Uses OpenRouter LLM (default: openai/gpt-4o) for analysis.
+
+# Tags and Modes
+tags:
+  - finance
+  - stock-analysis
+  - market-data
+  - yfinance
+  - duckduckgo
+  - markdown-output
+  - etf-analysis
+
+input_modes:
+  - text/plain
+  - application/json
+
+output_modes:
+  - text/plain
+  - text/markdown
+  - application/json
+
+# Example Queries
+examples:
+  - "analyze nvidia stock"
+  - "what's the current price of AAPL"
+  - "latest news about semiconductor stocks"
+  - "compare AAPL, MSFT, and NVDA"
+  - "analyze ETFs SPY, QQQ, and VTI"
+
+# Detailed Capabilities
+capabilities_detail:
+  primary_capability:
+    supported: true
+    description: "Stock and ETF data retrieval via YFinance"
+    features:
+      - "Current price lookup"
+      - "Basic financial metrics (market cap, P/E, 52-week high/low)"
+      - "Historical price data"
+      - "ETF information (AUM, expense ratio, holdings)"
+    limitations: "Data accuracy depends on YFinance API; may have delays"
+
+  secondary_capability:
+    supported: true
+    description: "Market news search via DuckDuckGo"
+    features:
+      - "Recent news article search"
+      - "News catalyst identification"
+      - "Market sentiment from news sources"
+    limitations: "Search results depend on DuckDuckGo availability; no guaranteed news coverage"
+
+  analysis_capability:
+    supported: true
+    description: "LLM-based analysis with markdown output"
+    features:
+      - "Markdown table generation"
+      - "Comparative analysis formatting"
+      - "Summary and insight generation"
+      - "Structured report creation"
+    limitations: "Analysis quality depends on OpenRouter LLM; requires OPENROUTER_API_KEY"
+
+# Requirements
+requirements:
+  packages:
+    - "agno"
+    - "bindu"
+    - "python-dotenv"
+  system:
+    - "Python 3.12+"
+  environment:
+    - "OPENROUTER_API_KEY (required)"
+    - "MODEL_NAME (optional, default: openai/gpt-4o)"
+  min_memory_mb: 256
+
+# Performance Metrics
+performance:
+  avg_processing_time_ms: 5000
+  max_concurrent_requests: 5
+  memory_per_request_mb: 256
+  scalability: vertical
+
+# Tool Restrictions
+allowed_tools:
+  - YFinanceTools
+  - DuckDuckGoTools
+
+# Rich Documentation
+documentation:
+  overview: |
+    The Finance skill retrieves stock/ETF data via YFinanceTools and market news via DuckDuckGoTools.
+    An OpenRouter LLM (default: openai/gpt-4o) processes queries and formats responses as markdown tables
+    and bullet points. Runs as a Bindu agent server on http://127.0.0.1:3773.
+
+  use_cases:
+    when_to_use:
+      - "Stock price and basic metrics lookup"
+      - "ETF comparison (price, AUM, expense ratio, holdings)"
+      - "Recent news search for stocks or sectors"
+      - "Multi-stock comparative analysis"
+      - "Markdown-formatted financial reports"
+
+    when_not_to_use:
+      - "Real-time trading execution"
+      - "Portfolio optimization or management"
+      - "Tax or legal advice"
+      - "High-frequency trading"
+      - "Advanced technical analysis (not explicitly supported)"
+      - "Cryptocurrency analysis (not supported by YFinance integration)"
+
+  input_structure: |
+    Accepts natural language queries via JSON-RPC 2.0 message/send method.
+
+    Message format:
+    - role: "user"
+    - parts: [{ kind: "text", text: "<query>" }]
+    - messageId, contextId, taskId required
+
+    Query examples:
+    - "analyze nvidia stock"
+    - "what's the current price of AAPL"
+    - "compare AAPL, MSFT, NVDA"
+    - "analyze ETFs SPY, QQQ, VTI"
+
+    Constraints:
+    - Queries must be about publicly traded stocks/ETFs
+    - YFinance API limitations apply
+    - DuckDuckGo search availability required
+
+  output_format: |
+    Returns JSON-RPC 2.0 response with task status.
+
+    Initial response:
+    - status.state: "submitted"
+    - history: contains user message
+
+    Completed response (via tasks/get):
+    - status.state: "completed"
+    - history: includes assistant message with markdown text
+    - artifacts: contains result with markdown-formatted analysis
+
+    Markdown content structure:
+    - # Title heading
+    - | Markdown | Tables | with proper formatting
+    - Bullet points for news/insights
+    - Brief summary sections
+
+    Note: Agent instructions enforce complete markdown tables, no raw JSON, no truncated output.
+
+  error_handling:
+    - "Missing OPENROUTER_API_KEY raises ValueError"
+    - "YFinance API failures (rate limits, network issues)"
+    - "DuckDuckGo search unavailability"
+    - "Invalid stock/ETF symbols"
+    - "Agent initialization errors"
+    - "No automatic retry or caching implemented in code"
+
+  examples:
+    - title: "Multi-Stock Comparison"
+      input:
+        query: "Provide a structured financial analysis of Apple (AAPL), Microsoft (MSFT), and Nvidia (NVDA)"
+      output:
+        success: true
+        result:
+          markdown_table: "Comparison table with Price, Market Cap, P/E, 52W High/Low, 30D % Change"
+          news_catalysts: "Bullet points for each stock"
+          summary: "Key insights and risk analysis"
+        processing_time: "~60 seconds"
+
+    - title: "ETF Analysis"
+      input:
+        query: "Analyze ETFs SPY, QQQ, and VTI with AUM, expense ratio, holdings, performance"
+      output:
+        success: true
+        result:
+          markdown_table: "ETF comparison with price, AUM, expense ratio, top holdings, returns, volatility"
+          summary: "Diversification differences and suitability analysis"
+        processing_time: "~50 seconds"
+
+  best_practices:
+    for_developers:
+      - "Set OPENROUTER_API_KEY in environment or .env file"
+      - "YFinanceTools and DuckDuckGoTools are initialized automatically"
+      - "Agent uses lazy initialization on first request"
+      - "Markdown output enforced via agent instructions"
+      - "No caching or retry logic in current implementation"
+
+    for_orchestrators:
+      - "Route queries with keywords: 'stock', 'ETF', 'price', 'analyze', 'compare', 'financial'"
+      - "Expect 30-60 second response times for multi-stock analysis"
+      - "Task follows async pattern: submit → poll tasks/get until completed"
+      - "Agent outputs markdown in artifacts[].parts[].text field"
+      - "No built-in rate limiting; monitor OpenRouter API usage"
+
+  installation: |
+    Install dependencies and run:
+
+    ```bash
+    # Install package
+    pip install -e .
+
+    # Set environment variable
+    export OPENROUTER_API_KEY=your_key_here
+
+    # Run agent server
+    python finance_agent/main.py
+    # Or: python finance_agent/main.py --openrouter-api-key YOUR_KEY --model openai/gpt-4o
+    ```
+
+    Server starts on http://127.0.0.1:3773
+
+    System Requirements:
+    - Python 3.12+
+    - Internet connection for YFinance and DuckDuckGo
+    - Valid OpenRouter API key
+
+  versioning:
+    - version: "1.0.0"
+      date: "2026-03-02"
+      changes: "Initial release with YFinance and DuckDuckGo integration, markdown output"
+
+# Assessment fields for skill negotiation
+assessment:
+  keywords:
+    - "stock"
+    - "ETF"
+    - "price"
+    - "analyze"
+    - "compare"
+    - "financial"
+    - "market"
+    - "news"
+
+  specializations:
+    - domain: "stock data retrieval"
+      confidence_boost: 0.5
+    - domain: "ETF comparison"
+      confidence_boost: 0.4
+    - domain: "market news search"
+      confidence_boost: 0.3
+
+  anti_patterns:
+    - "real-time trading execution"
+    - "portfolio optimization"
+    - "tax advice"
+    - "cryptocurrency"
+    - "forex"
+    - "options trading"
+    - "futures"
+
+  complexity_indicators:
+    simple:
+      - "single stock price"
+      - "basic ETF info"
+    medium:
+      - "single stock analysis with news"
+      - "2-3 stock comparison"
+    complex:
+      - "multi-stock comparison with metrics"
+      - "ETF analysis with holdings and performance"
+      - "sector-wide news aggregation"
