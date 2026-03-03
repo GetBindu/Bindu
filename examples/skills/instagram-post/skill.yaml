@@ -1,0 +1,241 @@
+id: instagram-post-v1
+name: instagram-post
+version: 1.0.0
+author: paras@getbindu.com
+
+# Description
+description: |
+  Instagram marketing content generator using CrewAI multi-agent system.
+  Accepts product website URL, scrapes content, analyzes competitors via web search,
+  generates 3 Instagram ad copy options and 3 photograph descriptions.
+
+# Tags and Modes
+tags:
+  - instagram
+  - marketing
+  - content-creation
+  - ad-copy
+
+input_modes:
+  - text/plain
+
+output_modes:
+  - text/plain
+  - text/markdown
+
+# Example Queries
+examples:
+  - "Create Instagram content for https://getbindu.com, focusing on the new collection of features. The content should include high-quality images and a compelling caption."
+  - "Plan Instagram campaign for luxury skincare product line like https://www.lakmeindia.com"
+
+# Detailed Capabilities
+capabilities_detail:
+  website_scraping:
+    supported: true
+    description: "Scrape and summarize website content using Browserless API"
+    features:
+      - "HTML content extraction via Browserless"
+      - "Content chunking (8000 chars per chunk)"
+      - "LLM-based summarization of scraped content"
+    limitations: "Requires BROWSERLESS_API_KEY; 30s timeout per request"
+
+  web_search:
+    supported: true
+    description: "Search internet and Instagram via Serper API"
+    features:
+      - "General web search (top 5 results)"
+      - "Instagram-specific search (site:instagram.com)"
+    limitations: "Requires SERPER_API_KEY; 30s timeout per request"
+
+  competitor_analysis:
+    supported: true
+    description: "Identify top 3 competitors via web search"
+    features:
+      - "Web search for competitor identification"
+      - "Strategy analysis based on search results"
+    limitations: "Limited to publicly available search results"
+
+  ad_copy_generation:
+    supported: true
+    description: "Generate 3 Instagram ad copy options"
+    features:
+      - "3 ad copy variants per request"
+      - "Uses extracted marketing parameters (product name, audience, tone, message, CTA, hashtags)"
+      - "Format validation with fallback formatting"
+    limitations: "Requires valid product URL; English only"
+
+  photograph_description_generation:
+    supported: true
+    description: "Generate 3 photograph descriptions for Instagram posts"
+    features:
+      - "3 photograph description variants per request"
+      - "Based on ad copy and product details"
+      - "Format validation with fallback formatting"
+    limitations: "Generates text descriptions only, not actual images"
+
+  marketing_parameter_extraction:
+    supported: true
+    description: "Extract structured marketing parameters from user input using LLM"
+    features:
+      - "Extracts: product_name, target_audience, campaign_tone, key_message, call_to_action, hashtags"
+      - "JSON output with fallback defaults"
+    limitations: "Best-effort extraction; may use defaults if extraction fails"
+
+# Requirements
+requirements:
+  packages:
+    - "crewai>=0.80.0"
+    - "requests>=2.31.0"
+    - "unstructured>=0.15.12"
+    - "python-dotenv>=1.0.1"
+    - "bindu"
+    - "pydantic"
+  system: []
+  min_memory_mb: 512
+  external_services:
+    - "OpenAI API or OpenRouter API (required)"
+    - "Serper API (required for search)"
+    - "Browserless API (required for web scraping)"
+
+# Performance Metrics
+performance:
+  avg_processing_time_ms: 120000
+  max_concurrent_requests: 1
+  memory_per_request_mb: 512
+  timeout_seconds: 180
+  max_input_length_chars: 10000
+  scalability: vertical
+
+# Tool Restrictions
+allowed_tools:
+  - ScrapeWebsiteTool
+  - SearchInternetTool
+  - SearchInstagramTool
+
+# Rich Documentation
+documentation:
+  overview: |
+    CrewAI-based agent that generates Instagram marketing content.
+    Uses 5 agents: Lead Market Analyst, Chief Marketing Strategist, Creative Content Creator,
+    Senior Photographer, Chief Creative Director.
+    Sequential processing: website analysis → competitor analysis → campaign strategy → ad copy → photo descriptions.
+
+  use_cases:
+    when_to_use:
+      - "Need 3 Instagram ad copy options for a product with a website"
+      - "Need 3 photograph descriptions for Instagram posts"
+      - "Have product URL and need competitor analysis"
+
+    when_not_to_use:
+      - "No product website URL available"
+      - "Need actual image generation (only generates descriptions)"
+      - "Need video content"
+      - "Need social media posting functionality"
+      - "Need analytics or performance tracking"
+
+  input_structure: |
+    Text format (required):
+    "Create Instagram content for [website URL] [optional additional details]"
+
+    Requirements:
+    - Must contain a valid HTTP/HTTPS URL
+    - URL must be accessible by Browserless API
+    - Additional details are optional
+
+    Message format (JSON-RPC):
+    {
+      "role": "user",
+      "parts": [
+        {
+          "kind": "text",
+          "text": "Create Instagram content for https://example.com product details here"
+        }
+      ],
+      "kind": "message",
+      "messageId": "uuid",
+      "contextId": "uuid",
+      "taskId": "uuid"
+    }
+
+  output_format: |
+    Markdown text format:
+
+    **Instagram Marketing Content**
+
+    **Ad Copy Options:**
+    Option 1:
+    [Ad copy text with emojis, hashtags, CTA]
+
+    Option 2:
+    [Ad copy text with emojis, hashtags, CTA]
+
+    Option 3:
+    [Ad copy text with emojis, hashtags, CTA]
+
+    **Photograph Descriptions:**
+    Photograph 1:
+    Option 1: [Detailed paragraph description]
+
+    Photograph 2:
+    Option 2: [Detailed paragraph description]
+
+    Photograph 3:
+    Option 3: [Detailed paragraph description]
+
+    **Marketing Parameters:**
+    - Product: [extracted product name]
+    - Target Audience: [extracted audience]
+    - Campaign Tone: [extracted tone]
+    - Key Message: [extracted message]
+    - Call to Action: [extracted CTA]
+    - Hashtags: [extracted hashtags]
+
+  error_handling:
+    - "Missing URL: Returns 'Please provide a product website URL'"
+    - "Invalid messages format: Returns 'Error: Invalid input format'"
+    - "Empty user input: Returns 'Please provide marketing details'"
+    - "BROWSERLESS_API_KEY not set: Returns 'Error: BROWSERLESS_API_KEY not set'"
+    - "SERPER_API_KEY not set: Returns 'Error: SERPER_API_KEY not set'"
+    - "No API key (OpenAI/OpenRouter): Raises ValueError during initialization"
+    - "Scraping timeout: 30s timeout, returns error message"
+    - "Crew execution failure: Returns 'Error generating Instagram ad copy' or 'Error generating image descriptions'"
+
+  examples:
+    - title: "Bindu Feature Collection"
+      input:
+        text: "Create Instagram content for https://getbindu.com, focusing on the new collection of features. The content should include high-quality images and a compelling caption."
+      output:
+        format: "Markdown text with 3 ad copy options, 3 photograph descriptions, marketing parameters"
+        agents_used: 5
+        tasks_completed: 6
+
+    - title: "Luxury Skincare Campaign"
+      input:
+        text: "Plan Instagram campaign for luxury skincare product line like https://www.lakmeindia.com"
+      output:
+        format: "Markdown text with 3 ad copy options, 3 photograph descriptions, marketing parameters"
+        agents_used: 5
+        tasks_completed: 6
+
+  best_practices:
+    for_developers:
+      - "Provide valid HTTP/HTTPS URLs"
+      - "Ensure website is accessible (not behind auth/paywall)"
+      - "Include product details in text for better context"
+      - "Set API keys in environment before running"
+
+    for_orchestrators:
+      - "Route requests with product URLs to this skill"
+      - "Expect 2-3 minute processing time per request"
+      - "Requires OPENAI_API_KEY or OPENROUTER_API_KEY"
+      - "Requires SERPER_API_KEY and BROWSERLESS_API_KEY"
+      - "Output is markdown text, not structured JSON"
+
+  installation: |
+    Environment variables (required):
+    - OPENAI_API_KEY or OPENROUTER_API_KEY
+    - SERPER_API_KEY
+    - BROWSERLESS_API_KEY
+
+    Optional:
+    - MODEL_NAME (default: openai/gpt-4o)
