@@ -1,0 +1,201 @@
+id: reasoning-team-agent-v1
+name: reasoning-team-agent
+version: 1.0.0
+author: raahul@getbindu.com
+
+# Description
+description: |
+  Team-based agent with reasoning capabilities for web search and financial research.
+  Leader agent delegates to web search and finance agents using reasoning tools.
+
+# Tags and Modes
+tags:
+  - reasoning
+  - team-orchestration
+  - web-search
+  - financial-research
+
+input_modes:
+  - text/plain
+  - application/json
+
+output_modes:
+  - text/plain
+  - application/json
+
+# Example Queries
+examples:
+  - "Compare investment opportunities in renewable energy sector"
+  - "Research market trends for AI startups in 2026"
+
+# Detailed Capabilities
+capabilities_detail:
+  primary_capability:
+    supported: true
+    description: "Team-based reasoning with web and financial data retrieval"
+    features:
+      - "Team leader with reasoning tools (anthropic/claude-3.7-sonnet)"
+      - "Web search agent using DuckDuckGo"
+      - "Finance agent using Exa with domain filtering (cnbc.com, reuters.com, bloomberg.com, wsj.com)"
+      - "Markdown formatted responses"
+      - "Member responses visibility enabled"
+    limitations: "Requires OPENROUTER_API_KEY and MEM0_API_KEY"
+
+  secondary_capability:
+    supported: false
+    description: "MCP server integration (currently disabled in code)"
+    features:
+      - "Airbnb MCP server configured but not initialized"
+      - "Google Maps MCP server configured but not initialized"
+    limitations: "MCP initialization commented out in initialize_all function"
+
+# Requirements
+requirements:
+  packages:
+    - "agno"
+    - "bindu"
+    - "python-dotenv"
+  system:
+    - "Node.js (for MCP servers if enabled)"
+  min_memory_mb: 512
+
+# Performance Metrics
+performance:
+  avg_processing_time_ms: "Not measured in code"
+  max_concurrent_requests: "Not specified in code"
+  memory_per_request_mb: "Not measured in code"
+  scalability: "Not specified in code"
+
+# Tool Restrictions
+allowed_tools:
+  - "DuckDuckGoTools (web search agent)"
+  - "ExaTools (finance agent)"
+  - "ReasoningTools (team leader)"
+
+# Rich Documentation
+documentation:
+  overview: |
+    Team of three agents coordinated by a reasoning leader.
+    Web Search Agent handles general web queries via DuckDuckGo.
+    Finance Agent retrieves financial data from curated news sources via Exa.
+    Team leader uses Claude 3.7 Sonnet with reasoning tools to delegate and synthesize.
+
+  use_cases:
+    when_to_use:
+      - "Multi-source research requiring web and financial data"
+      - "Investment and market analysis queries"
+      - "Tasks benefiting from reasoning-based delegation"
+
+    when_not_to_use:
+      - "Real-time data requirements"
+      - "Tasks requiring MCP server integrations (currently disabled)"
+      - "Image or video processing"
+
+  input_structure: |
+    Messages array with role and content keys:
+
+    [
+      {"role": "user", "content": "Your query here"}
+    ]
+
+    Constraints:
+    - List of dicts format
+    - Supports multi-turn via message history
+    - Processed by handler function
+
+  output_format: |
+    Agent response object returned by Team.arun().
+    Format depends on agent framework (agno).
+    Markdown formatting enabled.
+
+  error_handling:
+    - "OPENROUTER_API_KEY validation on startup (ValueError if missing)"
+    - "MEM0_API_KEY validation on startup (ValueError if missing)"
+    - "MCP server partial failure support (allow_partial_failure=True)"
+    - "MCP connection timeout: 30 seconds"
+    - "Lazy initialization on first request via _init_lock"
+
+  examples:
+    - title: "Investment Research Query"
+      input:
+        role: "user"
+        content: "Compare investment opportunities in renewable energy sector"
+      output:
+        content: "Comprehensive analysis with subsector breakdowns, company profiles, trends, policy impacts, and investment considerations"
+        sources: "Multiple financial news sources via Exa and web sources via DuckDuckGo"
+
+    - title: "Market Trends Query"
+      input:
+        role: "user"
+        content: "Research market trends for AI startups in 2026"
+      output:
+        content: "Growth areas, investment trends, challenges, and opportunities for AI startups"
+        sources: "Web and financial data aggregated by team"
+
+  best_practices:
+    for_developers:
+      - "Lazy initialization occurs on first request in handler function"
+      - "Response caching enabled for all OpenRouter model calls"
+      - "MCP cleanup handled in finally block on shutdown"
+      - "Use _init_lock to prevent concurrent initialization"
+
+    for_orchestrators:
+      - "Route queries needing web + financial data to this skill"
+      - "Ensure OPENROUTER_API_KEY and MEM0_API_KEY are set"
+      - "MCP servers currently disabled; do not route MCP-dependent tasks"
+      - "Bindufy framework handles JSON-RPC message/send and tasks/get endpoints"
+
+  installation: |
+    Install dependencies:
+
+    uv sync
+
+    Required environment variables:
+    OPENROUTER_API_KEY=<your-key>
+    MEM0_API_KEY=<your-key>
+
+    Optional:
+    MODEL_NAME=<model-id> (default: openai/gpt-5-nano)
+
+    Start server:
+    python -m reasoning_team_agent.main --api-key <key> --mem0-api-key <key>
+
+  versioning:
+    - version: "1.0.0"
+      date: "2026-02-26"
+      changes: "Team with reasoning leader, web agent (DuckDuckGo), finance agent (Exa). MCP disabled."
+
+# Assessment fields for skill negotiation
+assessment:
+  keywords:
+    - "reasoning"
+    - "web search"
+    - "financial research"
+    - "market analysis"
+    - "investment"
+    - "team"
+
+  specializations:
+    - domain: "financial-research"
+      confidence_boost: 0.3
+    - domain: "market-analysis"
+      confidence_boost: 0.3
+    - domain: "web-research"
+      confidence_boost: 0.2
+
+  anti_patterns:
+    - "Real-time trading"
+    - "MCP-dependent tasks (Google Maps, Airbnb)"
+    - "Image or video analysis"
+    - "Tasks requiring proprietary data sources"
+
+  complexity_indicators:
+    simple:
+      - "Single-source web lookup"
+      - "Basic company information query"
+    medium:
+      - "Multi-company comparison"
+      - "Sector overview"
+    complex:
+      - "Cross-sector investment analysis with reasoning"
+      - "Multi-source market trend research"
