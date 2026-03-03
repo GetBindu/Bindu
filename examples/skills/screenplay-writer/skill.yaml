@@ -1,0 +1,211 @@
+id: screenplay-writer-v1
+name: screenplay-writer
+version: 1.0.0
+author: paras@getbindu.com
+
+# Description
+description: |
+  Converts text input into industry-standard formatted screenplay text.
+  Uses a single LLM-powered agent to generate screenplay scenes with proper formatting
+  including scene headers, action lines, character names, and dialogue.
+
+# Tags and Modes
+tags:
+  - screenplay
+  - scriptwriting
+  - formatting
+  - dialogue
+  - scene-writing
+
+input_modes:
+  - text/plain
+
+output_modes:
+  - text/plain
+
+# Example Queries
+examples:
+  - "Write an opening scene for a sci-fi thriller set in 2045"
+  - "Create a courtroom drama scene with two lawyers arguing"
+  - "Write a meet-cute scene for a romantic comedy"
+  - "Generate a detective scene where the protagonist discovers evidence"
+  - "Create an action scene in a dark alley"
+
+# Detailed Capabilities
+capabilities_detail:
+  primary_capability:
+    supported: true
+    description: "Generates formatted screenplay text from text prompts"
+    features:
+      - "Generates screenplay scenes with FADE IN/FADE OUT"
+      - "Formats scene headers (INT./EXT. LOCATION - TIME)"
+      - "Centers character names in all caps"
+      - "Indents dialogue properly"
+      - "Includes action descriptions and parentheticals"
+      - "Enforces industry-standard screenplay formatting"
+    limitations: "Text output only; no character analysis, quality scoring, or structured metadata"
+
+  secondary_capability:
+    supported: false
+    description: "Not supported by code"
+    features: []
+
+# Requirements
+requirements:
+  packages:
+    - crewai>=0.80.0
+    - bindu
+    - python-dotenv>=1.0.1
+  system: []
+  min_memory_mb: 256
+  external_services:
+    - OpenRouter API (or OpenAI API)
+
+# Performance Metrics
+performance:
+  avg_processing_time_ms: 15000
+  agents_in_crew: 1
+  max_concurrent_requests: 1
+  memory_per_request_mb: 256
+  timeout_seconds: 180
+  scalability: vertical
+
+# Tool Restrictions
+allowed_tools:
+  - Write
+  - Format
+
+# Rich Documentation
+documentation:
+  overview: |
+    Converts text prompts into formatted screenplay text.
+    Uses a single CrewAI agent with LLM (OpenAI or OpenRouter) to generate screenplay scenes.
+    Post-processes output with strict formatting enforcement to ensure industry-standard screenplay format.
+
+  use_cases:
+    when_to_use:
+      - Generate screenplay scenes from text prompts
+      - Convert story ideas into formatted screenplay text
+      - Create dialogue-based scenes with proper formatting
+      - Generate screenplay snippets for specific scenarios
+
+    when_not_to_use:
+      - Character analysis or development
+      - Quality scoring or evaluation
+      - Structured JSON output with metadata
+      - Multi-format screenplay export
+      - Script revision or editing existing screenplays
+
+  input_structure: |
+    Accepts plain text prompts describing the screenplay scene to generate.
+    Input is extracted from message list with role="user".
+
+    Example:
+    "Write an opening scene for a sci-fi thriller set in 2045 where artificial intelligence controls the global power grid."
+
+    Constraints:
+    - Input format: Plain text only
+    - No structured JSON parsing
+    - Timeout: 180 seconds
+    - Language: English
+
+  output_format: |
+    Returns plain text formatted screenplay following industry standards:
+
+    Output Structure:
+    - FADE IN:
+    - Scene headers: INT./EXT. LOCATION - TIME (all caps)
+    - Action descriptions (present tense, short lines)
+    - Character names (centered, all caps)
+    - Dialogue (indented under character names)
+    - Parentheticals (indented, in parentheses)
+    - FADE OUT.
+
+    No metadata, no analysis, no character profiles, no quality scores.
+
+  error_handling:
+    - "Invalid messages format: Returns formatted error screenplay"
+    - "No user input: Returns default screenplay requesting story idea"
+    - "Crew initialization failed: Returns error screenplay"
+    - "LLM execution error: Returns error screenplay with error message"
+    - "All errors return valid screenplay format (FADE IN/FADE OUT)"
+
+  examples:
+    - title: "Sci-Fi Thriller Opening Scene"
+      input:
+        text: "Write an opening scene for a sci-fi thriller set in 2045 where artificial intelligence controls the global power grid. Include character dialogue and standard screenplay formatting."
+      output:
+        text: "FADE IN:\n\nINT. CONTROL ROOM - NIGHT\n\nRows of monitors flicker with data. The hum of servers\nfills the air.\n\n                    DR. ALIYA NASH\n               (whispering)\n          We're in deep.\n\nDr. Aliya Nash, 38, sharp-eyed, taps frantically on a\nkeyboard.\n\nFADE OUT."
+
+    - title: "Detective Character Arc Scene"
+      input:
+        text: "Develop a detailed character arc for a conflicted detective in a crime drama who slowly discovers he has been manipulating evidence unknowingly."
+      output:
+        text: "FADE IN:\n\nINT. DETECTIVE'S OFFICE - DAY\n\nStacks of case files litter the desk. Sunlight filters\nthrough dusty blinds.\n\n                    DETECTIVE HARRIS\n          This doesn't add up. Why would she lie?\n\nDetective Harris sifts through evidence photos.\n\nFADE OUT."
+
+  best_practices:
+    for_developers:
+      - "Provide clear, specific scene descriptions in prompts"
+      - "Include genre and tone context in the prompt text"
+      - "Expect plain text output only, no structured data"
+      - "Handle async initialization (lazy loading on first request)"
+
+    for_orchestrators:
+      - "Route screenplay scene generation requests to this agent"
+      - "Do not expect character analysis or quality scoring"
+      - "Output is always plain text screenplay format"
+      - "Single agent crew with sequential processing"
+
+  installation: |
+    Required packages:
+    pip install crewai bindu python-dotenv
+
+    Environment variables:
+    OPENROUTER_API_KEY=your_openrouter_api_key  # Required (or OPENAI_API_KEY)
+    OPENAI_API_KEY=your_openai_api_key  # Alternative to OpenRouter
+    MODEL_NAME=openai/gpt-4o  # Optional, defaults to openai/gpt-4o
+
+  versioning:
+    - version: "1.0.0"
+      date: "2026-01-14"
+      changes: "Initial release with single-agent screenplay formatter"
+
+# Assessment fields for skill negotiation
+assessment:
+  keywords:
+    - screenplay
+    - script
+    - scene
+    - dialogue
+    - formatting
+    - film
+    - movie
+    - scriptwriting
+
+  specializations:
+    - domain: screenplay_formatting
+      confidence_boost: 0.5
+    - domain: scene_writing
+      confidence_boost: 0.3
+
+  anti_patterns:
+    - "character analysis"
+    - "quality scoring"
+    - "script evaluation"
+    - "editing existing scripts"
+    - "grammar correction"
+    - "code generation"
+    - "technical writing"
+    - "research paper"
+
+  complexity_indicators:
+    simple:
+      - "write scene"
+      - "format screenplay"
+      - "generate dialogue"
+    medium:
+      - "multi-scene screenplay"
+      - "genre-specific scene"
+    complex:
+      - "full screenplay"
+      - "complex multi-character scenes"
