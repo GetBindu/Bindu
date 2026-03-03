@@ -141,49 +141,12 @@ class ManifestWorker(Worker):
                 self.manifest.enable_system_message
                 and app_settings.agent.enable_structured_responses
             ):
-                # If DSPy is enabled for this manifest, fetch prompts from DB with DID isolation.
-                if getattr(self.manifest, "enable_dspy", False):
-                    # Use worker's storage instance (already configured with DID)
-                    selected_prompt = await select_prompt_with_canary()
-
-                    if selected_prompt:
-                        # Use database-selected prompt with canary pooling
-                        system_prompt = selected_prompt["prompt_text"]
-                        selected_prompt_id = selected_prompt["id"]
-                        logger.info(
-                            f"Using prompt {selected_prompt_id} (status={selected_prompt['status']}, "
-                            f"traffic={selected_prompt['traffic']:.2f})"
-                        )
-                    else:
-                        # No prompts in database - create initial active prompt
-                        system_prompt = app_settings.agent.structured_response_system_prompt
-                        logger.warning("No prompts in database, creating initial active prompt")
-
-                        if not system_prompt:
-                            raise RuntimeError(
-                                "DSPy enabled but no fallback system prompt configured."
-                            )
-
-                        # Insert default prompt as active with 100% traffic using worker's storage
-                        selected_prompt_id = await insert_prompt(
-                            text=system_prompt,
-                            status="active",
-                            traffic=1.0,
-                            storage=self.storage,
-                        )
-                        logger.info(f"Created initial active prompt (id={selected_prompt_id}) with 100% traffic")
-
-                    if system_prompt:
-                        # Create new list to avoid mutating original message_history
-                        message_history = [{"role": "system", "content": system_prompt}] + (
-                            message_history or []
-                        )
-
-                    # Store prompt_id in task for tracking when using DB prompts
-                    await self.storage.update_task(
-                        task["id"],
-                        state=task["status"]["state"],  # preserve current state
-                        prompt_id=selected_prompt_id,
+                # Inject structured response system prompt as first message
+                system_prompt = app_settings.agent.structured_response_system_prompt
+                if system_prompt:
+                    # Create new list to avoid mutating original message_history
+                    message_history = [{"role": "system", "content": system_prompt}] + (
+                        message_history or []
                     )
 
             # Step 3.1: Execute agent with tracing
