@@ -1,0 +1,239 @@
+id: financial-coach-v1
+name: financial-coach
+version: 1.0.0
+author: paras@getbindu.com
+
+# Description
+description: |
+  LLM-based financial coaching agent that provides educational guidance on budgeting, debt management,
+  and financial literacy. Generates text-based coaching responses using OpenRouter API with no external
+  tools or integrations.
+
+# Tags and Modes
+tags:
+  - financial-coaching
+  - budget-planning
+  - debt-management
+  - financial-education
+  - personal-finance
+
+input_modes:
+  - text/plain
+  - application/json
+
+output_modes:
+  - text/markdown
+  - application/json
+
+# Example Queries
+examples:
+  - "help me create a monthly budget"
+  - "what's the best strategy to pay off credit card debt"
+  - "how can I start investing with $100"
+  - "what's a good emergency fund size"
+  - "teach me about index funds"
+  - "help me set financial goals"
+
+# Detailed Capabilities
+capabilities_detail:
+  primary_capability:
+    supported: true
+    description: "Text-based financial coaching and educational guidance"
+    features:
+      - "Budget framework suggestions"
+      - "Debt repayment strategy explanations (avalanche, snowball methods)"
+      - "Savings goal planning guidance"
+      - "Investment concept education"
+      - "Financial habit coaching"
+      - "Markdown-formatted responses with tables and action plans"
+    limitations: "No data persistence, no calculations, no external data sources, not certified financial advice"
+
+  secondary_capability:
+    supported: false
+    description: "Not supported by code"
+    features: []
+    limitations: "No advanced planning features implemented"
+
+  education_capability:
+    supported: true
+    description: "Financial literacy education through LLM knowledge"
+    features:
+      - "Financial concept explanations"
+      - "General investment education"
+      - "Budget template suggestions"
+      - "Financial terminology clarification"
+    limitations: "Limited to LLM training data, no real-time market data, no specific product recommendations"
+
+# Requirements
+requirements:
+  packages:
+    - "agno>=2.2.0"
+    - "bindu==2026.9.4"
+    - "python-dotenv"
+  system:
+    - "Python 3.12+"
+    - "Internet connection for OpenRouter API"
+  min_memory_mb: 256
+  external_services:
+    - "OpenRouter API (required)"
+  environment_variables:
+    - "OPENROUTER_API_KEY (required)"
+    - "MODEL_NAME (optional, defaults to openai/gpt-4o)"
+
+# Performance Metrics
+performance:
+  avg_processing_time_ms: 3000
+  max_concurrent_requests: 10
+  memory_per_request_mb: 256
+  timeout_seconds: 60
+  scalability: horizontal
+
+# Tool Restrictions
+allowed_tools: []
+
+# Rich Documentation
+documentation:
+  overview: |
+    LLM-based financial coaching agent using OpenRouter API (default: openai/gpt-4o).
+    Provides text-based educational guidance on budgeting, debt management, and financial literacy.
+    No tools, no data persistence, no external integrations beyond the LLM API.
+    Agent uses hardcoded instructions to focus on education and disclaimers.
+
+  use_cases:
+    when_to_use:
+      - "Budget framework suggestions"
+      - "Debt repayment strategy education (avalanche vs snowball)"
+      - "Savings goal planning concepts"
+      - "Investment education (general concepts only)"
+      - "Financial terminology explanations"
+
+    when_not_to_use:
+      - "Specific investment product recommendations"
+      - "Tax preparation or filing"
+      - "Legal financial advice"
+      - "Insurance policy recommendations"
+      - "Real-time market data or calculations"
+      - "Data persistence or user tracking"
+      - "Expense tracking or analysis (no tools available)"
+
+  input_structure: |
+    JSON-RPC 2.0 message/send request with text parts.
+
+    Example:
+    {
+      "jsonrpc": "2.0",
+      "method": "message/send",
+      "params": {
+        "message": {
+          "role": "user",
+          "parts": [{"kind": "text", "text": "help me create a monthly budget"}]
+        },
+        "skillId": "financial-coach-v1"
+      }
+    }
+
+  output_format: |
+    Markdown-formatted text responses with:
+    - Headers (# and ##)
+    - Tables for budget breakdowns
+    - Bullet points for action items
+    - Disclaimers about not being certified financial advisor
+
+    Returns task with status "submitted", then "completed" with result in artifacts.
+
+  error_handling:
+    - "Missing OPENROUTER_API_KEY returns ValueError"
+    - "LLM API failures propagate to caller"
+    - "No input validation beyond JSON-RPC layer"
+
+  examples:
+    - title: "Budget Creation Request"
+      input:
+        text: "I earn $5,200 per month. Create a budget."
+      output:
+        format: "Markdown with budget table, debt strategy, savings plan"
+        includes_disclaimer: true
+        processing_time_ms: 3000
+
+    - title: "Debt Strategy Request"
+      input:
+        text: "I have $8,000 credit card debt at 22% interest"
+      output:
+        format: "Debt avalanche explanation with payment timeline"
+        includes_disclaimer: true
+        processing_time_ms: 2800
+
+  best_practices:
+    for_developers:
+      - "Set OPENROUTER_API_KEY environment variable"
+      - "Agent has no tools - all responses are LLM-generated text"
+      - "No data persistence between requests"
+      - "Responses always include disclaimers per hardcoded instructions"
+
+    for_orchestrators:
+      - "Route budget/debt/savings queries based on keywords"
+      - "Agent cannot perform calculations or access external data"
+      - "Responses are educational guidance only"
+      - "No session state or user tracking"
+
+  installation: |
+    Requirements:
+    - Python 3.12+
+    - agno>=2.2.0
+    - bindu
+    - python-dotenv
+
+    Environment:
+    - OPENROUTER_API_KEY (required)
+    - MODEL_NAME (optional, default: openai/gpt-4o)
+
+    Run: python -m financial_coach_agent.main
+
+  versioning:
+    - version: "1.0.0"
+      date: "2026-03-02"
+      changes: "Initial release - LLM agent with OpenRouter, no tools"
+
+# Assessment fields for skill negotiation
+assessment:
+  keywords:
+    - "budget"
+    - "debt"
+    - "savings"
+    - "financial plan"
+    - "emergency fund"
+    - "retirement"
+    - "credit card"
+    - "student loan"
+    - "investment education"
+
+  specializations:
+    - domain: "budget planning"
+      confidence_boost: 0.6
+    - domain: "debt strategy education"
+      confidence_boost: 0.6
+    - domain: "financial education"
+      confidence_boost: 0.5
+
+  anti_patterns:
+    - "stock picks"
+    - "specific investment products"
+    - "tax filing"
+    - "legal advice"
+    - "insurance recommendations"
+    - "real-time market data"
+    - "expense tracking"
+    - "calculations"
+
+  complexity_indicators:
+    simple:
+      - "budget framework"
+      - "savings concepts"
+      - "financial terms"
+      - "general advice"
+    medium:
+      - "debt repayment strategies"
+      - "investment concepts"
+      - "multi-goal planning"
+    complex:
+      - "Not supported - agent provides educational guidance only"
