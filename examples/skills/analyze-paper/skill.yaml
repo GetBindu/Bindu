@@ -1,0 +1,272 @@
+id: analyze-paper-v1
+name: analyze-paper
+version: 1.0.0
+author: raahul@getbindu.com
+
+# Description
+description: |
+  Analyzes truth claims and arguments using LLM-based reasoning. Extracts claims from input text,
+  provides supporting and refuting evidence, identifies logical fallacies, assigns quality ratings (A-F),
+  and generates balanced assessments. Uses OpenRouter LLM with ArxivTools for academic paper access.
+
+# Tags and Modes
+tags:
+  - truth-claims
+  - argument-analysis
+  - critical-thinking
+  - fact-checking
+  - logical-fallacies
+
+input_modes:
+  - text/plain
+  - application/json
+
+output_modes:
+  - text/plain
+  - application/json
+
+# Example Queries
+examples:
+  - "Analyze the truth claims in this argument about climate change"
+  - "Evaluate the claims and provide supporting and refuting evidence"
+  - "Identify logical fallacies and rate the quality of these claims"
+
+# Detailed Capabilities
+capabilities_detail:
+  primary_capability:
+    supported: true
+    description: "LLM-based truth claim analysis with centrist orientation"
+    features:
+      - "Extracts truth claims from input text (< 16 words per claim)"
+      - "Provides claim support evidence via LLM reasoning"
+      - "Provides claim refutation evidence via LLM reasoning"
+      - "Identifies logical fallacies with quoted examples"
+      - "Assigns quality ratings (A/B/C/D/F scale)"
+      - "Generates argument summary (< 30 words)"
+      - "Calculates lowest, highest, and average claim scores"
+      - "Provides characterization labels (e.g., specious, extreme-right, weak, baseless)"
+      - "Generates overall analysis with recommendations (30 words)"
+    limitations: "Evidence quality depends on LLM knowledge cutoff; ArxivTools access limited to arXiv papers; no real-time fact verification API"
+
+  secondary_capability:
+    supported: true
+    description: "ArxivTools integration for academic paper retrieval"
+    features:
+      - "Can search and retrieve papers from arXiv"
+      - "Access to arXiv metadata and abstracts"
+    limitations: "Only arXiv papers; no direct access to other academic databases"
+
+# Requirements
+requirements:
+  packages:
+    - "agno"
+    - "bindu"
+    - "python-dotenv"
+  apis:
+    - "OPENROUTER_API_KEY (required)"
+    - "MEM0_API_KEY (required)"
+  system:
+    - "Internet access for ArxivTools"
+  min_memory_mb: 256
+
+# Performance Metrics
+performance:
+  avg_processing_time_ms: 30000
+  max_concurrent_requests: 10
+  memory_per_request_mb: 256
+  scalability: horizontal
+
+# Tool Restrictions
+allowed_tools:
+  - ArxivTools
+
+# Rich Documentation
+documentation:
+  overview: |
+    This skill provides centrist-oriented analysis of truth claims and arguments using LLM reasoning.
+    It extracts claims, provides both supporting and refuting evidence, identifies logical fallacies,
+    and assigns quality ratings. Built on Agno framework with OpenRouter LLM (default: openai/gpt-5.2-chat).
+    Includes ArxivTools for accessing academic papers from arXiv. Uses Mem0 for memory (API key required).
+    Exposes JSON-RPC 2.0 API via bindufy for task submission and retrieval.
+
+  use_cases:
+    when_to_use:
+      - "Analyzing truth claims in arguments or text"
+      - "Getting balanced perspectives with supporting and refuting evidence"
+      - "Identifying logical fallacies in arguments"
+      - "Rating claim quality on A-F scale"
+      - "Centrist-oriented critical analysis"
+
+    when_not_to_use:
+      - "Real-time fact verification (LLM has knowledge cutoff)"
+      - "Summarization only (use summarization skill)"
+      - "Creative writing or content generation"
+      - "Specialized domain analysis requiring recent data beyond LLM training"
+
+  input_structure: |
+    Accepts text containing arguments or claims via JSON-RPC 2.0 message/send method.
+
+    Request format:
+    {
+      "jsonrpc": "2.0",
+      "method": "message/send",
+      "params": {
+        "message": {
+          "role": "user",
+          "parts": [{"kind": "text", "text": "[argument or claims to analyze]"}],
+          "kind": "message",
+          "messageId": "[uuid]",
+          "contextId": "[uuid]",
+          "taskId": "[uuid]"
+        },
+        "skillId": "analyze-paper-v1",
+        "configuration": {"acceptedOutputModes": ["application/json"]}
+      },
+      "id": "[request-id]"
+    }
+
+    Constraints:
+    - Input should contain arguments or claims
+    - No hard length limits enforced in code
+    - English text recommended
+
+  output_format: |
+    Returns JSON-RPC 2.0 response with task submission, then markdown-formatted analysis via tasks/get.
+
+    Initial response (message/send):
+    {
+      "jsonrpc": "2.0",
+      "id": "[request-id]",
+      "result": {
+        "id": "[task-id]",
+        "status": {"state": "submitted", "timestamp": "[iso-timestamp]"},
+        "history": [...]
+      }
+    }
+
+    Task result (tasks/get):
+    {
+      "result": {
+        "status": {"state": "completed"},
+        "history": [{"role": "assistant", "parts": [{"kind": "text", "text": "[markdown analysis]"}]}],
+        "artifacts": [{"parts": [{"kind": "text", "text": "[markdown analysis]"}]}]
+      }
+    }
+
+    Analysis structure (markdown):
+    - ARGUMENT SUMMARY: (< 30 words)
+    - TRUTH CLAIMS: For each claim:
+      - CLAIM: (< 16 words)
+      - CLAIM SUPPORT EVIDENCE:
+      - CLAIM REFUTATION EVIDENCE:
+      - LOGICAL FALLACIES:
+      - CLAIM RATING: A/B/C/D/F
+      - LABELS:
+    - OVERALL SCORE:
+      - LOWEST CLAIM SCORE:
+      - HIGHEST CLAIM SCORE:
+      - AVERAGE CLAIM SCORE:
+    - OVERALL ANALYSIS: (30 words)
+
+  error_handling:
+    - "Missing API keys: Raises ValueError on startup"
+    - "Agent not initialized: Raises RuntimeError if handler called before init"
+    - "LLM errors: Propagated from OpenRouter API"
+    - "ArxivTools errors: Propagated from tool execution"
+    - "No explicit input validation in code"
+
+  examples:
+    - title: Transformer Paper Analysis
+      input:
+        text: Analyze the Transformer architecture paper and provide structured evaluation with methodology assessment and quality scoring
+      output:
+        format: Markdown with sections for Executive Summary, Methodology Evaluation, Results and Statistical Validity, Strengths, Weaknesses, Reproducibility, and Overall Quality Score
+        processing_time_ms: 30000
+        note: Output format varies based on LLM interpretation and may not strictly follow TRUTH CLAIMS template
+
+    - title: Clinical Trial Analysis
+      input:
+        text: Critically analyze a randomized controlled trial for diabetes medication with assessment of study design and statistical methods
+      output:
+        format: Markdown with sections for Study Design, Randomization Quality, Statistical Methods, Risk of Bias, External Validity, and Scientific Strength Rating
+        processing_time_ms: 28000
+        note: LLM adapts output structure to request and may not follow exact TRUTH CLAIMS format
+
+  best_practices:
+    for_developers:
+      - "Use JSON-RPC 2.0 message/send to submit tasks"
+      - "Poll tasks/get to retrieve completed results"
+      - "Provide clear arguments or claims in input text"
+      - "Allow 30+ seconds for LLM processing"
+      - "Set acceptedOutputModes to application/json in configuration"
+
+    for_orchestrators:
+      - "Route truth claim analysis and argument evaluation here"
+      - "Task state transitions: submitted → completed"
+      - "Results available in both history and artifacts"
+      - "No built-in retry logic; implement externally"
+      - "Monitor for LLM API availability and rate limits"
+
+  installation: |
+    Environment variables required:
+    - OPENROUTER_API_KEY: Get from https://openrouter.ai/keys (required)
+    - MEM0_API_KEY: Get from https://app.mem0.ai/dashboard/api-keys (required)
+    - MODEL_NAME: Optional, defaults to openai/gpt-5.2-chat
+
+    Quick start:
+    1. Set environment variables in .env file
+    2. Install dependencies: uv sync
+    3. Start agent: python -m analyze_paper_agent.main
+    4. Agent listens on port defined in agent_config.json
+    5. Send JSON-RPC 2.0 requests to http://localhost:[port]
+
+    Command-line options:
+    --model: Override MODEL_NAME
+    --api-key: Override OPENROUTER_API_KEY
+    --mem0-api-key: Override MEM0_API_KEY
+
+  versioning:
+    - version: "1.0.0"
+      date: "2026-03-02"
+      changes: "Initial release with LLM-based truth claim analysis, ArxivTools integration, JSON-RPC 2.0 API via bindufy"
+
+# Assessment fields for skill negotiation
+assessment:
+  keywords:
+    - "truth claims"
+    - "argument analysis"
+    - "logical fallacy"
+    - "evidence"
+    - "claim rating"
+    - "centrist analysis"
+    - "supporting evidence"
+    - "refuting evidence"
+    - "claim verification"
+
+  specializations:
+    - domain: "truth claim analysis"
+      confidence_boost: 0.5
+    - domain: "argument evaluation"
+      confidence_boost: 0.4
+    - domain: "logical fallacy detection"
+      confidence_boost: 0.4
+    - domain: "balanced assessment"
+      confidence_boost: 0.3
+
+  anti_patterns:
+    - "summarize without analysis"
+    - "write a paper"
+    - "translate text"
+    - "generate creative content"
+    - "real-time fact verification"
+
+  complexity_indicators:
+    simple:
+      - "single claim with evidence"
+      - "basic argument evaluation"
+    medium:
+      - "multiple claims with fallacy detection"
+      - "argument with supporting and refuting evidence"
+    complex:
+      - "comprehensive analysis with 10+ claims"
+      - "multi-faceted arguments with detailed ratings"
