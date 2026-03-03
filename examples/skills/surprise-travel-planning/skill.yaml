@@ -1,0 +1,344 @@
+id: surprise-travel-planning-v1
+name: surprise-travel-planning
+version: 1.0.0
+author: paras@getbindu.com
+
+# Description
+description: |
+  An AI-powered itinerary generation agent that creates day-by-day travel plans based on
+  user input. Uses three CrewAI agents (Activity Planner, Restaurant Scout, Itinerary Compiler)
+  to generate text-based travel itineraries with activity and dining suggestions. Extracts
+  travel parameters from natural language input including destination, duration, trip type,
+  and traveler details. Returns formatted text itineraries with daily schedules.
+
+# Tags and Modes
+tags:
+  - travel-planning
+  - itinerary-generation
+  - trip-planning
+  - text-generation
+  - crewai
+  - llm-agent
+
+input_modes:
+  - text/plain
+
+output_modes:
+  - text/plain
+
+# Example Queries
+examples:
+  - "Plan a surprise romantic getaway to Paris for 7 days"
+  - "Create a family vacation itinerary to Tokyo with kids"
+  - "Organize a luxury honeymoon package to the Maldives for a couple"
+  - "Plan a weekend trip to New York City"
+
+# Detailed Capabilities
+capabilities_detail:
+  parameter_extraction:
+    supported: true
+    description: "Extracts travel parameters from natural language input using LLM"
+    extracted_fields:
+      - destination
+      - trip_duration
+      - trip_context
+      - age_suitability
+      - hotel_type_suggestion
+      - origin_city
+    features:
+      - typo_correction
+      - semantic_understanding
+      - duration_parsing
+
+  activity_suggestions:
+    supported: true
+    description: "Generates activity suggestions using Activity Planner agent"
+    output_format: "Text-based daily activity lists"
+    limitations:
+      - "No real-time availability checking"
+      - "No booking integration"
+      - "No pricing information"
+
+  dining_recommendations:
+    supported: true
+    description: "Suggests dining options using Restaurant Scout agent"
+    output_format: "Text-based meal suggestions per day"
+    limitations:
+      - "No real-time restaurant data"
+      - "No reservation system"
+      - "No pricing information"
+
+  itinerary_compilation:
+    supported: true
+    description: "Compiles day-by-day itineraries using Itinerary Compiler agent"
+    formats:
+      - day_by_day_schedule
+    validation:
+      - "Validates correct number of days in output"
+      - "Auto-corrects if day count mismatches"
+    limitations:
+      - "Text output only"
+      - "No structured JSON itinerary"
+      - "No cost calculations"
+
+  not_supported:
+    booking: "No booking capabilities for flights, hotels, or activities"
+    pricing: "No real-time pricing or cost calculations"
+    external_apis: "No integration with travel booking APIs"
+    memory: "No conversation memory between requests"
+    multi_destination: "Single destination per request only"
+    budget_tracking: "No actual budget management or cost tracking"
+
+# Requirements
+requirements:
+  packages:
+    - crewai>=0.80.0
+    - bindu==2026.1.12
+    - python-dotenv>=1.0.1
+  system: []
+  min_memory_mb: 512
+  external_services:
+    - OpenRouter API (required) OR OpenAI API (required)
+  environment_variables:
+    - OPENROUTER_API_KEY (required if using OpenRouter)
+    - OPENAI_API_KEY (required if using OpenAI directly)
+    - MODEL_NAME (optional, defaults to openai/gpt-4o)
+
+# Performance Metrics
+performance:
+  avg_processing_time_seconds: 15-30
+  process_type: sequential
+  agent_count: 3
+  memory_enabled: false
+  max_input_length_chars: 5000
+  notes: "Processing time depends on LLM response time"
+
+# Agent Configuration
+agents:
+  - name: "Activity Planner"
+    role: "Personalized Activity Planner"
+    delegation: false
+  - name: "Restaurant Scout"
+    role: "Restaurant Scout"
+    delegation: false
+  - name: "Itinerary Compiler"
+    role: "Itinerary Compiler"
+    delegation: true
+
+# Rich Documentation
+documentation:
+  overview: |
+    This agent generates text-based travel itineraries using three CrewAI agents working
+    sequentially. It accepts natural language travel requests, extracts parameters using
+    LLM-based parsing, and produces day-by-day itineraries with activity and dining suggestions.
+
+    The agent uses parameter extraction to handle typos and semantic understanding (e.g.,
+    "budjet" -> "budget", "backpacking" -> "adventure trip"). Output is validated to ensure
+    the correct number of days matches the request.
+
+  use_cases:
+    when_to_use:
+      - User wants a text-based itinerary suggestion for a trip
+      - User needs activity and dining ideas for a destination
+      - User wants a structured day-by-day plan
+      - User provides destination and duration information
+
+    when_not_to_use:
+      - User needs actual bookings (no booking capability)
+      - User needs real-time pricing or availability (no external API integration)
+      - User needs multi-destination itineraries (single destination only)
+      - User needs budget calculations (no cost tracking)
+      - User needs transportation booking (suggestions only, no booking)
+      - User needs specific restaurant reservations (suggestions only)
+
+  input_structure: |
+    Accepts natural language text describing travel requests. The agent extracts parameters
+    automatically using LLM-based parsing.
+
+    Example inputs:
+    - "Plan a 7-day romantic getaway to Paris"
+    - "Create a family vacation to Tokyo with kids for 5 days"
+    - "Organize a luxury honeymoon to the Maldives"
+    - "Budget backpacking trip to Thailand for a week"
+
+    Extracted parameters:
+    - destination: City/country name (typo-corrected)
+    - trip_duration: Number of days (parsed from text like "week" = 7 days)
+    - trip_context: Inferred from keywords (romantic, family, adventure, budget, luxury)
+    - age: Inferred age suitability
+    - hotel_location: Suggested accommodation type based on context
+    - origin: Origin city if mentioned
+
+    Constraints:
+    - Max input length: 5000 characters
+    - Single destination per request
+    - Text input only
+
+  output_format: |
+    Plain text itinerary format:
+
+    Day 1: [Theme]
+    - Morning: [Activity description]
+    - Lunch: [Restaurant/dining suggestion]
+    - Afternoon: [Activity description]
+    - Dinner: [Restaurant/dining suggestion]
+    - Evening: [Optional activity]
+
+    Day 2: [Theme]
+    - Morning: [Activity description]
+    - Lunch: [Restaurant/dining suggestion]
+    - Afternoon: [Activity description]
+    - Dinner: [Restaurant/dining suggestion]
+    - Evening: [Optional activity]
+
+    [Continues for requested number of days]
+
+    Practical Tips:
+    - [Tip 1]
+    - [Tip 2]
+
+    Conclusion:
+    [Summary text]
+
+    Notes:
+    - Output is plain text, not structured JSON
+    - No pricing information included
+    - No booking links or reservation details
+    - Itinerary is validated to match requested number of days
+
+  error_handling:
+    - "Crew not initialized: Returns error message"
+    - "No API key: Returns error requesting OPENAI_API_KEY or OPENROUTER_API_KEY"
+    - "LLM extraction failed: Falls back to default parameters"
+    - "Crew execution failed: Returns error message with exception details"
+    - "Invalid input: Requests travel details from user"
+    - "Day count mismatch: Auto-corrects itinerary or returns error if too few days generated"
+
+  examples:
+    - title: "Romantic Paris Getaway"
+      input: "Plan a surprise romantic getaway to Paris for 7 days"
+      output_sample: |
+        Day 1: Arrival and Seine River Cruise
+        - Morning: Arrive in Paris and check into your luxury resort.
+        - Lunch: Savor a light lunch at Café de Flore...
+        - Afternoon: Relax and explore the hotel amenities.
+        - Dinner: Dine at Le Cinq, a Michelin-starred restaurant...
+        - Evening: Enjoy a Seine River Cruise at sunset...
+
+        [Continues for 7 days]
+
+        Practical Tips:
+        - Book tours and restaurants in advance
+        - Pack comfortable walking shoes
+
+        Conclusion:
+        Have a wonderful trip and enjoy the romance of Paris!
+
+    - title: "Maldives Honeymoon"
+      input: "Organize a luxury honeymoon package to the Maldives for a couple"
+      output_sample: |
+        Day 1: Arrival and Relaxation
+        - Morning: Arrival at the luxury resort with a welcome drink...
+        - Lunch: Enjoy a gourmet picnic lunch on the private beach...
+        - Afternoon: Relax with a couple's spa treatment...
+
+        [Continues for default 3 days if duration not specified]
+
+  best_practices:
+    for_users:
+      - "Include destination and duration in your request"
+      - "Specify trip type (romantic, family, adventure, budget, luxury)"
+      - "Mention traveler details if relevant (kids, age groups)"
+      - "Use natural language - typos will be corrected"
+
+    for_orchestrators:
+      - "Route itinerary generation requests to this agent"
+      - "Do NOT route booking requests (no booking capability)"
+      - "Do NOT route pricing requests (no cost calculation)"
+      - "Single destination per request only"
+      - "Expect 15-30 second processing time"
+      - "Output is plain text, not structured JSON"
+
+  installation: |
+    Required packages:
+    pip install crewai>=0.80.0 bindu==2026.1.12 python-dotenv>=1.0.1
+
+    Environment variables (one required):
+    OPENROUTER_API_KEY=your_openrouter_api_key
+    OR
+    OPENAI_API_KEY=your_openai_api_key
+
+    Optional:
+    MODEL_NAME=openai/gpt-4o  # Default model
+
+  versioning:
+    - version: "1.0.0"
+      date: "2026-02-26"
+      changes: "Initial release with 3-agent CrewAI crew for itinerary generation"
+
+# Assessment fields for skill negotiation
+assessment:
+  keywords:
+    - travel
+    - trip
+    - vacation
+    - itinerary
+    - planning
+    - destination
+    - getaway
+    - romantic
+    - family
+    - honeymoon
+    - adventure
+    - schedule
+    - activities
+    - dining
+    - day-by-day
+
+  specializations:
+    - domain: itinerary_generation
+      confidence_boost: 0.5
+    - domain: travel_planning
+      confidence_boost: 0.3
+    - domain: activity_suggestions
+      confidence_boost: 0.2
+
+  anti_patterns:
+    - "flight booking"
+    - "hotel booking"
+    - "hotel reservation"
+    - "book a flight"
+    - "reserve accommodation"
+    - "visa application"
+    - "currency exchange"
+    - "travel insurance"
+    - "real-time prices"
+    - "current availability"
+    - "weather forecast"
+    - "translation"
+    - "multi-destination"
+    - "multiple cities"
+    - "budget calculation"
+    - "cost breakdown"
+
+  complexity_indicators:
+    simple:
+      - "weekend trip"
+      - "short trip"
+      - "single destination"
+      - "basic itinerary"
+      - "2-3 days"
+    medium:
+      - "week-long trip"
+      - "family vacation"
+      - "romantic getaway"
+      - "5-7 days"
+    complex:
+      - "extended trip"
+      - "10+ days"
+      - "detailed scheduling"
+    not_supported:
+      - "multi-country tour"
+      - "multi-city trip"
+      - "actual bookings"
+      - "real-time pricing"
