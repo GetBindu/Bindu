@@ -19,8 +19,6 @@ from __future__ import annotations
 from typing import Literal
 
 from bindu.settings import app_settings
-from bindu.dspy.prompt_storage import PromptStorage
-from bindu.server.storage.postgres_storage import PostgresStorage
 from bindu.dspy.prompts import (
     get_active_prompt,
     get_candidate_prompt,
@@ -30,7 +28,6 @@ from bindu.dspy.prompts import (
 from bindu.utils.logging import get_logger
 
 logger = get_logger("bindu.dspy.canary.controller")
-
 
 def compare_metrics(
     active: dict, candidate: dict
@@ -86,7 +83,7 @@ def compare_metrics(
         return None
 
 
-async def promote_step(active: dict, candidate: dict, storage: PromptStorage) -> None:
+async def promote_step(active: dict, candidate: dict) -> None:
     """Promote candidate by increasing its traffic by 0.1 and decreasing active's.
 
     Args:
@@ -104,8 +101,8 @@ async def promote_step(active: dict, candidate: dict, storage: PromptStorage) ->
         f"{new_active_traffic:.1f}"
     )
 
-    await update_prompt_traffic(candidate["id"], new_candidate_traffic, storage=storage)
-    await update_prompt_traffic(active["id"], new_active_traffic, storage=storage)
+    await update_prompt_traffic(candidate["id"], new_candidate_traffic)
+    await update_prompt_traffic(active["id"], new_active_traffic)
 
     # Check for stabilization
     if new_candidate_traffic == 1.0 and new_active_traffic == 0.0:
@@ -113,10 +110,10 @@ async def promote_step(active: dict, candidate: dict, storage: PromptStorage) ->
             f"System stabilized: candidate won, promoting candidate {candidate['id']} "
             f"to active and deprecating old active {active['id']}"
         )
-        await update_prompt_status(candidate["id"], "active", storage=storage)
-        await update_prompt_status(active["id"], "deprecated", storage=storage)
+        await update_prompt_status(candidate["id"], "active")
+        await update_prompt_status(active["id"], "deprecated")
 
-async def hard_rollback(active: dict, candidate: dict, storage: PromptStorage) -> None:
+async def hard_rollback(active: dict, candidate: dict) -> None:
     """Immediately roll back candidate by setting its traffic to 0 and
     restoring active to 1.0.
 
@@ -132,56 +129,29 @@ async def hard_rollback(active: dict, candidate: dict, storage: PromptStorage) -
     )
 
     # Immediately restore traffic split
-    await update_prompt_traffic(candidate["id"], 0.0, storage=storage)
-    await update_prompt_traffic(active["id"], 1.0, storage=storage)
+    await update_prompt_traffic(candidate["id"], 0.0)
+    await update_prompt_traffic(active["id"], 1.0)
 
     # Mark candidate as rolled back
     await update_prompt_status(
-        candidate["id"], "rolled_back", storage=storage
+        candidate["id"], "rolled_back"
     )
 
-async def _check_stabilization(
-    active: dict, candidate: dict, active_traffic: float, candidate_traffic: float, storage: PromptStorage, did: str | None = None
-) -> None:
-    """Check if the system has stabilized and update statuses accordingly.
 
-    Args:
-        active: Active prompt data
-        candidate: Candidate prompt data
-        active_traffic: New active traffic value
-        candidate_traffic: New candidate traffic value
-        storage: Storage instance to use for database operations
-        did: Decentralized Identifier for schema isolation
-    """
-    if candidate_traffic == 1.0 and active_traffic == 0.0:
-        # Candidate won, promote to active and deprecate old active
-        logger.info(
-            f"System stabilized: candidate won, promoting candidate {candidate['id']} "
-            f"to active and deprecating old active {active['id']}"
-        )
-        await update_prompt_status(candidate["id"], "active", storage=storage)
-        await update_prompt_status(active["id"], "deprecated", storage=storage)
-
-
-async def run_canary_controller(did: str | None = None) -> None:
+async def run_canary_controller() -> None:
     """Main canary controller logic.
 
     Compares active and candidate prompts and adjusts traffic based on metrics.
     If no candidate exists, the system is considered stable.
     
     Args:
-        did: Decentralized Identifier for schema isolation (required for multi-tenancy)
+        storage: PromptStorage instance to use for database operations
     """
-    logger.info(f"Starting canary controller (DID: {did or 'public'})")
-    
-    # Create a single storage instance for the entire canary controller run
-    # This is more efficient than creating/destroying connections for each operation
-    storage = PostgresStorage(did=did)
-    await storage.connect()
+    logger.info(f"Starting canary controller")
     
     try:
-        active = await get_active_prompt(storage=storage)
-        candidate = await get_candidate_prompt(storage=storage)
+        active = await get_active_prompt()
+        candidate = await get_candidate_prompt()
 
         if not candidate:
             logger.info("No candidate prompt - system stable")
@@ -195,13 +165,10 @@ async def run_canary_controller(did: str | None = None) -> None:
         winner = compare_metrics(active, candidate)
 
         if winner == "candidate":
-            await promote_step(active, candidate, storage=storage)
+            await promote_step(active, candidate)
         elif winner == "active":
-            await hard_rollback(active, candidate, storage=storage)
+            await hard_rollback(active, candidate)
         else:
             logger.info("No clear winner - maintaining current traffic distribution")
-    
-    finally:
-        # Always disconnect storage, even if an error occurred
-        await storage.disconnect()
-        logger.info("Canary controller storage connection closed")
+    except Exception as e:
+        logger.error(f"Error in canary controller: {e}", exc_info=True)
