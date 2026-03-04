@@ -24,7 +24,6 @@ training examples for DSPy prompt optimization.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
@@ -35,34 +34,10 @@ from bindu.utils.logging import get_logger
 from bindu.settings import app_settings
 from bindu.server.storage.postgres_storage import PostgresStorage
 from .extractor import InteractionExtractor
-from .models import Interaction
+from .models import Interaction, RawTaskData
 from .strategies import BaseExtractionStrategy, LastTurnStrategy
 
 logger = get_logger("bindu.dspy.dataset")
-
-
-# =============================================================================
-# Data Models
-# =============================================================================
-
-
-@dataclass
-class RawTaskData:
-    """Raw task data fetched from the database.
-
-    This represents the raw data before interaction extraction.
-
-    Attributes:
-        id: Task UUID
-        history: List of message dictionaries from the conversation
-        created_at: Timestamp when the task was created
-        feedback_data: Optional feedback dictionary (ratings, thumbs up/down)
-    """
-
-    id: UUID
-    history: list[dict[str, Any]]
-    created_at: Any
-    feedback_data: dict[str, Any] | None = None
 
 
 # =============================================================================

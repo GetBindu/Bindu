@@ -21,7 +21,7 @@ import asyncio
 from bindu.dspy.canary.controller import run_canary_controller
 from bindu.utils.logging import get_logger
 
-logger = get_logger("bindu.dspy.cli.canary")
+logger = get_logger("bindu.cli.canary")
 
 
 def main() -> None:
