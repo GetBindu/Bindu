@@ -51,35 +51,33 @@ class Prompt(UserString):
         return self.data
 
 
-async def get_active_prompt(storage: Storage | None = None, did: str | None = None) -> dict[str, Any] | None:
+async def get_active_prompt(storage: PromptStorage = _storage) -> dict[str, Any] | None:
     """Get the current active prompt.
     
     Args:
         storage: Optional existing storage instance to reuse
-        did: Decentralized Identifier for schema isolation (only used if storage is None)
     
     Returns:
         Dictionary containing prompt data (id, prompt_text, status, traffic)
         or None if no active prompt exists
     """
-    return await _storage.get_active_prompt()
+    return await storage.get_active_prompt()
 
 
-async def get_candidate_prompt(storage: Storage | None = None, did: str | None = None) -> dict[str, Any] | None:
+async def get_candidate_prompt(storage: PromptStorage = _storage) -> dict[str, Any] | None:
     """Get the current candidate prompt.
     
     Args:
         storage: Optional existing storage instance to reuse
-        did: Decentralized Identifier for schema isolation (only used if storage is None)
     
     Returns:
         Dictionary containing prompt data (id, prompt_text, status, traffic)
         or None if no candidate prompt exists
     """
-    return await _storage.get_candidate_prompt()
+    return await storage.get_candidate_prompt()
 
 
-async def insert_prompt(text: str, status: str, traffic: float) -> str:
+async def insert_prompt(text: str, status: str, traffic: float, storage: PromptStorage = _storage) -> str:
     """Insert a new prompt into the storage.
     
     Args:
@@ -87,42 +85,40 @@ async def insert_prompt(text: str, status: str, traffic: float) -> str:
         status: The prompt status (active, candidate, deprecated, rolled_back)
         traffic: Traffic allocation (0.0 to 1.0)
         storage: Optional existing storage instance to reuse
-        did: Decentralized Identifier for schema isolation (only used if storage is None)
         
     Returns:
         The ID of the newly inserted prompt (UUID string)
     """
-    return await _storage.insert_prompt(text, status, traffic)
+    return await storage.insert_prompt(text, status, traffic)
 
 
-async def update_prompt_traffic(prompt_id: str, traffic: float) -> None:
+async def update_prompt_traffic(prompt_id: str, traffic: float, storage: PromptStorage = _storage) -> None:
     """Update the traffic allocation for a specific prompt.
     
     Args:
         prompt_id: The ID of the prompt to update
         traffic: New traffic allocation (0.0 to 1.0)
+        storage: Optional existing storage instance to reuse
     """
-    await _storage.update_prompt_traffic(prompt_id, traffic)
+    await storage.update_prompt_traffic(prompt_id, traffic)
 
 
-async def update_prompt_status(prompt_id: str, status: str) -> None:
+async def update_prompt_status(prompt_id: str, status: str, storage: PromptStorage = _storage) -> None:
     """Update the status of a specific prompt.
     
     Args:
         prompt_id: The ID of the prompt to update
         status: New status (active, candidate, deprecated, rolled_back)
         storage: Optional existing storage instance to reuse
-        did: Decentralized Identifier for schema isolation (only used if storage is None)
     """
-    await _storage.update_prompt_status(prompt_id, status)
+    await storage.update_prompt_status(prompt_id, status)
 
 
-async def zero_out_all_except(prompt_ids: list[str]) -> None:
+async def zero_out_all_except(prompt_ids: list[str], storage: PromptStorage = _storage) -> None:
     """Set traffic to 0 for all prompts except those in the given list.
     
     Args:
         prompt_ids: List of prompt IDs to preserve (keep their traffic unchanged)
         storage: Optional existing storage instance to reuse
-        did: Decentralized Identifier for schema isolation (only used if storage is None)
     """
-    await _storage.zero_out_all_except(prompt_ids)
+    await storage.zero_out_all_except(prompt_ids)

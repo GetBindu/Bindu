@@ -18,29 +18,30 @@ from __future__ import annotations
 import random
 from typing import Any
 
-from bindu.server.storage.base import Storage
+from bindu.dspy.prompt_storage import PromptStorage
 from bindu.dspy.prompts import get_active_prompt, get_candidate_prompt
 from bindu.utils.logging import get_logger
 
 logger = get_logger("bindu.dspy.prompt_selector")
 
+_storage = PromptStorage()
 
-async def select_prompt_with_canary(storage: Storage | None = None, did: str | None = None) -> dict[str, Any] | None:
+
+async def select_prompt_with_canary(storage: PromptStorage = _storage) -> dict[str, Any] | None:
     """Select a prompt using weighted random selection based on traffic allocation.
 
     This function implements canary deployment by:
-    1. Fetching active and candidate prompts from database
+    1. Fetching active and candidate prompts from storage
     2. Using traffic percentages as weights for random selection
     3. Returning the selected prompt with its metadata
 
     Args:
         storage: Optional existing storage instance to reuse
-        did: Decentralized Identifier for schema isolation (only used if storage is None)
 
     Returns:
         Selected prompt dict with keys: id, prompt_text, status, traffic,
-        num_interactions, average_feedback_score
-        Returns None if no prompts are available
+        num_interactions, average_feedback_score.
+        Returns None if no prompts are available.
 
     Example:
         >>> prompt = await select_prompt_with_canary(storage=storage)
@@ -49,8 +50,8 @@ async def select_prompt_with_canary(storage: Storage | None = None, did: str | N
         ...     logger.info(f"Using prompt {prompt['id']} with status {prompt['status']}")
     """
     # Fetch both prompts from storage
-    active = await get_active_prompt()
-    candidate = await get_candidate_prompt()
+    active = await get_active_prompt(storage=storage)
+    candidate = await get_candidate_prompt(storage=storage)
 
     # If no prompts exist, return None
     if not active and not candidate:
