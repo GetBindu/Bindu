@@ -170,7 +170,7 @@ class BinduApplication(Starlette):
         )
 
         # Add health endpoint import
-        from .endpoints.health import health_endpoint
+        from .endpoints.health import health_endpoint, healthz_endpoint
 
         # Protocol endpoints
         self._add_route(
@@ -214,8 +214,11 @@ class BinduApplication(Starlette):
             ["GET"],
             with_app=True,
         )
-        # Register health endpoint
+        # Register health endpoint (backward-compat, always ready=True)
         self._add_route("/health", health_endpoint, ["GET"], with_app=True)
+
+        # Register strict readiness endpoint for k8s probes (returns 503 until ready)
+        self._add_route("/healthz", healthz_endpoint, ["GET"], with_app=True)
 
         # Register metrics endpoint
         self._add_route("/metrics", metrics_endpoint, ["GET"], with_app=True)
@@ -621,9 +624,17 @@ class BinduApplication(Starlette):
         )
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        """Handle ASGI requests with TaskManager validation."""
+        """Handle ASGI requests with TaskManager validation.
+
+        Health, readiness, and metrics endpoints are exempt from the startup
+        gate so that Kubernetes (and other orchestrators) can probe the pod
+        while storage/scheduler initialisation is still in progress.
+        """
         if scope["type"] == "http" and (
             self.task_manager is None or not self.task_manager.is_running
         ):
-            raise RuntimeError("TaskManager was not properly initialized.")
+            path = scope.get("path", "")
+            # Allow observability and probe endpoints through before full startup
+            if path not in ("/health", "/healthz", "/metrics"):
+                raise RuntimeError("TaskManager was not properly initialized.")
         await super().__call__(scope, receive, send)

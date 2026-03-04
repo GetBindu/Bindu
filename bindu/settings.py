@@ -362,6 +362,11 @@ class AgentSettings(BaseSettings):
         "contexts/list": "list_contexts",
         "contexts/clear": "clear_context",
         "tasks/feedback": "task_feedback",
+        # Push-notification config methods (A2A protocol extension)
+        "tasks/pushNotification/set": "set_task_push_notification",
+        "tasks/pushNotification/get": "get_task_push_notification",
+        "tasks/pushNotification/list": "list_task_push_notifications",
+        "tasks/pushNotification/delete": "delete_task_push_notification",
     }
 
     # Task State Configuration (A2A Protocol)
@@ -504,6 +509,7 @@ class AuthSettings(BaseSettings):
         "/agent/skills",
         "/agent/skills/*",
         "/health",
+        "/healthz",  # strict readiness probe for k8s
         "/metrics",
         "/payment-capture",  # x402 payment capture page (browser-based)
     ]
@@ -601,6 +607,7 @@ class HydraSettings(BaseSettings):
         "/agent/skills",
         "/agent/skills/*",
         "/health",
+        "/healthz",  # strict readiness probe for k8s
         "/metrics",
         "/payment-capture",
         "/favicon.ico",

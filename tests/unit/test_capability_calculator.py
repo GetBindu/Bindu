@@ -42,10 +42,11 @@ def test_scoring_weights_negative_raises():
         ScoringWeights(skill_match=-0.5)
 
 
-def test_no_skills_rejection():
+@pytest.mark.asyncio
+async def test_no_skills_rejection():
     """Test immediate rejection when agent has no skills."""
     calculator = CapabilityCalculator(skills=[], x402_extension=None)
-    result = calculator.calculate(task_summary="summarize this document")
+    result = await calculator.calculate(task_summary="summarize this document")
 
     assert result.accepted is False
     assert result.score == 0.0
@@ -53,7 +54,8 @@ def test_no_skills_rejection():
     assert result.rejection_reason == "no_skills_advertised"
 
 
-def test_basic_skill_match():
+@pytest.mark.asyncio
+async def test_basic_skill_match():
     """Test basic skill matching with keywords."""
     skills = [
         {
@@ -65,7 +67,7 @@ def test_basic_skill_match():
         }
     ]
     calculator = CapabilityCalculator(skills=skills, x402_extension=None)
-    result = calculator.calculate(task_summary="summarize this document")
+    result = await calculator.calculate(task_summary="summarize this document")
 
     assert result.accepted is True
     assert result.score > 0
@@ -73,7 +75,8 @@ def test_basic_skill_match():
     assert result.skill_matches[0].skill_id == "summarizer"
 
 
-def test_input_mime_type_constraint():
+@pytest.mark.asyncio
+async def test_input_mime_type_constraint():
     """Test hard rejection when input mime type is unsupported."""
     skills = [
         {
@@ -84,7 +87,7 @@ def test_input_mime_type_constraint():
         }
     ]
     calculator = CapabilityCalculator(skills=skills, x402_extension=None)
-    result = calculator.calculate(
+    result = await calculator.calculate(
         task_summary="process this", input_mime_types=["application/pdf"]
     )
 
@@ -92,7 +95,8 @@ def test_input_mime_type_constraint():
     assert result.rejection_reason == "input_mime_unsupported"
 
 
-def test_output_mime_type_constraint():
+@pytest.mark.asyncio
+async def test_output_mime_type_constraint():
     """Test hard rejection when output mime type is unsupported."""
     skills = [
         {
@@ -103,7 +107,7 @@ def test_output_mime_type_constraint():
         }
     ]
     calculator = CapabilityCalculator(skills=skills, x402_extension=None)
-    result = calculator.calculate(
+    result = await calculator.calculate(
         task_summary="process this", output_mime_types=["application/pdf"]
     )
 
@@ -111,7 +115,8 @@ def test_output_mime_type_constraint():
     assert result.rejection_reason == "output_mime_unsupported"
 
 
-def test_required_tools():
+@pytest.mark.asyncio
+async def test_required_tools():
     """Test required tools constraint."""
     skills = [
         {
@@ -124,21 +129,22 @@ def test_required_tools():
     calculator = CapabilityCalculator(skills=skills, x402_extension=None)
 
     # Should accept when required tool is available and keywords match
-    result = calculator.calculate(
+    result = await calculator.calculate(
         task_summary="scrape website", required_tools=["web_browser"]
     )
     assert result.accepted is True
     assert result.score > 0
 
     # Should reject when required tool is not available (hard constraint)
-    result = calculator.calculate(
+    result = await calculator.calculate(
         task_summary="scrape website with browser", required_tools=["database"]
     )
     assert result.accepted is False
     assert result.rejection_reason == "required_tool_missing"
 
 
-def test_forbidden_tools():
+@pytest.mark.asyncio
+async def test_forbidden_tools():
     """Test forbidden tools constraint."""
     skills = [
         {
@@ -148,7 +154,7 @@ def test_forbidden_tools():
         }
     ]
     calculator = CapabilityCalculator(skills=skills, x402_extension=None)
-    result = calculator.calculate(
+    result = await calculator.calculate(
         task_summary="process data", forbidden_tools=["web_browser"]
     )
 
@@ -156,7 +162,8 @@ def test_forbidden_tools():
     assert result.rejection_reason == "forbidden_tool_present"
 
 
-def test_latency_constraint():
+@pytest.mark.asyncio
+async def test_latency_constraint():
     """Test latency performance constraint."""
     skills = [
         {
@@ -169,14 +176,15 @@ def test_latency_constraint():
     calculator = CapabilityCalculator(skills=skills, x402_extension=None)
 
     # Should reject when latency exceeds constraint by 2x
-    result = calculator.calculate(task_summary="process data", max_latency_ms=2000)
+    result = await calculator.calculate(task_summary="process data", max_latency_ms=2000)
     assert result.accepted is False
     assert result.rejection_reason == "latency_exceeds_constraint"
     # Should use skill's actual latency
     assert result.latency_estimate_ms == 10000
 
 
-def test_cost_constraint():
+@pytest.mark.asyncio
+async def test_cost_constraint():
     """Test cost constraint with x402 extension."""
     skills = [
         {
@@ -189,12 +197,13 @@ def test_cost_constraint():
     calculator = CapabilityCalculator(skills=skills, x402_extension=x402_ext)
 
     # Should reject when cost exceeds budget
-    result = calculator.calculate(task_summary="process data", max_cost_amount="50.00")
+    result = await calculator.calculate(task_summary="process data", max_cost_amount="50.00")
     assert result.accepted is False
     assert result.rejection_reason == "cost_exceeds_budget"
 
 
-def test_queue_depth_scoring():
+@pytest.mark.asyncio
+async def test_queue_depth_scoring():
     """Test queue depth affects load score."""
     skills = [
         {
@@ -206,13 +215,14 @@ def test_queue_depth_scoring():
     calculator = CapabilityCalculator(skills=skills, x402_extension=None)
 
     # Low queue depth should give better score
-    result_low = calculator.calculate(task_summary="process data", queue_depth=0)
-    result_high = calculator.calculate(task_summary="process data", queue_depth=10)
+    result_low = await calculator.calculate(task_summary="process data", queue_depth=0)
+    result_high = await calculator.calculate(task_summary="process data", queue_depth=10)
 
     assert result_low.subscores["load"] > result_high.subscores["load"]
 
 
-def test_custom_weights():
+@pytest.mark.asyncio
+async def test_custom_weights():
     """Test custom scoring weights."""
     skills = [
         {
@@ -231,7 +241,7 @@ def test_custom_weights():
         load=0.025,
         cost=0.025,
     )
-    result = calculator.calculate(task_summary="processor task", weights=weights)
+    result = await calculator.calculate(task_summary="processor task", weights=weights)
 
     # Skill match subscore should dominate
     assert result.subscores["skill_match"] > 0
@@ -239,7 +249,8 @@ def test_custom_weights():
     assert result.accepted is True
 
 
-def test_min_score_threshold():
+@pytest.mark.asyncio
+async def test_min_score_threshold():
     """Test minimum score threshold."""
     skills = [
         {
@@ -251,7 +262,7 @@ def test_min_score_threshold():
     calculator = CapabilityCalculator(skills=skills, x402_extension=None)
 
     # With high threshold, should reject weak matches
-    result = calculator.calculate(
+    result = await calculator.calculate(
         task_summary="highly specific unusual task", min_score=0.8
     )
 
@@ -260,7 +271,8 @@ def test_min_score_threshold():
         assert result.rejection_reason == "score_below_threshold"
 
 
-def test_confidence_calculation():
+@pytest.mark.asyncio
+async def test_confidence_calculation():
     """Test confidence calculation based on data quality."""
     skills = [
         {
@@ -275,7 +287,7 @@ def test_confidence_calculation():
     calculator = CapabilityCalculator(skills=skills, x402_extension=None)
 
     # More constraints = higher confidence
-    result = calculator.calculate(
+    result = await calculator.calculate(
         task_summary="process text",
         input_mime_types=["text/plain"],
         output_mime_types=["text/plain"],
@@ -287,7 +299,8 @@ def test_confidence_calculation():
     assert result.confidence > 0.7
 
 
-def test_matched_tags_and_capabilities():
+@pytest.mark.asyncio
+async def test_matched_tags_and_capabilities():
     """Test that matched tags and capabilities are tracked."""
     skills = [
         {
@@ -301,7 +314,7 @@ def test_matched_tags_and_capabilities():
         }
     ]
     calculator = CapabilityCalculator(skills=skills, x402_extension=None)
-    result = calculator.calculate(task_summary="classify images using machine learning")
+    result = await calculator.calculate(task_summary="classify images using machine learning")
 
     # Check that skill match occurred and reasons were populated
     assert len(result.skill_matches) > 0

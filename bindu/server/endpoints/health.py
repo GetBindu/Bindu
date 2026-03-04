@@ -81,3 +81,61 @@ async def health_endpoint(app: BinduApplication, request: Request) -> JSONRespon
     }
 
     return JSONResponse(payload)
+
+
+@handle_endpoint_errors("healthz check")
+async def healthz_endpoint(app: BinduApplication, request: Request) -> JSONResponse:
+    """Strict readiness check for Kubernetes readiness / liveness probes.
+
+    Unlike ``/health`` (which always returns ``ready: true`` for backward
+    compatibility), this endpoint returns ``ready: false`` and HTTP 503 until
+    storage, scheduler, and task-manager are all confirmed running.
+
+    Use ``/healthz`` as the Kubernetes ``readinessProbe`` target so that pods
+    are only added to the load-balancer after full initialization.
+    """
+    storage_type = type(app._storage).__name__ if app._storage else None
+    scheduler_type = type(app._scheduler).__name__ if app._scheduler else None
+    task_manager_running = app.task_manager.is_running if app.task_manager else False
+
+    strict_ready = all(
+        [
+            app._storage is not None,
+            app._scheduler is not None,
+            task_manager_running,
+        ]
+    )
+
+    agent_did = None
+    if (
+        app.manifest
+        and hasattr(app.manifest, "did_extension")
+        and app.manifest.did_extension
+    ):
+        agent_did = app.manifest.did_extension.did
+
+    payload = {
+        "status": "ok" if strict_ready else "degraded",
+        "ready": strict_ready,
+        "uptime_seconds": round(monotonic() - _start_time, 2),
+        "version": __version__,
+        "health": "healthy" if strict_ready else "degraded",
+        "runtime": {
+            "storage_backend": storage_type,
+            "scheduler_backend": scheduler_type,
+            "task_manager_running": task_manager_running,
+            "strict_ready": strict_ready,
+        },
+        "application": {
+            "penguin_id": str(app.penguin_id),
+            "agent_did": agent_did,
+        },
+        "system": {
+            "python_version": sys.version.split()[0],
+            "platform": platform.system(),
+            "environment": os.getenv("ENV", "development"),
+        },
+    }
+
+    status_code = 200 if strict_ready else 503
+    return JSONResponse(payload, status_code=status_code)

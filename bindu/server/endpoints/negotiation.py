@@ -151,10 +151,15 @@ async def negotiation_endpoint(app: BinduApplication, request: Request) -> Respo
         try:
             tasks = await app.task_manager.storage.list_tasks()
             # Count tasks in non-terminal states (from agent settings)
+            # Task dicts returned by storage have status nested as
+            # task["status"]["state"], not top-level task["state"] — reading
+            # the wrong key made queue_depth always 0, so load score was
+            # permanently pegged at 1.0 regardless of actual queue depth.
             queue_depth = sum(
                 1
                 for task in tasks
-                if task.get("state") in app_settings.agent.non_terminal_states
+                if task.get("status", {}).get("state")
+                in app_settings.agent.non_terminal_states
             )
         except Exception as e:
             logger.warning(f"Failed to get queue depth from storage: {e}")
@@ -162,8 +167,8 @@ async def negotiation_endpoint(app: BinduApplication, request: Request) -> Respo
     # Get or create cached calculator instance
     calculator = _get_or_create_calculator(app)
 
-    # Run calculation
-    result = calculator.calculate(
+    # Run calculation (async — embedder uses httpx.AsyncClient)
+    result = await calculator.calculate(
         task_summary=task_summary,
         task_details=task_details,
         input_mime_types=input_mime_types,

@@ -8,6 +8,7 @@ Enhanced with hybrid OAuth2 + DID authentication for cryptographic identity veri
 
 from __future__ import annotations as _annotations
 
+import hashlib
 import time
 from typing import Any
 
@@ -90,7 +91,9 @@ class HydraMiddleware(AuthMiddleware):
             Exception: If token is invalid, expired, or introspection fails
         """
         # Check cache first
-        cache_key = token[:50]  # Use first 50 chars as cache key
+        # Use full-token hash as cache key to prevent collision between
+        # two tokens that share the same first-50-char prefix.
+        cache_key = hashlib.sha256(token.encode()).hexdigest()
         if cache_key in self._introspection_cache:
             cached = self._introspection_cache[cache_key]
             if cached["expires_at"] > time.time():

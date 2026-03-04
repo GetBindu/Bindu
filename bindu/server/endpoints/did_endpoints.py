@@ -25,15 +25,20 @@ async def did_resolve_endpoint(app: BinduApplication, request: Request) -> Respo
     """Resolve DID and return full W3C-compliant DID document."""
     client_ip = get_client_ip(request)
 
-    # Get DID from query param or body
+    # Get DID from query param (GET) or JSON body (POST).
+    # Calling request.json() on a GET request raises an exception because
+    # GET requests carry no body — always check the method first.
     did: Optional[str] = None
-    try:
-        data = await request.json()
-        did = data.get("did")
-    except (ValueError, TypeError) as e:
-        logger.warning(f"Invalid JSON in DID resolve request from {client_ip}: {e}")
-        code, message = extract_error_fields(JSONParseError)
-        return jsonrpc_error(code, message, str(e))
+    if request.method == "GET":
+        did = request.query_params.get("did")
+    else:
+        try:
+            data = await request.json()
+            did = data.get("did")
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Invalid JSON in DID resolve request from {client_ip}: {e}")
+            code, message = extract_error_fields(JSONParseError)
+            return jsonrpc_error(code, message, str(e))
 
     if not did:
         logger.warning(f"DID resolve request missing 'did' parameter from {client_ip}")

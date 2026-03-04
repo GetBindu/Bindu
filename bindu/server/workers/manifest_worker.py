@@ -442,12 +442,7 @@ class ManifestWorker(Worker):
             )
             artifacts = self.build_artifacts(results)
 
-            # A2A Protocol: Send artifact notifications before updating storage
-            # This allows clients to receive artifact updates via webhook
-            for artifact in artifacts:
-                await self._notify_artifact(task["id"], task["context_id"], artifact)
-
-            # Handle payment settlement if payment context is available
+                # Handle payment settlement if payment context is available
             if payment_context:
                 settlement_metadata = await self._settle_payment(payment_context)
                 if additional_metadata:
@@ -455,6 +450,10 @@ class ManifestWorker(Worker):
                 else:
                     additional_metadata = settlement_metadata
 
+            # Persist task state BEFORE sending any notifications (outbox pattern).
+            # If a notification fires before the DB write and then the process crashes,
+            # clients receive an artifact webhook but the task is still "working" in the
+            # DB — an inconsistent state.  Write first, then notify.
             await self.storage.update_task(
                 task["id"],
                 state=state,
@@ -462,6 +461,11 @@ class ManifestWorker(Worker):
                 new_messages=agent_messages,
                 metadata=additional_metadata,
             )
+
+            # Send artifact notifications after the DB is committed
+            for artifact in artifacts:
+                await self._notify_artifact(task["id"], task["context_id"], artifact)
+
             await self._notify_lifecycle(task["id"], task["context_id"], state, True)
 
         elif state in ("failed", "rejected"):
