@@ -324,7 +324,7 @@ class PostgresStorage(Storage[ContextT]):
 
         return await self._retry_on_connection_error(_load)
 
-    async def submit_task(self, context_id: UUID, message: Message) -> Task:
+    async def submit_task(self, context_id: UUID, message: Message, prompt_id: str | None = None) -> Task:
         """Create a new task or continue an existing non-terminal task.
 
         Task-First Pattern (Bindu):
@@ -335,6 +335,7 @@ class PostgresStorage(Storage[ContextT]):
         Args:
             context_id: Context to associate the task with
             message: Initial message containing task request
+            prompt_id: Optional prompt ID (UUID string) to associate with this task
 
         Returns:
             Task in 'submitted' state (new or continued)
@@ -415,6 +416,7 @@ class PostgresStorage(Storage[ContextT]):
                             history=[serialized_message],
                             artifacts=[],
                             metadata={},
+                            prompt_id=prompt_id,
                         )
                         .returning(tasks_table)
                     )
@@ -499,6 +501,9 @@ class PostgresStorage(Storage[ContextT]):
                         update_values["history"] = func.jsonb_concat(
                             tasks_table.c.history, cast(serialized_messages, JSONB)
                         )
+
+                    if prompt_id is not None:
+                        update_values["prompt_id"] = prompt_id
 
                     # Execute update
                     stmt = (

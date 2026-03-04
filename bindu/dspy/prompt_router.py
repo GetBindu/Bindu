@@ -20,6 +20,7 @@ from typing import Any
 
 from bindu.dspy.prompt_storage import PromptStorage
 from bindu.dspy.prompts import get_active_prompt, get_candidate_prompt
+from bindu.dspy.context import set_prompt_id
 from bindu.utils.logging import get_logger
 
 logger = get_logger("bindu.dspy.prompt_router")
@@ -36,20 +37,21 @@ async def route_prompt(
     2. Fetching active and candidate prompts from storage
     3. Using traffic percentages as weights for random selection
     4. Returning the selected prompt text
+    5. Storing the prompt_id in async context for worker to retrieve
 
     Args:
         initial_prompt: Optional initial prompt text to create if storage is empty.
                        If storage is empty and this is None, returns the initial_prompt.
-        storage: Optional existing storage instance to reuse
 
     Returns:
-        The selected prompt text string. If storage is empty and no initial_prompt
-        is provided, returns empty string.
+        The selected prompt text string. The prompt_id is stored in async context
+        via set_prompt_id() for the worker to retrieve.
 
     Example:
         >>> initial = "You are a helpful assistant"
         >>> prompt_text = await route_prompt(initial_prompt=initial)
         >>> agent.instructions = prompt_text
+        >>> return agent.run(input=messages)  # Worker reads prompt_id from context
     """
     # Fetch both prompts from storage
     active = await get_active_prompt()
@@ -65,9 +67,11 @@ async def route_prompt(
                 traffic=1.0
             )
             logger.info(f"Initial prompt created (id={prompt_id}) with 100% traffic")
+            set_prompt_id(prompt_id)  # Store in context for worker
             return initial_prompt
         
         logger.warning("No prompts found in storage and no initial_prompt provided")
+        set_prompt_id(None)  # Clear context
         return initial_prompt or ""
 
     # If only active exists, use it
@@ -75,6 +79,7 @@ async def route_prompt(
         logger.debug(
             f"Using active prompt {active['id']} (no candidate, traffic={active['traffic']:.2f})"
         )
+        set_prompt_id(active["id"])  # Store in context for worker
         return active["prompt_text"]
 
     # If only candidate exists (shouldn't happen in normal flow), use it
@@ -82,6 +87,7 @@ async def route_prompt(
         logger.warning(
             f"Only candidate prompt {candidate['id']} exists (no active), using candidate"
         )
+        set_prompt_id(candidate["id"])  # Store in context for worker
         return candidate["prompt_text"]
 
     # Both exist - use weighted random selection
@@ -95,6 +101,7 @@ async def route_prompt(
         logger.warning(
             "Both active and candidate have 0 traffic, defaulting to active"
         )
+        set_prompt_id(active["id"])  # Store in context for worker
         return active["prompt_text"]
 
     # Weighted random choice
@@ -113,4 +120,5 @@ async def route_prompt(
             f"(traffic={candidate_traffic:.2f}, roll={choice:.3f})"
         )
 
+    set_prompt_id(selected["id"])  # Store in context for worker
     return selected["prompt_text"]
