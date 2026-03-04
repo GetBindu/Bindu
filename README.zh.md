@@ -73,12 +73,12 @@ uv --version
 
 在某些 Windows 系统上，即使安装后，命令提示符也可能无法识别 git——这是由于 PATH 配置问题。
 
-如果遇到此问题，您可以使用 *GitHub Desktop* 作为替代方案：
+如果遇到此问题，您可以使用 _GitHub Desktop_ 作为替代方案：
 
-1. 从 https://desktop.github.com/ 安装 GitHub Desktop
+1. 从 <https://desktop.github.com/> 安装 GitHub Desktop
 2. 使用您的 GitHub 账户登录
 3. 使用仓库 URL 克隆：
-   https://github.com/getbindu/Bindu.git
+   <https://github.com/getbindu/Bindu.git>
 
 GitHub Desktop 允许您在不使用命令行的情况下克隆仓库、管理分支、提交更改和打开 pull request。
 
@@ -152,9 +152,11 @@ from agno.agent import Agent
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.models.openai import OpenAIChat
 
+from bindu.dspy.prompts import Prompt
+
 # 定义您的代理
 agent = Agent(
-    instructions="您是一个研究助手，可以查找和总结信息。",
+    instructions=Prompt("您是一个研究助手，可以查找和总结信息。"),
     model=OpenAIChat(id="gpt-4o"),
     tools=[DuckDuckGoTools()],
 )
@@ -230,6 +232,7 @@ python examples/echo_agent.py
 <br/>
 
 输入：
+
 ```bash
 curl --location 'http://localhost:3773/' \
 --header 'Content-Type: application/json' \
@@ -261,6 +264,7 @@ curl --location 'http://localhost:3773/' \
 ```
 
 输出：
+
 ```bash
 {
     "jsonrpc": "2.0",
@@ -293,6 +297,7 @@ curl --location 'http://localhost:3773/' \
 ```
 
 检查任务状态
+
 ```bash
 curl --location 'http://localhost:3773/' \
 --header 'Content-Type: application/json' \
@@ -307,6 +312,7 @@ curl --location 'http://localhost:3773/' \
 ```
 
 输出：
+
 ```bash
 {
     "jsonrpc": "2.0",
@@ -547,27 +553,30 @@ Bindu Skills System 为智能编排和代理发现提供丰富的代理能力广
 
 在 Bindu 中，Skills 充当**丰富的广告元数据**，帮助编排器：
 
-* 🔍 **发现**任务的正确代理
-* 📖 **理解**详细的能力和限制
-* ✅ **验证**执行前的要求
-* 📊 **估计**性能和资源需求
-* 🔗 **智能链接**多个代理
+- 🔍 **发现**任务的正确代理
+- 📖 **理解**详细的能力和限制
+- ✅ **验证**执行前的要求
+- 📊 **估计**性能和资源需求
+- 🔗 **智能链接**多个代理
 
 > **注意**：Skills 不是可执行代码——它们是描述您的代理能做什么的结构化元数据。
 
 ### 🔌 API 端点
 
 **列出所有 Skills**：
+
 ```bash
 GET /agent/skills
 ```
 
 **获取 Skill 详情**：
+
 ```bash
 GET /agent/skills/{skill_id}
 ```
 
 **获取 Skill 文档**：
+
 ```bash
 GET /agent/skills/{skill_id}/documentation
 ```
@@ -601,6 +610,7 @@ POST /agent/negotiation
 ```
 
 **请求：**
+
 ```json
 {
   "task_summary": "从 PDF 发票中提取表格",
@@ -621,6 +631,7 @@ POST /agent/negotiation
 ```
 
 **响应：**
+
 ```json
 {
   "accepted": true,
@@ -721,6 +732,7 @@ Bindu 支持长时间运行任务的**实时 webhook 通知**，遵循 [A2A Prot
 
 1. **启动 webhook 接收器：** `python examples/webhook_client_example.py`
 2. **配置代理**在 `examples/echo_agent_with_webhooks.py` 中：
+
    ```python
    manifest = {
        "capabilities": {"push_notifications": True},
@@ -728,6 +740,7 @@ Bindu 支持长时间运行任务的**实时 webhook 通知**，遵循 [A2A Prot
        "global_webhook_token": "secret_abc123",
    }
    ```
+
 3. **运行代理：** `python examples/echo_agent_with_webhooks.py`
 4. **发送任务** - webhook 通知会自动到达
 
@@ -852,6 +865,7 @@ pytest -n auto --cov=bindu --cov-report= && coverage report --skip-covered --fai
 | `Permission denied`（macOS） | 运行 `xattr -cr .` 清除扩展属性 |
 
 **重置环境：**
+
 ```bash
 rm -rf .venv
 uv venv --python 3.12.9
@@ -859,6 +873,7 @@ uv sync --dev
 ```
 
 **Windows PowerShell：**
+
 ```bash
 Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```

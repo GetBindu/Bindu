@@ -27,10 +27,11 @@ from agno.agent import Agent
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.models.openrouter import OpenRouter
 
+from bindu.dspy.prompts import Prompt
 
 # Initialize the weather research agent
 agent = Agent(
-    instructions="You are a weather research assistant. When asked about weather, provide a clear, concise weather report with current conditions, temperature, and forecast. Focus on the most relevant information and present it in an organized, easy-to-read format. Avoid showing multiple search results - synthesize the information into a single coherent response.",
+    instructions=Prompt("You are a weather research assistant. When asked about weather, provide a clear, concise weather report with current conditions, temperature, and forecast. Focus on the most relevant information and present it in an organized, easy-to-read format. Avoid showing multiple search results - synthesize the information into a single coherent response."),
     model=OpenRouter(
         id="openai/gpt-oss-120b",
         api_key=os.getenv("OPENROUTER_API_KEY")

@@ -12,13 +12,14 @@ from bindu.penguin.bindufy import bindufy
 from agno.agent import Agent
 from agno.models.openrouter import OpenRouter
 from agno.tools.duckduckgo import DuckDuckGoTools
+from bindu.dspy.prompts import Prompt
 
 # ---------------------------------------------------------------------------
 # Agent Configuration
 # ---------------------------------------------------------------------------
 agent = Agent(
     name="Bindu Docs Agent",
-    instructions="""
+    instructions=Prompt("""
     You are an expert assistant for Bindu (GetBindu).
 
     TASK:
@@ -31,7 +32,7 @@ agent = Agent(
     - Use bullet points for lists.
     - Do NOT wrap the entire response in JSON code blocks. Just return the text.
     - At the end, include a '### Sources' section with links found.
-    """,
+    """),
     model=OpenRouter(
         id="openai/gpt-oss-120b",
         api_key=os.getenv("OPENROUTER_API_KEY"),

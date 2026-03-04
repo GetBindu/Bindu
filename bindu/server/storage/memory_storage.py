@@ -91,7 +91,7 @@ class InMemoryStorage(Storage[ContextT]):
         return task_copy
 
     @retry_storage_operation(max_attempts=3, min_wait=0.1, max_wait=1)
-    async def submit_task(self, context_id: UUID, message: Message) -> Task:
+    async def submit_task(self, context_id: UUID, message: Message, prompt_id: str | None = None) -> Task:
         """Create a new task or continue an existing non-terminal task.
 
         Task-First Pattern (Bindu):
@@ -102,6 +102,7 @@ class InMemoryStorage(Storage[ContextT]):
         Args:
             context_id: Context to associate the task with
             message: Initial message containing task request
+            prompt_id: Optional prompt ID (ignored for in-memory storage)
 
         Returns:
             Task in 'submitted' state (new or continued)
@@ -213,6 +214,7 @@ class InMemoryStorage(Storage[ContextT]):
         new_artifacts: list[Artifact] | None = None,
         new_messages: list[Message] | None = None,
         metadata: dict[str, Any] | None = None,
+        prompt_id: str | None = None,
     ) -> Task:
         """Update task state and append new content.
 
@@ -226,6 +228,7 @@ class InMemoryStorage(Storage[ContextT]):
             new_artifacts: Optional artifacts to append (for completion)
             new_messages: Optional messages to append to history
             metadata: Optional metadata to update/merge with task metadata
+            prompt_id: Optional prompt ID (ignored for in-memory storage)
 
         Returns:
             Updated task object

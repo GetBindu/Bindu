@@ -23,10 +23,11 @@ from agno.models.openrouter import OpenRouter
 from agno.tools.duckduckgo import DuckDuckGoTools
 from dotenv import load_dotenv
 load_dotenv()  # Load environment variables from .env file
+from bindu.dspy.prompts import Prompt
 
 
 agent = Agent(
-    instructions="You are a friendly assistant that explains things simply.",
+    instructions=Prompt("You are a friendly assistant that explains things simply."),
     model=OpenRouter(
         id="openai/gpt-oss-120b",
         api_key=os.getenv("OPENROUTER_API_KEY")

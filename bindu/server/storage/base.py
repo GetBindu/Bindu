@@ -56,12 +56,15 @@ class Storage(ABC, Generic[ContextT]):
         """
 
     @abstractmethod
-    async def submit_task(self, context_id: UUID, message: Message) -> Task:
+    async def submit_task(self, context_id: UUID, message: Message, prompt_id: str | None = None) -> Task:
         """Create and store a new task.
 
         Args:
             context_id: Context to associate the task with
             message: Initial message containing task request
+            prompt_id: Optional prompt ID to associate with this task (DSPy integration)
+                      Note: This is typically set via update_task after handler execution,
+                      not during submit_task.
 
         Returns:
             Newly created task in 'submitted' state
@@ -75,6 +78,7 @@ class Storage(ABC, Generic[ContextT]):
         new_artifacts: list[Artifact] | None = None,
         new_messages: list[Message] | None = None,
         metadata: dict[str, Any] | None = None,
+        prompt_id: str | None = None,
     ) -> Task:
         """Update task state and append new content.
 
@@ -84,6 +88,7 @@ class Storage(ABC, Generic[ContextT]):
             new_artifacts: Optional artifacts to append
             new_messages: Optional messages to append to history
             metadata: Optional metadata to update/merge with task metadata
+            prompt_id: Optional prompt ID to associate with this task (DSPy integration)
 
         Returns:
             Updated task object
