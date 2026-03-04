@@ -28,7 +28,6 @@ from bindu.server.storage.postgres_storage import PostgresStorage
 from .dataset import build_golden_dataset, convert_to_dspy_examples
 from .strategies import BaseExtractionStrategy, LastTurnStrategy
 from .guard import ensure_system_stable
-from .models import PromptCandidate
 from .optimizer import optimize
 from .program import AgentProgram
 from .prompts import (
