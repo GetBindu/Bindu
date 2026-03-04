@@ -356,9 +356,15 @@ class AgentSettings(BaseSettings):
     # Maps JSON-RPC method names to task_manager handler method names
     method_handlers: dict[str, str] = {
         "message/send": "send_message",
+        "message/stream": "stream_message",
         "tasks/get": "get_task",
         "tasks/cancel": "cancel_task",
         "tasks/list": "list_tasks",
+        "tasks/resubscribe": "resubscribe_task",
+        "tasks/pushNotification/set": "set_task_push_notification",
+        "tasks/pushNotification/get": "get_task_push_notification",
+        "tasks/pushNotificationConfig/list": "list_task_push_notifications",
+        "tasks/pushNotificationConfig/delete": "delete_task_push_notification",
         "contexts/list": "list_contexts",
         "contexts/clear": "clear_context",
         "tasks/feedback": "task_feedback",

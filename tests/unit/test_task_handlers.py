@@ -23,6 +23,7 @@ from bindu.common.protocol.types import (
     CancelTaskRequest,
     GetTaskRequest,
     ListTasksRequest,
+    ResubscribeTaskRequest,
     TaskFeedbackRequest,
 )
 from bindu.server.handlers.task_handlers import TaskHandlers
@@ -288,6 +289,73 @@ async def test_cancel_already_failed_task_returns_error():
 
         response = await handlers.cancel_task(request)
         assert "error" in response
+
+
+# ---------------------------------------------------------------------------
+# resubscribe_task
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_resubscribe_task_returns_existing_non_terminal_task():
+    """resubscribe_task returns task details for non-terminal tasks."""
+    storage = InMemoryStorage()
+    async with InMemoryScheduler() as scheduler:
+        handlers = _make_handlers(storage, scheduler)
+
+        message = create_test_message(text="still running")
+        await storage.submit_task(message["context_id"], message)
+
+        request: ResubscribeTaskRequest = {
+            "jsonrpc": "2.0",
+            "id": uuid4(),
+            "method": "tasks/resubscribe",
+            "params": {"task_id": message["task_id"]},
+        }
+
+        response = await handlers.resubscribe_task(request)
+        assert_jsonrpc_success(response)
+        assert response["result"]["id"] == message["task_id"]
+
+
+@pytest.mark.asyncio
+async def test_resubscribe_task_not_found_returns_error():
+    """resubscribe_task returns an error when task does not exist."""
+    storage = InMemoryStorage()
+    async with InMemoryScheduler() as scheduler:
+        handlers = _make_handlers(storage, scheduler)
+
+        request: ResubscribeTaskRequest = {
+            "jsonrpc": "2.0",
+            "id": uuid4(),
+            "method": "tasks/resubscribe",
+            "params": {"task_id": uuid4()},
+        }
+
+        response = await handlers.resubscribe_task(request)
+        assert_jsonrpc_error(response, -32001)
+
+
+@pytest.mark.asyncio
+async def test_resubscribe_task_terminal_state_returns_error():
+    """resubscribe_task returns error for terminal task states."""
+    storage = InMemoryStorage()
+    async with InMemoryScheduler() as scheduler:
+        handlers = _make_handlers(storage, scheduler)
+
+        message = create_test_message(text="done task")
+        await storage.submit_task(message["context_id"], message)
+        await storage.update_task(message["task_id"], state="completed")
+
+        request: ResubscribeTaskRequest = {
+            "jsonrpc": "2.0",
+            "id": uuid4(),
+            "method": "tasks/resubscribe",
+            "params": {"task_id": message["task_id"]},
+        }
+
+        response = await handlers.resubscribe_task(request)
+        assert_jsonrpc_error(response, -32001)
 
 
 # ---------------------------------------------------------------------------

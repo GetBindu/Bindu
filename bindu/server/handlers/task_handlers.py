@@ -26,6 +26,8 @@ from bindu.common.protocol.types import (
     GetTaskResponse,
     ListTasksRequest,
     ListTasksResponse,
+    ResubscribeTaskRequest,
+    ResubscribeTaskResponse,
     TaskFeedbackRequest,
     TaskFeedbackResponse,
     TaskNotCancelableError,
@@ -102,6 +104,34 @@ class TaskHandlers:
             )
 
         return ListTasksResponse(jsonrpc="2.0", id=request["id"], result=tasks)
+
+    @trace_task_operation("resubscribe_task")
+    async def resubscribe_task(
+        self, request: ResubscribeTaskRequest
+    ) -> ResubscribeTaskResponse:
+        """Resubscribe to updates for a non-terminal task."""
+        task_id = request["params"]["task_id"]
+        task = await self.storage.load_task(task_id)
+
+        if task is None:
+            return self.error_response_creator(
+                ResubscribeTaskResponse,
+                request["id"],
+                TaskNotFoundError,
+                "Task not found",
+            )
+
+        current_state = task["status"]["state"]
+        if current_state in app_settings.agent.terminal_states:
+            return self.error_response_creator(
+                ResubscribeTaskResponse,
+                request["id"],
+                TaskNotCancelableError,
+                f"Task cannot be resubscribed in '{current_state}' state. "
+                f"Only non-terminal tasks can be resubscribed.",
+            )
+
+        return ResubscribeTaskResponse(jsonrpc="2.0", id=request["id"], result=task)
 
     @trace_task_operation("task_feedback")
     async def task_feedback(self, request: TaskFeedbackRequest) -> TaskFeedbackResponse:
