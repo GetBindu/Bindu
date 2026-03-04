@@ -21,7 +21,7 @@ from typing import Any
 from bindu.dspy.prompt_storage import PromptStorage
 
 # Initialize global prompt storage
-_storage = PromptStorage()
+storage = PromptStorage()
 
 
 class Prompt(UserString):
@@ -44,14 +44,14 @@ class Prompt(UserString):
         self.status = status
         self.traffic = traffic
         # Synchronously save to storage
-        self.id = _storage.insert_prompt_sync(text, status, traffic)
+        self.id = storage.insert_prompt_sync(text, status, traffic)
 
     def __str__(self) -> str:
         """Return the prompt text."""
         return self.data
 
 
-async def get_active_prompt(storage: PromptStorage = _storage) -> dict[str, Any] | None:
+async def get_active_prompt() -> dict[str, Any] | None:
     """Get the current active prompt.
     
     Args:
@@ -64,7 +64,7 @@ async def get_active_prompt(storage: PromptStorage = _storage) -> dict[str, Any]
     return await storage.get_active_prompt()
 
 
-async def get_candidate_prompt(storage: PromptStorage = _storage) -> dict[str, Any] | None:
+async def get_candidate_prompt() -> dict[str, Any] | None:
     """Get the current candidate prompt.
     
     Args:
@@ -77,7 +77,7 @@ async def get_candidate_prompt(storage: PromptStorage = _storage) -> dict[str, A
     return await storage.get_candidate_prompt()
 
 
-async def insert_prompt(text: str, status: str, traffic: float, storage: PromptStorage = _storage) -> str:
+async def insert_prompt(text: str, status: str, traffic: float) -> str:
     """Insert a new prompt into the storage.
     
     Args:
@@ -92,7 +92,7 @@ async def insert_prompt(text: str, status: str, traffic: float, storage: PromptS
     return await storage.insert_prompt(text, status, traffic)
 
 
-async def update_prompt_traffic(prompt_id: str, traffic: float, storage: PromptStorage = _storage) -> None:
+async def update_prompt_traffic(prompt_id: str, traffic: float) -> None:
     """Update the traffic allocation for a specific prompt.
     
     Args:
@@ -103,7 +103,7 @@ async def update_prompt_traffic(prompt_id: str, traffic: float, storage: PromptS
     await storage.update_prompt_traffic(prompt_id, traffic)
 
 
-async def update_prompt_status(prompt_id: str, status: str, storage: PromptStorage = _storage) -> None:
+async def update_prompt_status(prompt_id: str, status: str) -> None:
     """Update the status of a specific prompt.
     
     Args:
@@ -114,7 +114,7 @@ async def update_prompt_status(prompt_id: str, status: str, storage: PromptStora
     await storage.update_prompt_status(prompt_id, status)
 
 
-async def zero_out_all_except(prompt_ids: list[str], storage: PromptStorage = _storage) -> None:
+async def zero_out_all_except(prompt_ids: list[str]) -> None:
     """Set traffic to 0 for all prompts except those in the given list.
     
     Args:

@@ -15,7 +15,6 @@ which manages A/B testing and gradual rollout of optimized prompts.
 
 from __future__ import annotations
 
-import argparse
 import asyncio
 
 from bindu.dspy.canary.controller import run_canary_controller
@@ -30,18 +29,8 @@ def main() -> None:
     This function serves as the main entry point for the canary CLI.
     It orchestrates the canary deployment process for prompt optimization.
     """
-    parser = argparse.ArgumentParser(description="Run DSPy canary deployment controller")
     
-    parser.add_argument(
-        "--did",
-        type=str,
-        default=None,
-        help="DID (Decentralized Identifier) for schema isolation. Example: did:bindu:author:agent:id",
-    )
-    
-    args = parser.parse_args()
-    
-    asyncio.run(run_canary_controller(did=args.did))
+    asyncio.run(run_canary_controller())
 
 
 if __name__ == "__main__":

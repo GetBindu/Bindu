@@ -24,12 +24,10 @@ from bindu.utils.logging import get_logger
 
 logger = get_logger("bindu.dspy.prompt_router")
 
-_storage = PromptStorage()
-
+storage = PromptStorage()
 
 async def route_prompt(
-    initial_prompt: str | None = None,
-    storage: PromptStorage = _storage,
+    initial_prompt: str | None = None
 ) -> str:
     """Route to a prompt using weighted random selection based on traffic allocation.
 
@@ -54,8 +52,8 @@ async def route_prompt(
         >>> agent.instructions = prompt_text
     """
     # Fetch both prompts from storage
-    active = await get_active_prompt(storage=storage)
-    candidate = await get_candidate_prompt(storage=storage)
+    active = await get_active_prompt()
+    candidate = await get_candidate_prompt()
 
     # If no prompts exist, create initial prompt if provided
     if not active and not candidate:
