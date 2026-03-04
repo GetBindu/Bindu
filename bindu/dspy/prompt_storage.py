@@ -21,9 +21,8 @@ import json
 import os
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
-import aiofiles
 from filelock import FileLock
 
 from bindu.utils.logging import get_logger
