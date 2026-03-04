@@ -31,7 +31,7 @@ from bindu.dspy.strategies import (
 from bindu.dspy.train import train
 from bindu.utils.logging import get_logger
 
-logger = get_logger("bindu.dspy.cli.train")
+logger = get_logger("bindu.cli.train")
 
 
 def parse_strategy(
