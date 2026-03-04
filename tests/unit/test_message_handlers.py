@@ -176,23 +176,36 @@ async def test_send_message_with_push_notification_config(mock_push_manager):
 
 
 @pytest.mark.asyncio
-async def test_send_message_payment_context_stripped_from_message():
-    """send_message removes _payment_context from message metadata before queuing."""
+async def test_send_message_payment_context_injected_and_stripped_flow():
+    """
+    Simulate endpoint injecting full _payment_context and ensure:
+    1. Handler processes request successfully
+    2. _payment_context does NOT persist in storage
+    """
     storage = InMemoryStorage()
     handlers = _make_handlers(storage)
 
+    # Simulate endpoint-injected metadata
     message = create_test_message(
-        text="paid request",
-        metadata={"_payment_context": {"receipt": "0xabc"}},
+        text="paid request full context",
+        metadata={
+            "_payment_context": {
+                "payment_payload": {"amount": 100},
+                "payment_requirements": {"currency": "USD"},
+                "verify_response": {"verified": True},
+            }
+        },
     )
+
     request = _send_request(message)
 
     response = await handlers.send_message(request)
     assert_jsonrpc_success(response)
 
-    # _payment_context must not survive into the stored task history
     stored_task = await storage.load_task(response["result"]["id"])
     stored_metadata = (stored_task["history"] or [{}])[-1].get("metadata", {})
+
+    # Core assertion: endpoint injection must not leak to storage
     assert "_payment_context" not in stored_metadata
 
 
