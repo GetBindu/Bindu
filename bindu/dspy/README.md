@@ -132,8 +132,8 @@ DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/bindu
 When `enable_dspy: true` is set:
 
 1. Agent startup checks for the `enable_dspy` flag in your manifest
-2. On each user request, the system calls `select_prompt_with_canary()`
-3. The prompt selector fetches `active` and `candidate` prompts from PostgreSQL
+2. On each user request, the system calls `route_prompt()`
+3. The prompt router fetches `active` and `candidate` prompts from PostgreSQL
 4. Weighted random selection based on traffic allocation (e.g., 90% active, 10% candidate)
 5. Selected prompt replaces the system message in the agent's context
 
@@ -765,7 +765,7 @@ bindu/dspy/
 ├── optimizer.py             # DSPy optimizer wrapper
 ├── program.py               # DSPy program definition
 ├── prompts.py               # Prompt CRUD operations
-├── prompt_selector.py       # Canary-based prompt selection
+├── prompt_router.py         # Canary-based prompt routing
 ├── signature.py             # DSPy signature definitions
 ├── train.py                 # Main training orchestrator
 │
