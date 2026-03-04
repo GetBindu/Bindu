@@ -7,9 +7,9 @@
 #
 #  Thank you users! We ❤️ you! - 🌻
 
-"""Prompt selector for canary deployment with weighted random selection.
+"""Prompt router for canary deployment with weighted random selection.
 
-This module provides functionality to select prompts from the database based
+This module provides functionality to route prompts from the database based
 on traffic allocation percentages, enabling A/B testing and gradual rollouts.
 """
 
@@ -22,55 +22,69 @@ from bindu.dspy.prompt_storage import PromptStorage
 from bindu.dspy.prompts import get_active_prompt, get_candidate_prompt
 from bindu.utils.logging import get_logger
 
-logger = get_logger("bindu.dspy.prompt_selector")
+logger = get_logger("bindu.dspy.prompt_router")
 
 _storage = PromptStorage()
 
 
-async def select_prompt_with_canary(storage: PromptStorage = _storage) -> dict[str, Any] | None:
-    """Select a prompt using weighted random selection based on traffic allocation.
+async def route_prompt(
+    initial_prompt: str | None = None,
+    storage: PromptStorage = _storage,
+) -> str:
+    """Route to a prompt using weighted random selection based on traffic allocation.
 
     This function implements canary deployment by:
-    1. Fetching active and candidate prompts from storage
-    2. Using traffic percentages as weights for random selection
-    3. Returning the selected prompt with its metadata
+    1. Checking if storage is empty - if so, creates initial prompt
+    2. Fetching active and candidate prompts from storage
+    3. Using traffic percentages as weights for random selection
+    4. Returning the selected prompt text
 
     Args:
+        initial_prompt: Optional initial prompt text to create if storage is empty.
+                       If storage is empty and this is None, returns the initial_prompt.
         storage: Optional existing storage instance to reuse
 
     Returns:
-        Selected prompt dict with keys: id, prompt_text, status, traffic,
-        num_interactions, average_feedback_score.
-        Returns None if no prompts are available.
+        The selected prompt text string. If storage is empty and no initial_prompt
+        is provided, returns empty string.
 
     Example:
-        >>> prompt = await select_prompt_with_canary(storage=storage)
-        >>> if prompt:
-        ...     system_message = prompt["prompt_text"]
-        ...     logger.info(f"Using prompt {prompt['id']} with status {prompt['status']}")
+        >>> initial = "You are a helpful assistant"
+        >>> prompt_text = await route_prompt(initial_prompt=initial)
+        >>> agent.instructions = prompt_text
     """
     # Fetch both prompts from storage
     active = await get_active_prompt(storage=storage)
     candidate = await get_candidate_prompt(storage=storage)
 
-    # If no prompts exist, return None
+    # If no prompts exist, create initial prompt if provided
     if not active and not candidate:
-        logger.warning("No prompts found in storage (no active or candidate)")
-        return None
+        if initial_prompt:
+            logger.info("No prompts found in storage. Creating initial active prompt...")
+            prompt_id = await storage.insert_prompt(
+                text=initial_prompt,
+                status="active",
+                traffic=1.0
+            )
+            logger.info(f"Initial prompt created (id={prompt_id}) with 100% traffic")
+            return initial_prompt
+        
+        logger.warning("No prompts found in storage and no initial_prompt provided")
+        return initial_prompt or ""
 
     # If only active exists, use it
     if active and not candidate:
         logger.debug(
             f"Using active prompt {active['id']} (no candidate, traffic={active['traffic']:.2f})"
         )
-        return active
+        return active["prompt_text"]
 
     # If only candidate exists (shouldn't happen in normal flow), use it
     if candidate and not active:
         logger.warning(
             f"Only candidate prompt {candidate['id']} exists (no active), using candidate"
         )
-        return candidate
+        return candidate["prompt_text"]
 
     # Both exist - use weighted random selection
     active_traffic = float(active["traffic"])
@@ -83,7 +97,7 @@ async def select_prompt_with_canary(storage: PromptStorage = _storage) -> dict[s
         logger.warning(
             "Both active and candidate have 0 traffic, defaulting to active"
         )
-        return active
+        return active["prompt_text"]
 
     # Weighted random choice
     choice = random.random()  # Returns float in [0.0, 1.0)
@@ -101,4 +115,4 @@ async def select_prompt_with_canary(storage: PromptStorage = _storage) -> dict[s
             f"(traffic={candidate_traffic:.2f}, roll={choice:.3f})"
         )
 
-    return selected
+    return selected["prompt_text"]
