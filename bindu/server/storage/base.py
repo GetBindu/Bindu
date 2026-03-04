@@ -75,6 +75,7 @@ class Storage(ABC, Generic[ContextT]):
         new_artifacts: list[Artifact] | None = None,
         new_messages: list[Message] | None = None,
         metadata: dict[str, Any] | None = None,
+        subtasks: list[Task] | None = None,
     ) -> Task:
         """Update task state and append new content.
 
@@ -84,6 +85,7 @@ class Storage(ABC, Generic[ContextT]):
             new_artifacts: Optional artifacts to append
             new_messages: Optional messages to append to history
             metadata: Optional metadata to update/merge with task metadata
+            subtasks: Optional list of subtasks to store with the task
 
         Returns:
             Updated task object
@@ -276,4 +278,37 @@ class Storage(ABC, Generic[ContextT]):
 
         Returns:
             Dictionary mapping task IDs to their webhook configurations
+        """
+
+    # -------------------------------------------------------------------------
+    # Checkpoint Operations
+    # -------------------------------------------------------------------------
+
+    @abstractmethod
+    async def save_checkpoint(
+        self,
+        task_id: UUID,
+        message_history: list[Message],
+        state_snapshot: dict[str, Any],
+    ) -> None:
+        """Save a task execution checkpoint to metadata.
+
+        Args:
+            task_id: Task identifier
+            message_history: Current list of messages
+            state_snapshot: additional state to persist
+        """
+
+    @abstractmethod
+    async def load_checkpoint(
+        self, task_id: UUID
+    ) -> tuple[list[Message], dict[str, Any]] | None:
+        """Load a task execution checkpoint from metadata.
+
+        Args:
+            task_id: Task identifier
+
+        Returns:
+            Tuple of (message_history, state_snapshot) if checkpoint exists,
+            otherwise None.
         """

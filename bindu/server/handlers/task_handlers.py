@@ -26,6 +26,10 @@ from bindu.common.protocol.types import (
     GetTaskResponse,
     ListTasksRequest,
     ListTasksResponse,
+    PauseTaskRequest,
+    PauseTaskResponse,
+    ResumeTaskRequest,
+    ResumeTaskResponse,
     TaskFeedbackRequest,
     TaskFeedbackResponse,
     TaskNotCancelableError,
@@ -90,6 +94,73 @@ class TaskHandlers:
         task = await self.storage.load_task(task_id)
 
         return CancelTaskResponse(jsonrpc="2.0", id=request["id"], result=task)
+
+    @trace_task_operation("pause_task")
+    async def pause_task(self, request: PauseTaskRequest) -> PauseTaskResponse:
+        """Pause a running task."""
+        task_id = request["params"]["task_id"]
+        task = await self.storage.load_task(task_id)
+
+        if task is None:
+            return self.error_response_creator(
+                PauseTaskResponse, request["id"], TaskNotFoundError, "Task not found"
+            )
+
+        # Check if task is in a pausable state
+        current_state = task["status"]["state"]
+        # Pausable states: working, input-required, auth-required
+        # We allow pausing in these states.
+        # Check against app_settings if needed, but logic is:
+        # If it's in terminal state, can't pause.
+        # If it's already paused, return success or error (idempotent preferable, but user might want error).
+
+        if current_state in app_settings.agent.terminal_states:
+            return self.error_response_creator(
+                PauseTaskResponse,
+                request["id"],
+                TaskNotCancelableError,
+                f"Task cannot be paused in '{current_state}' state. ",
+            )
+
+        if current_state == "paused":
+            # Already paused, just return the task
+            return PauseTaskResponse(jsonrpc="2.0", id=request["id"], result=task)
+
+        # Execute pause via scheduler (which calls worker)
+        # Note: scheduler must have pause_task method.
+        # Assuming scheduler propagates to worker.
+        await self.scheduler.pause_task(request["params"])
+
+        # Reload task to get updated state
+        task = await self.storage.load_task(task_id)
+        return PauseTaskResponse(jsonrpc="2.0", id=request["id"], result=task)
+
+    @trace_task_operation("resume_task")
+    async def resume_task(self, request: ResumeTaskRequest) -> ResumeTaskResponse:
+        """Resume a paused task."""
+        task_id = request["params"]["task_id"]
+        task = await self.storage.load_task(task_id)
+
+        if task is None:
+            return self.error_response_creator(
+                ResumeTaskResponse, request["id"], TaskNotFoundError, "Task not found"
+            )
+
+        current_state = task["status"]["state"]
+
+        if current_state != "paused":
+            return self.error_response_creator(
+                ResumeTaskResponse,
+                request["id"],
+                TaskNotCancelableError,
+                f"Task cannot be resumed from '{current_state}' state. Only paused tasks can be resumed.",
+            )
+
+        # Execute resume
+        await self.scheduler.resume_task(request["params"])
+
+        task = await self.storage.load_task(task_id)
+        return ResumeTaskResponse(jsonrpc="2.0", id=request["id"], result=task)
 
     @trace_task_operation("list_tasks", include_params=False)
     async def list_tasks(self, request: ListTasksRequest) -> ListTasksResponse:

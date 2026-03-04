@@ -133,7 +133,19 @@ class ManifestWorker(Worker):
         await self._notify_lifecycle(task["id"], task["context_id"], "working", False)
 
         # Step 2: Build conversation history (A2A Protocol)
-        message_history = await self._build_complete_message_history(task)
+        # Check for checkpoint first (Hybrid Checkpoint System)
+        checkpoint = await self.storage.load_checkpoint(task["id"])
+        if checkpoint:
+            message_history, state_snapshot = checkpoint
+            logger.info(
+                f"Loaded checkpoint for task {task['id']} with {len(message_history)} messages"
+            )
+            # Use checkpoint history as authoritative source
+            # Convert to chat format expected by manifest
+            message_history = self.build_message_history(message_history)
+        else:
+            # Fallback to standard reconstruction
+            message_history = await self._build_complete_message_history(task)
 
         try:
             # Step 3: Execute manifest with system prompt (if enabled)
