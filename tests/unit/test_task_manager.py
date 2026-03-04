@@ -12,8 +12,10 @@ from bindu.common.protocol.types import (
     GetTaskRequest,
     ListContextsRequest,
     ListTasksRequest,
+    ResubscribeTaskRequest,
     TaskFeedbackRequest,
 )
+from bindu.settings import app_settings
 from bindu.server.scheduler.memory_scheduler import InMemoryScheduler
 from bindu.server.storage.memory_storage import InMemoryStorage
 from bindu.server.task_manager import TaskManager
@@ -431,6 +433,49 @@ async def test_task_manager_lifecycle():
     uninitialized_tm = TaskManager(scheduler=scheduler, storage=storage, manifest=None)
     with pytest.raises(RuntimeError, match="TaskManager was not properly initialized"):
         await uninitialized_tm.__aexit__(None, None, None)
+
+
+def test_agent_method_handlers_include_realtime_routes():
+    """Agent method handlers include realtime and push notification RPC routes."""
+    method_handlers = app_settings.agent.method_handlers
+
+    assert method_handlers["message/stream"] == "stream_message"
+    assert method_handlers["tasks/resubscribe"] == "resubscribe_task"
+    assert method_handlers["tasks/pushNotification/set"] == "set_task_push_notification"
+    assert method_handlers["tasks/pushNotification/get"] == "get_task_push_notification"
+    assert (
+        method_handlers["tasks/pushNotificationConfig/list"]
+        == "list_task_push_notifications"
+    )
+    assert (
+        method_handlers["tasks/pushNotificationConfig/delete"]
+        == "delete_task_push_notification"
+    )
+
+
+@pytest.mark.asyncio
+async def test_resubscribe_non_terminal_task():
+    """TaskManager delegates resubscribe_task and returns non-terminal task."""
+    storage = InMemoryStorage()
+    async with InMemoryScheduler() as scheduler:
+        async with TaskManager(
+            scheduler=scheduler, storage=storage, manifest=None
+        ) as tm:
+            message = create_test_message(text="resubscribe")
+            await storage.submit_task(message["context_id"], message)
+
+            request: ResubscribeTaskRequest = {
+                "jsonrpc": "2.0",
+                "id": uuid4(),
+                "method": "tasks/resubscribe",
+                "params": {
+                    "task_id": message["task_id"],
+                },
+            }
+
+            response = await tm.resubscribe_task(request)
+            assert_jsonrpc_success(response)
+            assert response["result"]["id"] == message["task_id"]
 
 
 @pytest.mark.asyncio
