@@ -7,7 +7,8 @@ Example agents demonstrating Bindu's capabilities - from simple bots to multi-ag
 ### Prerequisites
 - Python 3.12+
 - uv package manager
-- OpenRouter API key
+- OpenRouter API key (required for cloud-model examples)
+- Ollama (optional, for local examples like `news-summarizer/`)
 
 ### Setup
 
@@ -16,6 +17,12 @@ git clone https://github.com/getbindu/bindu.git
 cd bindu
 uv sync --dev --extra agents
 export OPENROUTER_API_KEY="your-key-here"  # pragma: allowlist secret
+```
+
+For fully local Ollama examples (no API key), pull a local model:
+
+```bash
+ollama pull llama3
 ```
 
 ### Run an Agent
@@ -38,6 +45,7 @@ Agents run on ports 3773-3780 with UI at `http://localhost:[port]/docs`
 
 ### Specialized
 - `summarizer/` - Text summarization agent
+- `openrouter-meeting-brief/` - OpenRouter meeting-brief agent with structured action extraction
 - `weather-research/` - Weather intelligence agent
 - `premium-advisor/` - Paid agent with X402 payments (0.01 USDC per query)
 
@@ -52,9 +60,11 @@ Agents run on ports 3773-3780 with UI at `http://localhost:[port]/docs`
 
 ```bash
 # Required
-OPENROUTER_API_KEY=sk-or-v1-your-api-key-here
+OPENROUTER_API_KEY=sk-or-v1-your-api-key-here  # Required for OpenRouter-based examples
 
 # Optional
+OLLAMA_HOST=http://localhost:11434
+OLLAMA_MODEL=llama3
 HYDRA__ADMIN_URL=https://hydra-admin.getbindu.com
 HYDRA__PUBLIC_URL=https://hydra.getbindu.com
 DATABASE_URL=postgresql+asyncpg://user:pass@host/db  # pragma: allowlist secret
