@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<title>Aurora Agent Control Center</title>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+
+body{
+margin:0;
+font-family:Segoe UI,Roboto,sans-serif;
+background:#020617;
+color:white;
+}
+
+header{
+background:#020617;
+padding:20px;
+border-bottom:1px solid #1e293b;
+display:flex;
+justify-content:space-between;
+align-items:center;
+}
+
+.logo{
+font-size:22px;
+font-weight:bold;
+color:#38bdf8;
+}
+
+.subtitle{
+color:#94a3b8;
+font-size:14px;
+}
+
+.container{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:20px;
+padding:20px;
+}
+
+.card{
+background:#0f172a;
+border-radius:12px;
+padding:20px;
+box-shadow:0 8px 30px rgba(0,0,0,0.4);
+}
+
+.card h2{
+margin-top:0;
+color:#38bdf8;
+}
+
+textarea{
+width:100%;
+height:90px;
+background:#020617;
+border:1px solid #1e293b;
+border-radius:8px;
+color:white;
+padding:10px;
+resize:none;
+}
+
+button{
+padding:10px 16px;
+border-radius:8px;
+border:none;
+background:#38bdf8;
+color:black;
+font-weight:bold;
+cursor:pointer;
+margin-top:10px;
+transition:0.2s;
+}
+
+button:hover{
+background:#0ea5e9;
+transform:scale(1.05);
+}
+
+.result{
+margin-top:15px;
+background:#020617;
+border-radius:8px;
+padding:10px;
+}
+
+.pipeline{
+color:#22c55e;
+font-weight:bold;
+}
+
+.agent-card{
+background:#020617;
+padding:12px;
+border-radius:8px;
+margin-top:10px;
+border-left:4px solid #38bdf8;
+}
+
+.agent-name{
+font-weight:bold;
+color:#38bdf8;
+}
+
+.badge{
+background:#22c55e;
+color:black;
+padding:2px 8px;
+border-radius:6px;
+font-size:12px;
+}
+
+.footer{
+text-align:center;
+padding:20px;
+color:#64748b;
+}
+
+.graph{
+margin-top:10px;
+font-family:monospace;
+color:#22c55e;
+}
+
+.task-history{
+max-height:200px;
+overflow:auto;
+margin-top:10px;
+}
+
+.history-item{
+background:#020617;
+padding:8px;
+border-radius:6px;
+margin-bottom:6px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<header>
+
+<div>
+<div class="logo">Aurora AI</div>
+<div class="subtitle">Autonomous Agent Orchestration Platform</div>
+</div>
+
+<div>
+<button onclick="loadAgents()">Refresh Agents</button>
+</div>
+
+</header>
+
+<div class="container">
+
+<div class="card">
+
+<h2>Run Task</h2>
+
+<textarea id="taskInput" placeholder="Example: research and finance analysis of tesla earnings"></textarea>
+
+<button onclick="runTask()">Execute Pipeline</button>
+
+<div class="result" id="taskResult"></div>
+
+<div class="graph" id="pipelineGraph"></div>
+
+</div>
+
+
+<div class="card">
+
+<h2>Registered Agents</h2>
+
+<div id="agentsList"></div>
+
+</div>
+
+
+<div class="card">
+
+<h2>Task History</h2>
+
+<div class="task-history" id="history"></div>
+
+</div>
+
+
+<div class="card">
+
+<h2>System Info</h2>
+
+<p>Status: <span class="badge">ONLINE</span></p>
+
+<p>Agents: <span id="agentCount">0</span></p>
+
+<p>Framework: Aurora Multi-Agent Engine</p>
+
+</div>
+
+</div>
+
+<div class="footer">
+
+Aurora AI Platform • Multi-Agent Task Orchestration
+
+</div>
+
+<script>
+
+let historyList=[]
+
+async function runTask(){
+
+const taskText=document.getElementById("taskInput").value
+
+if(taskText.length==0){
+alert("Enter a task")
+return
+}
+
+const response=await fetch("http://127.0.0.1:8000/create_task",{
+
+method:"POST",
+
+headers:{
+"Content-Type":"application/json"
+},
+
+body:JSON.stringify({
+task_id:"web_task",
+description:taskText
+})
+
+})
+
+const data=await response.json()
+
+document.getElementById("taskResult").innerHTML=`
+
+<b>Selected Agent:</b> ${data.selected_agent.agent}<br>
+<b>Reputation:</b> ${data.selected_agent.reputation}<br>
+<b>Score:</b> ${data.selected_agent.score}<br><br>
+<b>Result:</b><br>${data.result}
+
+`
+
+document.getElementById("pipelineGraph").innerHTML=
+
+"Pipeline → "+data.pipeline.join(" → ")
+
+historyList.unshift(taskText)
+
+renderHistory()
+
+}
+
+function renderHistory(){
+
+let html=""
+
+historyList.forEach(t=>{
+
+html+=`<div class="history-item">${t}</div>`
+
+})
+
+document.getElementById("history").innerHTML=html
+
+}
+
+async function loadAgents(){
+
+const response=await fetch("http://127.0.0.1:8000/agents")
+
+const data=await response.json()
+
+let html=""
+
+let count=0
+
+for(let agent in data){
+
+count++
+
+html+=`
+
+<div class="agent-card">
+
+<div class="agent-name">${agent}</div>
+
+Capability: ${data[agent].capability}<br>
+
+Reputation: ${data[agent].reputation}
+
+</div>
+
+`
+
+}
+
+document.getElementById("agentsList").innerHTML=html
+
+document.getElementById("agentCount").innerText=count
+
+}
+
+loadAgents()
+
+</script>
+
+</body>
+</html>
