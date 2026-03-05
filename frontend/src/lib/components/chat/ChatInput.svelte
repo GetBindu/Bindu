@@ -2,8 +2,6 @@
 	import { onMount, tick } from "svelte";
 
 	import { afterNavigate } from "$app/navigation";
-
-	import { DropdownMenu } from "bits-ui";
 	import IconPlus from "~icons/lucide/plus";
 	import CarbonImage from "~icons/carbon/image";
 	import CarbonDocument from "~icons/carbon/document";
@@ -17,6 +15,7 @@
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
 	import { requireAuthUser } from "$lib/utils/auth";
 	import { page } from "$app/state";
+	import { error } from "$lib/stores/errors";
 
 	interface Props {
 		files?: File[];
@@ -56,6 +55,14 @@
 		const target = e.target as HTMLInputElement;
 		const selected = Array.from(target.files ?? []);
 		if (selected.length === 0) return;
+
+		// Check for size limit (10MB)
+		if (selected.some((f) => f.size > 10 * 1024 * 1024)) {
+			error.set("One or more files are too big (10MB max)");
+			target.value = "";
+			return;
+		}
+
 		files = [...files, ...selected];
 		await tick();
 		void focusTextarea();
@@ -69,12 +76,39 @@
 	let isUrlModalOpen = $state(false);
 	let isDropdownOpen = $state(false);
 
+	function clickOutside(node: HTMLElement, callback: () => void) {
+		const handleClick = (event: MouseEvent) => {
+			if (node && !node.contains(event.target as Node) && !event.defaultPrevented) {
+				callback();
+			}
+		};
+
+		document.addEventListener("click", handleClick, true);
+
+		return {
+			destroy() {
+				document.removeEventListener("click", handleClick, true);
+			},
+		};
+	}
+
 	function openPickerWithAccept(accept: string) {
 		if (!fileInputEl) return;
-		const allAccept = mimeTypes.join(",");
-		fileInputEl.setAttribute("accept", accept);
+		if (accept === "*/*" || accept === "*") {
+			fileInputEl.removeAttribute("accept");
+		} else {
+			fileInputEl.setAttribute("accept", accept);
+		}
 		fileInputEl.click();
-		queueMicrotask(() => fileInputEl?.setAttribute("accept", allAccept));
+		// Reset to default after a short delay
+		const allAccept = mimeTypes.join(",");
+		queueMicrotask(() => {
+			if (allAccept === "*/*" || allAccept === "*") {
+				fileInputEl?.removeAttribute("accept");
+			} else {
+				fileInputEl?.setAttribute("accept", allAccept);
+			}
+		});
 	}
 
 	function openFilePickerText() {
@@ -237,88 +271,88 @@
 						multiple
 						onchange={onFileChange}
 						onclick={(e) => {
+							console.log("Input clicked. requireAuthUser:", requireAuthUser(), "loading:", loading);
 							if (requireAuthUser()) {
+								console.error("Auth required, preventing default");
 								e.preventDefault();
 							}
 						}}
-						accept={mimeTypes.join(",")}
+						accept={mimeTypes.includes("*/*") ? "" : mimeTypes.join(",")}
 					/>
 
-					<DropdownMenu.Root
-						bind:open={isDropdownOpen}
-						onOpenChange={(open) => {
-							if (open && requireAuthUser()) {
-								isDropdownOpen = false;
-								return;
-							}
-							isDropdownOpen = open;
-						}}
-					>
-						<DropdownMenu.Trigger
-							class="btn size-8 rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner dark:border-transparent dark:bg-gray-600/50 dark:text-white dark:hover:enabled:bg-gray-600 sm:size-7"
+					<div class="relative" use:clickOutside={() => (isDropdownOpen = false)}>
+						<button
+							class="btn size-8 rounded-full border bg-white p-0 text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner disabled:opacity-50 dark:border-transparent dark:bg-gray-600/50 dark:text-white dark:hover:enabled:bg-gray-600 sm:size-7 flex items-center justify-center"
 							disabled={loading}
 							aria-label="Add attachment"
+							onclick={() => (isDropdownOpen = !isDropdownOpen)}
 						>
 							<IconPlus class="text-base sm:text-sm" />
-						</DropdownMenu.Trigger>
-						<DropdownMenu.Portal>
-							<DropdownMenu.Content
-								class="z-50 rounded-xl border border-gray-200 bg-white/95 p-1 text-gray-800 shadow-lg backdrop-blur dark:border-gray-700/60 dark:bg-gray-800/95 dark:text-gray-100"
-								side="top"
-								sideOffset={8}
-								align="start"
-								trapFocus={false}
-								onCloseAutoFocus={(e) => e.preventDefault()}
-								interactOutsideBehavior="defer-otherwise-close"
-							>
-								{#if modelIsMultimodal}
-									<DropdownMenu.Item
-										class="flex h-9 select-none items-center gap-1 rounded-md px-2 text-sm text-gray-700 data-[highlighted]:bg-gray-100 focus-visible:outline-none dark:text-gray-200 dark:data-[highlighted]:bg-white/10 sm:h-8"
-										onSelect={() => openFilePickerImage()}
-									>
-										<CarbonImage class="size-4 opacity-90 dark:opacity-80" />
-										Add image(s)
-									</DropdownMenu.Item>
-								{/if}
+						</button>
 
-								<DropdownMenu.Sub>
-									<DropdownMenu.SubTrigger
-										class="flex h-9 select-none items-center gap-1 rounded-md px-2 text-sm text-gray-700 data-[highlighted]:bg-gray-100 data-[state=open]:bg-gray-100 focus-visible:outline-none dark:text-gray-200 dark:data-[highlighted]:bg-white/10 dark:data-[state=open]:bg-white/10 sm:h-8"
+						{#if isDropdownOpen}
+							<div
+								class="absolute bottom-full left-0 mb-2 z-50 w-48 rounded-xl border border-gray-200 bg-white/95 p-1 text-gray-800 shadow-lg backdrop-blur dark:border-gray-700/60 dark:bg-gray-800/95 dark:text-gray-100"
+							>
+								{#if mimeTypes.includes("*/*")}
+									<button
+										class="flex w-full select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/10"
+										onclick={() => {
+											openPickerWithAccept("*/*");
+											isDropdownOpen = false;
+										}}
 									>
-										<div class="flex items-center gap-1">
-											<CarbonDocument class="size-4 opacity-90 dark:opacity-80" />
-											Add text file
-										</div>
-										<div class="ml-auto flex items-center">
-											<CarbonChevronRight class="size-4 opacity-70 dark:opacity-80" />
-										</div>
-									</DropdownMenu.SubTrigger>
-									<DropdownMenu.SubContent
-										class="z-50 rounded-xl border border-gray-200 bg-white/95 p-1 text-gray-800 shadow-lg backdrop-blur dark:border-gray-700/60 dark:bg-gray-800/95 dark:text-gray-100"
-										sideOffset={10}
-										trapFocus={false}
-										onCloseAutoFocus={(e) => e.preventDefault()}
-										interactOutsideBehavior="defer-otherwise-close"
+										<CarbonUpload class="size-4 opacity-90 dark:opacity-80" />
+										Upload file <span class="text-[10px] opacity-70 ml-auto">(10MB max)</span>
+									</button>
+									<button
+										class="flex w-full select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/10"
+										onclick={() => {
+											isUrlModalOpen = true;
+											isDropdownOpen = false;
+										}}
 									>
-										<DropdownMenu.Item
-											class="flex h-9 select-none items-center gap-1 rounded-md px-2 text-sm text-gray-700 data-[highlighted]:bg-gray-100 focus-visible:outline-none dark:text-gray-200 dark:data-[highlighted]:bg-white/10 sm:h-8"
-											onSelect={() => openFilePickerText()}
+										<CarbonLink class="size-4 opacity-90 dark:opacity-80" />
+										Fetch from URL
+									</button>
+								{:else}
+									{#if modelIsMultimodal}
+										<button
+											class="flex w-full select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/10"
+											onclick={() => {
+												openFilePickerImage();
+												isDropdownOpen = false;
+											}}
 										>
-											<CarbonUpload class="size-4 opacity-90 dark:opacity-80" />
-											Upload from device
-										</DropdownMenu.Item>
-										<DropdownMenu.Item
-											class="flex h-9 select-none items-center gap-1 rounded-md px-2 text-sm text-gray-700 data-[highlighted]:bg-gray-100 focus-visible:outline-none dark:text-gray-200 dark:data-[highlighted]:bg-white/10 sm:h-8"
-											onSelect={() => (isUrlModalOpen = true)}
-										>
-											<CarbonLink class="size-4 opacity-90 dark:opacity-80" />
-											Fetch from URL
-										</DropdownMenu.Item>
-									</DropdownMenu.SubContent>
-								</DropdownMenu.Sub>
-							</DropdownMenu.Content>
-						</DropdownMenu.Portal>
-					</DropdownMenu.Root>
+											<CarbonImage class="size-4 opacity-90 dark:opacity-80" />
+											Add image(s) <span class="text-[10px] opacity-70 ml-auto">(10MB max)</span>
+										</button>
+									{/if}
+
+									<button
+										class="flex w-full select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/10"
+										onclick={() => {
+											openFilePickerText();
+											isDropdownOpen = false;
+										}}
+									>
+										<CarbonDocument class="size-4 opacity-90 dark:opacity-80" />
+										Add text file <span class="text-[10px] opacity-70 ml-auto">(10MB max)</span>
+									</button>
+									<button
+										class="flex w-full select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-white/10"
+										onclick={() => {
+											isUrlModalOpen = true;
+											isDropdownOpen = false;
+										}}
+									>
+										<CarbonLink class="size-4 opacity-90 dark:opacity-80" />
+										Fetch from URL <span class="text-[10px] opacity-70 ml-auto">(10MB max)</span>
+									</button>
+								{/if}
+							</div>
+						{/if}
+					</div>
 				</div>
 			{/if}
 		</div>

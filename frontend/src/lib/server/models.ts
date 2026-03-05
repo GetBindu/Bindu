@@ -159,13 +159,13 @@ const fetchBinduAgent = async (): Promise<ModelConfig> => {
 		isRouter: false,
 		endpoints: binduBaseUrl
 			? [
-					{
-						type: "bindu" as const,
-						baseURL: binduBaseUrl,
-						apiKey: binduApiKey,
-						streamingSupported: true,
-					},
-			  ]
+				{
+					type: "bindu" as const,
+					baseURL: binduBaseUrl,
+					apiKey: binduApiKey,
+					streamingSupported: true,
+				},
+			]
 			: undefined,
 	};
 

@@ -55,9 +55,10 @@ def transcribe_audio(file_path: str) -> str:
                 "content": [
                     {"type": "text", "text": "Transcribe this audio file accurately and completely."},
                     {
-                        "type": "image_url", # OpenRouter uses image_url structure for multimodal blobs
-                        "image_url": {
-                            "url": f"data:{mime_type};base64,{audio_data}"
+                        "type": "input_audio",
+                        "input_audio": {
+                            "data": audio_data,
+                            "format": ext.strip(".") if ext else "wav"
                         }
                     }
                 ]
@@ -104,11 +105,52 @@ def handler(messages: list[dict[str, str]]) -> Any:
 
     Signature required by Bindu: (messages: list[dict[str, str]]) -> Any
     """
-    # Extract the user's message text
-    user_query = messages[-1].get("content", "")
+    # Extract the user's message
+    if not messages:
+        return "No messages received."
+
+    last_message = messages[-1]
+    content = last_message.get("content", "")
+
+    user_query = ""
+    temp_file_path = None
+
+    if isinstance(content, str):
+        user_query = content
+    elif isinstance(content, list):
+        # Handle multimodal content (text + files)
+        for part in content:
+            if part.get("type") == "text":
+                user_query += part.get("text", "") + " "
+            elif part.get("type") == "image_url":
+                # Extract file data (MessageConverter maps all files to image_url)
+                url = part.get("image_url", {}).get("url", "")
+                if url.startswith("data:"):
+                    try:
+                        header, encoded = url.split("base64,", 1)
+                        mime_type = header.split(":")[1].split(";")[0]
+                        file_ext = ".bin"
+                        if "audio/wav" in mime_type: file_ext = ".wav"
+                        elif "audio/mpeg" in mime_type: file_ext = ".mp3"
+                        elif "audio/ogg" in mime_type: file_ext = ".ogg"
+                        elif "audio/mp4" in mime_type: file_ext = ".m4a"
+                        
+                        # Save to temp file
+                        import tempfile
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as f:
+                            f.write(base64.b64decode(encoded))
+                            temp_file_path = f.name
+                        
+                        user_query += f"\n\nUser uploaded an audio file: {temp_file_path}. Please use the transcribe_audio tool to process this specific file."
+                    except Exception as e:
+                        user_query += f"\n\nError processing attachment: {str(e)}"
 
     # Run the Agno agent
     result = agent.run(user_query)
+    
+    # Cleanup temp file if needed (optional, or rely on OS/restart)
+    # if temp_file_path and os.path.exists(temp_file_path):
+    #    os.unlink(temp_file_path)
 
     # Return the content string as required by the protocol
     return result.content

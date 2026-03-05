@@ -12,6 +12,7 @@
 	import FileDropzone from "./FileDropzone.svelte";
 	import RetryBtn from "../RetryBtn.svelte";
 	import file2base64 from "$lib/utils/file2base64";
+	import { uploadFile } from "$lib/utils/uploadFileClient";
 	import { base } from "$app/paths";
 	import ChatMessage from "./ChatMessage.svelte";
 	import ScrollToBottomBtn from "../ScrollToBottomBtn.svelte";
@@ -95,8 +96,39 @@
 	);
 	let isTouchDevice = $derived(browser && navigator.maxTouchPoints > 0);
 
+	let fileStatuses = $state(new Map<File, { loading: boolean; error?: string; progress?: number }>());
+
+	$effect(() => {
+		for (const file of files) {
+			if (!fileStatuses.has(file) && !(file as any).hash) {
+				upload(file);
+			}
+		}
+	});
+
+	async function upload(file: File) {
+		fileStatuses.set(file, { loading: true });
+		// Trigger reactivity
+		fileStatuses = new Map(fileStatuses);
+
+		try {
+			const res = await uploadFile(file, page.params.id ?? "temp", (progress) => {
+				fileStatuses.set(file, { loading: true, progress });
+				fileStatuses = new Map(fileStatuses);
+			});
+			(file as any).hash = res.value;
+			fileStatuses.set(file, { loading: false, progress: 100 });
+		} catch (e) {
+			console.error(e);
+			fileStatuses.set(file, { loading: false, error: "Upload failed" });
+		}
+		fileStatuses = new Map(fileStatuses);
+	}
+
+	let isUploading = $derived(Array.from(fileStatuses.values()).some((s) => s.loading));
+
 	const handleSubmit = () => {
-		if (requireAuthUser() || loading || !draft) return;
+		if (requireAuthUser() || loading || !draft || isUploading) return;
 		onmessage?.(draft);
 		draft = "";
 	};
@@ -142,6 +174,12 @@
 
 			// filter based on activeMimeTypes, including wildcards
 			const filteredFiles = pastedFiles.filter((file) => {
+				// Check for size limit (10MB)
+				if (file.size > 10 * 1024 * 1024) {
+					error.set(`File "${file.name}" is too big (10MB max)`);
+					return false;
+				}
+
 				return activeMimeTypes.some((mimeType: string) => {
 					const [type, subtype] = mimeType.split("/");
 					const [fileType, fileSubtype] = file.type.split("/");
@@ -263,16 +301,7 @@
 	// Always allow common text-like files; add images only when model is multimodal
 	import { TEXT_MIME_ALLOWLIST, IMAGE_MIME_ALLOWLIST_DEFAULT } from "$lib/constants/mime";
 
-	let activeMimeTypes = $derived(
-		Array.from(
-			new Set([
-				...TEXT_MIME_ALLOWLIST,
-				...(modelIsMultimodal
-					? (currentModel.multimodalAcceptedMimetypes ?? [...IMAGE_MIME_ALLOWLIST_DEFAULT])
-					: []),
-			])
-		)
-	);
+	let activeMimeTypes = ["*/*"];
 	let isFileUploadEnabled = $derived(activeMimeTypes.length > 0);
 	let focused = $state(false);
 
@@ -434,6 +463,9 @@
 					{#await source then src}
 						<UploadedFile
 							file={src}
+							progress={fileStatuses.get(files[index])?.progress}
+							loading={fileStatuses.get(files[index])?.loading}
+							error={fileStatuses.get(files[index])?.error}
 							onclose={() => {
 								files = files.filter((_, i) => i !== index);
 							}}
@@ -500,7 +532,7 @@
 								mimeTypes={activeMimeTypes}
 								onsubmit={handleSubmit}
 								{onPaste}
-								disabled={isReadOnly || lastIsError}
+								disabled={isReadOnly || lastIsError || isUploading}
 								{modelIsMultimodal}
 								{modelSupportsTools}
 								bind:focused

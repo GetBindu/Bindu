@@ -16,6 +16,7 @@ export interface TextPart {
 
 export interface FilePart {
 	kind: "file";
+	text: string;
 	file: {
 		name?: string;
 		mimeType?: string;
@@ -26,6 +27,7 @@ export interface FilePart {
 
 export interface DataPart {
 	kind: "data";
+	text: string;
 	data: Record<string, unknown>;
 }
 
