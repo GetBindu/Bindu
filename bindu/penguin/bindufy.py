@@ -54,6 +54,15 @@ def _parse_deployment_url(
 ) -> tuple[str, int]:
     """Parse deployment URL to extract host and port.
 
+    Environment variable overrides (highest priority):
+        BINDU_HOST: Override the host (e.g., "0.0.0.0")
+        BINDU_PORT: Override the port (e.g., "8080")
+
+    Priority order:
+        1. BINDU_HOST / BINDU_PORT environment variables
+        2. deployment_config URL
+        3. app_settings defaults
+
     Args:
         deployment_config: Deployment configuration object
 
@@ -61,11 +70,29 @@ def _parse_deployment_url(
         Tuple of (host, port)
     """
     if not deployment_config:
-        return app_settings.network.default_host, app_settings.network.default_port
+        host = app_settings.network.default_host
+        port = app_settings.network.default_port
+    else:
+        parsed_url = urlparse(deployment_config.url)
+        host = parsed_url.hostname or app_settings.network.default_host
+        port = parsed_url.port or app_settings.network.default_port
 
-    parsed_url = urlparse(deployment_config.url)
-    host = parsed_url.hostname or app_settings.network.default_host
-    port = parsed_url.port or app_settings.network.default_port
+    # Environment variable overrides (highest priority)
+    env_host = os.environ.get("BINDU_HOST")
+    env_port = os.environ.get("BINDU_PORT")
+
+    if env_host:
+        host = env_host
+        logger.info(f"Using BINDU_HOST override: {host}")
+
+    if env_port:
+        try:
+            port = int(env_port)
+            logger.info(f"Using BINDU_PORT override: {port}")
+        except ValueError:
+            logger.warning(
+                f"Invalid BINDU_PORT value '{env_port}', using default: {port}"
+            )
 
     return host, port
 
