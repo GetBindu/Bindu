@@ -113,6 +113,9 @@ class MessageHandlers:
     @staticmethod
     def _sse_event(payload: dict[str, Any]) -> str:
         """Serialize an SSE event payload."""
+        if not payload:
+             return ""
+
         return f"data: {json.dumps(MessageHandlers._to_jsonable(payload))}\n\n"
 
     @trace_task_operation("send_message")
@@ -243,7 +246,9 @@ class MessageHandlers:
                 return
             except Exception as e:
                 logger.error(
-                    f"Unhandled stream error for task {task['id']}: {e}", exc_info=True
+                     "Unhandled stream error",
+                      extra = {task['id': str(task["id"])]},
+                      exc_info = True,
                 )
                 timestamp = datetime.now(timezone.utc).isoformat()
                 current_state = "failed"
