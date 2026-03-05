@@ -208,7 +208,28 @@ async def test_send_message_payment_context_injected_and_stripped_flow():
     # Core assertion: endpoint injection must not leak to storage
     assert "_payment_context" not in stored_metadata
 
+@pytest.mark.asyncio
+async def test_send_message_invalid_metadata_type_handled():
+    """
+    If metadata is not a dict, the handler should not crash and should normalize metadata safely.
+    """
+    storage = InMemoryStorage()
+    handlers = _make_handlers(storage)
 
+    message = create_test_message(
+        text = "invalid metadata",
+        metadata = "this_should_be_a_dict"
+    )
+    request = _send_request(message)
+
+    response = await handlers.send_message(request)
+    assert_jsonrpc_success(response)
+
+    stored_task = await storage.load_task(response["result"]["id"])
+    stored_metadata = (stored_task["history"] or [{}])[-1].get("metadata", {})
+    #Metadata should be normalized to a dictionary
+    assert isinstance(stored_metadata, dict) 
+    
 @pytest.mark.asyncio
 async def test_send_message_queues_task_to_scheduler():
     """send_message calls scheduler.run_task exactly once per request."""

@@ -77,13 +77,24 @@ class MessageHandlers:
                 task["id"], push_config, persist=is_long_running
             )
 
-        message_metadata = message.get("metadata", {})
-        if (
-            isinstance(message_metadata, dict)
-            and "_payment_context" in message_metadata
-        ):
+        message_metadata = message.get("metadata")
+        # Normalize metadata to a dictionary
+        if message_metadata is None:
+            message_metadata = {}
+            message["metadata"] = message_metadata
+
+        elif not isinstance(message_metadata, dict):    
+            logger.warning(
+                "Invalid metadata type received in message",
+                extra={"type": type(message_metadata).__name__}
+            )
+            message["metadata"] = {}
+            message_metadata = message["metadata"]
+
+        if "_payment_context" in message_metadata:
             scheduler_params["payment_context"] = message_metadata["_payment_context"]
             del message_metadata["_payment_context"]
+
 
         await self.scheduler.run_task(scheduler_params)
         return task, context_id
