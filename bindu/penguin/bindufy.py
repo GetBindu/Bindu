@@ -85,11 +85,18 @@ def _create_deployment_config(
     if not deploy_dict:
         return None
 
-    if "url" not in deploy_dict or "expose" not in deploy_dict:
-        logger.warning(
-            "Deployment config missing required fields (url, expose), using defaults"
-        )
-        return None
+    missing = []
+    
+    if "url" not in deploy_dict:
+        missing.append("deployment.url")
+        
+    if "expose" not in deploy_dict:
+        missing.append("deployment.expose")    
+        
+    if missing:
+        raise ValueError(
+            f"Missing required config field(s): {', '.join(missing)}"
+        )    
 
     return DeploymentConfig(
         url=deploy_dict["url"],
