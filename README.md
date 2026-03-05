@@ -510,10 +510,11 @@ Want integration with your favorite framework? [Let us know on Discord](https://
 
 ## 🧪 Testing
 
-Bindu maintains **64%+ test coverage**:
+Bindu maintains **70%+ test coverage** (target: 80%+):
 
 ```bash
-uv run pytest -n auto --cov=bindu --cov-report= && coverage report --skip-covered --fail-under=64
+uv run pytest -n auto --cov=bindu --cov-report=term-missing
+uv run coverage report --skip-covered --fail-under=70
 ```
 
 ---

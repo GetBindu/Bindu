@@ -331,7 +331,7 @@ New to open source? We're here to help!
 
 ## License
 
-By contributing to Bindu, you agree that your contributions will be licensed under the [MIT License](../LICENSE).
+By contributing to Bindu, you agree that your contributions will be licensed under the [Apache License 2.0](../LICENSE.md).
 
 ---
 
