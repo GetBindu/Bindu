@@ -77,13 +77,24 @@ class MessageHandlers:
                 task["id"], push_config, persist=is_long_running
             )
 
-        message_metadata = message.get("metadata", {})
-        if (
-            isinstance(message_metadata, dict)
-            and "_payment_context" in message_metadata
-        ):
+        message_metadata = message.get("metadata")
+        # Normalize metadata to a dictionary
+        if message_metadata is None:
+            message_metadata = {}
+            message["metadata"] = message_metadata
+
+        elif not isinstance(message_metadata, dict):    
+            logger.warning(
+                "Invalid metadata type received in message",
+                extra={"type": type(message_metadata).__name__}
+            )
+            message["metadata"] = {}
+            message_metadata = message["metadata"]
+
+        if "_payment_context" in message_metadata:
             scheduler_params["payment_context"] = message_metadata["_payment_context"]
             del message_metadata["_payment_context"]
+
 
         await self.scheduler.run_task(scheduler_params)
         return task, context_id
@@ -102,6 +113,9 @@ class MessageHandlers:
     @staticmethod
     def _sse_event(payload: dict[str, Any]) -> str:
         """Serialize an SSE event payload."""
+        if not payload:
+             return ""
+
         return f"data: {json.dumps(MessageHandlers._to_jsonable(payload))}\n\n"
 
     @trace_task_operation("send_message")
@@ -232,7 +246,9 @@ class MessageHandlers:
                 return
             except Exception as e:
                 logger.error(
-                    f"Unhandled stream error for task {task['id']}: {e}", exc_info=True
+                     "Unhandled stream error",
+                      extra = {task['id': str(task["id"])]},
+                      exc_info = True,
                 )
                 timestamp = datetime.now(timezone.utc).isoformat()
                 current_state = "failed"
