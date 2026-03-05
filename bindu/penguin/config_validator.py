@@ -201,9 +201,7 @@ class ConfigValidator:
                 return
 
             # Any other type is invalid
-            raise ValueError(
-                "Field 'execution_cost' must be a dict or a list of dicts"
-            )
+            raise ValueError("Field 'execution_cost' must be a dict or a list of dicts")
 
     # ------------------------------------------------------------------
     # Auth validation

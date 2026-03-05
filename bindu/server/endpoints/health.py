@@ -67,23 +67,19 @@ async def health_endpoint(app: BinduApplication, request: Request) -> JSONRespon
         "ready": True,
         "uptime_seconds": uptime,
         "version": __version__,
-
         # Observability extension
         "health": "healthy" if strict_ready else "degraded",
         "response_time_ms": response_time_ms,
-
         "runtime": {
             "storage_backend": storage_type,
             "scheduler_backend": scheduler_type,
             "task_manager_running": task_manager_running,
             "strict_ready": strict_ready,
         },
-
         "application": {
             "penguin_id": str(app.penguin_id),
             "agent_did": agent_did,
         },
-
         "system": {
             "python_version": sys.version.split()[0],
             "platform": platform.system(),

@@ -14,33 +14,42 @@ from types import SimpleNamespace
 from typing import cast
 
 import pytest
+from starlette.requests import Request
 
 from bindu.server.applications import BinduApplication
 from bindu.server.endpoints.negotiation import negotiation_endpoint
 
 
-def _make_request(body: dict, headers: dict | None = None) -> object:
+def _make_request(body: dict, headers: dict | None = None) -> Request:
     """Create a minimal mock request object with JSON body.
 
     The returned object includes a `state` attribute so tests can inject
     authentication info if needed.
     """
-    raw_headers = []
-    for k, v in (headers or {}).items():
-        raw_headers.append((k.lower().encode("latin-1"), v.encode("latin-1")))
+    body_bytes = json.dumps(body).encode("utf-8")
 
-    # Create async json() method
-    async def json_method():
-        return body
+    # Initialize sent flag before async function
+    sent_flag = {"value": False}
 
-    request = SimpleNamespace(
-        url=SimpleNamespace(path="/agent/negotiation"),
-        headers=headers or {},
-        client=SimpleNamespace(host="127.0.0.1"),
-        json=json_method,
-        state=SimpleNamespace(),
-    )
-    request._headers = raw_headers  # type: ignore
+    async def receive():
+        if sent_flag["value"]:
+            return {"type": "http.disconnect"}
+        sent_flag["value"] = True
+        return {"type": "http.request", "body": body_bytes, "more_body": False}
+
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/agent/negotiation",
+        "query_string": b"",
+        "headers": [
+            (k.lower().encode("latin-1"), v.encode("latin-1"))
+            for k, v in (headers or {}).items()
+        ],
+        "client": ("127.0.0.1", 1234),
+    }
+    request = Request(scope, receive)
+    request.state.user_info = None  # type: ignore
     return request
 
 
@@ -51,11 +60,11 @@ def _make_app_with_manifest(skills: list, x402: dict | None = None) -> object:
     return SimpleNamespace(manifest=manifest, scheduler=None, task_manager=None)
 
 
-
 @pytest.fixture(autouse=True)
 def _disable_auth_settings():
     """Ensure authentication is disabled by default for most tests."""
     from bindu.settings import app_settings
+
     orig_enabled = app_settings.auth.enabled
     orig_require = app_settings.auth.require_permissions
     app_settings.auth.enabled = False
@@ -276,6 +285,7 @@ async def test_negotiation_endpoint_skill_matches():
 # Authentication tests
 # -----------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_negotiation_requires_auth():
     """Verify endpoint rejects requests when authentication is enabled."""
@@ -292,7 +302,8 @@ async def test_negotiation_requires_auth():
     response = await negotiation_endpoint(cast(BinduApplication, app), request)  # type: ignore
     assert response.status_code == 401
     data = json.loads(response.body)
-    assert "Authentication" in data["error"]
+    assert "error" in data
+    assert "Authentication" in data["error"]["message"]
 
     # restore auth state (fixture will do this on teardown)
 
@@ -307,10 +318,10 @@ async def test_negotiation_allows_when_authenticated():
 
     app = _make_app_with_manifest([])
     request = _make_request({"task_summary": "foo"})
-    request.state.user_info = {"scope": ["irrelevant"]}
+    request.state.user_info = {"scope": ["irrelevant"]}  # type: ignore
 
     response = await negotiation_endpoint(cast(BinduApplication, app), request)  # type: ignore
     # since manifest is missing, we expect 500, but not an auth error
     assert response.status_code != 401
-    
+
     # auth state will be reset by fixture

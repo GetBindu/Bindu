@@ -10,6 +10,7 @@ ensuring both authorization (who they are) and payload integrity (has the reques
 
 from __future__ import annotations as _annotations
 
+import asyncio
 import hashlib
 import time
 from typing import Any
@@ -27,6 +28,7 @@ from bindu.utils.did_signature import (
 from .base import AuthMiddleware
 
 logger = get_logger("bindu.server.middleware.hydra")
+
 
 class HydraMiddleware(AuthMiddleware):
     """Hydra-specific authentication middleware with hybrid OAuth2 + DID authentication.
@@ -55,21 +57,21 @@ class HydraMiddleware(AuthMiddleware):
             auth_config: Hydra authentication configuration
         """
         super().__init__(app, auth_config)
-        
+
         # In-memory cache to reduce network roundtrips to the Hydra Admin API.
-        self._introspection_cache = {}  
-        
-        # Per-token asyncio locks. In a highly concurrent async environment, 
-        # this prevents the "Thundering Herd" (Cache Stampede) problem where 
+        self._introspection_cache = {}
+
+        # Per-token asyncio locks. In a highly concurrent async environment,
+        # this prevents the "Thundering Herd" (Cache Stampede) problem where
         # 100 concurrent requests for an expired token trigger 100 network calls.
-        self._cache_locks = {}  
-        
+        self._cache_locks = {}
+
         self._cache_ttl = 300  # 5 minutes cache TTL
-        
+
         # Strict memory boundary for payload signature verification.
         # Prevents Out-Of-Memory (OOM) crashes if a client uploads massive files.
         self._max_body_size = 2 * 1024 * 1024  # 2 MB
-        
+
     def _initialize_provider(self) -> None:
         """Initialize Hydra-specific components and HTTP clients."""
         try:
@@ -89,7 +91,7 @@ class HydraMiddleware(AuthMiddleware):
 
     async def _validate_token(self, token: str) -> dict[str, Any]:
         """Validate OAuth2 token using Hydra introspection.
-        
+
         This method utilizes a double-checked locking pattern to safely handle
         high-concurrency scenarios without blocking the main event loop.
         """
@@ -103,36 +105,38 @@ class HydraMiddleware(AuthMiddleware):
                 logger.debug("Token validated from cache")
                 return cached["data"]
 
-            try:
-                # Network I/O boundary: Reach out to the Hydra server
-                introspection_result = await self.hydra_client.introspect_token(token)
+        try:
+            # Network I/O boundary: Reach out to the Hydra server
+            introspection_result = await self.hydra_client.introspect_token(token)
 
-                if not introspection_result.get("active", False):
-                    raise ValueError("Token is not active")
-                if "sub" not in introspection_result:
-                    raise ValueError("Token missing subject (sub) claim")
-                if "exp" not in introspection_result:
-                    raise ValueError("Token missing expiration (exp) claim")
+            if not introspection_result.get("active", False):
+                raise ValueError("Token is not active")
+            if "sub" not in introspection_result:
+                raise ValueError("Token missing subject (sub) claim")
+            if "exp" not in introspection_result:
+                raise ValueError("Token missing expiration (exp) claim")
 
-                current_time = time.time()
-                if introspection_result["exp"] < current_time:
-                    raise ValueError(f"Token expired at {introspection_result['exp']}")
+            current_time = time.time()
+            if introspection_result["exp"] < current_time:
+                raise ValueError(f"Token expired at {introspection_result['exp']}")
 
-                # Populate the cache for subsequent requests
-                expires_at = min(introspection_result["exp"], current_time + self._cache_ttl)
-                self._introspection_cache[cache_key] = {
-                    "data": introspection_result,
-                    "expires_at": expires_at,
-                }
+            # Populate the cache for subsequent requests
+            expires_at = min(
+                introspection_result["exp"], current_time + self._cache_ttl
+            )
+            self._introspection_cache[cache_key] = {
+                "data": introspection_result,
+                "expires_at": expires_at,
+            }
 
-                # Perform a lightweight cache sweep
-                self._lazy_clean_cache()
+            # Perform a lightweight cache sweep
+            self._lazy_clean_cache()
 
-                return introspection_result
-            except Exception as e:
-                logger.error(f"Token introspection failed: {e}")
-                raise
-              
+            return introspection_result
+        except Exception as e:
+            logger.error(f"Token introspection failed: {e}")
+            raise
+
     def _extract_user_info(self, token_payload: dict[str, Any]) -> dict[str, Any]:
         """Normalize Hydra introspection data into a standard user/service object."""
         # Machine-to-Machine (M2M) tokens have a different lifecycle than user tokens.
@@ -175,31 +179,31 @@ class HydraMiddleware(AuthMiddleware):
 
     def _lazy_clean_cache(self) -> None:
         """O(1) amortized cache cleanup.
-        
-        Python dicts maintain insertion order. Because we insert tokens sequentially 
-        over time, the oldest tokens are always at the start of the dict. We only 
+
+        Python dicts maintain insertion order. Because we insert tokens sequentially
+        over time, the oldest tokens are always at the start of the dict. We only
         iterate until we hit the first unexpired token, avoiding a full O(N) scan.
         """
         current_time = time.time()
         expired_keys = []
-        
+
         for key, value in self._introspection_cache.items():
             if value["expires_at"] <= current_time:
                 expired_keys.append(key)
             else:
                 # Early exit: If this token is still valid, all subsequent ones are too.
                 break
-                
+
         # Clean up both the cache payload and its associated lock
         for key in expired_keys:
             self._introspection_cache.pop(key, None)
             self._cache_locks.pop(key, None)
-            
+
     async def _verify_did_signature(
         self, request: Any, client_did: str
     ) -> tuple[bool, dict[str, Any]]:
         """Verify the cryptographic integrity of the incoming request payload.
-        
+
         Warning: This method consumes the request body stream and performs heavy CPU math.
         It is carefully engineered to not block the ASGI event loop or cause memory leaks.
         """
@@ -221,22 +225,25 @@ class HydraMiddleware(AuthMiddleware):
         # attempting to load them into RAM for hashing.
         content_length = int(request.headers.get("content-length", 0))
         if content_length > self._max_body_size:
-            logger.warning(f"Payload too large for signature verification: {content_length} bytes")
+            logger.warning(
+                f"Payload too large for signature verification: {content_length} bytes"
+            )
             return False, {"did_verified": False, "reason": "payload_too_large"}
 
-        # ASGI Body Stream Management: 
+        # ASGI Body Stream Management:
         # Reading the body consumes the underlying network stream. If we don't
         # reconstruct it, the downstream route handler will hang forever waiting for data.
         body = await request.body()
-        
+
         # Inject a mock receive function to "rewind" the stream for the next middleware
         async def receive():
             return {"type": "http.request", "body": body}
+
         request._receive = receive
 
         # CPU Bound Operations:
-        # Cryptography is computationally heavy. We use asyncio.to_thread to run the 
-        # verification in a background thread pool, keeping the main event loop 
+        # Cryptography is computationally heavy. We use asyncio.to_thread to run the
+        # verification in a background thread pool, keeping the main event loop
         # responsive to other incoming network requests.
         is_valid = await asyncio.to_thread(
             verify_signature,
@@ -245,20 +252,28 @@ class HydraMiddleware(AuthMiddleware):
             did=signature_data["did"],
             timestamp=signature_data["timestamp"],
             public_key=public_key,
-            max_age_seconds=300
+            max_age_seconds=300,
         )
 
         if is_valid:
-            return True, {"did_verified": True, "did": client_did, "timestamp": signature_data["timestamp"]}
+            return True, {
+                "did_verified": True,
+                "did": client_did,
+                "timestamp": signature_data["timestamp"],
+            }
         else:
-            return False, {"did_verified": False, "reason": "invalid_signature", "did": client_did}
-    
+            return False, {
+                "did_verified": False,
+                "reason": "invalid_signature",
+                "did": client_did,
+            }
+
     async def dispatch(self, request, call_next):
-        """The core middleware execution flow.
-        
+        """Execute core middleware flow.
+
         Similar to `(req, res, next)` patterns, this intercepts the request,
         applies our business rules, and conditionally calls `call_next(request)`
-        to pass control down the chain. 
+        to pass control down the chain.
         """
         path = request.url.path
 
@@ -286,7 +301,7 @@ class HydraMiddleware(AuthMiddleware):
         except Exception as e:
             logger.error(f"Failed to extract user info for {path}: {e}")
             from bindu.common.protocol.types import InvalidTokenError
-            
+
             code, message = extract_error_fields(InvalidTokenError)
             return jsonrpc_error(code=code, message=message, status=401)
 

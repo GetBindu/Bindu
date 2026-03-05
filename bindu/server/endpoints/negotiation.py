@@ -27,7 +27,12 @@ from bindu.server.negotiation.capability_calculator import (
     CapabilityCalculator,
     ScoringWeights,
 )
-from bindu.utils.request_utils import handle_endpoint_errors, get_client_ip, extract_error_fields, jsonrpc_error
+from bindu.utils.request_utils import (
+    handle_endpoint_errors,
+    get_client_ip,
+    extract_error_fields,
+    jsonrpc_error,
+)
 from bindu.utils.logging import get_logger
 from bindu.utils.capabilities import get_x402_extension_from_capabilities
 from bindu.settings import app_settings

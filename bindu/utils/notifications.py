@@ -20,15 +20,17 @@ logger = get_logger("bindu.server.notifications")
 # SSRF attackers commonly target.  Webhook URLs resolving into these ranges are
 # rejected before any connection is attempted.
 _BLOCKED_NETWORKS: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = [
-    ipaddress.ip_network("127.0.0.0/8"),    # loopback
-    ipaddress.ip_network("10.0.0.0/8"),     # RFC-1918
+    ipaddress.ip_network("127.0.0.0/8"),  # loopback
+    ipaddress.ip_network("10.0.0.0/8"),  # RFC-1918
     ipaddress.ip_network("172.16.0.0/12"),  # RFC-1918
-    ipaddress.ip_network("192.168.0.0/16"), # RFC-1918
-    ipaddress.ip_network("169.254.0.0/16"), # link-local / cloud metadata (AWS, GCP, Azure)
+    ipaddress.ip_network("192.168.0.0/16"),  # RFC-1918
+    ipaddress.ip_network(
+        "169.254.0.0/16"
+    ),  # link-local / cloud metadata (AWS, GCP, Azure)
     ipaddress.ip_network("100.64.0.0/10"),  # Carrier-grade NAT
-    ipaddress.ip_network("::1/128"),        # IPv6 loopback
-    ipaddress.ip_network("fc00::/7"),       # IPv6 unique local
-    ipaddress.ip_network("fe80::/10"),      # IPv6 link-local
+    ipaddress.ip_network("::1/128"),  # IPv6 loopback
+    ipaddress.ip_network("fc00::/7"),  # IPv6 unique local
+    ipaddress.ip_network("fe80::/10"),  # IPv6 link-local
 ]
 
 

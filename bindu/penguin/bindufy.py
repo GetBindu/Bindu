@@ -286,14 +286,10 @@ def bindufy(
             cost_entries = [execution_cost]
         elif isinstance(execution_cost, list):
             if not execution_cost:
-                raise ValueError(
-                    "execution_cost list cannot be empty when configured"
-                )
+                raise ValueError("execution_cost list cannot be empty when configured")
             cost_entries = execution_cost
         else:
-            raise ValueError(
-                "execution_cost must be either a dict or a list of dicts"
-            )
+            raise ValueError("execution_cost must be either a dict or a list of dicts")
 
         normalized_costs: list[dict[str, Any]] = []
 

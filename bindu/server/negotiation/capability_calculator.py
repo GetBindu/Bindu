@@ -188,12 +188,15 @@ class CapabilityCalculator:
             )
 
         # Calculate component scores
-        skill_match_score, skill_matches, matched_tags, matched_caps = (
-            await self._calculate_skill_match(
-                task_keywords=task_keywords,
-                task_summary=task_summary,
-                task_details=task_details,
-            )
+        (
+            skill_match_score,
+            skill_matches,
+            matched_tags,
+            matched_caps,
+        ) = await self._calculate_skill_match(
+            task_keywords=task_keywords,
+            task_summary=task_summary,
+            task_details=task_details,
         )
         io_score = self._calculate_io_compatibility(input_mime_types, output_mime_types)
         load_score = self._calculate_load_score(queue_depth)
@@ -237,9 +240,7 @@ class CapabilityCalculator:
         # the full score (1.0) so the weight is not silently discarded.
         # Formula: linear decay from 1.0 (estimate = 0) to 0.0 (estimate = limit).
         if latency_estimate_ms is not None and max_latency_ms and max_latency_ms > 0:
-            performance_score = max(
-                0.0, 1.0 - latency_estimate_ms / max_latency_ms
-            )
+            performance_score = max(0.0, 1.0 - latency_estimate_ms / max_latency_ms)
         else:
             performance_score = 1.0
 

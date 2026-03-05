@@ -176,7 +176,9 @@ async def test_latency_constraint():
     calculator = CapabilityCalculator(skills=skills, x402_extension=None)
 
     # Should reject when latency exceeds constraint by 2x
-    result = await calculator.calculate(task_summary="process data", max_latency_ms=2000)
+    result = await calculator.calculate(
+        task_summary="process data", max_latency_ms=2000
+    )
     assert result.accepted is False
     assert result.rejection_reason == "latency_exceeds_constraint"
     # Should use skill's actual latency
@@ -197,7 +199,9 @@ async def test_cost_constraint():
     calculator = CapabilityCalculator(skills=skills, x402_extension=x402_ext)
 
     # Should reject when cost exceeds budget
-    result = await calculator.calculate(task_summary="process data", max_cost_amount="50.00")
+    result = await calculator.calculate(
+        task_summary="process data", max_cost_amount="50.00"
+    )
     assert result.accepted is False
     assert result.rejection_reason == "cost_exceeds_budget"
 
@@ -216,7 +220,9 @@ async def test_queue_depth_scoring():
 
     # Low queue depth should give better score
     result_low = await calculator.calculate(task_summary="process data", queue_depth=0)
-    result_high = await calculator.calculate(task_summary="process data", queue_depth=10)
+    result_high = await calculator.calculate(
+        task_summary="process data", queue_depth=10
+    )
 
     assert result_low.subscores["load"] > result_high.subscores["load"]
 
@@ -314,7 +320,9 @@ async def test_matched_tags_and_capabilities():
         }
     ]
     calculator = CapabilityCalculator(skills=skills, x402_extension=None)
-    result = await calculator.calculate(task_summary="classify images using machine learning")
+    result = await calculator.calculate(
+        task_summary="classify images using machine learning"
+    )
 
     # Check that skill match occurred and reasons were populated
     assert len(result.skill_matches) > 0

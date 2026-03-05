@@ -1,12 +1,13 @@
+"""Mortgage agent example runner."""
 
 import sys
 import os
 import io
 
 # Force UTF-8 encoding for Windows console compatibility
-if sys.platform == 'win32':
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
 
 
 # Add the current directory to sys.path to allow importing 'bindu'
