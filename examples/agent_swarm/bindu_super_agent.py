@@ -1,7 +1,7 @@
 from bindu.penguin.bindufy import bindufy
 from orchestrator import Orchestrator
-from typing import List, Dict, Any
 from dotenv import load_dotenv
+
 load_dotenv()
 
 
@@ -53,11 +53,11 @@ if __name__ == "__main__":
         "deployment": {
             "url": "http://localhost:3773",
             "expose": True,
-            "cors_origins": ["http://localhost:5173"]
+            "cors_origins": ["http://localhost:5173"],
         },
         "skills": ["skills/agent-swarm-intelligence"],
         "storage": {"type": "memory"},
-        "scheduler": {"type": "memory"}
+        "scheduler": {"type": "memory"},
     }
 
     bindufy(config=config, handler=handler)

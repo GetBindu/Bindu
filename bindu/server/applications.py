@@ -24,9 +24,11 @@ from uuid import UUID, uuid4
 
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
+from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import FileResponse, Response
 from starlette.routing import Route
+from starlette.staticfiles import StaticFiles
 from starlette.types import Lifespan, Receive, Scope, Send
 
 from bindu.common.models import (
@@ -39,7 +41,7 @@ from bindu.common.models import (
 from bindu.settings import app_settings
 from bindu.utils.retry import execute_with_retry
 
-from .middleware.auth import HydraMiddleware
+from .middleware import HydraMiddleware
 from .scheduler.base import Scheduler
 from .storage.base import Storage
 from .task_manager import TaskManager
@@ -69,6 +71,13 @@ class BinduApplication(Starlette):
         telemetry_config: TelemetryConfig | None = None,
         sentry_config: SentryConfig | None = None,
         cors_origins: list[str] | None = None,
+        grpc_enabled: bool | None = None,
+        grpc_host: str | None = None,
+        grpc_port: int | None = None,
+        grpc_max_workers: int | None = None,
+        grpc_tls_enabled: bool | None = None,
+        grpc_tls_cert_path: str | None = None,
+        grpc_tls_key_path: str | None = None,
     ):
         """Initialize Bindu application.
 
@@ -84,9 +93,17 @@ class BinduApplication(Starlette):
             lifespan: Optional custom lifespan
             routes: Optional custom routes
             middleware: Optional middleware
-            auth_enabled: Enable Hydra OAuth2 authentication middleware
+            auth_enabled: Enable Hydra authentication middleware
             telemetry_config: Optional telemetry configuration (defaults to disabled)
             sentry_config: Optional Sentry configuration (defaults to disabled)
+            cors_origins: Optional CORS allowed origins
+            grpc_enabled: Override gRPC enabled setting
+            grpc_host: Override gRPC host setting
+            grpc_port: Override gRPC port setting
+            grpc_max_workers: Override gRPC worker setting
+            grpc_tls_enabled: Override gRPC TLS enabled setting
+            grpc_tls_cert_path: Override gRPC TLS cert path
+            grpc_tls_key_path: Override gRPC TLS key path
         """
         # Generate penguin_id if not provided
         if penguin_id is None:
@@ -97,6 +114,19 @@ class BinduApplication(Starlette):
         self._scheduler_config = scheduler_config
         self._telemetry_config = telemetry_config or TelemetryConfig()
         self._sentry_config = sentry_config or SentryConfig()
+        self._cors_origins = cors_origins
+        self._grpc_enabled_override = grpc_enabled
+        self._grpc_host_override = grpc_host
+        self._grpc_port_override = grpc_port
+        self._grpc_max_workers_override = grpc_max_workers
+        self._grpc_tls_enabled_override = grpc_tls_enabled
+        self._grpc_tls_cert_path_override = grpc_tls_cert_path
+        self._grpc_tls_key_path_override = grpc_tls_key_path
+        self._grpc_enabled = (
+            grpc_enabled if grpc_enabled is not None else app_settings.grpc.enabled
+        )
+        self._grpc_host = grpc_host if grpc_host is not None else app_settings.grpc.host
+        self._grpc_port = grpc_port if grpc_port is not None else app_settings.grpc.port
 
         # Create default lifespan if none provided
         if lifespan is None:
@@ -137,6 +167,7 @@ class BinduApplication(Starlette):
         self.task_manager: TaskManager | None = None
         self._storage: Storage | None = None
         self._scheduler: Scheduler | None = None
+        self._grpc_server = None
         self._agent_card_json_schema: bytes | None = None
         self._x402_ext = x402_ext
         self._payment_session_manager = None
@@ -158,6 +189,7 @@ class BinduApplication(Starlette):
 
     def _register_routes(self) -> None:
         """Register all application routes."""
+        from pathlib import Path
         from .endpoints import (
             agent_card_endpoint,
             agent_run_endpoint,
@@ -166,7 +198,6 @@ class BinduApplication(Starlette):
             skill_detail_endpoint,
             skill_documentation_endpoint,
             skills_list_endpoint,
-            metrics_endpoint,
         )
 
         # Add health endpoint import
@@ -179,15 +210,6 @@ class BinduApplication(Starlette):
             ["HEAD", "GET", "OPTIONS"],
             with_app=True,
         )
-
-        # Root endpoint - redirect GET to agent card, POST for A2A protocol
-        from starlette.responses import RedirectResponse
-
-        async def root_redirect(app: BinduApplication, request: Request) -> Response:
-            """Redirect root GET requests to agent card."""
-            return RedirectResponse(url="/.well-known/agent.json", status_code=302)
-
-        self._add_route("/", root_redirect, ["GET"], with_app=True)
         self._add_route("/", agent_run_endpoint, ["POST"], with_app=True)
 
         # DID endpoints
@@ -217,9 +239,6 @@ class BinduApplication(Starlette):
         # Register health endpoint
         self._add_route("/health", health_endpoint, ["GET"], with_app=True)
 
-        # Register metrics endpoint
-        self._add_route("/metrics", metrics_endpoint, ["GET"], with_app=True)
-
         # Negotiation endpoint
         self._add_route(
             "/agent/negotiation",
@@ -227,6 +246,18 @@ class BinduApplication(Starlette):
             ["POST"],
             with_app=True,
         )
+
+        # Docs/Chat UI endpoint
+        self._add_route("/docs", self._docs_endpoint, ["GET"], with_app=False)
+
+        # Favicon endpoint
+        self._add_route("/favicon.ico", self._favicon_endpoint, ["GET"], with_app=False)
+
+        # Static files for CSS/JS
+        static_dir = Path(__file__).parent.parent / "ui" / "static"
+        if static_dir.exists():
+            self.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+            logger.info(f"Serving static files from: {static_dir}")
 
         if self._x402_ext:
             self._register_payment_endpoints()
@@ -283,6 +314,36 @@ class BinduApplication(Starlette):
     async def _wrap_with_app(self, endpoint: Callable, request: Request) -> Response:
         """Wrap endpoint that requires app instance."""
         return await endpoint(self, request)
+
+    async def _docs_endpoint(self, request: Request) -> Response:
+        """Serve the chat UI documentation interface."""
+        from pathlib import Path
+
+        # Try modular version first, fallback to monolithic
+        docs_path = Path(__file__).parent.parent / "ui" / "static" / "chat.html"
+
+        if not docs_path.exists():
+            logger.error(f"Chat UI file not found: {docs_path}")
+            return Response(
+                content="Chat UI not available. File not found.",
+                status_code=404,
+                media_type="text/plain",
+            )
+
+        logger.debug(f"Serving chat UI from: {docs_path}")
+        return FileResponse(docs_path, media_type="text/html")
+
+    async def _favicon_endpoint(self, request: Request) -> Response:
+        """Serve the Bindu sunflower SVG as favicon."""
+        from pathlib import Path
+
+        favicon_path = Path(__file__).parent.parent.parent / "assets" / "light.svg"
+
+        if not favicon_path.exists():
+            logger.warning(f"Favicon not found: {favicon_path}")
+            return Response(content="", status_code=404)
+
+        return FileResponse(favicon_path, media_type="image/svg+xml")
 
     def _create_default_lifespan(
         self,
@@ -398,7 +459,67 @@ class BinduApplication(Starlette):
                 async with task_manager:
                     app.task_manager = task_manager
                     logger.info("✅ TaskManager started")
+                    grpc_enabled = (
+                        self._grpc_enabled_override
+                        if self._grpc_enabled_override is not None
+                        else app_settings.grpc.enabled
+                    )
+                    grpc_host = (
+                        self._grpc_host_override
+                        if self._grpc_host_override is not None
+                        else app_settings.grpc.host
+                    )
+                    grpc_port = (
+                        self._grpc_port_override
+                        if self._grpc_port_override is not None
+                        else app_settings.grpc.port
+                    )
+                    grpc_max_workers = (
+                        self._grpc_max_workers_override
+                        if self._grpc_max_workers_override is not None
+                        else app_settings.grpc.max_workers
+                    )
+                    grpc_tls_enabled = (
+                        self._grpc_tls_enabled_override
+                        if self._grpc_tls_enabled_override is not None
+                        else app_settings.grpc.tls_enabled
+                    )
+                    grpc_tls_cert_path = (
+                        self._grpc_tls_cert_path_override
+                        if self._grpc_tls_cert_path_override is not None
+                        else app_settings.grpc.tls_cert_path
+                    )
+                    grpc_tls_key_path = (
+                        self._grpc_tls_key_path_override
+                        if self._grpc_tls_key_path_override is not None
+                        else app_settings.grpc.tls_key_path
+                    )
+
+                    app._grpc_enabled = grpc_enabled
+                    app._grpc_host = grpc_host
+                    app._grpc_port = grpc_port
+
+                    grpc_server = None
+                    if grpc_enabled:
+                        from bindu.server.grpc import GrpcServer
+
+                        grpc_server = GrpcServer(
+                            app,
+                            port=grpc_port,
+                            host=grpc_host,
+                            max_workers=grpc_max_workers,
+                            tls_enabled=grpc_tls_enabled,
+                            tls_cert_path=grpc_tls_cert_path,
+                            tls_key_path=grpc_tls_key_path,
+                        )
+                        app._grpc_server = grpc_server
+                        await grpc_server.start()
+                        logger.info("✅ gRPC server started")
                     yield
+                    if grpc_server:
+                        await grpc_server.stop()
+                        app._grpc_server = None
+                        logger.info("🛑 gRPC server stopped")
                 logger.info("🛑 TaskManager stopped")
             else:
                 yield
@@ -500,9 +621,9 @@ class BinduApplication(Starlette):
         payment_requirements: list[Any] | None,
         manifest: AgentManifest,
         auth_enabled: bool,
-        cors_origins: list[str] | None = None,
+        cors_origins: list[str] | None,
     ) -> list[Middleware]:
-        """Set up middleware chain with CORS, X402 and Hydra middleware.
+        """Set up middleware chain with X402 and Hydra middleware.
 
         Args:
             middleware: Custom middleware to include
@@ -510,29 +631,12 @@ class BinduApplication(Starlette):
             payment_requirements: Payment requirements for X402
             manifest: Agent manifest
             auth_enabled: Whether authentication is enabled
-            cors_origins: List of allowed CORS origins
+            cors_origins: Allowed CORS origins
 
         Returns:
             List of configured middleware
         """
         middleware_list = list(middleware) if middleware else []
-
-        # Add CORS middleware if origins are specified
-        if cors_origins:
-            from starlette.middleware.cors import CORSMiddleware
-
-            logger.info(f"CORS middleware enabled for origins: {cors_origins}")
-            cors_middleware = Middleware(
-                CORSMiddleware,
-                allow_origins=cors_origins,
-                allow_credentials=True,
-                allow_methods=["*"],
-                allow_headers=["*"],
-                expose_headers=["*"],
-            )
-            # CORS must be first in middleware chain
-            middleware_list.insert(0, cors_middleware)
-            logger.info("CORS middleware added to position 0 in middleware chain")
 
         # Add X402 middleware if configured
         if x402_ext and payment_requirements:
@@ -551,20 +655,24 @@ class BinduApplication(Starlette):
                 x402_ext=x402_ext,
                 payment_requirements=payment_requirements,
             )
-            middleware_list.append(x402_middleware)
+            middleware_list.insert(0, x402_middleware)
 
         # Add authentication middleware if enabled
         if auth_enabled and app_settings.auth.enabled:
             auth_middleware = self._create_auth_middleware()
-            # Add auth middleware after CORS and X402
-            middleware_list.append(auth_middleware)
+            # Add auth middleware after X402 (if present)
+            middleware_list.insert(1 if x402_ext else 0, auth_middleware)
 
-        # Add metrics middleware (should be last to capture all requests)
-        from .middleware import MetricsMiddleware
-
-        metrics_middleware = Middleware(MetricsMiddleware)
-        middleware_list.append(metrics_middleware)
-        logger.info("Metrics middleware enabled for Prometheus monitoring")
+        if cors_origins:
+            middleware_list.append(
+                Middleware(
+                    CORSMiddleware,
+                    allow_origins=cors_origins,
+                    allow_credentials=True,
+                    allow_methods=["*"],
+                    allow_headers=["*"],
+                )
+            )
 
         return middleware_list
 
@@ -580,8 +688,8 @@ class BinduApplication(Starlette):
         provider = app_settings.auth.provider.lower()
 
         if provider == "hydra":
-            logger.info("Hydra OAuth2 authentication enabled")
-            return Middleware(HydraMiddleware, auth_config=app_settings.hydra)
+            logger.info("Hydra authentication enabled")
+            return Middleware(HydraMiddleware, auth_config=app_settings.auth)
         else:
             logger.error(f"Unknown authentication provider: {provider}")
             raise ValueError(

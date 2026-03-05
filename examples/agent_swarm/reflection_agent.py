@@ -9,7 +9,7 @@ def build_reflection_agent():
         model=OpenRouter(
             id="openai/gpt-oss-120b",
             api_key=os.getenv("OPENROUTER_API_KEY"),
-            temperature=0
+            temperature=0,
         ),
         description="""You are a strict JSON-only quality evaluation agent.
 
@@ -44,5 +44,4 @@ Example Input: "Machine Learning is a subset of AI that uses algorithms to learn
 Example Output: {"quality":"good","issues":[],"fix_strategy":""}
 
 Remember: ONLY output the JSON object, nothing else.""",
-
     )

@@ -14,6 +14,7 @@ load_dotenv()
 # Agent Tools
 # -----------------------------
 
+
 def transcribe_audio(file_path: str) -> str:
     """Transcribes a real audio file (WAV, MP3, etc.) using Gemini's multimodal capabilities via OpenRouter.
 
@@ -45,26 +46,33 @@ def transcribe_audio(file_path: str) -> str:
         # We use Gemini 2.0 Flash because it is highly efficient and supports audio input via OpenRouter
         transcription_agent = Agent(
             model=OpenRouter(id="google/gemini-2.0-flash-001"),
-            instructions=["You are an expert transcriber. Transcribe the provided audio accurately. Do not add conversational filler."],
+            instructions=[
+                "You are an expert transcriber. Transcribe the provided audio accurately. Do not add conversational filler."
+            ],
         )
 
         # Send the audio data as a part
-        response = transcription_agent.run([
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": "Transcribe this audio file accurately and completely."},
-                    {
-                        "type": "image_url", # OpenRouter uses image_url structure for multimodal blobs
-                        "image_url": {
-                            "url": f"data:{mime_type};base64,{audio_data}"
-                        }
-                    }
-                ]
-            }
-        ])
+        response = transcription_agent.run(
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "Transcribe this audio file accurately and completely.",
+                        },
+                        {
+                            "type": "image_url",  # OpenRouter uses image_url structure for multimodal blobs
+                            "image_url": {
+                                "url": f"data:{mime_type};base64,{audio_data}"
+                            },
+                        },
+                    ],
+                }
+            ]
+        )
 
-        return response.content if hasattr(response, 'content') else str(response)
+        return response.content if hasattr(response, "content") else str(response)
 
     except Exception as e:
         return f"Error during transcription: {str(e)}"

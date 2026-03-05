@@ -94,7 +94,7 @@ config = {
     "deployment": {
         "url": "http://localhost:3773",
         "expose": True,
-        "cors_origins": ["http://localhost:5173"]
+        "cors_origins": ["http://localhost:5173"],
     },
     "skills": ["skills/pdf-processing", "skills/question-answering"],
 }
@@ -114,4 +114,4 @@ def handler(messages: list[dict[str, str]]):
 bindufy(config, handler)
 
 # if you want to use tunnel to expose your agent to the internet, use the following command
-#bindufy(config, handler, launch=True)
+# bindufy(config, handler, launch=True)

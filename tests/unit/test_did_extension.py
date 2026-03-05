@@ -1,5 +1,6 @@
 """Unit tests for DID Agent Extension and related utilities."""
 
+import sys
 import tempfile
 from pathlib import Path
 from uuid import uuid4
@@ -360,6 +361,9 @@ class TestDIDAgentExtension:
         private_key = ext2.private_key
         assert private_key is not None
 
+    @pytest.mark.skipif(
+        sys.platform == "win32", reason="Unix file permissions not supported on Windows"
+    )
     def test_file_permissions(self, did_extension):
         """Test that private key has correct file permissions."""
         did_extension.generate_and_save_key_pair()

@@ -33,6 +33,9 @@ dependencies = [
     "tenacity==9.1.4",
     "pynacl==1.5.0",
     "numpy==2.3.5",
+    # gRPC transport
+    "grpcio==1.74.0",
+    "protobuf==6.32.1",
     # Telemetry
     "opentelemetry-api==1.35.0",
     "opentelemetry-sdk==1.35.0",
@@ -93,6 +96,8 @@ core = [
     "requests==2.32.3",
     "tenacity==9.1.4",
     "pynacl==1.5.0",
+    "grpcio==1.74.0",
+    "protobuf==6.32.1",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -120,6 +125,7 @@ dev = [
     "twine>=6.1.0",
     "uvx<4.0",
     "ruff>=0.15.0",
+    "grpcio-tools==1.74.0",
 ]
 
 [tool.coverage.run]

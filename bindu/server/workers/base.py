@@ -127,9 +127,9 @@ class Worker(ABC):
             # Preserve trace context from scheduler
             with use_span(task_operation["_current_span"]):
                 with tracer.start_as_current_span(
-                    f"{task_operation['operation']} task",
-                    attributes={"logfire.tags": ["bindu"]},
-                ):
+                    f"{task_operation['operation']} task"
+                ) as span:
+                    span.set_attributes({"logfire.tags": ["bindu"]})
                     handler = operation_handlers.get(task_operation["operation"])
                     if handler:
                         await handler(task_operation["params"])

@@ -49,11 +49,7 @@ agent = Agent(
 
     Focus on premium, high-value insights that justify the cost. Be direct,
     confident, and provide specific, actionable advice.""",
-
-    model=OpenRouter(
-        id="openai/gpt-oss-120b",
-        api_key=os.getenv("OPENROUTER_API_KEY")
-    ),
+    model=OpenRouter(id="openai/gpt-oss-120b", api_key=os.getenv("OPENROUTER_API_KEY")),
 )
 
 
@@ -72,15 +68,19 @@ def handler(messages: list[dict[str, str]]):
     """
     # Extract the latest user message
     if messages:
-        latest_message = messages[-1].get('content', '') if isinstance(messages[-1], dict) else str(messages[-1])
+        latest_message = (
+            messages[-1].get("content", "")
+            if isinstance(messages[-1], dict)
+            else str(messages[-1])
+        )
 
         # Run the agent with the latest message
         result = agent.run(input=latest_message)
 
         # Format the response to be cleaner
-        if hasattr(result, 'content'):
+        if hasattr(result, "content"):
             return result.content
-        elif hasattr(result, 'response'):
+        elif hasattr(result, "response"):
             return result.response
         else:
             return str(result)
@@ -95,9 +95,9 @@ config = {
     "deployment": {
         "url": "http://localhost:3773",
         "expose": True,
-        "cors_origins": ["http://localhost:5173"]
+        "cors_origins": ["http://localhost:5173"],
     },
-     "execution_cost": {
+    "execution_cost": {
         "amount": "0.01",  # Cost of one interaction
         "token": "USDC",  # Currency
         "network": "base-sepolia",  # Network (Base Testnet)

@@ -43,9 +43,9 @@ config = {
     "deployment": {
         "url": "http://localhost:3773",
         "expose": True,
-        "cors_origins": ["http://localhost:5173"]
+        "cors_origins": ["http://localhost:5173"],
     },
-    "skills": ["skills/question-answering", "skills/pdf-processing"]
+    "skills": ["skills/question-answering", "skills/pdf-processing"],
 }
 
 
@@ -67,8 +67,9 @@ def handler(messages: list[dict[str, str]]):
 if __name__ == "__main__":
     # Disable auth for local development - frontend can connect without OAuth
     import os
-    #os.environ["AUTH_ENABLED"] = "false"
+
+    os.environ["AUTH_ENABLED"] = "false"
     bindufy(config, handler)
 
 # if you want to use tunnel to expose your agent to the internet, use the following command
-#bindufy(config, handler, launch=True)
+# bindufy(config, handler, launch=True)

@@ -102,6 +102,25 @@ def create_agent_card(app: BinduApplication) -> AgentCard:
         debug_level=manifest.debug_level,
         monitoring=manifest.monitoring,
         telemetry=manifest.telemetry,
+        preferred_transport="jsonrpc",
+        additional_interfaces=[
+            {
+                "transport": "jsonrpc",
+                "url": app.url,
+                "description": "JSON-RPC over HTTP",
+            }
+        ]
+        + (
+            [
+                {
+                    "transport": "grpc",
+                    "url": f"grpc://{app._grpc_host}:{app._grpc_port}",
+                    "description": "gRPC over HTTP/2",
+                }
+            ]
+            if app._grpc_enabled
+            else []
+        ),
         agent_trust=manifest.agent_trust,
         default_input_modes=["text/plain", "application/json"],
         default_output_modes=["text/plain", "application/json"],

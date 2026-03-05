@@ -4,6 +4,10 @@
 import sys
 from types import ModuleType
 
+from google.protobuf import struct_pb2  # noqa: F401
+
+sys.modules.setdefault("google.protobuf.struct_pb2", struct_pb2)
+
 # --- OpenTelemetry trace stub ---
 ot_trace = ModuleType("opentelemetry.trace")
 
@@ -350,10 +354,10 @@ async def task_manager_with_push(
         storage=storage,
         manifest=cast(AgentManifest, mock_manifest_with_push),
     )
-    tm.notification_service = cast(MockNotificationService, mock_notification_service)  # type: ignore[assignment]
-    await tm.__aenter__()
+    tm._push_manager.notification_service = cast(  # type: ignore[attr-defined]
+        MockNotificationService, mock_notification_service
+    )
     yield tm
-    await tm.__aexit__(None, None, None)
 
 
 @pytest_asyncio.fixture

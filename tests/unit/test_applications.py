@@ -22,6 +22,7 @@ from bindu.common.models import (
     SchedulerConfig,
     TelemetryConfig,
 )
+from bindu.settings import app_settings
 
 
 class TestBinduApplicationInit:
@@ -210,7 +211,7 @@ class TestBinduApplicationLifespan:
             mock_create_storage.return_value = mock_storage
 
             with patch("bindu.server.storage.factory.close_storage") as mock_close:
-                with patch("bindu.server.task_manager.TaskManager") as mock_tm:
+                with patch("bindu.server.applications.TaskManager") as mock_tm:
                     mock_tm_instance = MagicMock()
                     mock_tm_instance.__aenter__ = AsyncMock(
                         return_value=mock_tm_instance
@@ -301,6 +302,99 @@ class TestBinduApplicationLifespan:
 
                 mock_create_storage.assert_called_once()
                 mock_close.assert_called_once_with(mock_storage)
+
+    @pytest.mark.asyncio
+    async def test_lifespan_starts_grpc_when_enabled(self, mock_manifest):
+        """Test gRPC server starts and stops when enabled."""
+        if not hasattr(mock_manifest, "capabilities"):
+            mock_manifest.capabilities = {}
+
+        app = BinduApplication(
+            manifest=mock_manifest,
+            grpc_enabled=True,
+            grpc_host="127.0.0.1",
+            grpc_port=50555,
+            grpc_max_workers=5,
+            grpc_tls_enabled=True,
+            grpc_tls_cert_path="/tmp/test-grpc-cert.pem",
+            grpc_tls_key_path="/tmp/test-grpc-key.pem",
+        )
+
+        with patch(
+            "bindu.server.storage.factory.create_storage"
+        ) as mock_create_storage:
+            mock_storage = MagicMock()
+            mock_create_storage.return_value = mock_storage
+
+            with patch("bindu.server.storage.factory.close_storage") as mock_close:
+                with patch("bindu.server.applications.TaskManager") as mock_tm:
+                    mock_tm_instance = MagicMock()
+                    mock_tm_instance.__aenter__ = AsyncMock(
+                        return_value=mock_tm_instance
+                    )
+                    mock_tm_instance.__aexit__ = AsyncMock()
+                    mock_tm.return_value = mock_tm_instance
+
+                    with patch("bindu.server.grpc.GrpcServer") as mock_grpc_server:
+                        grpc_instance = MagicMock()
+
+                        async def _start():
+                            assert app.task_manager is mock_tm_instance
+
+                        grpc_instance.start = AsyncMock(side_effect=_start)
+                        grpc_instance.stop = AsyncMock()
+                        mock_grpc_server.return_value = grpc_instance
+
+                        lifespan_func = app._create_default_lifespan(mock_manifest)
+                        async with lifespan_func(app):
+                            grpc_instance.start.assert_awaited_once()
+                            assert app._grpc_server is grpc_instance
+
+                        grpc_instance.stop.assert_awaited_once()
+                        mock_grpc_server.assert_called_once_with(
+                            app,
+                            port=50555,
+                            host="127.0.0.1",
+                            max_workers=5,
+                            tls_enabled=True,
+                            tls_cert_path="/tmp/test-grpc-cert.pem",
+                            tls_key_path="/tmp/test-grpc-key.pem",
+                        )
+                        mock_create_storage.assert_called_once()
+                        mock_close.assert_called_once_with(mock_storage)
+
+    @pytest.mark.asyncio
+    async def test_lifespan_skips_grpc_when_disabled(self, mock_manifest, monkeypatch):
+        """Test gRPC server does not start when disabled."""
+        if not hasattr(mock_manifest, "capabilities"):
+            mock_manifest.capabilities = {}
+
+        monkeypatch.setattr(app_settings.grpc, "enabled", False)
+        app = BinduApplication(manifest=mock_manifest)
+
+        with patch(
+            "bindu.server.storage.factory.create_storage"
+        ) as mock_create_storage:
+            mock_storage = MagicMock()
+            mock_create_storage.return_value = mock_storage
+
+            with patch("bindu.server.storage.factory.close_storage") as mock_close:
+                with patch("bindu.server.task_manager.TaskManager") as mock_tm:
+                    mock_tm_instance = MagicMock()
+                    mock_tm_instance.__aenter__ = AsyncMock(
+                        return_value=mock_tm_instance
+                    )
+                    mock_tm_instance.__aexit__ = AsyncMock()
+                    mock_tm.return_value = mock_tm_instance
+
+                    with patch("bindu.server.grpc.GrpcServer") as mock_grpc_server:
+                        lifespan_func = app._create_default_lifespan(mock_manifest)
+                        async with lifespan_func(app):
+                            assert app._grpc_server is None
+
+                        mock_grpc_server.assert_not_called()
+                        mock_create_storage.assert_called_once()
+                        mock_close.assert_called_once_with(mock_storage)
 
 
 class TestBinduApplicationObservability:
