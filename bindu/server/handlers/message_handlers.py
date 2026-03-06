@@ -247,7 +247,7 @@ class MessageHandlers:
             except Exception as e:
                 logger.error(
                      "Unhandled stream error",
-                      extra = {task['id': str(task["id"])]},
+                      extra = {"task_id": str(task["id"])},
                       exc_info = True,
                 )
                 timestamp = datetime.now(timezone.utc).isoformat()
