@@ -293,6 +293,11 @@ class X402Settings(BaseSettings):
     pay_to_env: str = "X402_PAY_TO"
     max_timeout_seconds: int = 600
 
+    # Payment Security
+    # HMAC secret for signing payment payloads (prevents forgery/replay attacks)
+    # Must be set via X402__PAYMENT_SECURITY_SECRET env var in production
+    payment_security_secret: str | None = None
+
     # Extension URI
     extension_uri: str = "https://github.com/google-a2a/a2a-x402/v0.1"
 

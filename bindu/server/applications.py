@@ -584,13 +584,20 @@ class BinduApplication(Starlette):
         # (previous behavior required both flags; we now treat settings as authoritative
         # so that enabling auth via config always installs the middleware).
         if auth_enabled or app_settings.auth.enabled:
-            if app_settings.auth.enabled:
-                # ensure config value drives logging
+            if not (auth_enabled and app_settings.auth.enabled):
+                import warnings
+                warnings.warn(
+                    "Auth behavior changed: previously both auth_enabled and "
+                    "app_settings.auth.enabled needed to be True. "
+                    "Please update your configuration. "
+                    "This warning will become an error in a future version.",
+                     DeprecationWarning,
+                     stacklevel=2,
+        )
+        if app_settings.auth.enabled:
                 logger.info("Authentication middleware enabled")
-            auth_middleware = self._create_auth_middleware()
-            # Add auth middleware after CORS and X402
-            middleware_list.append(auth_middleware)
-
+        auth_middleware = self._create_auth_middleware()
+        middleware_list.append(auth_middleware)       
         # Add metrics middleware (should be last to capture all requests)
         from .middleware import MetricsMiddleware
 
