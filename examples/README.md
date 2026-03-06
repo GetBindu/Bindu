@@ -24,7 +24,7 @@ export OPENROUTER_API_KEY="your-key-here"  # pragma: allowlist secret
 uv run examples/beginner/echo_simple_agent.py
 ```
 
-Agents run on ports 3773-3780 with UI at `http://localhost:[port]/docs`
+Agents run on port 3773 by default (configurable via `PORT` environment variable) with UI at `http://localhost:[port]/docs`
 
 You can override the port for any example without editing code:
 
@@ -66,6 +66,9 @@ For full URL override, use `BINDU_DEPLOYMENT_URL` (e.g. `http://127.0.0.1:5001`)
 # Required
 OPENROUTER_API_KEY=sk-or-v1-your-api-key-here
 
+# Network Configuration
+PORT=3773  # Agent server port (default: 3773)
+
 # Optional
 PORT=4000
 BINDU_PORT=4000
@@ -75,6 +78,21 @@ HYDRA__PUBLIC_URL=https://hydra.getbindu.com
 DATABASE_URL=postgresql+asyncpg://user:pass@host/db  # pragma: allowlist secret
 REDIS_URL=rediss://default:pass@host:6379  # pragma: allowlist secret
 ```
+
+### Configuring Agent Port
+
+You can customize the port your agent runs on by setting the `PORT` environment variable:
+
+```bash
+# Run agent on port 8080
+export PORT=8080
+uv run examples/beginner/echo_simple_agent.py
+
+# Or inline
+PORT=8080 uv run examples/beginner/echo_simple_agent.py
+```
+
+All example agents now support the `PORT` environment variable and will automatically use it in their deployment configuration.
 
 ## X402 Payments
 
@@ -113,26 +131,3 @@ agent = Agent(
 )
 
 agent.instructions = ["Behavior guidelines"]
-
-if __name__ == "__main__":
-    agent.serve(port=3773)
-```
-
-## Documentation
-
-- [Bindu Docs](https://docs.getbindu.com)
-- [API Reference](../openapi.yaml)
-- [Payment Guide](../docs/PAYMENT.md)
-- [DID Guide](../docs/DID.md)
-- [Skills Guide](../docs/SKILLS.md)
-
-## Contributing
-
-1. Create your agent in the appropriate folder
-2. Add README with usage instructions
-3. Include .env.example
-4. Submit pull request
-
-## License
-
-See [LICENSE.md](LICENSE.md)

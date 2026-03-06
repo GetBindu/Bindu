@@ -14,6 +14,7 @@ Usage:
 
 Environment:
     Requires OPENROUTER_API_KEY in .env file
+    PORT: Agent server port (default: 3773)
 """
 
 import os
@@ -34,12 +35,15 @@ agent = Agent(
     tools=[DuckDuckGoTools()],
 )
 
+# Get port from environment variable, default to 3773
+port = os.getenv("PORT", "3773")
+
 config = {
     "author": "21uad051@kamarajengg.edu.in",
     "name": "beginner_zero_config_agent",
     "description": "Zero-config local Bindu agent for first-time users",
     "deployment": {
-        "url": "http://localhost:3773",
+        "url": f"http://localhost:{port}",
         "expose": True,
         "cors_origins": ["http://localhost:5173"]
     },

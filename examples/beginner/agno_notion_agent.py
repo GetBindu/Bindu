@@ -13,6 +13,7 @@ Usage:
 
 Environment:
     Requires OPENROUTER_API_KEY, NOTION_API_KEY, NOTION_DATABASE_ID in .env file
+    PORT: Agent server port (default: 3773)
 """
 
 import os
@@ -84,6 +85,9 @@ agent = Agent(
     tools=[create_notion_page, search_notion],
 )
 
+# Get port from environment variable, default to 3773
+port = os.getenv("PORT", "3773")
+
 # -----------------------------
 # Bindu Configuration
 # -----------------------------
@@ -92,7 +96,7 @@ config = {
     "name": "agno-notion-agent",
     "description": "Notion assistant agent (OpenRouter)",
     "deployment": {
-        "url": "http://localhost:3773",
+        "url": f"http://localhost:{port}",
         "expose": True,
         "cors_origins": ["http://localhost:5173"]
     },

@@ -13,9 +13,10 @@ Usage:
     python echo_simple_agent.py
 
 Environment:
-    No environment variables required
+    PORT: Agent server port (default: 3773)
 """
 
+import os
 from bindu.penguin.bindufy import bindufy
 
 
@@ -31,13 +32,15 @@ def handler(messages):
     # Reply with the user's latest input
     return [{"role": "assistant", "content": messages[-1]["content"]}]
 
+# Get port from environment variable, default to 3773
+port = os.getenv("PORT", "3773")
 
 config = {
     "author": "gaurikasethi88@gmail.com",
     "name": "echo_agent",
     "description": "A basic echo agent for quick testing.",
     "deployment": {
-        "url": "http://localhost:3773",
+        "url": f"http://localhost:{port}",
         "expose": True,
         "cors_origins": ["http://localhost:5173"]
     },
