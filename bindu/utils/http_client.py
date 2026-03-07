@@ -7,8 +7,8 @@ to avoid duplicating HTTP request logic, retry mechanisms, and session managemen
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Dict, Optional
 from contextlib import asynccontextmanager
+from typing import Any
 
 import aiohttp
 
@@ -34,7 +34,7 @@ class AsyncHTTPClient:
         timeout: int = 10,
         verify_ssl: bool = True,
         max_retries: int = 3,
-        default_headers: Optional[Dict[str, str]] = None,
+        default_headers: dict[str, str] | None = None,
     ) -> None:
         """Initialize HTTP client.
 
@@ -50,7 +50,7 @@ class AsyncHTTPClient:
         self.verify_ssl = verify_ssl
         self.max_retries = max_retries
         self.default_headers = default_headers or {}
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._session: aiohttp.ClientSession | None = None
 
         logger.debug(f"HTTP client initialized: base_url={base_url}")
 
@@ -85,11 +85,11 @@ class AsyncHTTPClient:
         method: str,
         endpoint: str,
         *,
-        params: Optional[Dict[str, Any]] = None,
-        data: Optional[Dict[str, Any]] = None,
-        json: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
-        retry_on_status: Optional[list[int]] = None,
+        params: dict[str, Any] | None = None,
+        data: dict[str, Any] | None = None,
+        json: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+        retry_on_status: list[int] | None = None,
         **kwargs,
     ) -> aiohttp.ClientResponse:
         """Make HTTP request with retry logic.
@@ -177,8 +177,8 @@ class AsyncHTTPClient:
         self,
         endpoint: str,
         *,
-        params: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
+        params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
         **kwargs,
     ) -> aiohttp.ClientResponse:
         """Make GET request.
@@ -200,9 +200,9 @@ class AsyncHTTPClient:
         self,
         endpoint: str,
         *,
-        data: Optional[Dict[str, Any]] = None,
-        json: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
+        data: dict[str, Any] | None = None,
+        json: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
         **kwargs,
     ) -> aiohttp.ClientResponse:
         """Make POST request.
@@ -225,9 +225,9 @@ class AsyncHTTPClient:
         self,
         endpoint: str,
         *,
-        data: Optional[Dict[str, Any]] = None,
-        json: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
+        data: dict[str, Any] | None = None,
+        json: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
         **kwargs,
     ) -> aiohttp.ClientResponse:
         """Make PUT request.
@@ -250,7 +250,7 @@ class AsyncHTTPClient:
         self,
         endpoint: str,
         *,
-        headers: Optional[Dict[str, str]] = None,
+        headers: dict[str, str] | None = None,
         **kwargs,
     ) -> aiohttp.ClientResponse:
         """Make DELETE request.
@@ -269,9 +269,9 @@ class AsyncHTTPClient:
         self,
         endpoint: str,
         *,
-        data: Optional[Dict[str, Any]] = None,
-        json: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
+        data: dict[str, Any] | None = None,
+        json: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
         **kwargs,
     ) -> aiohttp.ClientResponse:
         """Make PATCH request.
@@ -297,7 +297,7 @@ async def http_client(
     timeout: int = 10,
     verify_ssl: bool = True,
     max_retries: int = 3,
-    default_headers: Optional[Dict[str, str]] = None,
+    default_headers: dict[str, str] | None = None,
 ):
     """Context manager for creating and managing an HTTP client.
 

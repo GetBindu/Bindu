@@ -82,6 +82,8 @@ class MessageHandlers:
             isinstance(message_metadata, dict)
             and "_payment_context" in message_metadata
         ):
+            # Move payment context to scheduler params and strip it from the
+            # message metadata so it is not persisted or forwarded to the agent
             scheduler_params["payment_context"] = message_metadata["_payment_context"]
             del message_metadata["_payment_context"]
 
