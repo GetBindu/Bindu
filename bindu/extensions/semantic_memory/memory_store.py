@@ -1,4 +1,9 @@
-# Simple in-memory store for semantic memory
+"""
+Simple in-memory semantic memory store.
+
+Allows agents to store text + embeddings and retrieve them later
+for cross-agent knowledge sharing experiments.
+"""
 
 MEMORY_STORE = []
 
