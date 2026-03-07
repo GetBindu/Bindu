@@ -49,17 +49,16 @@ class InMemoryStorage(Storage[ContextT]):
     - tasks: Dict[UUID, Task] - All tasks indexed by task_id
     - contexts: Dict[UUID, list[UUID]] - Task IDs grouped by context_id
     - task_feedback: Dict[UUID, List[dict]] - Optional feedback storage
+    - _checkpoints: Dict[UUID, list] - Checkpoints for pause/resume
     """
 
     def __init__(self):
-        """Initialize in-memory storage.
-
-        Note: This is an __init__ method.
-        """
+        """Initialize in-memory storage."""
         self.tasks: dict[UUID, Task] = {}
         self.contexts: dict[UUID, list[UUID]] = {}
         self.task_feedback: dict[UUID, list[dict[str, Any]]] = {}
         self._webhook_configs: dict[UUID, PushNotificationConfig] = {}
+        self._checkpoints: dict[UUID, list[dict[str, Any]]] = {}
 
     @retry_storage_operation(max_attempts=3, min_wait=0.1, max_wait=1)
     async def load_task(
@@ -81,10 +80,8 @@ class InMemoryStorage(Storage[ContextT]):
         if task is None:
             return None
 
-        # Always return a deep copy to prevent mutations affecting stored task
         task_copy = cast(Task, copy.deepcopy(task))
 
-        # Limit history if requested
         if history_length is not None and history_length > 0 and "history" in task:
             task_copy["history"] = task["history"][-history_length:]
 
@@ -92,28 +89,10 @@ class InMemoryStorage(Storage[ContextT]):
 
     @retry_storage_operation(max_attempts=3, min_wait=0.1, max_wait=1)
     async def submit_task(self, context_id: UUID, message: Message) -> Task:
-        """Create a new task or continue an existing non-terminal task.
-
-        Task-First Pattern (Bindu):
-        - If task exists and is in non-terminal state: Append message and reset to 'submitted'
-        - If task exists and is in terminal state: Raise error (immutable)
-        - If task doesn't exist: Create new task
-
-        Args:
-            context_id: Context to associate the task with
-            message: Initial message containing task request
-
-        Returns:
-            Task in 'submitted' state (new or continued)
-
-        Raises:
-            TypeError: If IDs are invalid types
-            ValueError: If attempting to continue a terminal task
-        """
+        """Create a new task or continue an existing non-terminal task."""
         if not isinstance(context_id, UUID):
             raise TypeError(f"context_id must be UUID, got {type(context_id).__name__}")
 
-        # Parse task ID from message (handle both snake_case and camelCase)
         task_id_raw = message.get("task_id")
         task_id: UUID
 
@@ -126,7 +105,6 @@ class InMemoryStorage(Storage[ContextT]):
                 f"task_id must be UUID or str, got {type(task_id_raw).__name__}"
             )
 
-        # Ensure all UUID fields are proper UUID objects (normalize to snake_case)
         message["task_id"] = task_id
         message["context_id"] = context_id
 
@@ -138,7 +116,6 @@ class InMemoryStorage(Storage[ContextT]):
                 f"message_id must be UUID or str, got {type(message_id_raw).__name__}"
             )
 
-        # Validate and normalize reference_task_ids if present (handle both formats)
         ref_ids_key = "reference_task_ids"
         if ref_ids_key in message:
             ref_ids = message[ref_ids_key]
@@ -155,21 +132,17 @@ class InMemoryStorage(Storage[ContextT]):
                         )
                 message["reference_task_ids"] = normalized_refs
 
-        # Check if task already exists
         existing_task = self.tasks.get(task_id)
 
         if existing_task:
-            # Task exists - check if it's mutable
             current_state = existing_task["status"]["state"]
 
-            # Check if task is in terminal state (immutable)
             if current_state in app_settings.agent.terminal_states:
                 raise ValueError(
                     f"Cannot continue task {task_id}: Task is in terminal state '{current_state}' and is immutable. "
                     f"Create a new task with referenceTaskIds to continue the conversation."
                 )
 
-            # Non-terminal states (mutable) - append message and continue
             logger.info(
                 f"Continuing existing task {task_id} from state '{current_state}'"
             )
@@ -178,14 +151,12 @@ class InMemoryStorage(Storage[ContextT]):
                 existing_task["history"] = []
             existing_task["history"].append(message)
 
-            # Reset to submitted state for re-execution
             existing_task["status"] = TaskStatus(
                 state="submitted", timestamp=datetime.now(timezone.utc).isoformat()
             )
 
             return existing_task
 
-        # Task doesn't exist - create new task
         task_status = TaskStatus(
             state="submitted", timestamp=datetime.now(timezone.utc).isoformat()
         )
@@ -198,7 +169,6 @@ class InMemoryStorage(Storage[ContextT]):
         )
         self.tasks[task_id] = task
 
-        # Add task to context
         if context_id not in self.contexts:
             self.contexts[context_id] = []
         self.contexts[context_id].append(task_id)
@@ -214,26 +184,7 @@ class InMemoryStorage(Storage[ContextT]):
         new_messages: list[Message] | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> Task:
-        """Update task state and append new content.
-
-        Hybrid Pattern Support:
-        - Message only: update_task(task_id, "input-required", new_messages=[...], metadata={...})
-        - Completion: update_task(task_id, "completed", new_artifacts=[...], new_messages=[...])
-
-        Args:
-            task_id: Task to update
-            state: New task state (working, completed, failed, etc.)
-            new_artifacts: Optional artifacts to append (for completion)
-            new_messages: Optional messages to append to history
-            metadata: Optional metadata to update/merge with task metadata
-
-        Returns:
-            Updated task object
-
-        Raises:
-            TypeError: If task_id is not UUID
-            KeyError: If task not found
-        """
+        """Update task state and append new content."""
         if not isinstance(task_id, UUID):
             raise TypeError(f"task_id must be UUID, got {type(task_id).__name__}")
 
@@ -258,7 +209,6 @@ class InMemoryStorage(Storage[ContextT]):
         if new_messages:
             if "history" not in task:
                 task["history"] = []
-            # Add IDs to messages for consistency
             for message in new_messages:
                 if not isinstance(message, dict):
                     raise TypeError(
@@ -271,36 +221,12 @@ class InMemoryStorage(Storage[ContextT]):
         return task
 
     async def update_context(self, context_id: UUID, context: ContextT) -> None:
-        """Store or update context metadata.
-
-        Note: This stores additional context metadata. Task associations are
-        managed automatically via submit_task().
-
-        Args:
-            context_id: Context identifier
-            context: Context data (format determined by agent implementation)
-
-        Raises:
-            TypeError: If context_id is not UUID
-        """
+        """Store or update context metadata."""
         if not isinstance(context_id, UUID):
             raise TypeError(f"context_id must be UUID, got {type(context_id).__name__}")
 
-        # Note: This method is kept for backward compatibility but contexts
-        # are now primarily managed as task lists
-
     async def load_context(self, context_id: UUID) -> list[UUID] | None:
-        """Load context task list from storage.
-
-        Args:
-            context_id: Unique identifier of the context
-
-        Returns:
-            List of task UUIDs if context exists, None otherwise
-
-        Raises:
-            TypeError: If context_id is not UUID
-        """
+        """Load context task list from storage."""
         if not isinstance(context_id, UUID):
             raise TypeError(f"context_id must be UUID, got {type(context_id).__name__}")
 
@@ -309,51 +235,23 @@ class InMemoryStorage(Storage[ContextT]):
     async def append_to_contexts(
         self, context_id: UUID, messages: list[Message]
     ) -> None:
-        """Append messages to context history.
-
-        Note: This method is deprecated as contexts now store task lists.
-        Messages are stored in task history instead.
-
-        Args:
-            context_id: Context to update
-            messages: Messages to append to history
-
-        Raises:
-            TypeError: If context_id is not UUID or messages is not a list
-        """
+        """Append messages to context history."""
         if not isinstance(context_id, UUID):
             raise TypeError(f"context_id must be UUID, got {type(context_id).__name__}")
 
         if not isinstance(messages, list):
             raise TypeError(f"messages must be list, got {type(messages).__name__}")
 
-            self.contexts[context_id] = []
-
     async def list_tasks(self, length: int | None = None) -> list[Task]:
-        """List all tasks in storage.
-
-        Args:
-            length: Optional limit on number of tasks to return (most recent)
-
-        Returns:
-            List of tasks
-        """
+        """List all tasks in storage."""
         if length is None:
             return list(self.tasks.values())
 
-        # Optimize: Only convert to list what we need
         all_tasks = list(self.tasks.values())
         return all_tasks[-length:] if length < len(all_tasks) else all_tasks
 
     async def count_tasks(self, status: str | None = None) -> int:
-        """Count number of tasks, optionally filtered by status.
-
-        Args:
-            status: Optional status to filter by
-
-        Returns:
-            Count of matching tasks
-        """
+        """Count number of tasks, optionally filtered by status."""
         if status is None:
             return len(self.tasks)
 
@@ -362,24 +260,10 @@ class InMemoryStorage(Storage[ContextT]):
     async def list_tasks_by_context(
         self, context_id: UUID, length: int | None = None
     ) -> list[Task]:
-        """List tasks belonging to a specific context.
-
-        Used for building conversation history and supporting task refinements.
-
-        Args:
-            context_id: Context to filter tasks by
-            length: Optional limit on number of tasks to return (most recent)
-
-        Returns:
-            List of tasks in the context
-
-        Raises:
-            TypeError: If context_id is not UUID
-        """
+        """List tasks belonging to a specific context."""
         if not isinstance(context_id, UUID):
             raise TypeError(f"context_id must be UUID, got {type(context_id).__name__}")
 
-        # Get task IDs from context
         task_ids = self.contexts.get(context_id, [])
         tasks: list[Task] = [
             self.tasks[task_id] for task_id in task_ids if task_id in self.tasks
@@ -390,14 +274,7 @@ class InMemoryStorage(Storage[ContextT]):
         return tasks
 
     async def list_contexts(self, length: int | None = None) -> list[dict[str, Any]]:
-        """List all contexts in storage.
-
-        Args:
-            length: Optional limit on number of contexts to return (most recent)
-
-        Returns:
-            List of context objects with task counts
-        """
+        """List all contexts in storage."""
         contexts = [
             {"context_id": ctx_id, "task_count": len(task_ids), "task_ids": task_ids}
             for ctx_id, task_ids in self.contexts.items()
@@ -408,62 +285,37 @@ class InMemoryStorage(Storage[ContextT]):
         return contexts
 
     async def clear_context(self, context_id: UUID) -> None:
-        """Clear all tasks associated with a specific context.
-
-        Args:
-            context_id: The context ID to clear
-
-        Raises:
-            TypeError: If context_id is not UUID
-            ValueError: If context does not exist
-
-        Warning: This is a destructive operation.
-        """
+        """Clear all tasks associated with a specific context."""
         if not isinstance(context_id, UUID):
             raise TypeError(f"context_id must be UUID, got {type(context_id).__name__}")
 
-        # Check if context exists
         if context_id not in self.contexts:
             raise ValueError(f"Context {context_id} not found")
 
-        # Get task IDs from the context
         task_ids = self.contexts.get(context_id, [])
 
-        # Remove all tasks associated with this context
         for task_id in task_ids:
             if task_id in self.tasks:
                 del self.tasks[task_id]
-            # Also clear feedback for these tasks
             if task_id in self.task_feedback:
                 del self.task_feedback[task_id]
 
-        # Remove the context itself
         del self.contexts[context_id]
 
         logger.info(f"Cleared context {context_id}: removed {len(task_ids)} tasks")
 
     async def clear_all(self) -> None:
-        """Clear all tasks and contexts from storage.
-
-        Warning: This is a destructive operation.
-        """
+        """Clear all tasks and contexts from storage."""
         self.tasks.clear()
         self.contexts.clear()
         self.task_feedback.clear()
         self._webhook_configs.clear()
+        self._checkpoints.clear()
 
     async def store_task_feedback(
         self, task_id: UUID, feedback_data: dict[str, Any]
     ) -> None:
-        """Store user feedback for a task.
-
-        Args:
-            task_id: Task to associate feedback with
-            feedback_data: Feedback content (rating, comments, etc.)
-
-        Raises:
-            TypeError: If task_id is not UUID or feedback_data is not dict
-        """
+        """Store user feedback for a task."""
         if not isinstance(task_id, UUID):
             raise TypeError(f"task_id must be UUID, got {type(task_id).__name__}")
 
@@ -477,38 +329,16 @@ class InMemoryStorage(Storage[ContextT]):
         self.task_feedback[task_id].append(feedback_data)
 
     async def get_task_feedback(self, task_id: UUID) -> list[dict[str, Any]] | None:
-        """Retrieve feedback for a task.
-
-        Args:
-            task_id: Task to get feedback for
-
-        Returns:
-            List of feedback entries or None if no feedback exists
-
-        Raises:
-            TypeError: If task_id is not UUID
-        """
+        """Retrieve feedback for a task."""
         if not isinstance(task_id, UUID):
             raise TypeError(f"task_id must be UUID, got {type(task_id).__name__}")
 
         return self.task_feedback.get(task_id)
 
-    # -------------------------------------------------------------------------
-    # Webhook Persistence Operations (for long-running tasks)
-    # -------------------------------------------------------------------------
-
     async def save_webhook_config(
         self, task_id: UUID, config: PushNotificationConfig
     ) -> None:
-        """Save a webhook configuration for a task.
-
-        Args:
-            task_id: Task to associate the webhook config with
-            config: Push notification configuration to persist
-
-        Raises:
-            TypeError: If task_id is not UUID
-        """
+        """Save a webhook configuration for a task."""
         if not isinstance(task_id, UUID):
             raise TypeError(f"task_id must be UUID, got {type(task_id).__name__}")
 
@@ -516,33 +346,14 @@ class InMemoryStorage(Storage[ContextT]):
         logger.debug(f"Saved webhook config for task {task_id}")
 
     async def load_webhook_config(self, task_id: UUID) -> PushNotificationConfig | None:
-        """Load a webhook configuration for a task.
-
-        Args:
-            task_id: Task to load the webhook config for
-
-        Returns:
-            The webhook configuration if found, None otherwise
-
-        Raises:
-            TypeError: If task_id is not UUID
-        """
+        """Load a webhook configuration for a task."""
         if not isinstance(task_id, UUID):
             raise TypeError(f"task_id must be UUID, got {type(task_id).__name__}")
 
         return self._webhook_configs.get(task_id)
 
     async def delete_webhook_config(self, task_id: UUID) -> None:
-        """Delete a webhook configuration for a task.
-
-        Args:
-            task_id: Task to delete the webhook config for
-
-        Raises:
-            TypeError: If task_id is not UUID
-
-        Note: Does not raise if the config doesn't exist.
-        """
+        """Delete a webhook configuration for a task."""
         if not isinstance(task_id, UUID):
             raise TypeError(f"task_id must be UUID, got {type(task_id).__name__}")
 
@@ -551,9 +362,79 @@ class InMemoryStorage(Storage[ContextT]):
             logger.debug(f"Deleted webhook config for task {task_id}")
 
     async def load_all_webhook_configs(self) -> dict[UUID, PushNotificationConfig]:
-        """Load all stored webhook configurations.
-
-        Returns:
-            Dictionary mapping task IDs to their webhook configurations
-        """
+        """Load all stored webhook configurations."""
         return dict(self._webhook_configs)
+
+    async def save_checkpoint(
+        self,
+        task_id: UUID,
+        checkpoint_data: dict[str, Any],
+        step_number: int = 0,
+        step_label: str | None = None,
+    ) -> None:
+        """Save a checkpoint for task pause/resume."""
+        if not isinstance(task_id, UUID):
+            raise TypeError(f"task_id must be UUID, got {type(task_id).__name__}")
+
+        if not isinstance(checkpoint_data, dict):
+            raise TypeError(
+                f"checkpoint_data must be dict, got {type(checkpoint_data).__name__}"
+            )
+
+        if task_id not in self._checkpoints:
+            self._checkpoints[task_id] = []
+
+        self._checkpoints[task_id].append(
+            {
+                "checkpoint_data": checkpoint_data,
+                "step_number": step_number,
+                "step_label": step_label,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+        logger.debug(f"Saved checkpoint for task {task_id} at step {step_number}")
+
+    async def get_checkpoint(self, task_id: UUID) -> dict[str, Any] | None:
+        """Load the latest checkpoint for a task."""
+        if not isinstance(task_id, UUID):
+            raise TypeError(f"task_id must be UUID, got {type(task_id).__name__}")
+
+        checkpoints = self._checkpoints.get(task_id, [])
+        if not checkpoints:
+            return None
+
+        return checkpoints[-1]
+
+    async def delete_checkpoint(self, task_id: UUID) -> None:
+        """Delete checkpoint(s) for a task."""
+        if not isinstance(task_id, UUID):
+            raise TypeError(f"task_id must be UUID, got {type(task_id).__name__}")
+
+        if task_id in self._checkpoints:
+            del self._checkpoints[task_id]
+            logger.debug(f"Deleted checkpoint(s) for task {task_id}")
+
+    async def list_checkpoints(
+        self, task_id: UUID | None = None, limit: int = 100
+    ) -> list[dict[str, Any]]:
+        """List checkpoints, optionally filtered by task_id."""
+        results = []
+
+        for cp_task_id, checkpoints in self._checkpoints.items():
+            if task_id is not None and cp_task_id != task_id:
+                continue
+            for cp in checkpoints:
+                results.append(
+                    {
+                        "task_id": cp_task_id,
+                        "checkpoint_data": cp.get("checkpoint_data", {}),
+                        "step_number": cp.get("step_number", 0),
+                        "step_label": cp.get("step_label"),
+                        "created_at": cp.get("created_at"),
+                    }
+                )
+
+        # Sort by created_at descending (most recent first)
+        results.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+
+        return results[:limit]
