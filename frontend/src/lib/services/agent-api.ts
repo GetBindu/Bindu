@@ -155,6 +155,10 @@ export class AgentAPI {
     await this.request<void>('contexts/clear', { contextId });
   }
 
+  async clearTasks(contextId: string): Promise<void> {
+    await this.request<void>('tasks/clear', { contextId });
+  }
+
   async submitFeedback(taskId: string, rating: number, feedback?: string): Promise<void> {
     const params: Record<string, unknown> = { taskId, rating };
     if (feedback) params.feedback = feedback;

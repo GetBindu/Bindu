@@ -218,20 +218,33 @@ export function createNewContext() {
 }
 
 export async function clearContext(ctxId: string) {
-  try {
-    await agentAPI.clearContext(ctxId);
+	try {
+		await agentAPI.clearContext(ctxId);
 
-    contexts.update(ctxs => ctxs.filter(c => c.id !== ctxId));
+		contexts.update(ctxs => ctxs.filter(c => c.id !== ctxId));
 
-    if (get(contextId) === ctxId) {
-      createNewContext();
-    }
+		if (get(contextId) === ctxId) {
+			createNewContext();
+		}
 
-    addMessage('Context cleared successfully', 'status');
-  } catch (err) {
-    console.error('Error clearing context:', err);
-    setError('Failed to clear context');
-  }
+		addMessage('Context cleared successfully', 'status');
+	} catch (err) {
+		console.error('Error clearing context:', err);
+		setError('Failed to clear context');
+	}
+}
+
+export async function clearTasks(ctxId: string) {
+	try {
+		await agentAPI.clearTasks(ctxId);
+		currentTaskId.set(null);
+		currentTaskState.set(null);
+		replyToTaskId.set(null);
+		addMessage('Tasks cleared successfully', 'status');
+	} catch (err) {
+		console.error('Error clearing tasks:', err);
+		setError('Failed to clear tasks');
+	}
 }
 
 export async function sendMessage(text: string) {

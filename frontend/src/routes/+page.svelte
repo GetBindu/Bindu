@@ -23,6 +23,7 @@
 		currentTaskState,
 		createNewContext,
 		clearContext as clearAgentContext,
+		clearTasks as clearAgentTasks,
 		setReplyTo,
 		clearReplyTo,
 		replyToTaskId
@@ -194,10 +195,13 @@
 	}
 
 	async function handleClearTasks() {
-		// UI-only reset: start a fresh task thread (keep context if it exists)
+		const ctx = $contextId;
 		currentTaskId.set(null);
 		currentTaskState.set(null);
 		setReplyTo(null);
+		if (ctx) {
+			await clearAgentTasks(ctx);
+		}
 	}
 
 	async function handleClearContext() {
