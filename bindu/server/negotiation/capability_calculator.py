@@ -204,19 +204,15 @@ class CapabilityCalculator:
             )
 
         # Calculate component scores
-
-        (
-            skill_match_score,
-            skill_matches,
-            matched_tags,
-            matched_caps,
-            skill_debug_info,
-        ) = await self._calculate_skill_match(
-            task_keywords=task_keywords,
-            task_summary=task_summary,
-            task_details=task_details,
-            debug=debug,
+        skill_match_score, skill_matches, matched_tags, matched_caps, skill_debug_info = (
+            await self._calculate_skill_match(
+                task_keywords=task_keywords,
+                task_summary=task_summary,
+                task_details=task_details,
+                debug=debug,
+            )
         )
+
 
         io_score = self._calculate_io_compatibility(input_mime_types, output_mime_types)
         load_score = self._calculate_load_score(queue_depth)
