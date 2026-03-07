@@ -51,21 +51,26 @@ Guidelines:
 # Document Parsing
 def extract_text_from_pdf(file_bytes):
     """Extract text from pdf bytes"""
-    reader = PdfReader(io.BytesIO(file_bytes))
+    try:
+        reader = PdfReader(io.BytesIO(file_bytes))
+    except Exception as e:
+        raise ValueError(f"Invalid PDF file: {str(e)}")
     text = []
 
     for page in reader.pages:
-        page_text = page.extract_text()
-
-        if page_text:
-            text.append(page_text)
+        try:
+            page_text = page.extract_text()
+            if page_text:
+                text.append(page_text)
+        except Exception:
+            continue
 
     return "\n".join(text)
 
 def extract_text_from_docx(file_bytes):
     """Extract text from docx bytes"""
     doc = Document(io.BytesIO(file_bytes))
-    return "\n".join([content for content in doc.paragraphs])
+    return "\n".join([p.text for p in doc.paragraphs])
 
 def extract_document_text(file_bytes, mime_type):
     """Parse document according to their mime type"""
@@ -80,21 +85,24 @@ def extract_document_text(file_bytes, mime_type):
     raise ValueError(f"Unsupported file type: {mime_type}")
 
 # FilePart processing
-def get_file_bytes(file_part):
+def get_file_bytes(part):
     """Extract file bytes from FilePart"""
-    file_obj = file_part["file"]
+    file_info = part["file"]
 
-    if "data" in file_obj:
-        data = file_obj["data"]
+    if "bytes" in file_info:
+        data = file_info["bytes"]
+    elif "data" in file_info:
+        data = file_info["data"]
+    else:
+        raise ValueError("Unsupported file part format")
 
-        if isinstance(data, str):
-            return base64.b64decode(data)
-        return data
-    raise ValueError("Unsupported file part format.")
+    if isinstance(data, str):
+        import base64
+        return base64.b64decode(data)
+
+    return data
     
 # Handler
-import base64
-
 def handler(messages):
 
     if not messages:
@@ -157,4 +165,5 @@ config = {
     "skills": ["skills/document-processing"],
 }
 
-bindufy(config, handler)
+if __name__ == "__main__":
+    bindufy(config, handler)
