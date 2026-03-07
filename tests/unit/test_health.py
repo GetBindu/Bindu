@@ -27,6 +27,7 @@ def make_dummy_task_manager():
 def test_health_endpoint_ok():
     # disable auth to avoid middleware during simple health checks
     from bindu.settings import app_settings
+
     orig_auth = app_settings.auth.enabled
     app_settings.auth.enabled = False
 

@@ -84,7 +84,9 @@ async def test_agent_endpoint_returns_stream_response_directly():
         },
     }
 
-    response = await agent_run_endpoint(cast(BinduApplication, app), _make_request(payload))
+    response = await agent_run_endpoint(
+        cast(BinduApplication, app), _make_request(payload)
+    )
 
     assert isinstance(response, StreamingResponse)
     events = await asyncio.wait_for(_read_sse_events(response), timeout=2)

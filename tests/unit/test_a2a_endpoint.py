@@ -11,7 +11,9 @@ from bindu.server.applications import BinduApplication
 from bindu.settings import app_settings
 
 
-def _make_a2a_request(method: str, params: dict | None = None, headers: dict | None = None) -> object:
+def _make_a2a_request(
+    method: str, params: dict | None = None, headers: dict | None = None
+) -> object:
     """Create a minimal request object that mimics Starlette Request for A2A."""
     data = {"jsonrpc": "2.0", "id": "1", "method": method}
     if params is not None:

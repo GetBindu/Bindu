@@ -442,7 +442,7 @@ class ManifestWorker(Worker):
             )
             artifacts = self.build_artifacts(results)
 
-                # Handle payment settlement if payment context is available
+            # Handle payment settlement if payment context is available
             if payment_context:
                 settlement_metadata = await self._settle_payment(payment_context)
                 if additional_metadata:

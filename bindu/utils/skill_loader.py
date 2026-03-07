@@ -142,9 +142,15 @@ def load_skills(
                     "output_modes": skill_item.get("output_modes", ["text/plain"]),
                 }
                 for field in (
-                    "version", "author", "examples", "capabilities_detail",
-                    "requirements", "performance", "allowed_tools",
-                    "documentation", "assessment",
+                    "version",
+                    "author",
+                    "examples",
+                    "capabilities_detail",
+                    "requirements",
+                    "performance",
+                    "allowed_tools",
+                    "documentation",
+                    "assessment",
                 ):
                     if field in skill_item:
                         inline_skill[field] = skill_item[field]

@@ -92,7 +92,7 @@
 		{:else}
 			<div
 				role="dialog"
-				aria-modal="true" 
+				aria-modal="true"
 				aria-label="Dialog"
 				tabindex="-1"
 				bind:this={modalEl}

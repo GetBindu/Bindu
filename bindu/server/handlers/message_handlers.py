@@ -78,7 +78,10 @@ class MessageHandlers:
             )
 
         message_metadata = message.get("metadata", {})
-        if isinstance(message_metadata, dict) and "_payment_context" in message_metadata:
+        if (
+            isinstance(message_metadata, dict)
+            and "_payment_context" in message_metadata
+        ):
             scheduler_params["payment_context"] = message_metadata["_payment_context"]
             del message_metadata["_payment_context"]
 

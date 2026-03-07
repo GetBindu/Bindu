@@ -249,7 +249,9 @@ class TaskManager:
         """List all contexts in storage."""
         return await self._context_handlers.list_contexts(request)
 
-    async def clear_context(self, request: ClearContextsRequest) -> ClearContextsResponse:
+    async def clear_context(
+        self, request: ClearContextsRequest
+    ) -> ClearContextsResponse:
         """Clear a context from storage."""
         return await self._context_handlers.clear_context(request)
 

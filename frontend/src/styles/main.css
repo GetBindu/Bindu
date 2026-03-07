@@ -53,7 +53,7 @@ body {
 
 	.docs-content-container {
 		overflow-y: auto;
-		scrollbar-gutter: stable; 
+		scrollbar-gutter: stable;
 	}
 
 	.scrollbar-custom::-webkit-scrollbar {

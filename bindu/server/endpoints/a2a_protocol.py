@@ -83,9 +83,13 @@ async def agent_run_endpoint(app: BinduApplication, request: Request) -> Respons
                         logger.warning(
                             f"Insufficient permissions for method {method} from {client_ip}"
                         )
-                        from bindu.common.protocol.types import InsufficientPermissionsError
+                        from bindu.common.protocol.types import (
+                            InsufficientPermissionsError,
+                        )
 
-                        code, message = extract_error_fields(InsufficientPermissionsError)
+                        code, message = extract_error_fields(
+                            InsufficientPermissionsError
+                        )
                         return jsonrpc_error(
                             code,
                             message,
@@ -93,7 +97,7 @@ async def agent_run_endpoint(app: BinduApplication, request: Request) -> Respons
                             request_id,
                             403,
                         )
-        
+
         handler_name = app_settings.agent.method_handlers.get(method)
         if handler_name is None:
             logger.warning(f"Unsupported A2A method '{method}' from {client_ip}")

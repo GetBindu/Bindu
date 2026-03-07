@@ -146,7 +146,6 @@ class DIDAgentExtension:
         if not is_valid:
             raise ValueError(f"DID Document validation failed: {'; '.join(errors)}")
 
-
     def _generate_key_pair_data(self) -> tuple[bytes, bytes]:
         """Generate key pair and return PEM data.
 

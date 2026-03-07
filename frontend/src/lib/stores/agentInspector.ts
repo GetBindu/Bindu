@@ -27,4 +27,3 @@ export const agentInspector = writable<AgentInspectorSnapshot>(DEFAULT_AGENT_INS
 export function resetAgentInspector() {
 	agentInspector.set(DEFAULT_AGENT_INSPECTOR);
 }
-

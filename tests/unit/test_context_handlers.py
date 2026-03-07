@@ -19,7 +19,6 @@ import pytest
 
 from bindu.common.protocol.types import (
     ClearContextsRequest,
-    ContextNotFoundError,
     ListContextsRequest,
 )
 from bindu.server.handlers.context_handlers import ContextHandlers

@@ -24,11 +24,11 @@ from bindu.common.models import (
 )
 
 
-
 @pytest.fixture(autouse=True)
 def _reset_auth_config():
     """Reset authentication config for each application test."""
     from bindu.settings import app_settings
+
     orig = app_settings.auth.enabled
     app_settings.auth.enabled = False
     yield
@@ -106,6 +106,7 @@ class TestBinduApplicationInit:
     def test_init_with_auth_enabled(self, mock_manifest):
         """Test initialization with auth enabled via both flag and settings."""
         from bindu.settings import app_settings
+
         app_settings.auth.enabled = True
 
         app = BinduApplication(auth_enabled=True, manifest=mock_manifest)
@@ -125,7 +126,10 @@ class TestBinduApplicationInit:
         # look for HydraMiddleware in the middleware list
         found = False
         for m in getattr(app, "middleware", []):
-            if isinstance(m, HydraMiddleware) or getattr(m, "cls", None) is HydraMiddleware:
+            if (
+                isinstance(m, HydraMiddleware)
+                or getattr(m, "cls", None) is HydraMiddleware
+            ):
                 found = True
                 break
         assert found, "Auth middleware should be present when settings enable auth"

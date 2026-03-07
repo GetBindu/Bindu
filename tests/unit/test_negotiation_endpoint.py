@@ -51,11 +51,11 @@ def _make_app_with_manifest(skills: list, x402: dict | None = None) -> object:
     return SimpleNamespace(manifest=manifest, scheduler=None, task_manager=None)
 
 
-
 @pytest.fixture(autouse=True)
 def _disable_auth_settings():
     """Ensure authentication is disabled by default for most tests."""
     from bindu.settings import app_settings
+
     orig_enabled = app_settings.auth.enabled
     orig_require = app_settings.auth.require_permissions
     app_settings.auth.enabled = False
@@ -276,6 +276,7 @@ async def test_negotiation_endpoint_skill_matches():
 # Authentication tests
 # -----------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_negotiation_requires_auth():
     """Verify endpoint rejects requests when authentication is enabled."""
@@ -312,5 +313,5 @@ async def test_negotiation_allows_when_authenticated():
     response = await negotiation_endpoint(cast(BinduApplication, app), request)  # type: ignore
     # since manifest is missing, we expect 500, but not an auth error
     assert response.status_code != 401
-    
+
     # auth state will be reset by fixture

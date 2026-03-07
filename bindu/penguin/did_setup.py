@@ -86,13 +86,13 @@ def initialize_did_extension(
 
         # Perform integrity checks after keys are available
         try:
-             did_extension.check_integrity()
-             logger.info("✅ DID configuration and keys pass integrity check")
+            did_extension.check_integrity()
+            logger.info("✅ DID configuration and keys pass integrity check")
         except ValueError as e:
-             logger.error(f"❌ DID integrity check failed: {e}")
-             # We might want to raise here to stop startup, or just log
-             # For now, let's raise to enforce security
-             raise
+            logger.error(f"❌ DID integrity check failed: {e}")
+            # We might want to raise here to stop startup, or just log
+            # For now, let's raise to enforce security
+            raise
 
         # Backup keys to Vault if enabled and keys were newly generated
         if app_settings.vault.enabled:

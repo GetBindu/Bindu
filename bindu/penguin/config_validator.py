@@ -5,9 +5,6 @@ This module provides utilities to validate and process agent configurations,
 ensuring they meet the required schema and have proper defaults.
 """
 
-
-
-
 import os
 from typing import Any, Dict
 
