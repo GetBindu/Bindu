@@ -1,0 +1,317 @@
+# Document Analysis Skill
+# Analyze documents (PDF or DOCX) based on custom user prompts to extract insights
+
+# Basic Metadata
+id: document-analysis-v1
+name: document-analysis
+version: 1.1.0
+author: your.email@example.com
+
+# Description
+description: |
+  Analyze PDF and DOCX documents based on custom user prompts.
+  Extracts targeted insights such as summaries, key information,
+  important dates, financial data, legal clauses, action items,
+  or structured knowledge from any document.
+
+  Supports a wide range of documents including reports, contracts,
+  manuals, resumes, research papers, meeting notes, and business documents.
+
+# Tags and Modes
+tags:
+  - document
+  - analysis
+  - pdf
+  - docx
+  - summarization
+  - knowledge-extraction
+  - nlp
+
+input_modes:
+  - application/pdf
+  - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+
+output_modes:
+  - text/plain
+  - application/json
+
+# Example Queries
+examples:
+  - "Summarize the main points of this document"
+  - "Extract the key information from this file"
+  - "Provide a short summary of each section"
+  - "List all important dates mentioned in the document"
+  - "Identify the main topics discussed"
+  - "Extract all action items or tasks mentioned"
+  - "List any names, organizations, or locations referenced"
+  - "Highlight the most important insights from the document"
+  - "Explain the document in simple terms"
+  - "Provide a structured outline of the document"
+  - "Extract any numbers, statistics, or financial data"
+  - "Identify any instructions or procedures mentioned"
+  - "List the conclusions or recommendations"
+  - "Find any deadlines or time-sensitive information"
+  - "Provide key takeaways from the document"
+
+# Detailed Capabilities
+capabilities_detail:
+
+  document_preprocessing:
+    supported: true
+    features:
+      - text_cleaning
+      - header_footer_removal
+      - page_number_removal
+      - whitespace_normalization
+      - duplicate_line_removal
+
+  document_analysis:
+    supported: true
+    types:
+      - topic_identification
+      - key_information_extraction
+      - entity_extraction
+      - important_date_detection
+      - instruction_identification
+    output_formats:
+      - structured_report
+      - bullet_points
+      - section_wise_summary
+
+  document_summarization:
+    supported: true
+    types:
+      - executive_summary
+      - section_wise_summary
+      - key_points_extraction
+      - simplified_explanation
+    customizable: true
+    prompt_driven: true
+
+  contract_and_legal_analysis:
+    supported: true
+    types:
+      - clause_extraction
+      - obligation_identification
+      - risk_flagging
+      - party_identification
+      - date_and_deadline_extraction
+
+  financial_document_analysis:
+    supported: true
+    types:
+      - figure_extraction
+      - trend_identification
+      - ratio_analysis
+      - anomaly_flagging
+
+  multi_document_analysis:
+    supported: true
+    operations:
+      - document_comparison
+      - cross_document_summary
+      - duplicate_information_detection
+      - consistency_check
+
+  custom_prompt_analysis:
+    supported: true
+    description: "User provides any free-form analytical prompt; agent tailors response accordingly"
+    web_search_enrichment: true
+
+# Requirements
+requirements:
+  packages:
+    - pypdf>=3.0.0
+    - python-docx>=1.1.0
+  system: []
+  min_memory_mb: 256
+
+# Performance Metrics
+performance:
+  avg_processing_time_ms: 3000
+  avg_time_per_page_ms: 300
+  max_file_size_mb: 50
+  max_pages: 500
+  concurrent_requests: 5
+  memory_per_request_mb: 256
+  timeout_per_page_seconds: 30
+  scalability: horizontal
+
+# Tool Restrictions
+allowed_tools:
+  - Read
+  - Write
+  - WebSearch
+
+# Rich Documentation
+documentation:
+  overview: |
+    This agent analyzes PDF and DOCX documents based on a custom user-provided prompt.
+    Instead of performing generic summarization, it adapts its analysis to the user’s
+    request — whether extracting key information, identifying tasks, summarizing
+    sections, or pulling structured insights from the document.
+
+    It uses OpenRouter's gpt-oss-120b for advanced language understanding and
+    optionally enriches analysis with web search to validate references or
+    provide additional context.
+
+  use_cases:
+    when_to_use:
+      - User uploads a document and wants a summary
+      - User wants important information extracted from a report
+      - User wants tasks, instructions, or recommendations identified
+      - User wants important dates, numbers, or entities extracted
+      - User wants a structured outline of a document
+      - User wants to compare multiple documents
+
+    when_not_to_use:
+      - PDF form filling (use pdf-processing agent)
+      - Table extraction only (use pdf-processing agent)
+      - PDF merging, splitting, or editing (use pdf-manipulator agent)
+      - Image extraction from documents (use pdf-image-extractor agent)
+      - Real-time document streaming (not supported)
+
+  input_structure: |
+    Accepts one or more document files with a custom analytical prompt:
+
+    {
+      "files": [
+        {
+          "name": "document.pdf",
+          "mime_type": "application/pdf",
+          "data": "<base64_encoded_bytes>"
+        }
+      ],
+      "prompt": "Summarize the key points and extract important dates",
+      "options": {
+        "web_search": true,
+        "cite_sections": true,
+        "output_format": "structured"
+      }
+    }
+
+    File constraints:
+    - Max size: 50MB
+    - Max pages: 500
+    - Formats: PDF 1.0–2.0, DOCX (Office Open XML)
+
+  output_format: |
+    Structured Analysis:
+    {
+      "success": true,
+      "analysis": {
+        "prompt": "Summarize the key points and extract important dates",
+        "sections": [
+          {
+            "heading": "Key Summary",
+            "content": "The document discusses...",
+            "citations": ["Page 3"],
+            "confidence": 0.93
+          },
+          {
+            "heading": "Important Dates",
+            "content": "March 15, 2026 – Submission deadline...",
+            "citations": ["Page 5"],
+            "confidence": 0.91
+          }
+        ]
+      },
+      "metadata": {
+        "filename": "document.pdf",
+        "total_pages": 12,
+        "processing_time_ms": 3200,
+        "web_search_used": true
+      }
+    }
+
+  error_handling:
+    - "Unsupported file type: Returns error with list of supported formats"
+    - "Empty or corrupted file: Returns validation error with details"
+    - "Prompt too vague: Agent asks clarifying question before proceeding"
+    - "Document exceeds size limit: Returns error with file size constraints"
+    - "Web search unavailable: Falls back to document-only analysis"
+    - "Timeout: Returns partial analysis with notice of truncation"
+
+  best_practices:
+    for_developers:
+      - "Encourage users to provide clear and focused prompts"
+      - "Use cite_sections option to ground answers in document evidence"
+      - "Enable web search when contextual knowledge is required"
+      - "Handle large documents carefully with truncation warnings"
+      - "Cache analysis results for repeated queries"
+
+    for_orchestrators:
+      - "Route to pdf-processing if table extraction is required"
+      - "Chain with question-answering agent for follow-up queries"
+      - "Use file hash to prevent repeated processing"
+      - "Monitor token usage for large documents"
+      - "Implement retry logic for large document processing"
+
+  installation: |
+    Required packages:
+    pip install pypdf python-docx
+
+    No system-level dependencies required for standard PDF/DOCX text extraction.
+    For scanned PDFs requiring OCR, chain with the pdf-processing skill.
+
+  versioning:
+    - version: "1.0.0"
+      date: "2025-03-06"
+      changes: "Initial release with prompt-driven document analysis"
+    - version: "1.1.0"
+      date: "2026-03-06"
+      changes: "Added preprocessing, multi-document analysis, and confidence scoring"
+
+# Assessment fields for skill negotiation
+assessment:
+  keywords:
+    - analyze
+    - analysis
+    - document
+    - summarize
+    - summary
+    - extract
+    - insights
+    - review
+    - key points
+    - information
+    - tasks
+    - dates
+    - statistics
+
+  specializations:
+    - domain: document_analysis
+      confidence_boost: 0.4
+    - domain: contract_review
+      confidence_boost: 0.3
+    - domain: financial_analysis
+      confidence_boost: 0.3
+    - domain: custom_prompt_analysis
+      confidence_boost: 0.4
+
+  anti_patterns:
+    - "fill form"
+    - "form filling"
+    - "merge pdf"
+    - "split pdf"
+    - "edit pdf"
+    - "create pdf"
+    - "generate pdf"
+    - "extract images"
+    - "convert pdf"
+
+  complexity_indicators:
+    simple:
+      - "summarize"
+      - "what is this about"
+      - "key points"
+    medium:
+      - "extract information"
+      - "identify topics"
+      - "list dates"
+      - "find numbers"
+    complex:
+      - "cross reference"
+      - "compare documents"
+      - "multi-section analysis"
+      - "audit trail"
