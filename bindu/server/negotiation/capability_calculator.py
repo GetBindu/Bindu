@@ -479,7 +479,7 @@ class CapabilityCalculator:
         all_matched_tags: set[str] = set()
         all_matched_caps: set[str] = set()
 
-        skill_debug_info: list[dict[str, Any]] = [] if debug else None
+        skill_debug_info: Optional[list[dict[str, Any]]] = [] if debug else None
 
         # Try to use embeddings if enabled
         task_embedding = None
