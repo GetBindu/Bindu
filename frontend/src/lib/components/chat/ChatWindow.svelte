@@ -400,12 +400,12 @@
 	}}
 />
 
-<div class="relative min-h-0 min-w-0">
+<div class="relative flex min-h-0 min-w-0 flex-1 flex-col">
 	{#if shareModalOpen}
 		<ShareConversationModal open={shareModalOpen} onclose={() => shareModal.close()} />
 	{/if}
 	<div
-		class="scrollbar-custom h-full overflow-y-auto"
+		class="scrollbar-custom h-full flex-1 overflow-y-auto"
 		use:snapScrollToBottom={scrollDependency}
 		bind:this={chatContainer}
 	>
