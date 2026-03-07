@@ -19,7 +19,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 
 from bindu.settings import app_settings
 from bindu.utils.logging import get_logger
@@ -101,6 +101,7 @@ class AssessmentResult:
     latency_estimate_ms: int | None = None
     queue_depth: int | None = None
     subscores: dict[str, float] = field(default_factory=dict)
+    debug_trace: Optional[dict[str, Any]] = None
 
 
 class CapabilityCalculator:
@@ -155,6 +156,7 @@ class CapabilityCalculator:
         queue_depth: int | None = None,
         weights: ScoringWeights | None = None,
         min_score: float = 0.0,
+        debug: bool = False,
     ) -> AssessmentResult:
         """Calculate capability score for a task."""
         weights = weights or ScoringWeights()
@@ -180,24 +182,42 @@ class CapabilityCalculator:
             forbidden_tools=forbidden_tools,
         )
         if hard_fail:
+            debug_trace_obj = None
+            if debug:
+                debug_trace_obj = {
+                    "task_keywords": list(task_keywords),
+                    "normalized_weights": normalized_weights,
+                    "subscores": {},
+                    "skill_evaluations": [],
+                    "hard_constraint_failure": hard_fail,
+                    "decision": {
+                        "accepted": False,
+                        "reason": hard_fail,
+                    },
+                }
             return AssessmentResult(
                 accepted=False,
                 score=0.0,
                 confidence=1.0,
                 rejection_reason=hard_fail,
+                debug_trace=debug_trace_obj,
             )
 
         # Calculate component scores
+
         (
             skill_match_score,
             skill_matches,
             matched_tags,
             matched_caps,
+            skill_debug_info,
         ) = await self._calculate_skill_match(
             task_keywords=task_keywords,
             task_summary=task_summary,
             task_details=task_details,
+            debug=debug,
         )
+
         io_score = self._calculate_io_compatibility(input_mime_types, output_mime_types)
         load_score = self._calculate_load_score(queue_depth)
         cost_score = self._calculate_cost_score(max_cost_amount)
@@ -235,25 +255,17 @@ class CapabilityCalculator:
                     latency_estimate_ms=latency_estimate_ms,
                 )
 
-        # Compute performance subscore from latency estimate vs constraint.
-        # When no constraint is given, or no latency data is available, award
-        # the full score (1.0) so the weight is not silently discarded.
-        # Formula: linear decay from 1.0 (estimate = 0) to 0.0 (estimate = limit).
-        if latency_estimate_ms is not None and max_latency_ms and max_latency_ms > 0:
-            performance_score = max(0.0, 1.0 - latency_estimate_ms / max_latency_ms)
-        else:
-            performance_score = 1.0
+        performance_score = self._calculate_performance_score(
+            latency_estimate_ms, max_latency_ms
+        )
 
-        # Compute weighted final score.  All five subscore keys must be present
-        # so that normalized_weights (which includes "performance") is fully
-        # consumed.  Previously "performance" was absent, silently losing 15% of
-        # the total weight and causing final_score to be capped at ~0.85.
+        # Compute weighted final score
         subscores = {
             "skill_match": skill_match_score,
             "io_compatibility": io_score,
+            "performance": performance_score,
             "load": load_score,
             "cost": cost_score,
-            "performance": performance_score,
         }
         final_score = sum(normalized_weights[key] * subscores[key] for key in subscores)
 
@@ -268,6 +280,22 @@ class CapabilityCalculator:
         # Accept if score meets threshold and there's a skill match
         accepted = final_score >= min_score and skill_match_score > 0
 
+        debug_trace_obj = None
+
+        if debug:
+            debug_trace_obj = {
+                "task_keywords": list(task_keywords),
+                "normalized_weights": normalized_weights,
+                "subscores": subscores,
+                "skill_evaluations": skill_debug_info or [],
+                "hard_constraint_failure": None,
+                "decision": {
+                    "accepted": accepted,
+                    "final_score": round(final_score, 4),
+                    "min_score": min_score,
+                },
+            }
+
         return AssessmentResult(
             accepted=accepted,
             score=round(final_score, 4),
@@ -279,6 +307,7 @@ class CapabilityCalculator:
             latency_estimate_ms=latency_estimate_ms,
             queue_depth=queue_depth,
             subscores=subscores,
+            debug_trace=debug_trace_obj,
         )
 
     def _extract_keywords(self, summary: str, details: str | None = None) -> set[str]:
@@ -433,18 +462,28 @@ class CapabilityCalculator:
         task_keywords: set[str],
         task_summary: str = "",
         task_details: str | None = None,
-    ) -> tuple[float, list[SkillMatchResult], list[str], list[str]]:
-        """Calculate skill match score using hybrid approach (async).
+        debug: bool = False,
+    ) -> tuple[
+        float,
+        list[SkillMatchResult],
+        list[str],
+        list[str],
+        list[dict[str, Any]] | None,
+    ]:
+        """Calculate skill match score using hybrid approach.
 
         Uses embeddings for semantic matching (if enabled) combined with
         keyword matching and assessment field boosting.
         """
         if not task_keywords and not task_summary:
-            return 0.5, [], [], []
+            empty_debug = [] if debug else None
+            return 0.5, [], [], [], empty_debug
 
         skill_matches: list[SkillMatchResult] = []
         all_matched_tags: set[str] = set()
         all_matched_caps: set[str] = set()
+
+        skill_debug_info: list[dict[str, Any]] = [] if debug else None
 
         # Try to use embeddings if enabled
         task_embedding = None
@@ -523,6 +562,20 @@ class CapabilityCalculator:
 
             match_score = base_score
 
+            if debug:
+                skill_debug_info.append(
+                    {
+                        "skill_id": skill_id,
+                        "embedding_score": embedding_score,
+                        "keyword_score": keyword_score,
+                        "base_score": base_score,
+                        "final_score": match_score,
+                        "intersection": list(intersection),
+                        "anti_patterns": anti_patterns,
+                        "specializations": specializations,
+                    }
+                )
+
             # Track reasons for match
             reasons: list[str] = []
             if task_embedding is not None and embedding_score > 0:
@@ -561,7 +614,13 @@ class CapabilityCalculator:
         skill_matches.sort(key=lambda x: x.score, reverse=True)
         best_score = skill_matches[0].score if skill_matches else 0.0
 
-        return best_score, skill_matches, list(all_matched_tags), list(all_matched_caps)
+        return (
+            best_score,
+            skill_matches,
+            list(all_matched_tags),
+            list(all_matched_caps),
+            skill_debug_info,
+        )
 
     def _calculate_io_compatibility(
         self,
@@ -661,3 +720,26 @@ class CapabilityCalculator:
             confidence += 0.1
 
         return min(confidence, 1.0)
+
+    def _calculate_performance_score(
+        self,
+        latency_estimate_ms: int | None,
+        max_latency_ms: int | None,
+    ) -> float:
+        if latency_estimate_ms is None:
+            return 0.5  # neutral
+
+        # If no constraint, normalize against default baseline
+        baseline = max_latency_ms or self.DEFAULT_LATENCY_MS
+
+        if baseline <= 0:
+            return 0.5
+
+        ratio = latency_estimate_ms / baseline
+
+        if ratio <= 1:
+            # Under budget → reward
+            return max(0.5, 1.0 - (ratio * 0.5))
+        else:
+            # Over budget → degrade quickly
+            return max(0.0, 1.0 - ratio)
