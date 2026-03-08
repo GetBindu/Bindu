@@ -33,6 +33,20 @@ export interface OIDCUserInfo {
 	userData: UserinfoResponse;
 }
 
+/** Structured error codes returned when an OAuth provider is unavailable or misbehaving. */
+export type OAuthErrorCode = "OAUTH_PROVIDER_UNAVAILABLE" | "OAUTH_PROVIDER_ERROR";
+
+/** Thrown (and caught) to distinguish OAuth provider failures from other errors. */
+export class OAuthProviderError extends Error {
+	public readonly code: OAuthErrorCode;
+
+	constructor(message: string, code: OAuthErrorCode = "OAUTH_PROVIDER_ERROR") {
+		super(message);
+		this.name = "OAuthProviderError";
+		this.code = code;
+	}
+}
+
 const stringWithDefault = (value: string) =>
 	z
 		.string()
@@ -319,18 +333,33 @@ export async function getOIDCUserData(
 	iss: string | undefined,
 	url: URL
 ): Promise<OIDCUserInfo> {
-	const client = await getOIDCClient(settings, url);
-	const token = await client.callback(
-		settings.redirectURI,
-		{
-			code,
-			iss,
-		},
-		{ code_verifier: codeVerifier }
-	);
-	const userData = await client.userinfo(token);
-
-	return { token, userData };
+	try {
+		const client = await getOIDCClient(settings, url);
+		const token = await client.callback(
+			settings.redirectURI,
+			{
+				code,
+				iss,
+			},
+			{ code_verifier: codeVerifier }
+		);
+		const userData = await client.userinfo(token);
+		return { token, userData };
+	} catch (err) {
+		// Re-wrap as a typed error so callers (e.g. callback +server.ts) can distinguish
+		// provider unavailability from other failures without logging sensitive token data.
+		const isNetworkError =
+			err instanceof TypeError ||
+			(err instanceof Error && (err.message.includes("ECONNREFUSED") || err.message.includes("ENOTFOUND") || err.message.includes("fetch failed")));
+		const code: OAuthErrorCode = isNetworkError
+			? "OAUTH_PROVIDER_UNAVAILABLE"
+			: "OAUTH_PROVIDER_ERROR";
+		logger.error({ code, msg: err instanceof Error ? err.message : String(err) }, "OAuth provider error in getOIDCUserData");
+		throw new OAuthProviderError(
+			isNetworkError ? "OAuth provider is unreachable" : "OAuth provider returned an error",
+			code
+		);
+	}
 }
 
 /**
@@ -522,8 +551,6 @@ export async function triggerOauthFlow({ url, locals, cookies }: RequestEvent): 
 	// let redirectURI = `${(referer ? new URL(referer) : url).origin}${base}/login/callback`;
 	let redirectURI = `${url.origin}${base}/login/callback`;
 
-	// TODO: Handle errors if provider is not responding
-
 	if (url.searchParams.has("callback")) {
 		const callback = url.searchParams.get("callback") || redirectURI;
 		if (config.ALTERNATIVE_REDIRECT_URLS.includes(callback)) {
@@ -545,10 +572,47 @@ export async function triggerOauthFlow({ url, locals, cookies }: RequestEvent): 
 		next = sanitizeReturnPath(`${base}/`) ?? "/";
 	}
 
-	const authorizationUrl = await getOIDCAuthorizationUrl(
-		{ redirectURI },
-		{ sessionId: locals.sessionId, next, url, cookies }
-	);
+	try {
+		const authorizationUrl = await getOIDCAuthorizationUrl(
+			{ redirectURI },
+			{ sessionId: locals.sessionId, next, url, cookies }
+		);
+		throw redirect(302, authorizationUrl);
+	} catch (err) {
+		// Let SvelteKit redirect responses pass through unchanged.
+		if (err instanceof Response || (err && typeof err === "object" && "status" in err && "location" in err)) {
+			throw err;
+		}
 
-	throw redirect(302, authorizationUrl);
+		// Determine structured error code based on error type.
+		const isNetworkError =
+			err instanceof TypeError ||
+			(err instanceof Error &&
+				(err.message.includes("ECONNREFUSED") ||
+					err.message.includes("ENOTFOUND") ||
+					err.message.includes("fetch failed")));
+		const errorCode: OAuthErrorCode = isNetworkError
+			? "OAUTH_PROVIDER_UNAVAILABLE"
+			: "OAUTH_PROVIDER_ERROR";
+
+		// Log the error without sensitive data (no tokens, no secrets).
+		logger.error(
+			{ code: errorCode, msg: err instanceof Error ? err.message : String(err) },
+			"OAuth provider error during authorization URL generation"
+		);
+
+		return new Response(
+			JSON.stringify({
+				code: errorCode,
+				message:
+					errorCode === "OAUTH_PROVIDER_UNAVAILABLE"
+						? "The sign-in service is temporarily unavailable. Please try again later."
+						: "An error occurred during sign-in. Please try again.",
+			}),
+			{
+				status: 502,
+				headers: { "Content-Type": "application/json" },
+			}
+		);
+	}
 }
