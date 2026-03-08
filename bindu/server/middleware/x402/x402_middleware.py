@@ -35,6 +35,7 @@ from x402.types import (
 from bindu.utils.logging import get_logger
 from bindu.extensions.x402 import X402AgentExtension
 from bindu.settings import app_settings
+from bindu.server.middleware.x402.payment_security import PaymentSecurity
 
 from bindu.common.models import AgentManifest, VerifyResponse
 
@@ -78,6 +79,11 @@ class X402Middleware(BaseHTTPMiddleware):
         self.x402_ext = x402_ext
         self.facilitator = FacilitatorClient(config=facilitator_config)
         self._payment_requirements = payment_requirements
+        
+        # Initialize payment security for signature verification
+        self.payment_security = PaymentSecurity(
+            app_settings.x402.payment_security_secret
+        )
 
         self.protected_path = "/"  # A2A protocol endpoint
 
@@ -202,9 +208,35 @@ class X402Middleware(BaseHTTPMiddleware):
             )
             return self._create_402_response("X-PAYMENT header required")
 
-        # Decode and parse payment payload
+        # Decode and parse payment payload with signature verification
         try:
             payment_dict = json.loads(safe_base64_decode(payment_header))
+            
+            # Extract signature from payload (signed payloads include _hmac_signature field)
+            signature = payment_dict.pop("_hmac_signature", None)
+            
+            if not signature:
+                logger.warning(
+                    f"Missing payment signature from {request.client.host if request.client else 'unknown'}"
+                )
+                return self._create_402_response(
+                    "X-PAYMENT must include cryptographic signature (_hmac_signature)"
+                )
+            
+            # Verify signature integrity
+            is_valid, error_msg = self.payment_security.verify_payload(
+                payment_dict, signature
+            )
+            
+            if not is_valid:
+                logger.warning(
+                    f"Payment signature verification failed from {request.client.host if request.client else 'unknown'}: {error_msg}"
+                )
+                return self._create_402_response(
+                    f"Invalid payment signature: {error_msg}"
+                )
+            
+            # Signature verified, parse payload
             payment_payload = PaymentPayload.model_validate(payment_dict)
         except Exception as e:
             logger.warning(
