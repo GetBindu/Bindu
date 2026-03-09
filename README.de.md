@@ -1093,7 +1093,7 @@ Für Tasks, die länger als typische Request-Timeouts laufen (Minuten, Stunden o
 
 </details>
 
-📖 **[Vollständige Dokumentation](docs/long-running-task-notifications.md)** - Detaillierter Leitfaden mit Architektur, Sicherheit, Beispielen und Troubleshooting.
+📖 **[Vollständige Dokumentation](docs/NOTIFICATIONS.md)** - Detaillierter Leitfaden mit Architektur, Sicherheit, Beispielen und Troubleshooting.
 
 ---
 

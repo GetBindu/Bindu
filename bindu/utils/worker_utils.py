@@ -31,20 +31,35 @@ class MessageConverter:
     def to_chat_format(history: list[Message]) -> list[ChatMessage]:
         """Convert protocol messages to standard chat format.
 
+        Preserves file parts so handlers can process uploaded documents.
+
         Args:
             history: List of protocol messages
 
         Returns:
             List of chat messages with role and content fields
         """
-        return [
-            {
-                "role": MessageConverter.ROLE_MAP.get(msg.get("role", "user"), "user"),
-                "content": content,
-            }
-            for msg in history
-            if (content := MessageConverter._extract_text_content(msg))
-        ]
+        result = []
+        for msg in history:
+            parts = msg.get("parts", [])
+            if not parts:
+                continue
+
+            role = MessageConverter.ROLE_MAP.get(msg.get("role", "user"), "user")
+
+            # If message has only text parts, keep original string-content format
+            # for backwards compatibility with text-only agents
+            has_file = any(p.get("kind") == "file" for p in parts)
+
+            if has_file:
+                # Preserve full parts structure so handler can access file bytes
+                result.append({"role": role, "parts": parts})
+            else:
+                content = MessageConverter._extract_text_content(msg)
+                if content:
+                    result.append({"role": role, "content": content})
+
+        return result
 
     @staticmethod
     def to_protocol_messages(

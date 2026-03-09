@@ -731,7 +731,7 @@ Bindu prend en charge les **notifications webhook en temps réel** pour les tâc
 3. **Exécutez l'agent :** `python examples/echo_agent_with_webhooks.py`
 4. **Envoyez des tâches** - les notifications webhook arrivent automatiquement
 
-📖 **[Documentation complète](docs/long-running-task-notifications.md)** - Guide détaillé avec architecture, sécurité, exemples et dépannage.
+📖 **[Documentation complète](docs/NOTIFICATIONS.md)** - Guide détaillé avec architecture, sécurité, exemples et dépannage.
 
 ---
 

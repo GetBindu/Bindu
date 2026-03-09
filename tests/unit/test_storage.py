@@ -349,6 +349,11 @@ class TestConcurrentAccess:
         assert final_task is not None
         assert final_task["status"]["state"] == "working"
 
+        # FIX: Ensure metadata was actually updated in concurrency scenario
+        assert "metadata" in final_task
+        assert "update" in final_task["metadata"]
+        assert final_task["metadata"]["update"] in range(5)
+
 
 class TestDataIntegrity:
     """Test data integrity and isolation."""
@@ -382,5 +387,14 @@ class TestDataIntegrity:
         task_id = task["id"]
 
         loaded_task = await storage.load_task(task_id)
+
         # Check if metadata exists and has the custom field
         assert loaded_task is not None
+
+        # FIX: Added strict assertions to prevent this from being a Ghost Test
+        assert "history" in loaded_task
+        assert len(loaded_task["history"]) > 0
+        assert "metadata" in loaded_task["history"][0]
+        assert (
+            loaded_task["history"][0]["metadata"].get("custom_field") == "custom_value"
+        )

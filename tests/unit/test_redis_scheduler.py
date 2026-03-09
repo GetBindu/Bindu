@@ -1,7 +1,7 @@
 """Unit tests for RedisScheduler."""
 
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -169,20 +169,15 @@ class TestRedisSchedulerSerialization:
 
     def test_serialize_task_operation(self, redis_url):
         """Test task operation serialization."""
-
         scheduler = RedisScheduler(redis_url=redis_url)
 
-        # Create a mock span with proper span context
-        mock_span = MagicMock()
-        mock_span_context = MagicMock()
-        mock_span_context.span_id = 0x0123456789ABCDEF
-        mock_span_context.trace_id = 0x0123456789ABCDEF0123456789ABCDEF
-        mock_span.get_span_context.return_value = mock_span_context
-
+        # We no longer need to mock complex OpenTelemetry objects!
+        # The new architecture uses clean, serializable primitives.
         task_op = {
             "operation": "run",
             "params": {"task_id": "test-123", "context_id": "ctx-456"},
-            "_current_span": mock_span,
+            "trace_id": "0123456789abcdef0123456789abcdef",
+            "span_id": "0123456789abcdef",
         }
 
         serialized = scheduler._serialize_task_operation(task_op)
@@ -190,8 +185,8 @@ class TestRedisSchedulerSerialization:
 
         assert data["operation"] == "run"
         assert data["params"]["task_id"] == "test-123"
-        assert "span_id" in data
-        assert "trace_id" in data
+        assert data["span_id"] == "0123456789abcdef"
+        assert data["trace_id"] == "0123456789abcdef0123456789abcdef"
 
     def test_deserialize_task_operation_run(self, redis_url):
         """Test deserialization of run task operation."""
@@ -214,6 +209,9 @@ class TestRedisSchedulerSerialization:
 
         assert task_op["operation"] == "run"
         assert task_op["params"]["task_id"] == "test-123"
+        # Explicitly verify the new architecture preserves tracing correctly
+        assert task_op["span_id"] == "0123456789abcdef"
+        assert task_op["trace_id"] == "0123456789abcdef0123456789abcdef"
 
     def test_deserialize_task_operation_cancel(self, redis_url):
         """Test deserialization of cancel task operation."""
@@ -232,6 +230,8 @@ class TestRedisSchedulerSerialization:
 
         assert task_op["operation"] == "cancel"
         assert task_op["params"]["task_id"] == "test-123"
+        assert task_op["span_id"] is None
+        assert task_op["trace_id"] is None
 
     def test_deserialize_unknown_operation(self, redis_url):
         """Test deserialization with unknown operation type."""

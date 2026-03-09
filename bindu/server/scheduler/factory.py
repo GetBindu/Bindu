@@ -3,15 +3,6 @@
 This module provides a factory function to create schedulers based on
 configuration settings. It supports easy switching between scheduler implementations
 without changing application code.
-
-Usage:
-    from bindu.server.scheduler.factory import create_scheduler
-
-    # Create scheduler based on config
-    scheduler = await create_scheduler(config)
-
-    # Use scheduler
-    await scheduler.run_task(params)
 """
 
 from __future__ import annotations as _annotations
@@ -39,25 +30,6 @@ async def create_scheduler(config: SchedulerConfig | None = None) -> Scheduler:
 
     Reads the scheduler type from config and creates the appropriate scheduler instance.
     If no config is provided, uses app_settings.scheduler defaults.
-
-    Supported backends:
-    - "memory": InMemoryScheduler (default, single-process)
-    - "redis": RedisScheduler (distributed, multi-process)
-
-    Args:
-        config: Scheduler configuration. If None, uses app_settings.scheduler.
-
-    Returns:
-        Scheduler instance ready to use
-
-    Raises:
-        ValueError: If unknown scheduler backend is specified or Redis is not available
-        ConnectionError: If unable to connect to Redis
-
-    Example:
-        >>> config = SchedulerConfig(type="redis", redis_url="redis://localhost:6379")
-        >>> scheduler = await create_scheduler(config)
-        >>> await scheduler.run_task(params)
     """
     from bindu.settings import app_settings
 
@@ -139,16 +111,11 @@ async def create_scheduler(config: SchedulerConfig | None = None) -> Scheduler:
 async def close_scheduler(scheduler: Scheduler) -> None:
     """Close scheduler connection gracefully.
 
-    Args:
-        scheduler: Scheduler instance to close
-
-    Example:
-        >>> scheduler = await create_scheduler(config)
-        >>> # ... use scheduler ...
-        >>> await close_scheduler(scheduler)
+    Unconditionally calls __aexit__ as all Scheduler interfaces implement it.
+    This prevents resource leaks (like unclosed anyio streams in InMemoryScheduler).
     """
-    if REDIS_AVAILABLE and isinstance(scheduler, RedisScheduler):
+    try:
         await scheduler.__aexit__(None, None, None)
-        logger.info("Redis scheduler connection closed")
-    else:
-        logger.debug(f"Scheduler {type(scheduler).__name__} does not require cleanup")
+        logger.info(f"{type(scheduler).__name__} connection closed")
+    except Exception as e:
+        logger.error(f"Error closing {type(scheduler).__name__}: {e}")

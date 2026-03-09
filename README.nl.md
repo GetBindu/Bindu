@@ -731,7 +731,7 @@ Bindu ondersteunt **real-time webhook notifications** voor langlopende taken, vo
 3. **Voer agent uit:** `python examples/echo_agent_with_webhooks.py`
 4. **Verstuur tasks** - webhook notifications komen automatisch binnen
 
-📖 **[Volledige documentatie](docs/long-running-task-notifications.md)** - Gedetailleerde gids met architectuur, beveiliging, voorbeelden en probleemoplossing.
+📖 **[Volledige documentatie](docs/NOTIFICATIONS.md)** - Gedetailleerde gids met architectuur, beveiliging, voorbeelden en probleemoplossing.
 
 ---
 

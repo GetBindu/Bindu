@@ -114,6 +114,7 @@ class TaskHandlers:
                 TaskFeedbackResponse, request["id"], TaskNotFoundError, "Task not found"
             )
 
+        # Timestamp is always stored in UTC ISO-8601 format for consistency
         feedback_data = {
             "task_id": task_id,
             "feedback": request["params"]["feedback"],

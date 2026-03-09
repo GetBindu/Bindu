@@ -265,7 +265,8 @@
 					messageUpdatesAbortController.signal,
 					currentTaskId ?? undefined,
 					currentTaskState ?? undefined,
-					replyToTaskId ?? undefined
+					replyToTaskId ?? undefined,
+                                        isRetry ? userMessage?.files : base64Files
 				);
 				// Clear reply after sending
 				clearReply();

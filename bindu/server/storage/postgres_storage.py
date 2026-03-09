@@ -25,6 +25,7 @@ Features:
 
 from __future__ import annotations as _annotations
 
+import typing
 from typing import Any
 from uuid import UUID
 
@@ -200,7 +201,7 @@ class PostgresStorage(Storage[ContextT]):
             logger.error(f"Failed to connect to PostgreSQL: {e}")
             raise ConnectionError(f"Failed to connect to PostgreSQL: {e}") from e
 
-    async def disconnect(self) -> None:
+    async def close(self) -> None:
         """Close SQLAlchemy engine and connection pool."""
         if self._engine:
             await self._engine.dispose()
@@ -512,11 +513,14 @@ class PostgresStorage(Storage[ContextT]):
 
         return await self._retry_on_connection_error(_update)
 
-    async def list_tasks(self, length: int | None = None) -> list[Task]:
+    async def list_tasks(
+        self, length: int | None = None, offset: int = 0
+    ) -> list[Task]:
         """List all tasks using SQLAlchemy.
 
         Args:
             length: Optional limit on number of tasks to return
+            offset: Optional offset for pagination
 
         Returns:
             List of tasks
@@ -529,6 +533,8 @@ class PostgresStorage(Storage[ContextT]):
 
                 if length is not None:
                     stmt = stmt.limit(length)
+                if offset > 0:
+                    stmt = stmt.offset(offset)
 
                 result = await session.execute(stmt)
                 rows = result.fetchall()
@@ -537,11 +543,11 @@ class PostgresStorage(Storage[ContextT]):
 
         return await self._retry_on_connection_error(_list)
 
-    async def count_tasks(self, status: str | None = None) -> int:
+    async def count_tasks(self, status: TaskState | None = None) -> int:
         """Count number of tasks, optionally filtered by status.
 
         Args:
-            status: Optional status to filter by
+            status: Optional strict TaskState to filter by
 
         Returns:
             Count of matching tasks
@@ -561,13 +567,14 @@ class PostgresStorage(Storage[ContextT]):
         return await self._retry_on_connection_error(_count)
 
     async def list_tasks_by_context(
-        self, context_id: UUID, length: int | None = None
+        self, context_id: UUID, length: int | None = None, offset: int = 0
     ) -> list[Task]:
         """List tasks belonging to a specific context.
 
         Args:
             context_id: Context to filter tasks by
             length: Optional limit on number of tasks to return
+            offset: Optional offset for pagination
 
         Returns:
             List of tasks in the context
@@ -589,6 +596,8 @@ class PostgresStorage(Storage[ContextT]):
 
                 if length is not None:
                     stmt = stmt.limit(length)
+                if offset > 0:
+                    stmt = stmt.offset(offset)
 
                 result = await session.execute(stmt)
                 rows = result.fetchall()
@@ -710,14 +719,17 @@ class PostgresStorage(Storage[ContextT]):
 
         await self._retry_on_connection_error(_append)
 
-    async def list_contexts(self, length: int | None = None) -> list[dict[str, Any]]:
+    async def list_contexts(
+        self, length: int | None = None, offset: int = 0
+    ) -> list[ContextT]:
         """List all contexts using SQLAlchemy.
 
         Args:
             length: Optional limit on number of contexts to return
+            offset: Optional offset for pagination
 
         Returns:
-            List of context objects with task counts
+            List of strictly typed ContextT objects
         """
         self._ensure_connected()
 
@@ -744,16 +756,21 @@ class PostgresStorage(Storage[ContextT]):
 
                 if length is not None:
                     stmt = stmt.limit(length)
+                if offset > 0:
+                    stmt = stmt.offset(offset)
 
                 result = await session.execute(stmt)
                 rows = result.fetchall()
 
                 return [
-                    {
-                        "context_id": row.context_id,
-                        "task_count": row.task_count,
-                        "task_ids": row.task_ids,
-                    }
+                    typing.cast(
+                        ContextT,
+                        {
+                            "context_id": row.context_id,
+                            "task_count": row.task_count,
+                            "task_ids": row.task_ids,
+                        },
+                    )
                     for row in rows
                 ]
 

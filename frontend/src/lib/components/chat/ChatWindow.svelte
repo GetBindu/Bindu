@@ -306,12 +306,13 @@
 	);
 
 	// Always allow common text-like files; add images only when model is multimodal
-	import { TEXT_MIME_ALLOWLIST, IMAGE_MIME_ALLOWLIST_DEFAULT } from "$lib/constants/mime";
+	import { TEXT_MIME_ALLOWLIST, IMAGE_MIME_ALLOWLIST_DEFAULT, DOCUMENT_MIME_ALLOWLIST } from "$lib/constants/mime";
 
 	let activeMimeTypes = $derived(
 		Array.from(
 			new Set([
 				...TEXT_MIME_ALLOWLIST,
+				...DOCUMENT_MIME_ALLOWLIST,
 				...(modelIsMultimodal
 					? (currentModel.multimodalAcceptedMimetypes ?? [...IMAGE_MIME_ALLOWLIST_DEFAULT])
 					: []),

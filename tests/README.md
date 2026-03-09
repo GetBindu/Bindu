@@ -12,7 +12,6 @@ tests/
 │   ├── test_scheduler.py           # Task scheduler tests
 │   ├── test_manifest_worker.py     # Worker & hybrid pattern tests
 │   └── test_task_manager.py        # TaskManager tests
-├── integration/                    # Integration tests
 │   └── test_postman_scenarios.py   # Postman collection scenarios
 ├── e2e/                            # End-to-end tests
 ├── conftest.py                     # Pytest fixtures
@@ -24,37 +23,32 @@ tests/
 
 ### Run All Tests
 ```bash
-pytest
+uv run pytest
 ```
 
 ### Run Specific Test Categories
 ```bash
 # Unit tests only
-pytest tests/unit/
+uv run pytest tests/unit/
 
 # Integration tests only
-pytest tests/integration/
+uv run pytest tests/integration/
 
 # Specific test file
-pytest tests/unit/test_protocol_types.py
+uv run pytest tests/unit/test_protocol_types.py
 
 # Specific test class
-pytest tests/unit/test_storage.py::TestTaskStorage
+uv run pytest tests/unit/test_storage.py::TestTaskStorage
 
 # Specific test
-pytest tests/unit/test_storage.py::TestTaskStorage::test_save_and_load_task
+uv run pytest tests/unit/test_storage.py::TestTaskStorage::test_save_and_load_task
 ```
 
 ### Run with Coverage
 ```bash
-# Install pytest-cov first
-uv add --dev pytest-cov
-
-# Run with coverage
-pytest --cov=bindu --cov-report=html --cov-report=term-missing
-
-# View HTML coverage report
-open htmlcov/index.html
+# Run with coverage and enforce minimum threshold
+uv run pytest --cov=bindu --cov-report=term-missing
+uv run coverage report --skip-covered --fail-under=70
 ```
 
 ### Run with Markers
@@ -62,8 +56,6 @@ open htmlcov/index.html
 # Run only unit tests
 pytest -m unit
 
-# Run only integration tests
-pytest -m integration
 
 # Run only asyncio tests
 pytest -m asyncio
@@ -213,6 +205,6 @@ pytest --timeout=10
 When adding new features:
 1. Write tests first (TDD)
 2. Ensure all tests pass
-3. Maintain >90% coverage for new code
+3. Maintain minimum 70% coverage overall (target: 80%+)
 4. Add integration tests for new endpoints
 5. Update this README if needed

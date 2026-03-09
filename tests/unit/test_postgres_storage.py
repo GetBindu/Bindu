@@ -162,7 +162,7 @@ class TestPostgresStorageConnection:
         storage._engine = mock_engine
         storage._session_factory = MagicMock()
 
-        await storage.disconnect()
+        await storage.close()
 
         assert storage._engine is None
         assert storage._session_factory is None
@@ -300,7 +300,7 @@ class TestPostgresStorageEdgeCases:
         """Test disconnect when engine is None."""
         storage = PostgresStorage()
         # Should not raise error
-        await storage.disconnect()
+        await storage.close()
         assert storage._engine is None
 
     def test_serialize_empty_structures(self):

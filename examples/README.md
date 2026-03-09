@@ -121,7 +121,6 @@ if __name__ == "__main__":
 ## Documentation
 
 - [Bindu Docs](https://docs.getbindu.com)
-- [API Reference](../openapi.yaml)
 - [Payment Guide](../docs/PAYMENT.md)
 - [DID Guide](../docs/DID.md)
 - [Skills Guide](../docs/SKILLS.md)
@@ -135,4 +134,4 @@ if __name__ == "__main__":
 
 ## License
 
-See [LICENSE.md](LICENSE.md)
+See [LICENSE.md](../LICENSE.md)
