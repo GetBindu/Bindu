@@ -327,29 +327,37 @@ class InMemoryStorage(Storage[ContextT]):
         if not isinstance(messages, list):
             raise TypeError(f"messages must be list, got {type(messages).__name__}")
 
-            self.contexts[context_id] = []
+        # FIX: Replaced destructive data wipe (self.contexts[context_id] = []) with pass
+        # to ensure context-task mapping associations are safely preserved.
+        pass
 
-    async def list_tasks(self, length: int | None = None) -> list[Task]:
+    async def list_tasks(
+        self, length: int | None = None, offset: int = 0
+    ) -> list[Task]:
         """List all tasks in storage.
 
         Args:
-            length: Optional limit on number of tasks to return (most recent)
+            length: Optional limit on number of tasks to return
+            offset: Optional offset for pagination
 
         Returns:
             List of tasks
         """
-        if length is None:
-            return list(self.tasks.values())
-
-        # Optimize: Only convert to list what we need
         all_tasks = list(self.tasks.values())
-        return all_tasks[-length:] if length < len(all_tasks) else all_tasks
 
-    async def count_tasks(self, status: str | None = None) -> int:
+        if offset > 0:
+            all_tasks = all_tasks[offset:]
+
+        if length is not None and length > 0:
+            all_tasks = all_tasks[:length]
+
+        return all_tasks
+
+    async def count_tasks(self, status: TaskState | None = None) -> int:
         """Count number of tasks, optionally filtered by status.
 
         Args:
-            status: Optional status to filter by
+            status: Optional strict TaskState to filter by
 
         Returns:
             Count of matching tasks
@@ -360,7 +368,7 @@ class InMemoryStorage(Storage[ContextT]):
         return sum(1 for t in self.tasks.values() if t["status"]["state"] == status)
 
     async def list_tasks_by_context(
-        self, context_id: UUID, length: int | None = None
+        self, context_id: UUID, length: int | None = None, offset: int = 0
     ) -> list[Task]:
         """List tasks belonging to a specific context.
 
@@ -368,7 +376,8 @@ class InMemoryStorage(Storage[ContextT]):
 
         Args:
             context_id: Context to filter tasks by
-            length: Optional limit on number of tasks to return (most recent)
+            length: Optional limit on number of tasks to return
+            offset: Optional offset for pagination
 
         Returns:
             List of tasks in the context
@@ -385,26 +394,44 @@ class InMemoryStorage(Storage[ContextT]):
             self.tasks[task_id] for task_id in task_ids if task_id in self.tasks
         ]
 
-        if length is not None and length > 0 and length < len(tasks):
-            return tasks[-length:]
+        if offset > 0:
+            tasks = tasks[offset:]
+
+        if length is not None and length > 0:
+            tasks = tasks[:length]
+
         return tasks
 
-    async def list_contexts(self, length: int | None = None) -> list[dict[str, Any]]:
+    async def list_contexts(
+        self, length: int | None = None, offset: int = 0
+    ) -> list[ContextT]:
         """List all contexts in storage.
 
         Args:
-            length: Optional limit on number of contexts to return (most recent)
+            length: Optional limit on number of contexts to return
+            offset: Optional offset for pagination
 
         Returns:
-            List of context objects with task counts
+            List of typed ContextT objects
         """
         contexts = [
-            {"context_id": ctx_id, "task_count": len(task_ids), "task_ids": task_ids}
+            cast(
+                ContextT,
+                {
+                    "context_id": ctx_id,
+                    "task_count": len(task_ids),
+                    "task_ids": task_ids,
+                },
+            )
             for ctx_id, task_ids in self.contexts.items()
         ]
 
-        if length is not None and length > 0 and length < len(contexts):
-            return contexts[-length:]
+        if offset > 0:
+            contexts = contexts[offset:]
+
+        if length is not None and length > 0:
+            contexts = contexts[:length]
+
         return contexts
 
     async def clear_context(self, context_id: UUID) -> None:
@@ -451,6 +478,10 @@ class InMemoryStorage(Storage[ContextT]):
         self.contexts.clear()
         self.task_feedback.clear()
         self._webhook_configs.clear()
+
+    async def close(self) -> None:
+        """Safely close and cleanup resources."""
+        await self.clear_all()
 
     async def store_task_feedback(
         self, task_id: UUID, feedback_data: dict[str, Any]

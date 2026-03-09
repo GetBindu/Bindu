@@ -31,6 +31,10 @@
 	import { requireAuthUser } from "$lib/utils/auth";
 	import { isPro } from "$lib/stores/isPro";
 	import IconPro from "$lib/components/icons/IconPro.svelte";
+	import AgentStatePanel from "$lib/components/AgentStatePanel.svelte";
+	import { agentInspector } from "$lib/stores/agentInspector";
+	import { slide } from "svelte/transition";
+	import { cubicOut } from "svelte/easing";
 
 	const publicConfig = usePublicConfig();
 	const client = useAPIClient();
@@ -57,6 +61,7 @@
 	}: Props = $props();
 
 	let hasMore = $state(true);
+	let showAgentInspector = $state(false);
 
 	function handleNewChatClick(e: MouseEvent) {
 		isAborted.set(true);
@@ -157,6 +162,51 @@
 <div
 	class="scrollbar-custom flex touch-pan-y flex-col gap-1 overflow-y-auto rounded-r-xl border border-l-0 border-gray-100 from-gray-50 px-3 pb-3 pt-2 text-[.9rem] dark:border-transparent dark:from-gray-800/30 max-sm:bg-gradient-to-t md:bg-gradient-to-l"
 >
+	<!-- Agent inspector toggle (collapsed by default) -->
+	<div>
+		<button
+			type="button"
+			class="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-gray-700 dark:hover:text-white"
+			aria-controls="agent-inspector"
+			aria-expanded={showAgentInspector}
+			onclick={() => (showAgentInspector = !showAgentInspector)}
+		>
+			<span
+				class="w-3 shrink-0 text-gray-400 transition-transform duration-150 motion-reduce:transition-none dark:text-gray-500 {showAgentInspector ? 'rotate-90' : ''}"
+				aria-hidden="true"
+			>
+				<svg viewBox="0 0 20 20" fill="currentColor" class="size-3">
+					<path
+						fill-rule="evenodd"
+						d="M7.21 14.77a.75.75 0 0 1 .02-1.06L10.94 10 7.23 6.29a.75.75 0 1 1 1.06-1.06l4.24 4.24a.75.75 0 0 1 0 1.06l-4.24 4.24a.75.75 0 0 1-1.06-.02Z"
+						clip-rule="evenodd"
+					/>
+				</svg>
+			</span>
+			<span class="font-medium">Agent Inspector</span>
+		</button>
+		<div class="px-2.5 pb-1 text-[10px] leading-snug text-gray-500 dark:text-gray-500">
+			<span class="inline-block pl-5">Inspect what the agent remembers and is working on</span>
+		</div>
+	</div>
+	{#if showAgentInspector}
+		<div
+			id="agent-inspector"
+			class="pl-2.5"
+			transition:slide|local={{ duration: 120, easing: cubicOut }}
+		>
+			<AgentStatePanel
+				agentName={$agentInspector.agentName}
+				contextId={$agentInspector.contextId}
+				sessionId={$agentInspector.sessionId}
+				taskCount={$agentInspector.taskCount}
+				disabled={$agentInspector.disabled}
+				onClearContext={$agentInspector.onClearContext}
+				onClearTasks={$agentInspector.onClearTasks}
+			/>
+		</div>
+	{/if}
+
 	<!-- Agent Contexts Section -->
 	<ContextList />
 </div>

@@ -365,6 +365,7 @@ async def test_push_not_supported():
             if not tm._push_manager.is_push_supported():
                 assert_jsonrpc_error(response, -32005)
 
+
 @pytest.mark.asyncio
 async def test_parse_context_id_fallback():
     """Test that malformed UUID strings safely generate a new UUID (DoS protection)."""
@@ -382,7 +383,7 @@ async def test_parse_context_id_fallback():
             result_invalid = tm._parse_context_id("invalid-garbage-string")
             assert isinstance(result_invalid, uuid.UUID)
             assert result_invalid != "invalid-garbage-string"
-            
+
             # 3. None input should generate a fresh UUID
             result_none = tm._parse_context_id(None)
             assert isinstance(result_none, uuid.UUID)
@@ -397,11 +398,15 @@ async def test_getattr_security_and_missing_methods():
             scheduler=scheduler, storage=storage, manifest=None
         ) as tm:
             # Test recursion guard (accessing non-existent private attributes)
-            with pytest.raises(AttributeError, match="has no attribute '_fake_private'"):
+            with pytest.raises(
+                AttributeError, match="has no attribute '_fake_private'"
+            ):
                 _ = tm._fake_private
-                
+
             # Test missing public methods
-            with pytest.raises(AttributeError, match="has no attribute 'make_me_a_sandwich'"):
+            with pytest.raises(
+                AttributeError, match="has no attribute 'make_me_a_sandwich'"
+            ):
                 _ = tm.make_me_a_sandwich
 
 
@@ -410,18 +415,18 @@ async def test_task_manager_lifecycle():
     """Test is_running state and proper AsyncExitStack initialization."""
     storage = InMemoryStorage()
     scheduler = InMemoryScheduler()
-    
+
     # 1. State should be False before context is entered
     tm = TaskManager(scheduler=scheduler, storage=storage, manifest=None)
     assert not tm.is_running
-    
+
     # 2. State should be True inside the context
     async with tm:
         assert tm.is_running
-        
+
     # 3. State should revert to False after exiting
     assert not tm.is_running
-    
+
     # 4. Attempting to exit an uninitialized manager should raise a RuntimeError
     uninitialized_tm = TaskManager(scheduler=scheduler, storage=storage, manifest=None)
     with pytest.raises(RuntimeError, match="TaskManager was not properly initialized"):
@@ -436,13 +441,12 @@ async def test_manifest_worker_initialization():
         # Create a mock manifest to trigger the worker initialization block
         mock_manifest = MagicMock()
         tm = TaskManager(scheduler=scheduler, storage=storage, manifest=mock_manifest)
-        
+
         # Before entering context, no workers should exist
         assert len(tm._workers) == 0
-        
+
         async with tm:
             # Inside context, the worker should be initialized and added to the list
             assert len(tm._workers) == 1
             # Verify the worker got the correct manifest attached
             assert tm._workers[0].manifest == mock_manifest
-            

@@ -36,7 +36,7 @@ class Task(BaseModel):
     ] = Field(
         ...,
         description="Use 'common_mistakes' exactly once in the plan.",
-    ) 
+    )
 
 
 class Plan(BaseModel):
@@ -169,10 +169,10 @@ def reducer(state: State) -> dict:
 
     title = state["plan"].blog_title
     body = "\n\n".join(state["sections"]).strip()
-    
+
     final_md = f"# {title}\n\n{body}\n"
 
-    
+
 
     return {"final": final_md}
 # -----------------------------
@@ -193,4 +193,3 @@ def build_graph():
     app = g.compile()
 
     return app
-

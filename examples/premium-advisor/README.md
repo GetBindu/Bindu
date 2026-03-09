@@ -95,6 +95,8 @@ curl -X POST http://localhost:3773/ \
 
 ### Agent Configuration
 
+Single payment option (current example code):
+
 ```python
 config = {
     "author": "premium.advisor@example.com",
@@ -106,6 +108,32 @@ config = {
         "network": "base-sepolia",  # Blockchain network
         "pay_to_address": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e"
     },
+    "deployment": {"url": "http://localhost:3773", "expose": True},
+    "skills": ["skills/premium-market-insight-skill"]
+}
+```
+
+Multiple payment options (alternative configuration):
+
+```python
+config = {
+    "author": "premium.advisor@example.com",
+    "name": "Oracle_of_Value",
+    "description": "I provide high-value market insights. Payment required upfront.",
+    "execution_cost": [
+        {
+            "amount": "0.01",          # 0.01 USDC on Base Sepolia
+            "token": "USDC",
+            "network": "base-sepolia",
+            "pay_to_address": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
+        },
+        {
+            "amount": "0.0001",        # 0.0001 ETH on Ethereum mainnet
+            "token": "ETH",
+            "network": "ethereum",
+            "pay_to_address": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
+        },
+    ],
     "deployment": {"url": "http://localhost:3773", "expose": True},
     "skills": ["skills/premium-market-insight-skill"]
 }

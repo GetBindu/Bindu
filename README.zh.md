@@ -731,7 +731,7 @@ Bindu 支持长时间运行任务的**实时 webhook 通知**，遵循 [A2A Prot
 3. **运行代理：** `python examples/echo_agent_with_webhooks.py`
 4. **发送任务** - webhook 通知会自动到达
 
-📖 **[完整文档](docs/long-running-task-notifications.md)** - 包含架构、安全性、示例和故障排除的详细指南。
+📖 **[完整文档](docs/NOTIFICATIONS.md)** - 包含架构、安全性、示例和故障排除的详细指南。
 
 ---
 

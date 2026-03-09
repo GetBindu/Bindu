@@ -119,11 +119,48 @@ def load_skills(
     for skill_item in skills_config:
         try:
             if isinstance(skill_item, str):
+                # File-based skill: path to a directory containing skill.yaml
                 skill = load_skill_from_directory(skill_item, caller_dir)
                 skills.append(skill)
+            elif isinstance(skill_item, dict):
+                # Inline skill: dict with at minimum "name" and "description" keys.
+                # Documented in load_skills() docstring but was previously discarded.
+                if "name" not in skill_item:
+                    raise ValueError(
+                        f"Inline skill definition missing required 'name': {skill_item}"
+                    )
+                if "description" not in skill_item:
+                    raise ValueError(
+                        f"Inline skill definition missing required 'description': {skill_item}"
+                    )
+                inline_skill: Dict[str, Any] = {
+                    "id": skill_item.get("id", skill_item["name"]),
+                    "name": skill_item["name"],
+                    "description": skill_item["description"],
+                    "tags": skill_item.get("tags", []),
+                    "input_modes": skill_item.get("input_modes", ["text/plain"]),
+                    "output_modes": skill_item.get("output_modes", ["text/plain"]),
+                }
+                for field in (
+                    "version",
+                    "author",
+                    "examples",
+                    "capabilities_detail",
+                    "requirements",
+                    "performance",
+                    "allowed_tools",
+                    "documentation",
+                    "assessment",
+                ):
+                    if field in skill_item:
+                        inline_skill[field] = skill_item[field]
+                logger.info(f"Loaded inline skill: {inline_skill['name']}")
+                skills.append(cast(Skill, inline_skill))
             else:
-                logger.warning(f"Invalid skill configuration: {skill_item}")
-        except Exception as e:
+                logger.warning(
+                    f"Invalid skill configuration (expected str path or dict): {skill_item}"
+                )
+        except (FileNotFoundError, ValueError) as e:
             logger.error(f"Failed to load skill {skill_item}: {e}")
             raise
 

@@ -361,14 +361,16 @@ class X402Middleware(BaseHTTPMiddleware):
                     )
 
             except Exception as balance_error:
-                # Balance check failed - log warning but continue validation
-                logger.warning(
-                    f"Could not verify on-chain balance for {payment_requirements.asset}: {balance_error}. "
-                    f"Skipping balance check and allowing payment based on signature verification only."
+                # Balance check failed — reject payment rather than silently allowing
+                # an unverified charge. This prevents funds from being charged when the
+                # on-chain state cannot be confirmed (broken RPC, wrong token address, etc.)
+                logger.error(
+                    f"Balance check failed for {payment_requirements.asset}: {balance_error}. "
+                    f"Rejecting payment to prevent unverified charge."
                 )
-                logger.info(
-                    f"Payment validation passed (without balance check): network={payment_payload.network}, "
-                    f"token={payment_requirements.asset}, amount={payment_value}, payer={auth.from_}"
+                return (
+                    False,
+                    f"Balance check failed: {balance_error}",
                 )
 
             return True, None

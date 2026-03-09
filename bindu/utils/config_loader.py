@@ -6,6 +6,7 @@ from environment variables and setting up infrastructure components.
 
 import os
 from typing import Any, Dict, cast, Literal
+from urllib.parse import urlparse, urlunparse
 
 from bindu.utils.logging import get_logger
 
@@ -231,6 +232,49 @@ def load_config_from_env(config: Dict[str, Any]) -> Dict[str, Any]:
     # Create a copy to avoid mutating the input
     enriched_config = config.copy()
     capabilities = enriched_config.get("capabilities", {})
+
+    # Deployment configuration - support environment-based URL/port overrides
+    deployment_dict = enriched_config.get("deployment")
+    if isinstance(deployment_dict, dict):
+        deployment_url_override = os.getenv("BINDU_DEPLOYMENT_URL")
+        deployment_host_override = os.getenv("BINDU_HOST")
+        deployment_port_override = os.getenv("BINDU_PORT") or os.getenv("PORT")
+
+        if deployment_url_override:
+            deployment_dict["url"] = deployment_url_override
+            logger.debug("Loaded BINDU_DEPLOYMENT_URL from environment")
+        elif deployment_host_override or deployment_port_override:
+            existing_url = deployment_dict.get("url", "http://localhost:3773")
+            parsed_url = urlparse(existing_url)
+
+            scheme = parsed_url.scheme or "http"
+            host = deployment_host_override or parsed_url.hostname or "localhost"
+
+            if deployment_port_override:
+                try:
+                    port = int(deployment_port_override)
+                except ValueError as exc:
+                    raise ValueError(
+                        f"Invalid deployment port '{deployment_port_override}'. "
+                        "BINDU_PORT/PORT must be an integer"
+                    ) from exc
+            else:
+                port = parsed_url.port or 3773
+
+            netloc = f"{host}:{port}"
+            deployment_dict["url"] = urlunparse(
+                (
+                    scheme,
+                    netloc,
+                    parsed_url.path or "",
+                    parsed_url.params,
+                    parsed_url.query,
+                    parsed_url.fragment,
+                )
+            )
+            logger.debug(
+                f"Applied deployment override from environment: {deployment_dict['url']}"
+            )
 
     # Storage configuration - load from env if not in user config
     if "storage" not in enriched_config:

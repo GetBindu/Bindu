@@ -282,16 +282,26 @@ class TestLoadSkills:
         assert len(skills) == 1
         assert skills[0]["name"] == "Absolute Skill"
 
-    def test_load_skills_invalid_config_dict(self, tmp_path):
-        """Test that dict configs are logged as warnings but don't crash."""
-        # Currently the function logs a warning for dict configs
-        # but doesn't actually load them (inline skills not implemented)
-        skills_config = [{"name": "Inline Skill", "description": "Not supported"}]
+    def test_load_skills_inline_dict(self, tmp_path):
+        """Test that valid inline dict skills are loaded correctly."""
+        skills_config = [{"name": "Inline Skill", "description": "An inline skill"}]
 
         skills = load_skills(skills_config, tmp_path)
 
-        # Should return empty list since dict configs are not supported
-        assert len(skills) == 0
+        assert len(skills) == 1
+        assert skills[0]["name"] == "Inline Skill"
+        assert skills[0]["id"] == "Inline Skill"
+        assert skills[0]["description"] == "An inline skill"
+
+    def test_load_skills_inline_dict_missing_name(self, tmp_path):
+        """Test that inline dict skills missing required fields raise ValueError."""
+        with pytest.raises(ValueError, match="missing required 'name'"):
+            load_skills([{"description": "No name"}], tmp_path)
+
+    def test_load_skills_inline_dict_missing_description(self, tmp_path):
+        """Test that inline dict skills missing description raise ValueError."""
+        with pytest.raises(ValueError, match="missing required 'description'"):
+            load_skills([{"name": "No desc"}], tmp_path)
 
     def test_load_skills_error_propagates(self, tmp_path):
         """Test that errors during loading are propagated."""

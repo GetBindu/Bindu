@@ -6,8 +6,11 @@ from HashiCorp Vault, ensuring persistence across pod restarts.
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from typing import Any, Optional
+
+import aiohttp
 
 from bindu.common.models import AgentCredentials
 from bindu.settings import app_settings
@@ -101,7 +104,7 @@ class VaultClient:
 
             return await response.json()
 
-        except Exception as e:
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as e:
             logger.error(f"Vault request error: {e}")
             return None
 
@@ -325,7 +328,7 @@ async def restore_did_keys_from_vault(
         logger.info(f"✅ DID keys restored from Vault to {key_dir}")
         return keys["did"]
 
-    except Exception as e:
+    except (OSError, ValueError, KeyError) as e:
         logger.error(f"Failed to restore DID keys from Vault: {e}")
         return None
     finally:
@@ -375,7 +378,7 @@ async def backup_did_keys_to_vault(
             did=did,
         )
 
-    except Exception as e:
+    except (OSError, ValueError) as e:
         logger.error(f"Failed to backup DID keys to Vault: {e}")
         return False
     finally:

@@ -142,7 +142,7 @@ class CapabilityCalculator:
         # Pre-compute skill metadata for faster matching
         self._skill_metadata = self._precompute_skill_metadata()
 
-    def calculate(
+    async def calculate(
         self,
         task_summary: str,
         task_details: str | None = None,
@@ -188,12 +188,15 @@ class CapabilityCalculator:
             )
 
         # Calculate component scores
-        skill_match_score, skill_matches, matched_tags, matched_caps = (
-            self._calculate_skill_match(
-                task_keywords=task_keywords,
-                task_summary=task_summary,
-                task_details=task_details,
-            )
+        (
+            skill_match_score,
+            skill_matches,
+            matched_tags,
+            matched_caps,
+        ) = await self._calculate_skill_match(
+            task_keywords=task_keywords,
+            task_summary=task_summary,
+            task_details=task_details,
         )
         io_score = self._calculate_io_compatibility(input_mime_types, output_mime_types)
         load_score = self._calculate_load_score(queue_depth)
@@ -232,12 +235,25 @@ class CapabilityCalculator:
                     latency_estimate_ms=latency_estimate_ms,
                 )
 
-        # Compute weighted final score
+        # Compute performance subscore from latency estimate vs constraint.
+        # When no constraint is given, or no latency data is available, award
+        # the full score (1.0) so the weight is not silently discarded.
+        # Formula: linear decay from 1.0 (estimate = 0) to 0.0 (estimate = limit).
+        if latency_estimate_ms is not None and max_latency_ms and max_latency_ms > 0:
+            performance_score = max(0.0, 1.0 - latency_estimate_ms / max_latency_ms)
+        else:
+            performance_score = 1.0
+
+        # Compute weighted final score.  All five subscore keys must be present
+        # so that normalized_weights (which includes "performance") is fully
+        # consumed.  Previously "performance" was absent, silently losing 15% of
+        # the total weight and causing final_score to be capped at ~0.85.
         subscores = {
             "skill_match": skill_match_score,
             "io_compatibility": io_score,
             "load": load_score,
             "cost": cost_score,
+            "performance": performance_score,
         }
         final_score = sum(normalized_weights[key] * subscores[key] for key in subscores)
 
@@ -384,8 +400,8 @@ class CapabilityCalculator:
 
         return metadata
 
-    def _ensure_embeddings(self) -> None:
-        """Lazy load embedder and compute skill embeddings on first use."""
+    async def _ensure_embeddings(self) -> None:
+        """Lazy load embedder and compute skill embeddings on first use (async)."""
         if self._skill_embeddings is not None:
             return
 
@@ -396,7 +412,7 @@ class CapabilityCalculator:
             from bindu.server.negotiation.embedder import SkillEmbedder
 
             self._embedder = SkillEmbedder(api_key=self._embedding_api_key)
-            self._skill_embeddings = self._embedder.compute_skill_embeddings(
+            self._skill_embeddings = await self._embedder.compute_skill_embeddings(
                 self._skills
             )
         except ImportError:
@@ -412,13 +428,13 @@ class CapabilityCalculator:
             )
             self._use_embeddings = False
 
-    def _calculate_skill_match(
+    async def _calculate_skill_match(
         self,
         task_keywords: set[str],
         task_summary: str = "",
         task_details: str | None = None,
     ) -> tuple[float, list[SkillMatchResult], list[str], list[str]]:
-        """Calculate skill match score using hybrid approach.
+        """Calculate skill match score using hybrid approach (async).
 
         Uses embeddings for semantic matching (if enabled) combined with
         keyword matching and assessment field boosting.
@@ -433,11 +449,11 @@ class CapabilityCalculator:
         # Try to use embeddings if enabled
         task_embedding = None
         if self._use_embeddings and task_summary:
-            self._ensure_embeddings()
+            await self._ensure_embeddings()
             if self._embedder and self._skill_embeddings:
                 try:
                     task_text = task_details or ""
-                    task_embedding = self._embedder.embed_task_cached(
+                    task_embedding = await self._embedder.embed_task_cached(
                         task_summary, task_text
                     )
                 except Exception as e:

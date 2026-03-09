@@ -1,15 +1,24 @@
 """Hydra authentication middleware for Bindu server.
 
-This middleware validates OAuth2 tokens issued by Ory Hydra for user authentication.
-It inherits from AuthMiddleware and implements Hydra-specific token introspection.
+This middleware acts as the primary gatekeeper for the application.
+It intercepts incoming requests and validates OAuth2 tokens issued by Ory Hydra.
 
-Enhanced with hybrid OAuth2 + DID authentication for cryptographic identity verification.
+Enhanced with hybrid OAuth2 + DID authentication for cryptographic identity verification,
+ensuring both authorization (who they are) and payload integrity (has the request been tampered with).
+Refactored to Pure ASGI to prevent stream deadlocks during DID verification.
 """
 
 from __future__ import annotations as _annotations
 
+import asyncio
+import hashlib
 import time
-from typing import Any
+import inspect
+from typing import Any, Callable
+
+from starlette.requests import HTTPConnection
+from starlette.responses import JSONResponse
+from starlette.websockets import WebSocket
 
 from bindu.auth.hydra.client import HydraClient
 from bindu.utils.logging import get_logger
@@ -26,42 +35,19 @@ logger = get_logger("bindu.server.middleware.hydra")
 
 
 class HydraMiddleware(AuthMiddleware):
-    """Hydra-specific authentication middleware with hybrid OAuth2 + DID authentication.
-
-    This middleware implements dual-layer authentication:
-
-    Layer 1 - OAuth2 Token Validation:
-    - Token active status via Hydra Admin API
-    - Token expiration (exp claim)
-    - Token scope validation
-    - Client ID validation
-
-    Layer 2 - DID Signature Verification (optional):
-    - Cryptographic signature verification using DID public key
-    - Timestamp validation to prevent replay attacks
-    - Request body integrity verification
-
-    Supports both user authentication (authorization_code) and M2M (client_credentials).
-    """
+    """Hydra-specific authentication middleware with hybrid OAuth2 + DID authentication."""
 
     def __init__(self, app: Any, auth_config: Any) -> None:
-        """Initialize Hydra middleware.
-
-        Args:
-            app: ASGI application
-            auth_config: Hydra authentication configuration
-        """
+        """Initialize Hydra middleware."""
         super().__init__(app, auth_config)
-        self._introspection_cache = {}  # Simple token cache
+
+        self._introspection_cache = {}
+        self._cache_locks = {}
         self._cache_ttl = 300  # 5 minutes cache TTL
+        self._max_body_size = 2 * 1024 * 1024  # 2 MB
 
     def _initialize_provider(self) -> None:
-        """Initialize Hydra-specific components.
-
-        Sets up:
-        - HydraClient for token introspection
-        - Hydra Admin API endpoint configuration
-        """
+        """Initialize Hydra-specific components and HTTP clients."""
         try:
             self.hydra_client = HydraClient(
                 admin_url=self.config.admin_url,
@@ -69,7 +55,6 @@ class HydraMiddleware(AuthMiddleware):
                 timeout=getattr(self.config, "timeout", 10),
                 verify_ssl=getattr(self.config, "verify_ssl", True),
             )
-
             logger.info(
                 f"Hydra middleware initialized. Admin URL: {self.config.admin_url}"
             )
@@ -78,45 +63,28 @@ class HydraMiddleware(AuthMiddleware):
             raise
 
     async def _validate_token(self, token: str) -> dict[str, Any]:
-        """Validate OAuth2 token using Hydra introspection.
-
-        Args:
-            token: OAuth2 access token issued by Hydra
-
-        Returns:
-            Decoded token introspection result
-
-        Raises:
-            Exception: If token is invalid, expired, or introspection fails
-        """
-        # Check cache first
-        cache_key = token[:50]  # Use first 50 chars as cache key
+        """Validate OAuth2 token using Hydra introspection."""
+        cache_key = hashlib.sha256(token.encode()).hexdigest()
         if cache_key in self._introspection_cache:
             cached = self._introspection_cache[cache_key]
             if cached["expires_at"] > time.time():
                 logger.debug("Token validated from cache")
                 return cached["data"]
 
-        # Perform introspection via Hydra Admin API
         try:
             introspection_result = await self.hydra_client.introspect_token(token)
 
             if not introspection_result.get("active", False):
                 raise ValueError("Token is not active")
-
-            # Validate required fields
             if "sub" not in introspection_result:
                 raise ValueError("Token missing subject (sub) claim")
-
             if "exp" not in introspection_result:
                 raise ValueError("Token missing expiration (exp) claim")
 
-            # Check expiration
             current_time = time.time()
             if introspection_result["exp"] < current_time:
                 raise ValueError(f"Token expired at {introspection_result['exp']}")
 
-            # Cache the result
             expires_at = min(
                 introspection_result["exp"], current_time + self._cache_ttl
             )
@@ -125,37 +93,14 @@ class HydraMiddleware(AuthMiddleware):
                 "expires_at": expires_at,
             }
 
-            # Clean old cache entries
-            self._clean_cache()
-
+            self._lazy_clean_cache()
             return introspection_result
-
         except Exception as e:
             logger.error(f"Token introspection failed: {e}")
             raise
 
     def _extract_user_info(self, token_payload: dict[str, Any]) -> dict[str, Any]:
-        """Extract user/service information from Hydra introspection result.
-
-        Args:
-            token_payload: Hydra token introspection result
-
-        Returns:
-            Dictionary with standardized user information:
-            {
-                "sub": "user_id or client_id",
-                "is_m2m": True/False,
-                "client_id": "oauth_client_id",
-                "scope": ["scope1", "scope2"],
-                "exp": expiration_timestamp,
-                "iat": issued_at_timestamp,
-                "aud": ["audience1", "audience2"],
-                "username": "optional_username",
-                "email": "optional_email",
-                "name": "optional_full_name"
-            }
-        """
-        # Determine if this is an M2M token
+        """Normalize Hydra introspection data into a standard user/service object."""
         is_m2m = (
             token_payload.get("token_type") == "access_token"
             and token_payload.get("grant_type") == "client_credentials"
@@ -176,7 +121,6 @@ class HydraMiddleware(AuthMiddleware):
             "active": token_payload.get("active", False),
         }
 
-        # Extract additional user info from sub or extra claims
         if not is_m2m and "ext" in token_payload:
             ext_data = token_payload["ext"]
             if isinstance(ext_data, dict):
@@ -192,206 +136,200 @@ class HydraMiddleware(AuthMiddleware):
         logger.debug(f"Extracted user info for sub={user_info['sub']}, is_m2m={is_m2m}")
         return user_info
 
-    async def _verify_did_signature(
-        self, request: Any, client_did: str
-    ) -> tuple[bool, dict[str, Any]]:
-        """Verify DID signature on request (Layer 2 authentication).
+    def _lazy_clean_cache(self) -> None:
+        """O(1) amortized cache cleanup."""
+        current_time = time.time()
+        expired_keys = []
 
-        Args:
-            request: Starlette Request object
-            client_did: Client's DID from token
+        for key, value in self._introspection_cache.items():
+            if value["expires_at"] <= current_time:
+                expired_keys.append(key)
+            else:
+                break
 
-        Returns:
-            Tuple of (is_valid, signature_info)
-        """
-        # Extract DID signature headers
-        signature_data = extract_signature_headers(dict(request.headers))
+        for key in expired_keys:
+            self._introspection_cache.pop(key, None)
+            self._cache_locks.pop(key, None)
+
+    async def _verify_did_signature_asgi(
+        self, receive: Callable, client_did: str, headers: Any
+    ) -> tuple[bool, dict[str, Any], Callable]:
+        """Safely verify DID signature by buffering the raw ASGI receive stream."""
+        signature_data = extract_signature_headers(dict(headers))
 
         if not signature_data:
-            # No DID signature headers present - this is optional for backward compatibility
-            logger.debug("No DID signature headers found - skipping DID verification")
-            return True, {"did_verified": False, "reason": "no_signature_headers"}
-
-        # Verify DID matches token
-        if signature_data["did"] != client_did:
-            logger.warning(
-                f"DID mismatch: header={signature_data['did']}, token={client_did}"
+            return (
+                True,
+                {"did_verified": False, "reason": "no_signature_headers"},
+                receive,
             )
-            return False, {
-                "did_verified": False,
-                "reason": "did_mismatch",
-                "header_did": signature_data["did"],
-                "token_did": client_did,
-            }
 
-        # Get client's public key from Hydra metadata
+        if signature_data["did"] != client_did:
+            return False, {"did_verified": False, "reason": "did_mismatch"}, receive
+
         public_key = await get_public_key_from_hydra(client_did, self.hydra_client)
-
         if not public_key:
-            logger.warning(f"No public key found for client: {client_did}")
-            # If client has no public key, skip DID verification
-            return True, {
-                "did_verified": False,
-                "reason": "no_public_key",
-                "client_did": client_did,
-            }
+            return True, {"did_verified": False, "reason": "no_public_key"}, receive
 
-        # Read request body
-        body = await request.body()
+        # Memory Safety Guard
+        content_length = int(headers.get("content-length", 0))
+        if content_length > self._max_body_size:
+            logger.warning(
+                f"Payload too large for signature verification: {content_length} bytes"
+            )
+            return (
+                False,
+                {"did_verified": False, "reason": "payload_too_large"},
+                receive,
+            )
 
-        # Verify signature
-        is_valid = verify_signature(
+        # Safely buffer the ASGI stream chunks
+        body = b""
+        more_body = True
+        messages = []
+        while more_body:
+            message = await receive()
+            messages.append(message)
+            body += message.get("body", b"")
+            more_body = message.get("more_body", False)
+
+        # Create a proxy receiver to feed the downstream application
+        async def cached_receive():
+            if messages:
+                return messages.pop(0)
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        # Background thread crypto validation to prevent event loop blocking
+        is_valid = await asyncio.to_thread(
+            verify_signature,
             body=body,
             signature=signature_data["signature"],
             did=signature_data["did"],
             timestamp=signature_data["timestamp"],
             public_key=public_key,
-            max_age_seconds=300,  # 5 minutes
+            max_age_seconds=300,
         )
 
-        if is_valid:
-            logger.info(f"✅ DID signature verified for {client_did}")
-            return True, {
-                "did_verified": True,
-                "did": client_did,
-                "timestamp": signature_data["timestamp"],
-            }
-        else:
-            logger.warning(f"❌ Invalid DID signature for {client_did}")
-            return False, {
-                "did_verified": False,
-                "reason": "invalid_signature",
-                "did": client_did,
-            }
+        verification_result = {
+            "did_verified": is_valid,
+            "did": client_did,
+            "timestamp": signature_data.get("timestamp"),
+            "reason": None if is_valid else "invalid_signature",
+        }
+        return is_valid, verification_result, cached_receive
 
-    async def dispatch(self, request, call_next):
-        """Process request with hybrid OAuth2 + DID authentication.
+    async def __call__(
+        self, scope: dict[str, Any], receive: Callable, send: Callable
+    ) -> None:
+        """Hydra-specific Pure ASGI pipeline overriding the base class."""
+        if scope["type"] not in ("http", "websocket"):
+            await self.app(scope, receive, send)
+            return
 
-        Flow:
-        1. Check if endpoint is public
-        2. Extract and validate OAuth2 token (Layer 1)
-        3. Verify DID signature if present (Layer 2)
-        4. Attach user context and continue
+        conn = HTTPConnection(scope)
+        path = conn.url.path
 
-        Args:
-            request: Incoming HTTP request
-            call_next: Next middleware/endpoint in chain
-
-        Returns:
-            Response from endpoint or error response
-        """
-        from starlette.responses import JSONResponse
-
-        path = request.url.path
-
-        # Skip authentication for public endpoints
         if self._is_public_endpoint(path):
             logger.debug(f"Public endpoint: {path}")
-            return await call_next(request)
+            await self.app(scope, receive, send)
+            return
 
-        # Extract token
-        token = self._extract_token(request)
+        token = self._extract_token(conn)
         if not token:
-            logger.warning(f"No token provided for {path}")
-            return await self._auth_required_error(request)
+            from bindu.common.protocol.types import AuthenticationRequiredError
 
-        # Layer 1: Validate OAuth2 token
+            await self._send_error(
+                scope, receive, send, AuthenticationRequiredError, 401
+            )
+            return
+
         try:
-            token_payload = await self._validate_token(token)
+            result = self._validate_token(token)
+            token_payload = await result if inspect.isawaitable(result) else result
         except Exception as e:
             logger.warning(f"Token validation failed for {path}: {e}")
-            return self._handle_validation_error(e, path)
+            await self._handle_validation_error(e, path, scope, receive, send)
+            return
 
-        # Extract user info
         try:
             user_info = self._extract_user_info(token_payload)
         except Exception as e:
             logger.error(f"Failed to extract user info for {path}: {e}")
             from bindu.common.protocol.types import InvalidTokenError
-            from bindu.utils.request_utils import extract_error_fields
 
-            code, message = extract_error_fields(InvalidTokenError)
-            return jsonrpc_error(code=code, message=message, status=401)
+            await self._send_error(scope, receive, send, InvalidTokenError, 401)
+            return
 
-        # Layer 2: Verify DID signature (if present)
+        # --- LAYER 2: ASGI Safe DID Verification ---
         client_did = user_info.get("client_id")
-
-        # Check if client uses DID-based authentication
-        if client_did and client_did.startswith("did:"):
-            is_valid, signature_info = await self._verify_did_signature(
-                request, client_did
+        if scope["type"] == "http" and client_did and client_did.startswith("did:"):
+            is_valid, signature_info, receive = await self._verify_did_signature_asgi(
+                receive, client_did, conn.headers
             )
 
             if not is_valid:
                 logger.warning(f"DID signature verification failed for {client_did}")
-                return JSONResponse(
-                    {
-                        "error": "Invalid DID signature",
-                        "details": signature_info,
-                    },
+                response = JSONResponse(
+                    {"error": "Invalid DID signature", "details": signature_info},
                     status_code=403,
                 )
+                await response(scope, receive, send)
+                return
 
-            # Add signature info to user context
             user_info["signature_info"] = signature_info
             logger.debug(f"DID verification result: {signature_info}")
 
-        # Attach context to request state
-        self._attach_user_context(request, user_info, token_payload)
+        self._attach_user_context(scope, user_info, token_payload)
+        await self.app(scope, receive, send)
 
-        logger.debug(
-            f"Authenticated {path} - sub={user_info.get('sub')}, "
-            f"m2m={user_info.get('is_m2m', False)}, "
-            f"did_verified={user_info.get('signature_info', {}).get('did_verified', False)}"
-        )
-
-        return await call_next(request)
-
-    def _clean_cache(self) -> None:
-        """Clean expired entries from introspection cache."""
-        current_time = time.time()
-        expired_keys = [
-            key
-            for key, value in self._introspection_cache.items()
-            if value["expires_at"] <= current_time
-        ]
-        for key in expired_keys:
-            del self._introspection_cache[key]
-
-    def _handle_validation_error(self, error: Exception, path: str) -> Any:
-        """Handle Hydra-specific token validation errors.
-
-        Args:
-            error: Validation exception
-            path: Request path
-
-        Returns:
-            JSON-RPC error response
-        """
+    async def _handle_validation_error(
+        self,
+        error: Exception,
+        path: str,
+        scope: dict[str, Any],
+        receive: Callable,
+        send: Callable,
+    ) -> None:
+        """Map raw exceptions to standard JSON-RPC error responses (Pure ASGI)."""
         error_str = str(error).lower()
 
-        # Special handling for Hydra-specific errors
         if "connection refused" in error_str or "timeout" in error_str:
             logger.error(f"Hydra service unavailable for {path}: {error}")
             from bindu.common.protocol.types import InternalError
 
-            code, message = extract_error_fields(InternalError)
-            return jsonrpc_error(
+            code, _ = extract_error_fields(InternalError)
+            response = jsonrpc_error(
                 code=code,
                 message="Authentication service temporarily unavailable",
                 data=str(error),
                 status=503,
             )
+
+            if scope["type"] == "websocket":
+                ws = WebSocket(scope, receive, send)
+                await ws.accept()
+                await ws.close(code=1011, reason="Auth service unavailable")
+            else:
+                await response(scope, receive, send)
+            return
+
         elif "not active" in error_str:
             from bindu.common.protocol.types import InvalidTokenError
 
-            code, message = extract_error_fields(InvalidTokenError)
-            return jsonrpc_error(
+            code, _ = extract_error_fields(InvalidTokenError)
+            response = jsonrpc_error(
                 code=code,
                 message="Token is not active or has been revoked",
                 data=str(error),
                 status=401,
             )
 
-        # Fall back to base class error handling
-        return super()._handle_validation_error(error, path)
+            if scope["type"] == "websocket":
+                ws = WebSocket(scope, receive, send)
+                await ws.accept()
+                await ws.close(code=1008, reason="Token not active")
+            else:
+                await response(scope, receive, send)
+            return
+
+        await super()._handle_validation_error(error, path, scope, receive, send)

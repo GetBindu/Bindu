@@ -189,9 +189,10 @@ def track_active_task(func: F) -> F:
     @functools.wraps(func)
     async def wrapper(self, request, *args, **kwargs):
         operation = getattr(func, "__name__", "unknown")
+        create_operations = {"send_message", "stream_message"}
 
         # Increment active tasks for creation operations
-        if operation in ["send_message"]:
+        if operation in create_operations:
             active_tasks.add(1, {"operation": "create"})
 
         try:
@@ -205,7 +206,7 @@ def track_active_task(func: F) -> F:
 
         except Exception:
             # Decrement on error for creation operations
-            if operation in ["send_message"]:
+            if operation in create_operations:
                 active_tasks.add(-1, {"operation": "error"})
             raise
 

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import json
+import socket
 from dataclasses import dataclass
 from typing import Any
 from urllib import error, request
@@ -13,6 +15,23 @@ from bindu.common.protocol.types import PushNotificationConfig
 from bindu.utils.logging import get_logger
 
 logger = get_logger("bindu.server.notifications")
+
+# RFC-1918 private ranges, loopback, link-local, and cloud-metadata CIDRs that
+# SSRF attackers commonly target.  Webhook URLs resolving into these ranges are
+# rejected before any connection is attempted.
+_BLOCKED_NETWORKS: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = [
+    ipaddress.ip_network("127.0.0.0/8"),  # loopback
+    ipaddress.ip_network("10.0.0.0/8"),  # RFC-1918
+    ipaddress.ip_network("172.16.0.0/12"),  # RFC-1918
+    ipaddress.ip_network("192.168.0.0/16"),  # RFC-1918
+    ipaddress.ip_network(
+        "169.254.0.0/16"
+    ),  # link-local / cloud metadata (AWS, GCP, Azure)
+    ipaddress.ip_network("100.64.0.0/10"),  # Carrier-grade NAT
+    ipaddress.ip_network("::1/128"),  # IPv6 loopback
+    ipaddress.ip_network("fc00::/7"),  # IPv6 unique local
+    ipaddress.ip_network("fe80::/10"),  # IPv6 link-local
+]
 
 
 class NotificationDeliveryError(Exception):
@@ -58,12 +77,36 @@ class NotificationService:
         await self._post_with_retries(config["url"], headers, payload, event)
 
     def validate_config(self, config: PushNotificationConfig) -> None:
-        """Validate push notification configuration before use."""
+        """Validate push notification configuration before use.
+
+        In addition to URL structure checks this method resolves the hostname
+        and rejects any address that falls within a private, loopback, link-local
+        or cloud-metadata range to prevent Server-Side Request Forgery (SSRF).
+        """
         parsed = urlparse(config["url"])
         if parsed.scheme not in {"http", "https"}:
             raise ValueError("Push notification URL must use http or https scheme.")
         if not parsed.netloc:
             raise ValueError("Push notification URL must include a network location.")
+
+        # SSRF defence: resolve the hostname and reject internal/private addresses.
+        hostname = parsed.hostname
+        if not hostname:
+            raise ValueError("Push notification URL must include a valid hostname.")
+        try:
+            resolved_ip = socket.getaddrinfo(hostname, None)[0][4][0]
+            addr = ipaddress.ip_address(resolved_ip)
+        except (socket.gaierror, ValueError) as exc:
+            raise ValueError(
+                f"Push notification URL hostname could not be resolved: {exc}"
+            ) from exc
+
+        for blocked in _BLOCKED_NETWORKS:
+            if addr in blocked:
+                raise ValueError(
+                    f"Push notification URL resolves to a blocked address range "
+                    f"({addr} is in {blocked}). Internal addresses are not allowed."
+                )
 
     async def _post_with_retries(
         self, url: str, headers: dict[str, str], payload: bytes, event: dict[str, Any]
@@ -150,7 +193,7 @@ class NotificationService:
             body = b""
             try:
                 body = exc.read() or b""
-            except Exception:
+            except OSError:
                 body = b""
             message = body.decode("utf-8", errors="ignore").strip()
             raise NotificationDeliveryError(

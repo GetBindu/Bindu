@@ -371,13 +371,16 @@ dependencies = [
 agents = [
     { name = "agno" },
     { name = "ddgs" },
-    { name = "dotenv" },
     { name = "duckduckgo-search" },
+    { name = "eth-utils" },
     { name = "langchain" },
     { name = "langchain-openai" },
     { name = "langgraph" },
     { name = "ollama" },
     { name = "openrouter" },
+    { name = "pycryptodome" },
+    { name = "python-dotenv" },
+    { name = "web3" },
 ]
 core = [
     { name = "aiofiles" },
@@ -429,9 +432,9 @@ requires-dist = [
     { name = "cryptography", marker = "extra == 'core'", specifier = "==44.0.2" },
     { name = "ddgs", marker = "extra == 'agents'", specifier = ">=9.10.0" },
     { name = "detect-secrets", specifier = "==1.5.0" },
-    { name = "dotenv", marker = "extra == 'agents'", specifier = ">=0.9.9" },
     { name = "duckduckgo-search", marker = "extra == 'agents'", specifier = ">=8.1.1" },
     { name = "eth-account", specifier = "==0.13.7" },
+    { name = "eth-utils", marker = "extra == 'agents'", specifier = ">=5.0.0" },
     { name = "httpx", specifier = "==0.28.1" },
     { name = "httpx", marker = "extra == 'core'", specifier = "==0.28.1" },
     { name = "langchain", marker = "extra == 'agents'", specifier = ">=1.2.9" },
@@ -450,6 +453,7 @@ requires-dist = [
     { name = "opentelemetry-sdk", specifier = "==1.35.0" },
     { name = "orjson", specifier = "==3.10.18" },
     { name = "orjson", marker = "extra == 'core'", specifier = "==3.10.18" },
+    { name = "pycryptodome", marker = "extra == 'agents'", specifier = ">=3.20.0" },
     { name = "pydantic", specifier = ">=2.11.7" },
     { name = "pydantic", marker = "extra == 'core'", specifier = ">=2.11.7" },
     { name = "pyjwt", extras = ["crypto"], specifier = "==2.10.1" },
@@ -458,6 +462,7 @@ requires-dist = [
     { name = "pynacl", marker = "extra == 'core'", specifier = "==1.5.0" },
     { name = "pyperclip", specifier = "==1.11.0" },
     { name = "python-dotenv", specifier = ">=1.1.0" },
+    { name = "python-dotenv", marker = "extra == 'agents'", specifier = ">=1.0.0" },
     { name = "pyyaml", specifier = "==6.0.2" },
     { name = "pyyaml", marker = "extra == 'core'", specifier = "==6.0.2" },
     { name = "redis", specifier = "==7.1.0" },
@@ -474,6 +479,7 @@ requires-dist = [
     { name = "uvicorn", specifier = ">=0.35" },
     { name = "uvicorn", marker = "extra == 'core'", specifier = ">=0.35" },
     { name = "web3", specifier = "==7.13.0" },
+    { name = "web3", marker = "extra == 'agents'", specifier = ">=7.0.0" },
     { name = "x402", specifier = "==0.2.1" },
 ]
 provides-extras = ["agents", "core"]
@@ -1168,17 +1174,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/ae/ed/aefcc8cd0ba62a0560c3c18c33925362d46c6075480bfa4df87b28e169a9/docutils-0.21.2.tar.gz", hash = "sha256:3a6b18732edf182daa3cd12775bbb338cf5691468f91eeeb109deff6ebfa986f", size = 2204444, upload-time = "2024-04-23T18:57:18.24Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8f/d7/9322c609343d929e75e7e5e6255e614fcc67572cfd083959cdef3b7aad79/docutils-0.21.2-py3-none-any.whl", hash = "sha256:dafca5b9e384f0e419294eb4d2ff9fa826435bf15f15b7bd45723e8ad76811b2", size = 587408, upload-time = "2024-04-23T18:57:14.835Z" },
-]
-
-[[package]]
-name = "dotenv"
-version = "0.9.9"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "python-dotenv" },
-]
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b2/b7/545d2c10c1fc15e48653c91efde329a790f2eecfbbf2bd16003b5db2bab0/dotenv-0.9.9-py2.py3-none-any.whl", hash = "sha256:29cf74a087b31dafdb5a446b6d7e11cbce8ed2741540e2339c69fbef92c94ce9", size = 1892, upload-time = "2025-02-19T22:15:01.647Z" },
 ]
 
 [[package]]

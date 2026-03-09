@@ -6,7 +6,10 @@ including getting tokens for agents and validating tokens.
 
 from __future__ import annotations as _annotations
 
+import asyncio
 from typing import Optional
+
+import aiohttp
 
 from bindu.auth.hydra.registration import load_agent_credentials
 from bindu.settings import app_settings
@@ -63,7 +66,7 @@ async def get_client_credentials_token(
                 )
                 return None
 
-    except Exception as e:
+    except (aiohttp.ClientError, asyncio.TimeoutError) as e:
         logger.error(f"Failed to get client credentials token: {e}")
         return None
 
@@ -119,7 +122,7 @@ async def introspect_token(token: str) -> Optional[dict]:
             result = await hydra.introspect_token(token)
             return result
 
-    except Exception as e:
+    except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as e:
         logger.error(f"Failed to introspect token: {e}")
         return None
 
@@ -144,7 +147,7 @@ async def revoke_token(token: str) -> bool:
         ) as hydra:
             return await hydra.revoke_token(token)
 
-    except Exception as e:
+    except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as e:
         logger.error(f"Failed to revoke token: {e}")
         return False
 

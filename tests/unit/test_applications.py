@@ -24,12 +24,24 @@ from bindu.common.models import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _reset_auth_config():
+    """Reset authentication config for each application test."""
+    from bindu.settings import app_settings
+
+    orig = app_settings.auth.enabled
+    app_settings.auth.enabled = False
+    yield
+    app_settings.auth.enabled = orig
+
+
 class TestBinduApplicationInit:
     """Test BinduApplication initialization."""
 
     def test_init_minimal(self, mock_manifest):
         """Test initialization with minimal parameters."""
-        app = BinduApplication(manifest=mock_manifest)
+        # explicitly disable auth so middleware isn't added during constructor
+        app = BinduApplication(manifest=mock_manifest, auth_enabled=False)
 
         assert app.penguin_id is not None
         assert app._storage_config is None
@@ -92,12 +104,36 @@ class TestBinduApplicationInit:
         assert "/custom" in route_paths
 
     def test_init_with_auth_enabled(self, mock_manifest):
-        """Test initialization with auth enabled."""
-        app = BinduApplication(auth_enabled=True, manifest=mock_manifest)
+        """Test initialization with auth enabled via both flag and settings."""
+        from bindu.settings import app_settings
 
-        # Auth middleware should be in middleware stack
-        # (This would require checking app.middleware)
+        app_settings.auth.enabled = True
+
+        app = BinduApplication(auth_enabled=True, manifest=mock_manifest)
         assert app is not None
+
+        # restore setting
+        app_settings.auth.enabled = False
+
+    def test_middleware_added_when_settings_true(self, mock_manifest):
+        """Even if auth_enabled=False, enabling auth in settings installs middleware."""
+        from bindu.settings import app_settings
+        from bindu.server.middleware.auth.hydra import HydraMiddleware
+
+        app_settings.auth.enabled = True
+        app = BinduApplication(auth_enabled=False, manifest=mock_manifest)
+
+        # look for HydraMiddleware in the middleware stack
+        found = False
+        for m in getattr(app, "user_middleware", []):
+            if (
+                isinstance(m, HydraMiddleware)
+                or getattr(m, "cls", None) is HydraMiddleware
+            ):
+                found = True
+                break
+        assert found, "Auth middleware should be present when settings enable auth"
+        app_settings.auth.enabled = False
 
     def test_init_with_debug_mode(self, mock_manifest):
         """Test initialization with debug mode."""

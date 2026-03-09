@@ -161,6 +161,8 @@ Your local agent becomes a live, secure, discoverable service. [Learn more →](
 Create your agent script `my_agent.py`:
 
 ```python
+import os
+
 from bindu.penguin.bindufy import bindufy
 from agno.agent import Agent
 from agno.tools.duckduckgo import DuckDuckGoTools
@@ -178,7 +180,10 @@ config = {
     "author": "your.email@example.com",
     "name": "research_agent",
     "description": "A research assistant agent",
-    "deployment": {"url": "http://localhost:3773", "expose": True},
+    "deployment": {
+        "url": os.getenv("BINDU_DEPLOYMENT_URL", "http://localhost:3773"),
+        "expose": True,
+    },
     "skills": ["skills/question-answering", "skills/pdf-processing"]
 }
 
@@ -204,7 +209,19 @@ bindufy(config, handler)
 
 ![Sample Agent](assets/agno-simple.png)
 
-Your agent is now live at `http://localhost:3773` and ready to communicate with other agents.
+Your agent is now live at the URL configured in `deployment.url`.
+
+Set a custom port without code changes:
+
+```bash
+# Linux/macOS
+export BINDU_PORT=4000
+
+# Windows PowerShell
+$env:BINDU_PORT="4000"
+```
+
+Existing examples that use `http://localhost:3773` are automatically overridden when `BINDU_PORT` is set.
 
 ### Option 3: Zero-Config Local Agent
 
@@ -223,6 +240,8 @@ python examples/beginner_zero_config_agent.py
 Smallest possible working agent:
 
 ```python
+import os
+
 from bindu.penguin.bindufy import bindufy
 
 def handler(messages):
@@ -232,7 +251,10 @@ config = {
     "author": "your.email@example.com",
     "name": "echo_agent",
     "description": "A basic echo agent for quick testing.",
-    "deployment": {"url": "http://localhost:3773", "expose": True},
+    "deployment": {
+        "url": os.getenv("BINDU_DEPLOYMENT_URL", "http://localhost:3773"),
+        "expose": True,
+    },
     "skills": []
 }
 
@@ -510,10 +532,11 @@ Want integration with your favorite framework? [Let us know on Discord](https://
 
 ## 🧪 Testing
 
-Bindu maintains **64%+ test coverage**:
+Bindu maintains **70%+ test coverage** (target: 80%+):
 
 ```bash
-uv run pytest -n auto --cov=bindu --cov-report= && coverage report --skip-covered --fail-under=64
+uv run pytest -n auto --cov=bindu --cov-report=term-missing
+uv run coverage report --skip-covered --fail-under=70
 ```
 
 ---
@@ -531,7 +554,7 @@ uv run pytest -n auto --cov=bindu --cov-report= && coverage report --skip-covere
 |-------|----------|
 | `Python 3.12 not found` | Install Python 3.12+ and set in PATH, or use `pyenv` |
 | `bindu: command not found` | Activate virtual environment: `source .venv/bin/activate` |
-| `Port 3773 already in use` | Change port in config: `"url": "http://localhost:4000"` |
+| `Port 3773 already in use` | Set `BINDU_PORT=4000` or override URL with `BINDU_DEPLOYMENT_URL=http://localhost:4000` |
 | Pre-commit fails | Run `pre-commit run --all-files` |
 | Tests fail | Install dev dependencies: `uv sync --dev` |
 | `Permission denied` (macOS) | Run `xattr -cr .` to clear extended attributes |

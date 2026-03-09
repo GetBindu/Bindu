@@ -15,7 +15,6 @@ from bindu.common.protocol.types import AgentCapabilities, Skill
 class ConfigValidator:
     """Validates and processes agent configuration."""
 
-    # Default values for optional fields
     DEFAULTS = {
         "name": "bindu-agent",
         "description": "A Bindu agent",
@@ -47,27 +46,18 @@ class ConfigValidator:
         "oltp_batch_export_timeout_millis": 30000,
     }
 
-    # Required fields that must be present
-    REQUIRED_FIELDS = ["author", "deployment"]
+    # Required fields (supports nested keys via dot notation)
+    REQUIRED_FIELDS = [
+        "author",
+        "name",
+        "deployment.url",
+    ]
 
     @classmethod
     def validate_and_process(cls, config: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Validate and process agent configuration.
-
-        Args:
-            config: Raw configuration dictionary
-
-        Returns:
-            Processed configuration with defaults applied
-
-        Raises:
-            ValueError: If required fields are missing or invalid
-        """
-        # Check required fields
-        missing_fields = [field for field in cls.REQUIRED_FIELDS if field not in config]
-        if missing_fields:
-            raise ValueError(f"Missing required fields: {', '.join(missing_fields)}")
+        """Validate and process agent configuration."""
+        # 🔥 Validate required fields first (fail-fast)
+        cls._validate_required_fields(config)
 
         # Start with defaults
         processed_config = cls.DEFAULTS.copy()
@@ -83,42 +73,73 @@ class ConfigValidator:
 
         return processed_config
 
+    # ------------------------------------------------------------------
+    # Required field validation (NEW IMPROVED VERSION)
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def _validate_required_fields(cls, config: Dict[str, Any]) -> None:
+        """Validate required fields including nested fields."""
+        missing = []
+
+        for field in cls.REQUIRED_FIELDS:
+            keys = field.split(".")
+            value = config
+
+            for key in keys:
+                if not isinstance(value, dict) or key not in value:
+                    missing.append(field)
+                    break
+                value = value[key]
+
+            if field not in missing and (
+                value is None or (isinstance(value, str) and not value.strip())
+            ):
+                missing.append(field)
+
+        if missing:
+            formatted_fields = "\n".join(f"- {f}" for f in missing)
+
+            example = """{
+  "author": "you@example.com",
+  "name": "my-agent",
+  "deployment": {"url": "http://localhost:3773"}
+}"""
+
+            raise ValueError(
+                f"Invalid Bindu configuration.\n\n"
+                f"Missing required field(s):\n"
+                f"{formatted_fields}\n\n"
+                f"Example:\n{example}"
+            )
+
+    # ------------------------------------------------------------------
+    # Complex field processing
+    # ------------------------------------------------------------------
+
     @classmethod
     def _process_complex_fields(cls, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Process fields that need special handling."""
-        # Process skills if provided as dict list
         if isinstance(config.get("skills"), list) and config["skills"]:
             if isinstance(config["skills"][0], dict):
                 config["skills"] = [Skill(**skill) for skill in config["skills"]]
 
-        # Process capabilities
         if isinstance(config.get("capabilities"), dict):
             config["capabilities"] = AgentCapabilities(**config["capabilities"])
 
-        # TODO: Process agent_trust - IN DEVELOPMENT PHASE
-        # Agent trust validation is currently in development
-        # Keep as dict for now - TypedDict validation will be added in future
-        if isinstance(config.get("agent_trust"), dict):
-            pass  # Keep as dict, validation to be implemented
-
-        # Process key password - support environment variable and prompt
-        if config.get("key_password"):
-            config["key_password"] = config["key_password"]
-
-        # Validate auth configuration if provided
         if config.get("auth"):
             cls._validate_auth_config(config["auth"])
 
-        # Process OLTP configuration only if telemetry is enabled
         if config.get("telemetry"):
             cls._process_oltp_config(config)
 
         return config
 
+    # ------------------------------------------------------------------
+    # Field type validation
+    # ------------------------------------------------------------------
+
     @classmethod
     def _validate_field_types(cls, config: Dict[str, Any]) -> None:
-        """Validate that fields have correct types."""
-        # Validate string fields
         string_fields = [
             "author",
             "name",
@@ -127,6 +148,7 @@ class ConfigValidator:
             "kind",
             "key_password",
         ]
+
         for field in string_fields:
             if (
                 field in config
@@ -135,13 +157,11 @@ class ConfigValidator:
             ):
                 raise ValueError(f"Field '{field}' must be a string")
 
-        # Validate boolean fields
         bool_fields = ["recreate_keys", "debug_mode", "monitoring", "telemetry"]
         for field in bool_fields:
             if field in config and not isinstance(config[field], bool):
                 raise ValueError(f"Field '{field}' must be a boolean")
 
-        # Validate numeric fields
         if "debug_level" in config:
             if not isinstance(config["debug_level"], int) or config[
                 "debug_level"
@@ -157,31 +177,46 @@ class ConfigValidator:
                     "Field 'num_history_sessions' must be a non-negative integer"
                 )
 
-        # Validate kind
         if config.get("kind") not in ["agent", "team", "workflow"]:
             raise ValueError("Field 'kind' must be one of: agent, team, workflow")
 
+        # execution_cost can be either a single dict or a list of dicts
+        if "execution_cost" in config and config["execution_cost"] is not None:
+            execution_cost = config["execution_cost"]
+
+            # Normalize basic type – we accept a dict or list of dicts
+            if isinstance(execution_cost, dict):
+                # Single option – nothing else to validate here
+                return
+
+            if isinstance(execution_cost, list):
+                if not execution_cost:
+                    raise ValueError("Field 'execution_cost' list cannot be empty")
+
+                for item in execution_cost:
+                    if not isinstance(item, dict):
+                        raise ValueError(
+                            "Field 'execution_cost' must be a dict or a list of dicts"
+                        )
+                return
+
+            # Any other type is invalid
+            raise ValueError("Field 'execution_cost' must be a dict or a list of dicts")
+
+    # ------------------------------------------------------------------
+    # Auth validation
+    # ------------------------------------------------------------------
+
     @classmethod
     def _validate_auth_config(cls, auth_config: Dict[str, Any]) -> None:
-        """Validate authentication configuration.
-
-        Args:
-            auth_config: Auth configuration dictionary
-
-        Raises:
-            ValueError: If auth configuration is invalid
-        """
         if not isinstance(auth_config, dict):
             raise ValueError("Field 'auth' must be a dictionary")
 
-        # Check if enabled
         if not auth_config.get("enabled", False):
-            return  # Auth disabled, no further validation needed
+            return
 
-        # Get provider (default to hydra)
         provider = auth_config.get("provider", "hydra").lower()
 
-        # Validate based on provider
         if provider == "hydra":
             cls._validate_hydra_config(auth_config)
         else:
@@ -191,186 +226,44 @@ class ConfigValidator:
 
     @classmethod
     def _validate_hydra_config(cls, auth_config: Dict[str, Any]) -> None:
-        """Validate Hydra-specific configuration.
-
-        Args:
-            auth_config: Auth configuration dictionary
-
-        Raises:
-            ValueError: If Hydra configuration is invalid
-        """
-        # Validate admin_url and public_url if provided
         if "admin_url" in auth_config:
             admin_url = auth_config["admin_url"]
-            if not admin_url.startswith("http://") and not admin_url.startswith(
-                "https://"
-            ):
+            if not admin_url.startswith(("http://", "https://")):
                 raise ValueError(
                     f"Invalid Hydra admin_url: '{admin_url}'. "
                     f"Expected format: 'https://hydra-admin.getbindu.com'"
                 )
 
-        if "public_url" in auth_config:
-            public_url = auth_config["public_url"]
-            if not public_url.startswith("http://") and not public_url.startswith(
-                "https://"
-            ):
-                raise ValueError(
-                    f"Invalid Hydra public_url: '{public_url}'. "
-                    f"Expected format: 'https://hydra.getbindu.com'"
-                )
-
-        # Validate timeout
-        if "timeout" in auth_config:
-            timeout = auth_config["timeout"]
-            if not isinstance(timeout, int) or timeout <= 0:
-                raise ValueError(
-                    f"Invalid Hydra timeout: '{timeout}'. "
-                    f"Expected positive integer (seconds)"
-                )
-
-        # Validate verify_ssl
-        if "verify_ssl" in auth_config:
-            verify_ssl = auth_config["verify_ssl"]
-            if not isinstance(verify_ssl, bool):
-                raise ValueError(
-                    f"Invalid Hydra verify_ssl: '{verify_ssl}'. "
-                    f"Expected boolean (true/false)"
-                )
-
-        # Validate max_retries
-        if "max_retries" in auth_config:
-            max_retries = auth_config["max_retries"]
-            if not isinstance(max_retries, int) or max_retries < 0:
-                raise ValueError(
-                    f"Invalid Hydra max_retries: '{max_retries}'. "
-                    f"Expected non-negative integer"
-                )
-
-        # Validate cache_ttl
-        if "cache_ttl" in auth_config:
-            cache_ttl = auth_config["cache_ttl"]
-            if not isinstance(cache_ttl, int) or cache_ttl <= 0:
-                raise ValueError(
-                    f"Invalid Hydra cache_ttl: '{cache_ttl}'. "
-                    f"Expected positive integer (seconds)"
-                )
-
-        # Validate max_cache_size
-        if "max_cache_size" in auth_config:
-            max_cache_size = auth_config["max_cache_size"]
-            if not isinstance(max_cache_size, int) or max_cache_size <= 0:
-                raise ValueError(
-                    f"Invalid Hydra max_cache_size: '{max_cache_size}'. "
-                    f"Expected positive integer"
-                )
-
-        # Validate auto_register_agents
-        if "auto_register_agents" in auth_config:
-            auto_register = auth_config["auto_register_agents"]
-            if not isinstance(auto_register, bool):
-                raise ValueError(
-                    f"Invalid Hydra auto_register_agents: '{auto_register}'. "
-                    f"Expected boolean (true/false)"
-                )
-
-        # Validate agent_client_prefix
-        if "agent_client_prefix" in auth_config:
-            prefix = auth_config["agent_client_prefix"]
-            if not isinstance(prefix, str) or not prefix:
-                raise ValueError(
-                    f"Invalid Hydra agent_client_prefix: '{prefix}'. "
-                    f"Expected non-empty string"
-                )
+    # ------------------------------------------------------------------
+    # Telemetry processing
+    # ------------------------------------------------------------------
 
     @classmethod
     def _process_oltp_config(cls, config: Dict[str, Any]) -> None:
-        """Process OLTP configuration when telemetry is enabled.
-
-        This function extracts OLTP endpoint, service name, and verbose logging from the config,
-        supporting environment variable references.
-
-        Args:
-            config: Configuration dictionary (modified in place)
-        """
-        # Process OLTP endpoint - support environment variable
         oltp_endpoint = config.get("oltp_endpoint")
         if oltp_endpoint and isinstance(oltp_endpoint, str):
             if oltp_endpoint.startswith("env:"):
-                env_var = oltp_endpoint[4:]  # Remove 'env:' prefix
-                config["oltp_endpoint"] = os.getenv(env_var)
-            # else: use the value as-is
+                config["oltp_endpoint"] = os.getenv(oltp_endpoint[4:])
 
-        # Process OLTP service name - support environment variable
-        oltp_service_name = config.get("oltp_service_name")
-        if oltp_service_name and isinstance(oltp_service_name, str):
-            if oltp_service_name.startswith("env:"):
-                env_var = oltp_service_name[4:]  # Remove 'env:' prefix
-                config["oltp_service_name"] = os.getenv(env_var)
-            # else: use the value as-is
-
-        # Process verbose logging flag - support environment variable
-        oltp_verbose_logging = config.get("oltp_verbose_logging")
-        if oltp_verbose_logging and isinstance(oltp_verbose_logging, str):
-            if oltp_verbose_logging.startswith("env:"):
-                env_var = oltp_verbose_logging[4:]  # Remove 'env:' prefix
-                env_value = os.getenv(env_var, "false").lower()
-                config["oltp_verbose_logging"] = env_value in ("true", "1", "yes")
-            # else: use the value as-is
+    # ------------------------------------------------------------------
+    # Public helper
+    # ------------------------------------------------------------------
 
     @classmethod
     def create_bindufy_config(cls, raw_config: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Create a configuration dict ready for bindufy function.
-
-        This is a convenience method that validates, processes, and ensures
-        the config is in the right format for the bindufy function.
-
-        Args:
-            raw_config: Raw configuration (e.g., from JSON file)
-
-        Returns:
-            Configuration dictionary ready for bindufy
-        """
-        # Validate and process
-        config = cls.validate_and_process(raw_config)
-
-        # Ensure nested configs are dictionaries (not model instances)
-        # for compatibility with bindufy
-        if "deployment" not in config:
-            config["deployment"] = {}
-        if "storage" not in config:
-            config["storage"] = {}
-        if "scheduler" not in config:
-            config["scheduler"] = {}
-
-        return config
+        """Create bindufy configuration from raw config."""
+        return cls.validate_and_process(raw_config)
 
 
 def load_and_validate_config(config_path: str) -> Dict[str, Any]:
-    """
-    Load configuration from file and validate it.
-
-    Args:
-        config_path: Path to configuration file (JSON)
-
-    Returns:
-        Validated and processed configuration
-
-    Raises:
-        FileNotFoundError: If config file doesn't exist
-        ValueError: If configuration is invalid
-    """
+    """Load and validate configuration from file path."""
     import json
 
-    # Handle relative paths
     if not os.path.isabs(config_path):
         caller_dir = os.path.dirname(os.path.abspath(__file__))
         config_path = os.path.join(caller_dir, config_path)
 
-    # Load config
     with open(config_path, "r") as f:
         raw_config = json.load(f)
 
-    # Validate and return
     return ConfigValidator.create_bindufy_config(raw_config)

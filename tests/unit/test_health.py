@@ -25,6 +25,12 @@ def make_dummy_task_manager():
 
 
 def test_health_endpoint_ok():
+    # disable auth to avoid middleware during simple health checks
+    from bindu.settings import app_settings
+
+    orig_auth = app_settings.auth.enabled
+    app_settings.auth.enabled = False
+
     # Provide a minimal manifest so BinduApplication doesn't try to access attributes on None
     manifest = make_minimal_manifest()
     app = BinduApplication(manifest=manifest, debug=True)
@@ -35,6 +41,8 @@ def test_health_endpoint_ok():
     client = TestClient(app)
     resp = client.get("/health")
     assert resp.status_code == 200
+    # restore auth setting
+    app_settings.auth.enabled = orig_auth
     body = resp.json()
     assert body["status"] == "ok"
     assert isinstance(body["uptime_seconds"], (int, float))

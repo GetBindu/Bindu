@@ -47,20 +47,19 @@ from .memory_storage import InMemoryStorage
 from .factory import create_storage, close_storage
 
 # Export SQLAlchemy schema (tables, not models)
-from .schema import contexts_table, metadata, task_feedback_table, tasks_table
-
-# Conditional import of PostgresStorage (requires SQLAlchemy)
-try:
-    from .postgres_storage import PostgresStorage
-except ImportError:
-    PostgresStorage = None  # type: ignore[assignment]  # SQLAlchemy not installed
+from .schema import (
+    contexts_table,
+    metadata,
+    task_feedback_table,
+    tasks_table,
+    webhook_configs_table,
+)
 
 __all__ = [
     # Base interface
     "Storage",
     # Storage implementations
     "InMemoryStorage",
-    "PostgresStorage",
     # Factory functions
     "create_storage",
     "close_storage",
@@ -69,4 +68,13 @@ __all__ = [
     "tasks_table",
     "contexts_table",
     "task_feedback_table",
+    "webhook_configs_table",
 ]
+
+# Conditional import of PostgresStorage (requires SQLAlchemy)
+try:
+    from .postgres_storage import PostgresStorage
+
+    __all__.append("PostgresStorage")
+except ImportError:
+    PostgresStorage = None  # type: ignore[assignment]  # SQLAlchemy not installed

@@ -25,7 +25,7 @@ def handler(messages):
 
         result = graph.invoke({
             "topic": query,
-            "plan": None,          
+            "plan": None,
             "sections": [],
             "final": None
         })
@@ -43,7 +43,7 @@ config = {
         "url": "http://localhost:3773",
         "expose": True,
         "cors_origins": ["*"],
-    }, 
+    },
     "skills": ["skills/Blog_writing_agent"],
 }
 

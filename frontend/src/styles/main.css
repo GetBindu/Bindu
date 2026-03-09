@@ -34,10 +34,26 @@ body {
 	}
 }
 
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 @layer utilities {
 	/* your existing utilities */
 	.scrollbar-custom {
 		@apply scrollbar-thin scrollbar-track-transparent scrollbar-thumb-black/10 scrollbar-thumb-rounded-full scrollbar-w-1 hover:scrollbar-thumb-black/20 dark:scrollbar-thumb-white/10 dark:hover:scrollbar-thumb-white/20;
+	}
+
+	.docs-content-container {
+		overflow-y: auto;
+		scrollbar-gutter: stable;
 	}
 
 	.scrollbar-custom::-webkit-scrollbar {

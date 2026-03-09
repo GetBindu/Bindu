@@ -170,7 +170,7 @@ class BinduApplication(Starlette):
         )
 
         # Add health endpoint import
-        from .endpoints.health import health_endpoint
+        from .endpoints.health import health_endpoint, healthz_endpoint
 
         # Protocol endpoints
         self._add_route(
@@ -214,8 +214,11 @@ class BinduApplication(Starlette):
             ["GET"],
             with_app=True,
         )
-        # Register health endpoint
+        # Register health endpoint (backward-compat, always ready=True)
         self._add_route("/health", health_endpoint, ["GET"], with_app=True)
+
+        # Register strict readiness endpoint for k8s probes (returns 503 until ready)
+        self._add_route("/healthz", healthz_endpoint, ["GET"], with_app=True)
 
         # Register metrics endpoint
         self._add_route("/metrics", metrics_endpoint, ["GET"], with_app=True)
@@ -466,32 +469,56 @@ class BinduApplication(Starlette):
         from x402.types import PaymentRequirements, SupportedNetworks
         from typing import cast
 
-        max_amount_required, asset_address, eip712_domain = (
-            process_price_to_atomic_amount(x402_ext.amount, x402_ext.network)
-        )
+        # When multiple payment options are configured on the extension, create a
+        # PaymentRequirements entry for each one. Otherwise, fall back to the single
+        # amount/network configuration for backward compatibility.
+        payment_requirements: list[PaymentRequirements] = []
 
-        return [
-            PaymentRequirements(
-                scheme="exact",
-                network=cast(SupportedNetworks, x402_ext.network),
-                asset=asset_address,
-                max_amount_required=max_amount_required,
-                resource=f"{manifest.url}{resource_suffix}",
-                description=f"Payment required to use {manifest.name}",
-                mime_type="",
-                pay_to=x402_ext.pay_to_address,
-                max_timeout_seconds=60,
-                output_schema={
-                    "input": {
-                        "type": "http",
-                        "method": "POST",
-                        "discoverable": True,
-                    },
-                    "output": {},
-                },
-                extra=eip712_domain,
+        options: list[dict[str, Any]]
+        if getattr(x402_ext, "payment_options", None):
+            options = list(x402_ext.payment_options)  # type: ignore[assignment]
+        else:
+            options = [
+                {
+                    "amount": x402_ext.amount,
+                    "network": x402_ext.network,
+                    "pay_to_address": x402_ext.pay_to_address,
+                }
+            ]
+
+        for opt in options:
+            amount = opt.get("amount")
+            network = opt.get("network") or app_settings.x402.default_network
+            pay_to_address = opt.get("pay_to_address") or x402_ext.pay_to_address
+
+            max_amount_required, asset_address, eip712_domain = (
+                process_price_to_atomic_amount(amount, network)
             )
-        ]
+
+            payment_requirements.append(
+                PaymentRequirements(
+                    scheme="exact",
+                    network=cast(SupportedNetworks, network),
+                    asset=asset_address,
+                    max_amount_required=max_amount_required,
+                    resource=f"{manifest.url}{resource_suffix}",
+                    description=f"Payment required to use {manifest.name}",
+                    mime_type="",
+                    pay_to=pay_to_address,
+                    max_timeout_seconds=60,
+                    output_schema={
+                        "input": {
+                            "type": "http",
+                            "method": "POST",
+                            "discoverable": True,
+                        },
+                        "output": {},
+                    },
+                    extra=eip712_domain,
+                )
+            )
+
+        return payment_requirements
 
     def _setup_middleware(
         self,
@@ -553,8 +580,13 @@ class BinduApplication(Starlette):
             )
             middleware_list.append(x402_middleware)
 
-        # Add authentication middleware if enabled
-        if auth_enabled and app_settings.auth.enabled:
+        # Add authentication middleware if requested or globally enabled
+        # (previous behavior required both flags; we now treat settings as authoritative
+        # so that enabling auth via config always installs the middleware).
+        if auth_enabled or app_settings.auth.enabled:
+            if app_settings.auth.enabled:
+                # ensure config value drives logging
+                logger.info("Authentication middleware enabled")
             auth_middleware = self._create_auth_middleware()
             # Add auth middleware after CORS and X402
             middleware_list.append(auth_middleware)
@@ -621,9 +653,17 @@ class BinduApplication(Starlette):
         )
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        """Handle ASGI requests with TaskManager validation."""
+        """Handle ASGI requests with TaskManager validation.
+
+        Health, readiness, and metrics endpoints are exempt from the startup
+        gate so that Kubernetes (and other orchestrators) can probe the pod
+        while storage/scheduler initialisation is still in progress.
+        """
         if scope["type"] == "http" and (
             self.task_manager is None or not self.task_manager.is_running
         ):
-            raise RuntimeError("TaskManager was not properly initialized.")
+            path = scope.get("path", "")
+            # Allow observability and probe endpoints through before full startup
+            if path not in ("/health", "/healthz", "/metrics"):
+                raise RuntimeError("TaskManager was not properly initialized.")
         await super().__call__(scope, receive, send)
