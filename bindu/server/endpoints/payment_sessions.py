@@ -52,7 +52,11 @@ async def start_payment_session_endpoint(
             content={"error": "Agent manifest not configured"}, status_code=500
         )
 
+    logger.debug("Starting payment session request")
+
     session = app._payment_session_manager.create_session()
+
+    logger.info(f"Payment session created: {session.session_id}")
 
     # Construct browser URL using app's base URL
     browser_url = f"{app.manifest.url}/payment-capture?session_id={session.session_id}"
