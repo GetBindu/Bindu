@@ -289,3 +289,56 @@ class Storage(ABC, Generic[ContextT]):
         Returns:
             Dictionary mapping task IDs to their webhook configurations
         """
+
+    # -------------------------------------------------------------------------
+    # Checkpoint Operations (for pause/resume support)
+    # -------------------------------------------------------------------------
+
+    @abstractmethod
+    async def save_checkpoint(
+        self,
+        task_id: UUID,
+        checkpoint_data: dict[str, Any],
+        step_number: int = 0,
+        step_label: str | None = None,
+    ) -> None:
+        """Save a checkpoint for task pause/resume.
+
+        Stores execution state that can be restored when resuming a paused task.
+
+        Args:
+            task_id: Task to save checkpoint for
+            checkpoint_data: Execution state to persist
+            step_number: Current step in execution
+            step_label: Optional label for current step
+        """
+
+    @abstractmethod
+    async def get_checkpoint(self, task_id: UUID) -> dict[str, Any] | None:
+        """Load the latest checkpoint for a task.
+
+        Args:
+            task_id: Task to load checkpoint for
+
+        Returns:
+            Checkpoint data if found, None otherwise
+        """
+
+    @abstractmethod
+    async def delete_checkpoint(self, task_id: UUID) -> None:
+        """Delete checkpoint(s) for a task.
+
+        Args:
+            task_id: Task to delete checkpoint(s) for
+        """
+
+    async def cleanup_old_checkpoints(self, days_old: int = 7) -> int:
+        """Delete checkpoints older than specified days.
+
+        Args:
+            days_old: Delete checkpoints older than this many days
+
+        Returns:
+            Number of checkpoints deleted
+        """
+        return 0

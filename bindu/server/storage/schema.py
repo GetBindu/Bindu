@@ -186,6 +186,48 @@ webhook_configs_table = Table(
 )
 
 # -----------------------------------------------------------------------------
+# Task Checkpoints Table (for pause/resume support)
+# -----------------------------------------------------------------------------
+
+task_checkpoints_table = Table(
+    "task_checkpoints",
+    metadata,
+    # Primary key
+    Column("id", Integer, primary_key=True, autoincrement=True, nullable=False),
+    # Foreign key to task
+    Column(
+        "task_id",
+        PG_UUID(as_uuid=True),
+        ForeignKey("tasks.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    # Checkpoint data - stores execution state for resume
+    Column("checkpoint_data", JSONB, nullable=False),
+    # Step info for tracking progress
+    Column("step_number", Integer, nullable=False, default=0),
+    Column("step_label", String(255), nullable=True),
+    # Timestamps
+    Column(
+        "created_at",
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    ),
+    Column(
+        "updated_at",
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
+    # Indexes
+    Index("idx_task_checkpoints_task_id", "task_id"),
+    Index("idx_task_checkpoints_created_at", "created_at"),
+    # Table comment
+    comment="Task checkpoints for pause/resume support",
+)
+
+# -----------------------------------------------------------------------------
 # Helper Functions
 # -----------------------------------------------------------------------------
 

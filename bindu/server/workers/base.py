@@ -31,6 +31,7 @@ from opentelemetry.trace import get_tracer, use_span
 from bindu.common.protocol.types import Artifact, Message, TaskIdParams, TaskSendParams
 from bindu.server.scheduler.base import Scheduler
 from bindu.server.storage.base import Storage
+from bindu.settings import app_settings
 from bindu.utils.logging import get_logger
 
 tracer = get_tracer(__name__)
@@ -215,25 +216,130 @@ class Worker(ABC):
         ...
 
     # -------------------------------------------------------------------------
-    # Future Operations (Not Yet Implemented)
+    # Pause/Resume Operations
     # -------------------------------------------------------------------------
 
     async def _handle_pause(self, params: TaskIdParams) -> None:
-        """Handle pause operation.
+        """Handle pause operation - suspend task execution with checkpoint.
 
-        TODO: Implement task pause functionality
-        - Save current execution state
-        - Update task to 'suspended' state
-        - Release resources while preserving context
+        Saves current execution state and updates task to 'suspended' state.
+        The task can be resumed later from the checkpoint.
+
+        Args:
+            params: Task identification parameters containing task_id
         """
-        raise NotImplementedError("Pause operation not yet implemented")
+        from opentelemetry.trace import get_current_span
+
+        task_id = params["task_id"]
+        task = await self.storage.load_task(task_id)
+
+        if task is None:
+            logger.warning(f"Cannot pause task {task_id}: task not found")
+            return
+
+        current_state = task["status"]["state"]
+
+        # Check if task can be paused
+        if current_state not in app_settings.agent.pausable_states:
+            logger.warning(
+                f"Cannot pause task {task_id}: task is in '{current_state}' state, "
+                f"which is not pausable. Pausable states: {app_settings.agent.pausable_states}"
+            )
+            return
+
+        # Add span event for pause
+        current_span = get_current_span()
+        if current_span.is_recording():
+            current_span.add_event(
+                "task.state_changed",
+                attributes={
+                    "from_state": current_state,
+                    "to_state": "suspended",
+                    "operation": "pause",
+                },
+            )
+
+        # Save checkpoint with current task state
+        checkpoint_data = {
+            "task_state": current_state,
+            "history": task.get("history", []),
+            "artifacts": task.get("artifacts", []),
+            "metadata": task.get("metadata", {}),
+        }
+        await self.storage.save_checkpoint(
+            task_id=task_id,
+            checkpoint_data=checkpoint_data,
+            step_number=0,
+            step_label="paused",
+        )
+
+        # Update task to suspended state
+        await self.storage.update_task(task_id, state="suspended")
+        await self._notify_lifecycle(task_id, task["context_id"], "suspended", False)
+
+        logger.info(f"Task {task_id} paused at checkpoint")
 
     async def _handle_resume(self, params: TaskIdParams) -> None:
-        """Handle resume operation.
+        """Handle resume operation - restore task from checkpoint.
 
-        TODO: Implement task resume functionality
-        - Restore execution state
-        - Update task to 'resumed' state
-        - Continue from last checkpoint
+        Loads checkpoint data and updates task to 'working' state.
+        The task can then be picked up by the scheduler for execution.
+
+        Args:
+            params: Task identification parameters containing task_id
         """
-        raise NotImplementedError("Resume operation not yet implemented")
+        from opentelemetry.trace import get_current_span
+
+        task_id = params["task_id"]
+        task = await self.storage.load_task(task_id)
+
+        if task is None:
+            logger.warning(f"Cannot resume task {task_id}: task not found")
+            return
+
+        current_state = task["status"]["state"]
+
+        # Check if task is in suspended state
+        if current_state != "suspended":
+            logger.warning(
+                f"Cannot resume task {task_id}: task is in '{current_state}' state, "
+                f"only suspended tasks can be resumed"
+            )
+            return
+
+        # Load checkpoint
+        checkpoint = await self.storage.get_checkpoint(task_id)
+        if checkpoint is None:
+            logger.warning(f"Cannot resume task {task_id}: no checkpoint found")
+            return
+
+        # Add span event for resume
+        current_span = get_current_span()
+        if current_span.is_recording():
+            current_span.add_event(
+                "task.state_changed",
+                attributes={
+                    "from_state": "suspended",
+                    "to_state": "working",
+                    "operation": "resume",
+                    "step_number": checkpoint.get("step_number", 0),
+                },
+            )
+
+        # Update task metadata with checkpoint info
+        checkpoint_info = {
+            "resumed_from_checkpoint": True,
+            "checkpoint_step": checkpoint.get("step_number", 0),
+            "checkpoint_label": checkpoint.get("step_label"),
+        }
+        await self.storage.update_task(
+            task_id,
+            state="working",
+            metadata=checkpoint_info,
+        )
+
+        await self._notify_lifecycle(task_id, task["context_id"], "working", False)
+
+        logger.info(
+            f"Task {task_id} resumed from checkpoint at step {checkpoint.get('step_number', 0)}"
+        )
