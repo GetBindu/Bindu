@@ -128,6 +128,7 @@
 	});
 
 	let shareModalOpen = $state(false);
+	let isSubmitting = $state(false);
 	let editMsdgId: Message["id"] | null = $state(null);
 	let pastedLongContent = $state(false);
 
@@ -139,10 +140,15 @@
 	);
 	let isTouchDevice = $derived(browser && navigator.maxTouchPoints > 0);
 
-	const handleSubmit = () => {
+	const handleSubmit = async () => {
 		if (requireAuthUser() || loading || !draft) return;
-		onmessage?.(draft);
-		draft = "";
+		isSubmitting = true;
+		try {
+			await onmessage?.(draft);
+			draft = "";
+		} finally {
+			isSubmitting = false;
+		}
 	};
 
 	let lastTarget: EventTarget | null = null;
@@ -323,6 +329,10 @@
 	let focused = $state(false);
 
 
+	function handleFileError(msg: string) {
+		$error = msg;
+	}
+
 	async function handleRecordingConfirm(audioBlob: Blob) {
 		isRecording = false;
 		isTranscribing = true;
@@ -480,6 +490,7 @@
 					{#await source then src}
 						<UploadedFile
 							file={src}
+							uploading={isSubmitting}
 							onclose={() => {
 								files = files.filter((_, i) => i !== index);
 							}}
@@ -529,7 +540,7 @@
 						onerror={handleRecordingError}
 					/>
 				{:else if onDrag && isFileUploadEnabled}
-					<FileDropzone bind:files bind:onDrag mimeTypes={activeMimeTypes} />
+					<FileDropzone bind:files bind:onDrag mimeTypes={activeMimeTypes} onerror={handleFileError} />
 				{:else}
 					<div
 						class="flex w-full flex-1 rounded-xl border-none bg-transparent"
@@ -550,6 +561,7 @@
 								{modelIsMultimodal}
 								{modelSupportsTools}
 								bind:focused
+								onerror={handleFileError}
 							/>
 						{/if}
 
@@ -589,6 +601,11 @@
 					</div>
 				{/if}
 			</form>
+			{#if isFileUploadEnabled}
+				<p class="mt-1 text-center text-xs text-gray-400 dark:text-gray-500">
+					Accepted: text, JSON, CSV{activeMimeTypes.some(m => m.startsWith("image")) ? ", images" : ""} · Max 10 MB
+				</p>
+			{/if}
 			<div
 				class={{
 					"mt-1.5 flex h-5 items-center self-stretch whitespace-nowrap px-0.5 text-xs text-gray-400/90 max-md:mb-2 max-sm:gap-2": true,
