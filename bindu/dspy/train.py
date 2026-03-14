@@ -114,7 +114,7 @@ async def train_async(
 
     # Step 0: Ensure system is stable (no active experiments)
     logger.info("Checking system stability")
-    await ensure_system_stable(did=did)
+    await ensure_system_stable()
 
     # Step 1: Fetch current active prompt from storage
     logger.info("Fetching active prompt from storage")
@@ -143,7 +143,6 @@ async def train_async(
     golden_dataset = await build_golden_dataset(
         limit=None,  # Use default from settings
         strategy=strategy,
-        require_feedback=require_feedback,
         min_feedback_threshold=app_settings.dspy.min_feedback_threshold,
         did=did,
     )
@@ -192,6 +191,7 @@ async def train_async(
     logger.info(
         "Extracting optimized instructions from predictor"
     )
+    # Access instructions via the property (works after SIMBA optimization)
     instructions = optimized_program.instructions
 
     if not instructions or not instructions.strip():

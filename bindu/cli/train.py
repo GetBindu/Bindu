@@ -119,17 +119,6 @@ def main() -> None:
         ),
     )
 
-    parser.add_argument(
-        "--min-feedback-threshold",
-        type=float,
-        default=None,
-        help=(
-            "Minimum feedback quality threshold for filtering interactions when "
-            "building the golden dataset. Interactions with feedback scores below "
-            "this threshold will be excluded. If not set, no filtering will be applied."
-        ),
-    )
-
     # Optimizer parameters
     parser.add_argument(
         "--bsize",
@@ -198,7 +187,6 @@ def main() -> None:
         optimizer=optimizer,
         strategy=strategy,
         did=args.did,
-        min_feedback_threshold=args.min_feedback_threshold,
     )
 
 

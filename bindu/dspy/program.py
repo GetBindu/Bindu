@@ -18,7 +18,10 @@ from __future__ import annotations
 
 import dspy
 
+from bindu.utils.logging import get_logger
 from .signature import AgentSignature
+
+logger = get_logger("bindu.dspy.program")
 
 
 # class AgentProgram(dspy.Module):
@@ -45,5 +48,34 @@ class AgentProgram(dspy.Module):
 
         self.predictor = dspy.Predict(signature)
 
+    @property
+    def instructions(self) -> str:
+        """Get the current instructions from the signature.
+        
+        The instructions are stored in the signature and can be modified by
+        optimizers like SIMBA during training. This property provides easy access
+        to the current instructions without needing to navigate the nested structure.
+        
+        Returns:
+            The current instructions string from the signature
+        """
+        return self.predictor.signature.instructions
+
     def forward(self, input: str) -> dspy.Prediction:
-        return self.predictor(input=input)
+        try:
+            prediction = self.predictor(input=input)
+            
+            # Validate prediction has required output field
+            if prediction is None:
+                logger.error(f"Predictor returned None for input: {input[:50]}...")
+                return None
+            
+            if not hasattr(prediction, 'output'):
+                logger.error(f"Prediction missing 'output' field. Prediction: {prediction}")
+                return None
+            
+            logger.debug(f"Generated output: {str(prediction.output)[:100]}...")
+            return prediction
+        except Exception as e:
+            logger.exception(f"Error in AgentProgram.forward(): {e}")
+            return None

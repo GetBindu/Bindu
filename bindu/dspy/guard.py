@@ -16,28 +16,25 @@ with active experiments.
 from __future__ import annotations
 
 from bindu.utils.logging import get_logger
-from bindu.server.storage.base import Storage
-
 from .prompts import get_candidate_prompt
 
 logger = get_logger("bindu.dspy.guard")
 
 
-async def ensure_system_stable(agent_id: str | None = None, storage: Storage | None = None, did: str | None = None) -> None:
+async def ensure_system_stable() -> None:
     """Ensure system is stable before starting DSPy training.
     
     Checks if there's already an active candidate prompt being tested.
     If a candidate exists, it means an A/B test is in progress and we
     should not start new training until that experiment concludes.
     
-    Args:
-        agent_id: Agent identifier (currently unused)
+    Uses the JSON-based prompt storage (prompts.json) to check for candidates.
     
     Raises:
         RuntimeError: If a candidate prompt already exists (experiment active)
     """
-    # Check if there's already a candidate prompt with provided storage or DID isolation
-    candidate = await get_candidate_prompt(storage=storage, did=did)
+    # Check if there's already a candidate prompt
+    candidate = await get_candidate_prompt()
     
     if candidate is not None:
         logger.error(

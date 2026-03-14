@@ -38,27 +38,46 @@ def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
 
 
 def embedding_similarity_metric() -> Callable:
-    """Embedding similarity metric compatible with SIMBA."""
+    """Embedding similarity metric compatible with SIMBA.
+    
+    Uses dspy.Embedder with OpenAI's text-embedding-3-small model.
+    Computes cosine similarity between embeddings of reference vs generated outputs.
+    """
+    embedder = dspy.Embedder("openai/text-embedding-3-small")
 
-    embedder = dspy.Embed()  # instantiate once
-
-    def metric(example: dspy.Example, prediction_dict: dict) -> float:
+    def metric(example: dspy.Example, pred) -> float:
         try:
+            # Get reference output
             reference = example.output
-            generated = prediction_dict["output"]
+            if not reference:
+                return 0.0
+            
+            # Extract generated output - handle multiple input types
+            generated = None
+            if pred is None:
+                logger.warning("Metric received None prediction")
+                return 0.0
+            elif isinstance(pred, dict):
+                # pred is a dict (could happen with different DSPy versions)
+                generated = pred.get("output")
+            elif hasattr(pred, 'output'):
+                # pred is a dspy.Prediction object
+                generated = pred.output
+            else:
+                logger.warning(f"Unexpected pred type: {type(pred)}")
+                return 0.0
+            
+            if not generated:
+                return 0.0
 
             ref_vec = embedder(reference)
             gen_vec = embedder(generated)
 
-            score = _cosine_similarity(
-                np.array(ref_vec),
-                np.array(gen_vec),
-            )
-
+            score = _cosine_similarity(ref_vec, gen_vec)
             return max(0.0, min(1.0, float(score)))
 
-        except Exception:
-            logger.exception("Embedding metric failed")
+        except Exception as e:
+            logger.exception(f"Embedding metric failed: {e}")
             return 0.0
 
     return metric
@@ -75,12 +94,35 @@ def llm_judge_metric() -> Callable:
 
     judge = dspy.Predict(judge_signature)
 
-    def metric(example: dspy.Example, prediction_dict: dict) -> float:
+    def metric(example: dspy.Example, pred) -> float:
         try:
+            # Get reference output
+            reference = example.output
+            if not reference:
+                return 0.0
+            
+            # Extract generated output - handle multiple input types
+            generated = None
+            if pred is None:
+                logger.warning("Metric received None prediction")
+                return 0.0
+            elif isinstance(pred, dict):
+                # pred is a dict (could happen with different DSPy versions)
+                generated = pred.get("output")
+            elif hasattr(pred, 'output'):
+                # pred is a dspy.Prediction object
+                generated = pred.output
+            else:
+                logger.warning(f"Unexpected pred type: {type(pred)}")
+                return 0.0
+            
+            if not generated:
+                return 0.0
+
             result = judge(
                 input=example.input,
-                reference=example.output,
-                generated=prediction_dict["output"],
+                reference=reference,
+                generated=generated,
             )
 
             raw = result.score.strip()
@@ -88,8 +130,8 @@ def llm_judge_metric() -> Callable:
 
             return max(0.0, min(1.0, score))
 
-        except Exception:
-            logger.exception("LLM judge metric failed")
+        except Exception as e:
+            logger.exception(f"LLM judge metric failed: {e}")
             return 0.0
 
     return metric
