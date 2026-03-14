@@ -27,6 +27,7 @@ from sqlalchemy import (
     String,
     Table,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 
