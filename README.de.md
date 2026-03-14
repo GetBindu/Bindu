@@ -33,6 +33,7 @@ Mit einer verteilten Architektur (Task Manager, Scheduler, Storage) macht es Bin
   <strong>🌟 <a href="https://bindus.directory">Registriere deinen Agenten</a> • 🌻 <a href="https://docs.getbindu.com">Dokumentation</a> • 💬 <a href="https://discord.gg/3w5zuYUuwt">Discord Community</a></strong>
 </p>
 
+
 ---
 
 <br/>
@@ -44,6 +45,7 @@ Mit einer verteilten Architektur (Task Manager, Scheduler, Storage) macht es Bin
     <img src="https://img.youtube.com/vi/qppafMuw_KI/maxresdefault.jpg" alt="Bindu Demo" width="640" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
   </a>
 </div>
+
 
 ## 📋 Voraussetzungen
 
@@ -67,18 +69,17 @@ uv --version
 <br/>
 
 ## 📦 Installation
-
 <details>
 <summary><b>Hinweis für Windows-Nutzer (Git & GitHub Desktop)</b></summary>
 
 Auf manchen Windows-Systemen wird Git möglicherweise nicht in der Eingabeaufforderung erkannt, selbst nach der Installation – aufgrund von PATH-Konfigurationsproblemen.
 
-Falls du auf dieses Problem stößt, kannst du _GitHub Desktop_ als Alternative verwenden:
+Falls du auf dieses Problem stößt, kannst du *GitHub Desktop* als Alternative verwenden:
 
-1. Installiere GitHub Desktop von <https://desktop.github.com/>
+1. Installiere GitHub Desktop von https://desktop.github.com/
 2. Melde dich mit deinem GitHub-Konto an
 3. Klone das Repository mit der Repository-URL:
-   <https://github.com/getbindu/Bindu.git>
+   https://github.com/getbindu/Bindu.git
 
 GitHub Desktop ermöglicht es dir, Repositories zu klonen, Branches zu verwalten, Änderungen zu committen und Pull Requests zu öffnen – ohne die Kommandozeile.
 
@@ -152,11 +153,9 @@ from agno.agent import Agent
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.models.openai import OpenAIChat
 
-from bindu.dspy.prompts import Prompt
-
 # Definiere deinen Agenten
 agent = Agent(
-    instructions=Prompt("Du bist ein Recherche-Assistent, der Informationen findet und zusammenfasst."),
+    instructions="Du bist ein Recherche-Assistent, der Informationen findet und zusammenfasst.",
     model=OpenAIChat(id="gpt-4o"),
     tools=[DuckDuckGoTools()],
 )
@@ -232,7 +231,6 @@ python examples/echo_agent.py
 <br/>
 
 Eingabe:
-
 ```bash
 curl --location 'http://localhost:3773/' \
 --header 'Content-Type: application/json' \
@@ -264,7 +262,6 @@ curl --location 'http://localhost:3773/' \
 ```
 
 Ausgabe:
-
 ```bash
 {
     "jsonrpc": "2.0",
@@ -297,7 +294,6 @@ Ausgabe:
 ```
 
 Überprüfe den Status der Aufgabe
-
 ```bash
 curl --location 'http://localhost:3773/' \
 --header 'Content-Type: application/json' \
@@ -312,7 +308,6 @@ curl --location 'http://localhost:3773/' \
 ```
 
 Ausgabe:
-
 ```bash
 {
     "jsonrpc": "2.0",
@@ -464,6 +459,7 @@ Alle Operationen werden in Redis in die Warteschlange gestellt und von verfügba
 
 Bindu enthält einen integrierten Tenacity-basierten Retry-Mechanismus, um vorübergehende Fehler elegant über Worker, Storage, Scheduler und API-Aufrufe hinweg zu behandeln. Dies stellt sicher, dass deine Agenten in Produktionsumgebungen resilient bleiben.
 
+
 ### ⚙️ Standardeinstellungen
 
 Falls nicht konfiguriert, verwendet Bindu diese Standards:
@@ -553,11 +549,11 @@ Das Bindu Skills-System bietet umfassende Agenten-Fähigkeits-Werbung für intel
 
 Skills in Bindu dienen als **umfassende Werbe-Metadaten**, die Orchestratoren helfen:
 
-- 🔍 **Entdecken** des richtigen Agenten für eine Aufgabe
-- 📖 **Verstehen** detaillierter Fähigkeiten und Einschränkungen
-- ✅ **Validieren** von Anforderungen vor der Ausführung
-- 📊 **Schätzen** von Performance und Ressourcenbedarf
-- 🔗 **Verketten** mehrerer Agenten intelligent
+* 🔍 **Entdecken** des richtigen Agenten für eine Aufgabe
+* 📖 **Verstehen** detaillierter Fähigkeiten und Einschränkungen
+* ✅ **Validieren** von Anforderungen vor der Ausführung
+* 📊 **Schätzen** von Performance und Ressourcenbedarf
+* 🔗 **Verketten** mehrerer Agenten intelligent
 
 > **Hinweis**: Skills sind kein ausführbarer Code – sie sind strukturierte Metadaten, die beschreiben, was dein Agent kann.
 
@@ -749,19 +745,16 @@ assessment:
 ### 🔌 API-Endpunkte
 
 **Alle Skills auflisten**:
-
 ```bash
 GET /agent/skills
 ```
 
 **Skill-Details abrufen**:
-
 ```bash
 GET /agent/skills/{skill_id}
 ```
 
 **Skill-Dokumentation abrufen**:
-
 ```bash
 GET /agent/skills/{skill_id}/documentation
 ```
@@ -795,7 +788,6 @@ POST /agent/negotiation
 ```
 
 **Anfrage:**
-
 ```json
 {
   "task_summary": "Extrahiere Tabellen aus PDF-Rechnungen",
@@ -816,7 +808,6 @@ POST /agent/negotiation
 ```
 
 **Antwort:**
-
 ```json
 {
   "accepted": true,
@@ -994,7 +985,6 @@ Bindu unterstützt **Echtzeit-Webhook-Benachrichtigungen** für lang laufende Ta
 
 1. **Webhook-Empfänger starten:** `python examples/webhook_client_example.py`
 2. **Agent konfigurieren** in `examples/echo_agent_with_webhooks.py`:
-
    ```python
    manifest = {
        "capabilities": {"push_notifications": True},
@@ -1002,7 +992,6 @@ Bindu unterstützt **Echtzeit-Webhook-Benachrichtigungen** für lang laufende Ta
        "global_webhook_token": "secret_abc123",
    }
    ```
-
 3. **Agent ausführen:** `python examples/echo_agent_with_webhooks.py`
 4. **Tasks senden** - Webhook-Benachrichtigungen kommen automatisch an
 
@@ -1035,7 +1024,6 @@ async def handle_task_update(request: Request, authorization: str = Header(None)
 <br/>
 
 **Status-Update-Event** - Gesendet, wenn sich der Task-Status ändert:
-
 ```json
 {
   "kind": "status-update",
@@ -1046,7 +1034,6 @@ async def handle_task_update(request: Request, authorization: str = Header(None)
 ```
 
 **Artifact-Update-Event** - Gesendet, wenn Artifacts generiert werden:
-
 ```json
 {
   "kind": "artifact-update",
@@ -1180,6 +1167,7 @@ NightSky ermöglicht Schwärme von Agenten. Jeder Bindu ist ein Punkt, der Agent
 
 ---
 
+
 <br/>
 
 ## 🛠️ Unterstützte Agenten-Frameworks
@@ -1211,7 +1199,6 @@ uv run pytest -n auto --cov=bindu --cov-report= && coverage report --skip-covere
 <br/>
 
 ## Troubleshooting
-
 <details>
 <summary>Häufige Probleme</summary>
 
@@ -1227,7 +1214,6 @@ uv run pytest -n auto --cov=bindu --cov-report= && coverage report --skip-covere
 | `Permission denied` (macOS) | Führe `xattr -cr .` aus, um erweiterte Attribute zu löschen |
 
 **Umgebung zurücksetzen:**
-
 ```bash
 rm -rf .venv
 uv venv --python 3.12.9
@@ -1235,7 +1221,6 @@ uv sync --dev
 ```
 
 **Windows PowerShell:**
-
 ```bash
 Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```

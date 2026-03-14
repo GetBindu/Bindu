@@ -73,12 +73,12 @@ uv --version
 
 En algunos sistemas Windows, git puede no ser reconocido en el Command Prompt incluso después de la instalación – debido a problemas de configuración de PATH.
 
-Si encuentras este problema, puedes usar _GitHub Desktop_ como alternativa:
+Si encuentras este problema, puedes usar *GitHub Desktop* como alternativa:
 
-1. Instala GitHub Desktop desde <https://desktop.github.com/>
+1. Instala GitHub Desktop desde https://desktop.github.com/
 2. Inicia sesión con tu cuenta de GitHub
 3. Clona usando la URL del repositorio:
-   <https://github.com/getbindu/Bindu.git>
+   https://github.com/getbindu/Bindu.git
 
 GitHub Desktop te permite clonar repositorios, gestionar ramas, hacer commits de cambios y abrir pull requests sin la línea de comandos.
 
@@ -152,11 +152,9 @@ from agno.agent import Agent
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.models.openai import OpenAIChat
 
-from bindu.dspy.prompts import Prompt
-
 # Define tu agente
 agent = Agent(
-    instructions=Prompt("Eres un asistente de investigación que encuentra y resume información."),
+    instructions="Eres un asistente de investigación que encuentra y resume información.",
     model=OpenAIChat(id="gpt-4o"),
     tools=[DuckDuckGoTools()],
 )
@@ -232,7 +230,6 @@ python examples/echo_agent.py
 <br/>
 
 Entrada:
-
 ```bash
 curl --location 'http://localhost:3773/' \
 --header 'Content-Type: application/json' \
@@ -264,7 +261,6 @@ curl --location 'http://localhost:3773/' \
 ```
 
 Salida:
-
 ```bash
 {
     "jsonrpc": "2.0",
@@ -297,7 +293,6 @@ Salida:
 ```
 
 Verifica el estado de la tarea
-
 ```bash
 curl --location 'http://localhost:3773/' \
 --header 'Content-Type: application/json' \
@@ -312,7 +307,6 @@ curl --location 'http://localhost:3773/' \
 ```
 
 Salida:
-
 ```bash
 {
     "jsonrpc": "2.0",
@@ -553,30 +547,27 @@ El Bindu Skills System proporciona publicidad rica de capacidades de agentes par
 
 En Bindu, las Skills actúan como **metadatos de publicidad ricos** que ayudan a los orquestadores a:
 
-- 🔍 **Descubrir** el agente correcto para una tarea
-- 📖 **Entender** capacidades y limitaciones detalladas
-- ✅ **Verificar** requisitos antes de la ejecución
-- 📊 **Estimar** rendimiento y necesidades de recursos
-- 🔗 **Encadenar** múltiples agentes inteligentemente
+* 🔍 **Descubrir** el agente correcto para una tarea
+* 📖 **Entender** capacidades y limitaciones detalladas
+* ✅ **Verificar** requisitos antes de la ejecución
+* 📊 **Estimar** rendimiento y necesidades de recursos
+* 🔗 **Encadenar** múltiples agentes inteligentemente
 
 > **Nota**: Las Skills no son código ejecutable—son metadatos estructurados que describen lo que tu agente puede hacer.
 
 ### 🔌 Endpoints API
 
 **Listar todas las Skills**:
-
 ```bash
 GET /agent/skills
 ```
 
 **Obtener detalles de Skill**:
-
 ```bash
 GET /agent/skills/{skill_id}
 ```
 
 **Obtener documentación de Skill**:
-
 ```bash
 GET /agent/skills/{skill_id}/documentation
 ```
@@ -610,7 +601,6 @@ POST /agent/negotiation
 ```
 
 **Solicitud:**
-
 ```json
 {
   "task_summary": "Extraer tablas de facturas PDF",
@@ -631,7 +621,6 @@ POST /agent/negotiation
 ```
 
 **Respuesta:**
-
 ```json
 {
   "accepted": true,
@@ -732,7 +721,6 @@ Bindu soporta **notificaciones webhook en tiempo real** para tareas de larga dur
 
 1. **Inicia el receptor webhook:** `python examples/webhook_client_example.py`
 2. **Configura el agente** en `examples/echo_agent_with_webhooks.py`:
-
    ```python
    manifest = {
        "capabilities": {"push_notifications": True},
@@ -740,7 +728,6 @@ Bindu soporta **notificaciones webhook en tiempo real** para tareas de larga dur
        "global_webhook_token": "secret_abc123",
    }
    ```
-
 3. **Ejecuta el agente:** `python examples/echo_agent_with_webhooks.py`
 4. **Envía tareas** - las notificaciones webhook llegan automáticamente
 
@@ -865,7 +852,6 @@ pytest -n auto --cov=bindu --cov-report= && coverage report --skip-covered --fai
 | `Permission denied` (macOS) | Ejecuta `xattr -cr .` para limpiar atributos extendidos |
 
 **Reiniciar entorno:**
-
 ```bash
 rm -rf .venv
 uv venv --python 3.12.9
@@ -873,7 +859,6 @@ uv sync --dev
 ```
 
 **Windows PowerShell:**
-
 ```bash
 Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
