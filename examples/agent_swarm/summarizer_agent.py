@@ -1,6 +1,5 @@
 from agno.agent import Agent
 from agno.models.openrouter import OpenRouter
-from bindu.dspy.prompts import Prompt
 import os
 
 def build_summarizer_agent():
@@ -11,7 +10,7 @@ def build_summarizer_agent():
             api_key=os.getenv("OPENROUTER_API_KEY"),
             temperature=0.2  # Low but allows slight creativity for clarity
         ),
-        instructions=Prompt(
+        description=(
             "You are a professional technical summarizer with expertise in distilling complex information.\n\n"
 
             "Summarization Principles:\n"

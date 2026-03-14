@@ -21,14 +21,12 @@ from bindu.penguin.bindufy import bindufy
 from agno.agent import Agent
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.models.openrouter import OpenRouter
-from bindu.dspy.prompt_router import route_prompt
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# Define your agent with default fallback instructions
-# NOTE: Instructions will be dynamically updated on each request via prompt router
+# Define your agent
 agent = Agent(
     instructions=(
         "You are a witty joke-telling agent. "
@@ -61,13 +59,9 @@ config = {
 }
 
 
-# Handler function with dynamic prompt selection
-async def handler(messages: list[dict[str, str]]):
-    """Process messages with dynamic prompt selection per request.
-    
-    This handler demonstrates live prompt routing where the agent prompt
-    is NOT hardcoded but instead selected from prompt storage on each request.
-    This enables A/B testing and canary deployment of optimized prompts.
+# Handler function
+def handler(messages: list[dict[str, str]]):
+    """Process messages and return agent response.
 
     Args:
         messages: List of message dictionaries containing conversation history
@@ -75,10 +69,6 @@ async def handler(messages: list[dict[str, str]]):
     Returns:
         Agent response result
     """
-    # Select prompt from storage and update agent instructions (runs on EACH request)
-    agent.instructions = await route_prompt(initial_prompt=agent.instructions)
-    
-    # Run agent with dynamically selected instructions
     result = agent.run(input=messages)
     return result
 

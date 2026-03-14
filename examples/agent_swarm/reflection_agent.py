@@ -1,6 +1,5 @@
 from agno.agent import Agent
 from agno.models.openrouter import OpenRouter
-from bindu.dspy.prompts import Prompt
 import os
 
 
@@ -12,7 +11,7 @@ def build_reflection_agent():
             api_key=os.getenv("OPENROUTER_API_KEY"),
             temperature=0
         ),
-        instructions=Prompt("""You are a strict JSON-only quality evaluation agent.
+        description="""You are a strict JSON-only quality evaluation agent.
 
 CRITICAL RULES:
 1. Output ONLY valid JSON - no markdown, no explanations, no text
@@ -44,6 +43,6 @@ Example Output: {"quality":"bad","issues":["Too vague","Missing key concepts","N
 Example Input: "Machine Learning is a subset of AI that uses algorithms to learn from data..."
 Example Output: {"quality":"good","issues":[],"fix_strategy":""}
 
-Remember: ONLY output the JSON object, nothing else."""),
+Remember: ONLY output the JSON object, nothing else.""",
 
     )

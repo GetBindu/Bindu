@@ -5,7 +5,6 @@ Example agents demonstrating Bindu's capabilities - from simple bots to multi-ag
 ## Quick Start
 
 ### Prerequisites
-
 - Python 3.12+
 - uv package manager
 - OpenRouter API key
@@ -42,7 +41,6 @@ For full URL override, use `BINDU_DEPLOYMENT_URL` (e.g. `http://127.0.0.1:5001`)
 ## Examples
 
 ### Beginner
-
 - `beginner/echo_simple_agent.py` - Minimal echo bot
 - `beginner/beginner_zero_config_agent.py` - Zero-config agent with web search
 - `beginner/agno_simple_example.py` - Joke generator
@@ -51,18 +49,15 @@ For full URL override, use `BINDU_DEPLOYMENT_URL` (e.g. `http://127.0.0.1:5001`)
 - `beginner/agno_notion_agent.py` - Notion integration
 
 ### Specialized
-
 - `summarizer/` - Text summarization agent
 - `weather-research/` - Weather intelligence agent
 - `premium-advisor/` - Paid agent with X402 payments (0.01 USDC per query)
 
 ### Advanced
-
 - `agent_swarm/` - Multi-agent collaboration system
 - `cerina_bindu/cbt/` - CBT therapy protocol generator
 
 ### Components
-
 - `skills/` - Reusable agent capabilities
 
 ## Environment Variables
@@ -94,14 +89,12 @@ Users must pay 0.01 USDC before the agent responds.
 ## Testing
 
 ### Web UI
-
 ```bash
 cd frontend
 npm run dev
 ```
 
 ### API
-
 ```bash
 curl -X POST ${BINDU_DEPLOYMENT_URL:-http://localhost:${BINDU_PORT:-3773}}/ \
   -H "Content-Type: application/json" \
@@ -111,28 +104,18 @@ curl -X POST ${BINDU_DEPLOYMENT_URL:-http://localhost:${BINDU_PORT:-3773}}/ \
 ## Building Your Own
 
 ```python
-from agno.agent import Agent
-from bindu.dspy.prompts import Prompt
-from bindu.penguin.bindufy import bindufy
+from bindu import Agent
 
 agent = Agent(
     name="My Agent",
-    instructions=Prompt("Behavior guidelines"),
+    description="What it does",
     model="openai/gpt-4o",
 )
 
-config = {
-    "name": "my_agent",
-    "author": "your.email@example.com",
-    "description": "What it does",
-    "deployment": {"url": "http://localhost:3773", "expose": True}
-}
+agent.instructions = ["Behavior guidelines"]
 
 if __name__ == "__main__":
-    def handler(messages):
-        return agent.run(input=messages)
-
-    bindufy(config, handler)
+    agent.serve(port=3773)
 ```
 
 ## Documentation
