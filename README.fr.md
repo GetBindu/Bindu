@@ -823,7 +823,49 @@ Vous voulez une intégration avec votre framework préféré ? [Faites-le nous s
 
 <br/>
 
-## 🧪 Tests
+## � Optimisation des invites DSPy
+
+Bindu intègre **DSPy**, un framework pour optimiser programmatiquement les invites de LLM afin d'améliorer les performances des agents. Au lieu de créer manuellement les invites, DSPy génère et valide automatiquement les versions améliorées en utilisant les commentaires réels des agents.
+
+### Comment ça fonctionne
+
+DSPy offre trois capacités clés :
+
+1. **🎯 Entraîner les invites optimisées** - Analyser les interactions des agents et générer de meilleures invites
+   ```bash
+   bindu train --did agent_did
+   ```
+   Cela crée des variantes de test A/B : une invite "active" (votre version actuelle) et une version "candidate" (optimisée) avec division du trafic configurable.
+
+2. **📊 Lancement Canary** - Décaler progressivement le trafic vers l'invite améliorée
+   ```bash
+   bindu canary --did agent_did
+   ```
+
+3. **🔄 Routage d'invites en direct** - Servir dynamiquement la bonne version d'invite à chaque demande
+   ```python
+   from bindu.dspy.prompt_router import route_prompt
+   
+   async def handler(messages: list[dict[str, str]]):
+       agent.instructions = await route_prompt(initial_prompt=agent.instructions)
+       return agent.run(input=messages)
+   ```
+
+### Exemple de démarrage rapide
+
+Consultez [examples/agno_dspy_example.py](examples/agno_dspy_example.py) pour un exemple complet et fonctionnel avec un agent Agno.
+
+### Conditions préalables à la formation DSPy
+
+- Définissez `OPENAI_API_KEY` dans votre fichier `.env`
+- Configurez PostgreSQL avec l'historique des tâches des agents et les évaluations de rétroaction
+- Assurez-vous que les agents enregistrent les interactions avec des scores de rétroaction (échelle de notation 0-1 ou 1-5)
+
+---
+
+<br/>
+
+## �🧪 Tests
 
 Bindu maintient **70%+ de couverture de tests** :
 

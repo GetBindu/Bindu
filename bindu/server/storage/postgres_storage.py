@@ -25,7 +25,6 @@ Features:
 
 from __future__ import annotations as _annotations
 
-import typing
 from typing import Any
 from uuid import UUID
 
@@ -325,7 +324,7 @@ class PostgresStorage(Storage[ContextT]):
 
         return await self._retry_on_connection_error(_load)
 
-    async def submit_task(self, context_id: UUID, message: Message) -> Task:
+    async def submit_task(self, context_id: UUID, message: Message, prompt_id: str | None = None) -> Task:
         """Create a new task or continue an existing non-terminal task.
 
         Task-First Pattern (Bindu):
@@ -336,6 +335,7 @@ class PostgresStorage(Storage[ContextT]):
         Args:
             context_id: Context to associate the task with
             message: Initial message containing task request
+            prompt_id: Optional prompt ID (UUID string) to associate with this task
 
         Returns:
             Task in 'submitted' state (new or continued)
@@ -416,6 +416,7 @@ class PostgresStorage(Storage[ContextT]):
                             history=[serialized_message],
                             artifacts=[],
                             metadata={},
+                            prompt_id=prompt_id,
                         )
                         .returning(tasks_table)
                     )
@@ -433,6 +434,7 @@ class PostgresStorage(Storage[ContextT]):
         new_artifacts: list[Artifact] | None = None,
         new_messages: list[Message] | None = None,
         metadata: dict[str, Any] | None = None,
+        prompt_id: str | None = None,
     ) -> Task:
         """Update task state and append new content using SQLAlchemy.
 
@@ -442,6 +444,7 @@ class PostgresStorage(Storage[ContextT]):
             new_artifacts: Optional artifacts to append
             new_messages: Optional messages to append to history
             metadata: Optional metadata to update/merge
+            prompt_id: Optional prompt ID (UUID string) to associate with this task
 
         Returns:
             Updated task object
@@ -498,6 +501,9 @@ class PostgresStorage(Storage[ContextT]):
                         update_values["history"] = func.jsonb_concat(
                             tasks_table.c.history, cast(serialized_messages, JSONB)
                         )
+
+                    if prompt_id is not None:
+                        update_values["prompt_id"] = prompt_id
 
                     # Execute update
                     stmt = (
@@ -605,6 +611,62 @@ class PostgresStorage(Storage[ContextT]):
                 return [self._row_to_task(row) for row in rows]
 
         return await self._retry_on_connection_error(_list)
+
+    async def fetch_tasks_with_feedback(
+        self, limit: int | None = None
+    ) -> list[dict[str, Any]]:
+        """Fetch tasks with their associated feedback for DSPy training.
+
+        Performs a LEFT JOIN between tasks and task_feedback tables to retrieve
+        task history along with feedback data (if any exists). Used by the DSPy
+        dataset pipeline to gather training data.
+
+        Args:
+            limit: Maximum number of tasks to fetch (default: unlimited)
+
+        Returns:
+            List of dicts with keys: id, history, created_at, feedback_data
+            Each dict represents a task with its optional feedback.
+
+        Raises:
+            ConnectionError: If unable to fetch from database
+        """
+        self._ensure_connected()
+
+        async def _fetch():
+            async with self._get_session_with_schema() as session:
+                stmt = (
+                    select(
+                        tasks_table.c.id,
+                        tasks_table.c.history,
+                        tasks_table.c.created_at,
+                        task_feedback_table.c.feedback_data,
+                    )
+                    .select_from(tasks_table)
+                    .outerjoin(
+                        task_feedback_table,
+                        tasks_table.c.id == task_feedback_table.c.task_id,
+                    )
+                    .order_by(tasks_table.c.created_at.desc())
+                )
+
+                if limit:
+                    stmt = stmt.limit(limit)
+
+                result = await session.execute(stmt)
+                rows = result.fetchall()
+
+                return [
+                    {
+                        "id": row.id,
+                        "history": row.history,
+                        "created_at": row.created_at,
+                        "feedback_data": row.feedback_data,
+                    }
+                    for row in rows
+                ]
+
+        return await self._retry_on_connection_error(_fetch)
 
     # -------------------------------------------------------------------------
     # Context Operations

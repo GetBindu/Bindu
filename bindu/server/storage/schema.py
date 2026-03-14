@@ -50,6 +50,11 @@ tasks_table = Table(
         ForeignKey("contexts.id", ondelete="CASCADE"),
         nullable=False,
     ),
+    Column(
+        "prompt_id",
+        String,
+        nullable=True,
+    ),
     # Task metadata
     Column("kind", String(50), nullable=False, default="task"),
     Column("state", String(50), nullable=False),
