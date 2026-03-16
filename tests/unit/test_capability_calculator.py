@@ -333,3 +333,56 @@ async def test_matched_tags_and_capabilities():
         assert any(
             "tags" in r or "capabilities" in r for r in result.skill_matches[0].reasons
         )
+
+
+@pytest.mark.asyncio
+async def test_debug_mode_include_trace():
+    skills = [
+        {
+            "id": "processor",
+            "name": "Processor",
+            "tags": ["processing"],
+        }
+    ]
+    calculator = CapabilityCalculator(skills=skills, x402_extension=None)
+    result = await calculator.calculate(task_summary="process data", debug=True)
+
+    assert result.debug_trace is not None
+    assert "subscores" in result.debug_trace
+    assert "decision" in result.debug_trace
+
+
+@pytest.mark.asyncio
+async def test_debug_mode_disabled_by_default():
+    skills = [
+        {
+            "id": "processor",
+            "name": "Processor",
+            "tags": ["processing"],
+        }
+    ]
+
+    calculator = CapabilityCalculator(skills=skills, x402_extension=None)
+
+    result = await calculator.calculate(task_summary="process data")
+
+    assert result.debug_trace is None
+
+
+def test_performance_score_rewards_fast_agents():
+    calculator = CapabilityCalculator(skills=[], x402_extension=None)
+
+    score = calculator._calculate_performance_score(
+        latency_estimate_ms=500, max_latency_ms=1000
+    )
+    assert score > 0.5  # Should reward faster than max latency
+
+
+def test_performance_score_penalizes_slow_agents():
+    calculator = CapabilityCalculator(skills=[], x402_extension=None)
+
+    score = calculator._calculate_performance_score(
+        latency_estimate_ms=2000, max_latency_ms=1000
+    )
+
+    assert score < 0.5
