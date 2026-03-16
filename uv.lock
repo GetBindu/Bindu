@@ -330,6 +330,7 @@ wheels = [
 name = "bindu"
 source = { editable = "." }
 dependencies = [
+    { name = "agno" },
     { name = "aiofiles" },
     { name = "alembic" },
     { name = "asyncpg" },
@@ -337,11 +338,14 @@ dependencies = [
     { name = "cdp-sdk" },
     { name = "cookiecutter" },
     { name = "cryptography" },
+    { name = "ddgs" },
     { name = "detect-secrets" },
+    { name = "duckduckgo-search" },
     { name = "eth-account" },
     { name = "httpx" },
     { name = "loguru" },
     { name = "numpy" },
+    { name = "openai" },
     { name = "opentelemetry-api" },
     { name = "opentelemetry-exporter-otlp" },
     { name = "opentelemetry-exporter-otlp-proto-http" },
@@ -419,6 +423,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "agno", specifier = ">=2.5.2" },
     { name = "agno", marker = "extra == 'agents'", specifier = ">=2.5.2" },
     { name = "aiofiles", specifier = "==24.1.0" },
     { name = "aiofiles", marker = "extra == 'core'", specifier = "==24.1.0" },
@@ -430,8 +435,10 @@ requires-dist = [
     { name = "cookiecutter", specifier = "==2.6.0" },
     { name = "cryptography", specifier = "==44.0.2" },
     { name = "cryptography", marker = "extra == 'core'", specifier = "==44.0.2" },
+    { name = "ddgs", specifier = ">=9.10.0" },
     { name = "ddgs", marker = "extra == 'agents'", specifier = ">=9.10.0" },
     { name = "detect-secrets", specifier = "==1.5.0" },
+    { name = "duckduckgo-search", specifier = ">=8.1.1" },
     { name = "duckduckgo-search", marker = "extra == 'agents'", specifier = ">=8.1.1" },
     { name = "eth-account", specifier = "==0.13.7" },
     { name = "eth-utils", marker = "extra == 'agents'", specifier = ">=5.0.0" },
@@ -444,6 +451,7 @@ requires-dist = [
     { name = "loguru", marker = "extra == 'core'", specifier = "==0.7.3" },
     { name = "numpy", specifier = "==2.3.5" },
     { name = "ollama", marker = "extra == 'agents'", specifier = ">=0.6.1" },
+    { name = "openai", specifier = ">=2.17.0" },
     { name = "openrouter", marker = "extra == 'agents'", specifier = ">=0.6.0" },
     { name = "opentelemetry-api", specifier = "==1.35.0" },
     { name = "opentelemetry-exporter-otlp", specifier = "==1.35.0" },

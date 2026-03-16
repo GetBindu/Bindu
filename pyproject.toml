@@ -57,6 +57,10 @@ dependencies = [
     # Security
     "detect-secrets==1.5.0",
     "python-dotenv>=1.1.0",
+    "agno>=2.5.2",
+    "duckduckgo-search>=8.1.1",
+    "ddgs>=9.10.0",
+    "openai>=2.17.0",
 ]
 
 [project.optional-dependencies]

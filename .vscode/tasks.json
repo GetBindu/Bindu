@@ -1,0 +1,12 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Bindu: Start Backend Agent (Echo)",
+			"type": "shell",
+			"command": "STORAGE_TYPE=memory SCHEDULER_TYPE=memory /home/shrey/Bindu/.venv/bin/python examples/beginner/echo_simple_agent.py",
+			"isBackground": true,
+			"problemMatcher": []
+		}
+	]
+}
