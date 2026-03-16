@@ -1,0 +1,4 @@
+skill_id: "data-extraction-v1" name: "Data Extraction & Scraping" version: "1.0.0" description: "Extracts structured data from unstructured 
+text, web scrapes, and documents." capabilities:
+  - text_extraction - web_scraping - table_extraction tags: - extraction - parsing - scraping
+  - pdf
