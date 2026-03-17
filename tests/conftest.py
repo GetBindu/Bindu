@@ -8,7 +8,27 @@ from types import ModuleType
 ot_trace = ModuleType("opentelemetry.trace")
 
 
+class _SpanContext:
+    """Mock SpanContext for testing."""
+
+    def __init__(self, trace_id=0, span_id=0, is_remote=False, trace_flags=None):
+        self.trace_id = trace_id
+        self.span_id = span_id
+        self.is_remote = is_remote
+        self.trace_flags = trace_flags or _TraceFlags(0)
+        self.is_valid = trace_id != 0 and span_id != 0
+
+
+class _TraceFlags(int):
+    """Mock TraceFlags for testing."""
+
+    SAMPLED = 1
+
+
 class _Span:
+    def __init__(self, context=None):
+        self._context = context or _SpanContext()
+
     def is_recording(self):
         return True
 
@@ -23,6 +43,16 @@ class _Span:
 
     def set_status(self, *args, **kwargs):  # noqa: D401
         return None
+
+    def get_span_context(self):
+        return self._context
+
+
+# NonRecordingSpan is the same as _Span for testing
+_NonRecordingSpan = _Span
+
+# Invalid span context constant
+_INVALID_SPAN_CONTEXT = _SpanContext(trace_id=0, span_id=0, is_remote=False)
 
 
 def get_current_span():  # noqa: D401
@@ -62,6 +92,14 @@ ot_trace.Status = _Status  # type: ignore[attr-defined]
 ot_trace.StatusCode = _StatusCode  # type: ignore[attr-defined]
 ot_trace.Span = _Span  # type: ignore[attr-defined]
 ot_trace.use_span = lambda span: _SpanCtx()  # type: ignore[attr-defined]
+
+# --- OpenTelemetry trace.span submodule stub ---
+ot_trace_span = ModuleType("opentelemetry.trace.span")
+ot_trace_span.NonRecordingSpan = _NonRecordingSpan  # type: ignore[attr-defined]
+ot_trace_span.SpanContext = _SpanContext  # type: ignore[attr-defined]
+ot_trace_span.TraceFlags = _TraceFlags  # type: ignore[attr-defined]
+ot_trace_span.INVALID_SPAN_CONTEXT = _INVALID_SPAN_CONTEXT  # type: ignore[attr-defined]
+ot_trace.span = ot_trace_span  # type: ignore[attr-defined]
 
 # Build minimal opentelemetry root and metrics stub
 op_root = ModuleType("opentelemetry")
@@ -107,6 +145,7 @@ op_root.trace = ot_trace  # type: ignore[attr-defined]
 
 sys.modules["opentelemetry"] = op_root
 sys.modules["opentelemetry.trace"] = ot_trace
+sys.modules["opentelemetry.trace.span"] = ot_trace_span
 sys.modules["opentelemetry.metrics"] = metrics_mod
 
 

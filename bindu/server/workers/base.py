@@ -27,6 +27,12 @@ from typing import Any, AsyncIterator
 
 import anyio
 from opentelemetry.trace import get_tracer, use_span
+from opentelemetry.trace.span import (
+    INVALID_SPAN_CONTEXT,
+    NonRecordingSpan,
+    SpanContext,
+    TraceFlags,
+)
 
 from bindu.common.protocol.types import Artifact, Message, TaskIdParams, TaskSendParams
 from bindu.server.scheduler.base import Scheduler
@@ -35,6 +41,38 @@ from bindu.utils.logging import get_logger
 
 tracer = get_tracer(__name__)
 logger = get_logger(__name__)
+
+
+def _reconstruct_span(
+    trace_id: str | None, span_id: str | None
+) -> NonRecordingSpan:
+    """Reconstruct a NonRecordingSpan from serialized trace_id/span_id strings.
+
+    Used to restore OpenTelemetry trace context after the scheduler serializes
+    the span into primitive strings (required for Redis JSON serialization).
+
+    Args:
+        trace_id: Hex-encoded trace ID (32 chars) or None
+        span_id: Hex-encoded span ID (16 chars) or None
+
+    Returns:
+        A NonRecordingSpan that carries the trace context for correlation
+    """
+    if trace_id and span_id:
+        try:
+            ctx = SpanContext(
+                trace_id=int(trace_id, 16),
+                span_id=int(span_id, 16),
+                is_remote=True,
+                trace_flags=TraceFlags(TraceFlags.SAMPLED),
+            )
+            return NonRecordingSpan(ctx)
+        except (ValueError, TypeError):
+            logger.warning(
+                f"Invalid trace context: trace_id={trace_id}, span_id={span_id}"
+            )
+    # Return a no-op span with invalid context as fallback
+    return NonRecordingSpan(INVALID_SPAN_CONTEXT)
 
 
 @dataclass
@@ -104,7 +142,7 @@ class Worker(ABC):
         """Dispatch task operation to appropriate handler.
 
         Args:
-            task_operation: Operation dict with 'operation', 'params', and '_current_span'
+            task_operation: Operation dict with 'operation', 'params', 'trace_id', 'span_id'
 
         Supported Operations:
         - run: Execute a task
@@ -124,8 +162,12 @@ class Worker(ABC):
         }
 
         try:
-            # Preserve trace context from scheduler
-            with use_span(task_operation["_current_span"]):
+            # Reconstruct trace context from serialized trace_id/span_id
+            span = _reconstruct_span(
+                task_operation.get("trace_id"),
+                task_operation.get("span_id"),
+            )
+            with use_span(span):
                 with tracer.start_as_current_span(
                     f"{task_operation['operation']} task",
                     attributes={"logfire.tags": ["bindu"]},

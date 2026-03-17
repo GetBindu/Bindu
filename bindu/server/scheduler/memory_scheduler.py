@@ -2,7 +2,6 @@
 
 from __future__ import annotations as _annotations
 
-import math
 from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack
 from typing import Any
@@ -23,6 +22,10 @@ from bindu.utils.logging import get_logger
 from bindu.utils.retry import retry_scheduler_operation
 
 logger = get_logger("bindu.server.scheduler.memory_scheduler")
+
+# Bounded buffer prevents unbounded memory growth while allowing the API
+# handler to enqueue a task before the worker loop is ready to receive.
+_TASK_QUEUE_BUFFER_SIZE = 100
 
 
 def _get_trace_context() -> tuple[str | None, str | None]:
@@ -46,12 +49,11 @@ class InMemoryScheduler(Scheduler):
         self.aexit_stack = AsyncExitStack()
         await self.aexit_stack.__aenter__()
 
-        # FIX: Added math.inf to create a buffered stream.
-        # Without this, the stream defaults to 0 (unbuffered), which causes
-        # the API server to deadlock/hang waiting for a worker to receive the task.
+        # Bounded buffer allows the API handler to enqueue tasks before the
+        # worker loop is ready while preventing unbounded memory growth.
         self._write_stream, self._read_stream = anyio.create_memory_object_stream[
             TaskOperation
-        ](math.inf)
+        ](_TASK_QUEUE_BUFFER_SIZE)
         await self.aexit_stack.enter_async_context(self._read_stream)
         await self.aexit_stack.enter_async_context(self._write_stream)
 
