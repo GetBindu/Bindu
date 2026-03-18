@@ -303,19 +303,34 @@ def onboard() -> None:
     print(Panel(
         f"""[green]✅ Project created successfully[/green]
 
-[bold]📂 Project:[/bold] ./{project_name}
-
-[bold]👉 To start your agent:[/bold]
+[bold]📂 Project:[/bold] ./{project_name}""",
+        expand=False,
+        style="green"
+    ))
+    
+    # Ask if user wants to start the agent now
+    start_now = questionary.confirm(
+        "🚀 Start the agent now?",
+        default=False
+    ).ask()
+    
+    if start_now:
+        print()
+        print("[cyan]🚀 Starting agent...[/cyan]")
+        run_command(["uv", "run", "python", "-m", f"{project_slug}.main"], cwd=str(project_dir))
+    else:
+        print()
+        print(Panel(
+            f"""[bold]👉 To start your agent:[/bold]
 [cyan]cd {project_name}[/cyan]
 [cyan]uv run python -m {project_slug}.main[/cyan]
 
 [bold]💡 Next steps:[/bold]
   • Edit [cyan].env[/cyan] if needed
-  • Add skills in [cyan]/{project_slug}/skills[/cyan]
-  • Run [cyan]uv run python -m {project_slug}.main[/cyan]""",
-        expand=False,
-        style="green"
-    ))
+  • Add skills in [cyan]./{project_slug}/skills[/cyan]""",
+            expand=False,
+            style="blue"
+        ))
 
 
 if __name__ == "__main__":
