@@ -93,10 +93,10 @@ def onboard() -> None:
     if use_defaults:
         print("[cyan]📋 Using default configuration...[/cyan]")
         project_slug = snake_case(project_name)
-        author = get_system_username()
-        email = ""
-        github_handle = ""
-        dockerhub_username = ""
+        author = "Bindu Sunflower"
+        email = "bindu.builder@getbindu.com"
+        github_handle = "bindu-wizard"
+        dockerhub_username = github_handle
         agent_framework = "agno"
         skill_names = ""
         auth_provider = "n"
@@ -105,7 +105,7 @@ def onboard() -> None:
         scheduler_type = "memory"
         security_features = "did-only"
         enable_paywall = "n"
-        include_github_actions = "n"
+        include_github_actions = "y"
         open_source_license = "MIT license"
     else:
         print()
@@ -113,23 +113,23 @@ def onboard() -> None:
         
         author = questionary.text(
             "✏️  Author name?",
-            default=get_system_username()
-        ).ask() or get_system_username()
+            default="Bindu Sunflower"
+        ).ask() or "Bindu Sunflower"
         
         email = questionary.text(
             "📧 Email?",
-            default=""
-        ).ask() or ""
+            default="bindu.builder@getbindu.com"
+        ).ask() or "bindu.builder@getbindu.com"
         
         github_handle = questionary.text(
             "🐙 GitHub handle?",
-            default=""
-        ).ask() or ""
+            default="bindu-wizard"
+        ).ask() or "bindu-wizard"
         
         dockerhub_username = questionary.text(
             "🐳 DockerHub username?",
-            default=""
-        ).ask() or ""
+            default=github_handle
+        ).ask() or github_handle
         
         agent_framework = questionary.select(
             "🤖 Agent framework?",
@@ -180,7 +180,7 @@ def onboard() -> None:
         
         include_github_actions = questionary.confirm(
             "🐙 Include GitHub Actions?",
-            default=False
+            default=True
         ).ask()
         include_github_actions = "y" if include_github_actions else "n"
         
