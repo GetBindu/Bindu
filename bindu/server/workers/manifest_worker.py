@@ -175,6 +175,19 @@ class ManifestWorker(Worker):
                     # Normalize result to extract final response (intelligent extraction)
                     results = ResultProcessor.normalize_result(collected_results)
 
+                    # DSPy Integration: Check if handler used route_prompt (via ContextVar)
+                    # If so, retrieve the prompt_id and update task for canary tracking
+                    from bindu.dspy.context import get_prompt_id, clear_prompt_id
+                    
+                    prompt_id = get_prompt_id()
+                    if prompt_id:
+                        current_state = task["status"]["state"]
+                        await self.storage.update_task(
+                            task["id"], state=current_state, prompt_id=prompt_id
+                        )
+                        logger.info(f"Task {task['id']} associated with prompt {prompt_id}")
+                        clear_prompt_id()  # Clean up context to avoid leakage
+
                     # Record successful execution
                     execution_time = time.time() - start_time
                     agent_span.set_attribute(

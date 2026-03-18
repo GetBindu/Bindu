@@ -1186,7 +1186,49 @@ Möchtest du Integration mit deinem Lieblings-Framework? [Lass es uns auf Discor
 
 <br/>
 
-## 🧪 Testing
+## � DSPy-Prompt-Optimierung
+
+Bindu integriert **DSPy**, ein Framework zur programmatischen Optimierung von LLM-Prompts, um die Performance von Agenten zu verbessern. Anstatt Prompts manuell zu erstellen, generiert DSPy automatisch und validiert verbesserte Versionen basierend auf echtem Agenten-Feedback.
+
+### Funktionsweise
+
+DSPy bietet drei Hauptfunktionen:
+
+1. **🎯 Trainiere optimierte Prompts** - Analysiere Agenten-Interaktionen und generiere bessere Prompts
+   ```bash
+   bindu train --did agent_did
+   ```
+   Dies erstellt A/B-Test-Varianten: einen "aktiven" Prompt (deine aktuelle Version) und einen "Kandidaten" (optimierte Version) mit konfigurierbarem Traffic-Split.
+
+2. **📊 Canary Rollout** - Verschiebe den Traffic schrittweise zu dem verbesserten Prompt
+   ```bash
+   bindu canary --did agent_did
+   ```
+
+3. **🔄 Live Prompt Routing** - Diene dynamisch die richtige Prompt-Version bei jeder Anfrage
+   ```python
+   from bindu.dspy.prompt_router import route_prompt
+   
+   async def handler(messages: list[dict[str, str]]):
+       agent.instructions = await route_prompt(initial_prompt=agent.instructions)
+       return agent.run(input=messages)
+   ```
+
+### Quick Start-Beispiel
+
+Siehe [examples/agno_dspy_example.py](examples/agno_dspy_example.py) für ein komplettes funktionierendes Beispiel mit einem Agno-Agenten.
+
+### Voraussetzungen für DSPy Training
+
+- Setze `OPENAI_API_KEY` in deiner `.env`-Datei
+- Habe PostgreSQL mit Agenten-Aufgabenhistorie und Feedback-Bewertungen konfiguriert
+- Stelle sicher, dass Agenten Interaktionen mit Feedback-Scores protokollieren (0-1 oder 1-5 Bewertungsskala)
+
+---
+
+<br/>
+
+## �🧪 Testing
 
 Bindu hält **70%+ Test-Coverage**:
 

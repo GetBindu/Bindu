@@ -57,6 +57,8 @@ dependencies = [
     # Security
     "detect-secrets==1.5.0",
     "python-dotenv>=1.1.0",
+    "dspy>=2.5.0",
+    "psycopg2>=2.9.11",
 ]
 
 [project.optional-dependencies]
@@ -118,7 +120,6 @@ dev = [
     "types-requests>=2.32.0.20250328",
     "pipreqs>=0.5.0",
     "twine>=6.1.0",
-    "uvx<4.0",
     "ruff>=0.15.0",
 ]
 
@@ -154,3 +155,6 @@ fallback-version = "0.3.14"
 
 [tool.hatch.build.hooks.vcs]
 version-file = "bindu/_version.py"
+
+[project.scripts]
+bindu = "bindu.cli.main:main"

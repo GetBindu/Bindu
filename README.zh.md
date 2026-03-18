@@ -823,7 +823,49 @@ Bindu 是**框架无关的**，并已测试：
 
 <br/>
 
-## 🧪 测试
+## � DSPy 提示优化
+
+Bindu 集成了 **DSPy**，一个用于以编程方式优化 LLM 提示以改进代理性能的框架。不是手动编写提示，DSPy 使用真实的代理反馈自动生成并验证改进的版本。
+
+### 工作原理
+
+DSPy 提供三种关键功能：
+
+1. **🎯 训练优化的提示** - 分析代理交互并生成更好的提示
+   ```bash
+   bindu train --did agent_did
+   ```
+   这创建了 A/B 测试变体：一个"活跃"提示（你的当前版本）和一个"候选"（优化版本）可配置的流量分割。
+
+2. **📊 金丝雀发布** - 逐步将流量转向改进的提示
+   ```bash
+   bindu canary --did agent_did
+   ```
+
+3. **🔄 实时提示路由** - 为每个请求动态提供正确的提示版本
+   ```python
+   from bindu.dspy.prompt_router import route_prompt
+   
+   async def handler(messages: list[dict[str, str]]):
+       agent.instructions = await route_prompt(initial_prompt=agent.instructions)
+       return agent.run(input=messages)
+   ```
+
+### 快速入门示例
+
+有关使用 Agno 代理的完整工作示例，请参阅 [examples/agno_dspy_example.py](examples/agno_dspy_example.py)。
+
+### DSPy 训练的先决条件
+
+- 在 `.env` 文件中设置 `OPENAI_API_KEY`
+- 使用代理任务历史记录和反馈评分配置 PostgreSQL
+- 确保代理使用反馈分数（0-1 或 1-5 评分范围）记录交互
+
+---
+
+<br/>
+
+## �🧪 测试
 
 Bindu 维持 **70%+ 测试覆盖率**：
 
