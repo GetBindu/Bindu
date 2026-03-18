@@ -7,11 +7,14 @@ Routes incoming requests to the appropriate agent.
 
 class RouterAgent:
 
-    def __init__(self, registry):
-        self.registry = registry
-
     def route(self, request: str):
 
-        agent = self.registry.find_agent(request)
+        request = request.lower()
 
-        return agent
+        if "summarize" in request:
+            return "summarizer_agent"
+
+        elif "translate" in request:
+            return "translator_agent"
+
+        return None

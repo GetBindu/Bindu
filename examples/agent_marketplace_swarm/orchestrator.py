@@ -5,9 +5,6 @@ Coordinates agent discovery and execution.
 """
 
 from router_agent import RouterAgent
-from skill_registry import SkillRegistry
-
-from research_agent import ResearchAgent
 from summarizer_agent import SummarizerAgent
 from translator_agent import TranslatorAgent
 
@@ -16,24 +13,11 @@ class Orchestrator:
 
     def __init__(self):
 
-        self.registry = SkillRegistry()
-
-        # initialize agents
-        self.research_agent = ResearchAgent()
-        self.summarizer_agent = SummarizerAgent()
-        self.translator_agent = TranslatorAgent()
-
-        # register agents dynamically
-        self.registry.register_agent("research_agent", ["research", "explain"])
-        self.registry.register_agent("summarizer_agent", ["summarize"])
-        self.registry.register_agent("translator_agent", ["translate"])
-
-        self.router = RouterAgent(self.registry)
+        self.router = RouterAgent()
 
         self.agents = {
-            "research_agent": self.research_agent,
-            "summarizer_agent": self.summarizer_agent,
-            "translator_agent": self.translator_agent,
+            "summarizer_agent": SummarizerAgent(),
+            "translator_agent": TranslatorAgent(),
         }
 
     async def run(self, request: str):

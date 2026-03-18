@@ -1,24 +1,19 @@
-import os
-from groq import Groq
+"""
+Translator Agent
+"""
 
-MODEL = os.getenv("MODEL_NAME", "llama-3.3-70b-versatile")
-
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+from agno.agent import Agent
+from agno.models.openrouter import OpenRouter
 
 
 class TranslatorAgent:
 
-    async def run(self, text: str):
-
-        prompt = f"""
-        Translate the following text to Spanish.
-
-        {text}
-        """
-
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role": "user", "content": prompt}],
+    def __init__(self):
+        self.agent = Agent(
+            model=OpenRouter(id="openai/gpt-oss-120b"),
+            instructions="Translate the given text to Spanish.",
         )
 
-        return response.choices[0].message.content
+    async def run(self, text: str):
+        response = self.agent.run(text)
+        return response.content
