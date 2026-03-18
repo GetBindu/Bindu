@@ -310,6 +310,7 @@ def onboard() -> None:
 [cyan]uv run python -m {project_slug}.main[/cyan]
 
 [bold]💡 Next steps:[/bold]
+  • Update [cyan]./{project_slug}/agent_config.json[/cyan] if needed
   • Edit [cyan].env[/cyan] if needed
   • Add skills in [cyan]./{project_slug}/skills[/cyan]""",
         expand=False,
