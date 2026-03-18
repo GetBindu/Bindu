@@ -41,16 +41,13 @@ def get_system_username() -> str:
 
 
 def run_command(cmd: list[str], cwd: Optional[str] = None) -> bool:
-    """Run shell command and return success status."""
+    """Run shell command and return success status with live output."""
     try:
-        result = subprocess.run(cmd, cwd=cwd, check=True, capture_output=True, text=True)
-        if result.stdout:
-            print(result.stdout)
-        return True
-    except subprocess.CalledProcessError as e:
+        result = subprocess.run(cmd, cwd=cwd, check=False, text=True)
+        return result.returncode == 0
+    except Exception as e:
         print(f"[red]❌ Command failed: {' '.join(cmd)}[/red]")
-        if e.stderr:
-            print(f"[red]{e.stderr}[/red]")
+        print(f"[red]{str(e)}[/red]")
         return False
 
 
