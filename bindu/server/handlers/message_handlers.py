@@ -55,7 +55,6 @@ class MessageHandlers:
     async def _submit_and_schedule_task(
         self, request_params: dict[str, Any]
     ) -> tuple[Task, UUID]:
-        """Submit task to storage and schedule it with shared send/stream logic."""
         message = request_params["message"]
         context_id = self.context_id_parser(message.get("context_id"))
 
@@ -79,33 +78,42 @@ class MessageHandlers:
             )
 
         message_metadata = message.get("metadata")
-        # Normalize metadata to a dictionary
+
         if message_metadata is None:
             message_metadata = {}
             message["metadata"] = message_metadata
 
-        elif not isinstance(message_metadata, dict):    
+        elif not isinstance(message_metadata, dict):
             logger.warning(
                 "Invalid metadata type received in message",
-                extra={"type": type(message_metadata).__name__}
+                extra={"type": type(message_metadata).__name__},
             )
             message["metadata"] = {}
             message_metadata = message["metadata"]
 
-        # FIXED payment context handling
-        if isinstance(message_metadata, dict):
-            payment_context = message_metadata.pop("_payment_context", None)
-            if payment_context is not None:
-                scheduler_params["payment_context"] = payment_context
-
-     
+        # ✅ SAFE payment context handling
+        payment_context = message_metadata.pop("_payment_context", None)
+        if payment_context is not None:
+            scheduler_params["payment_context"] = payment_context
 
         await self.scheduler.run_task(scheduler_params)
         return task, context_id
 
+    async def _retry_load_task(self, task_id):
+        """Retry loading a task from storage."""
+        retries = max(app_settings.agent.stream_missing_task_retries, 0)
+        delay = max(app_settings.agent.stream_missing_task_retry_delay_seconds, 0.0)
+
+        for _ in range(retries):
+            task = await self.storage.load_task(task_id)
+            if task is not None:
+                return task
+            await anyio.sleep(delay)
+
+        return None
+
     @staticmethod
     def _to_jsonable(value: Any) -> Any:
-        """Convert UUID-rich protocol objects into JSON-serializable values."""
         if isinstance(value, UUID):
             return str(value)
         if isinstance(value, dict):
@@ -116,184 +124,128 @@ class MessageHandlers:
 
     @staticmethod
     def _sse_event(payload: dict[str, Any]) -> str:
-        """Serialize an SSE event payload."""
         if not payload:
-             return ""
-
+            return ""
         return f"data: {json.dumps(MessageHandlers._to_jsonable(payload))}\n\n"
 
     @trace_task_operation("send_message")
     @track_active_task
     async def send_message(self, request: SendMessageRequest) -> SendMessageResponse:
-        """Send a message using the A2A protocol.
-
-        Note: Payment enforcement is handled by X402Middleware before this method is called.
-        If the request reaches here, payment has already been verified.
-        Settlement will be handled by ManifestWorker when task completes.
-        """
         task, _ = await self._submit_and_schedule_task(request["params"])
         return SendMessageResponse(jsonrpc="2.0", id=request["id"], result=task)
 
     @trace_task_operation("stream_message")
     @track_active_task
     async def stream_message(self, request: StreamMessageRequest):
-        """Stream messages using Server-Sent Events.
-
-        Uses the same submit + scheduler execution path as message/send to keep
-        lifecycle and error handling consistent.
-        """
         from starlette.responses import StreamingResponse
 
         task, context_id = await self._submit_and_schedule_task(request["params"])
 
         async def stream_generator():
-            """Stream task status and artifact events from storage updates."""
             seen_status = task["status"]["state"]
             seen_artifact_ids: set[str] = set()
             cancelled_exc = anyio.get_cancelled_exc_class()
             poll_interval = max(app_settings.agent.stream_poll_interval_seconds, 0.01)
-            missing_retries = max(app_settings.agent.stream_missing_task_retries, 0)
-            missing_retry_delay = max(
-                app_settings.agent.stream_missing_task_retry_delay_seconds,
-                0.0,
-            )
 
-            submitted_event = {
-                "kind": "status-update",
-                "task_id": str(task["id"]),
-                "context_id": str(context_id),
-                "status": task["status"],
-                "final": False,
-            }
-            yield self._sse_event(submitted_event)
+            yield self._sse_event(
+                {
+                    "kind": "status-update",
+                    "task_id": str(task["id"]),
+                    "context_id": str(context_id),
+                    "status": task["status"],
+                    "final": False,
+                }
+            )
 
             try:
                 while True:
                     loaded_task = await self.storage.load_task(task["id"])
+
                     if loaded_task is None:
-                        for _ in range(missing_retries):
-                            await anyio.sleep(missing_retry_delay)
-                            loaded_task = await self.storage.load_task(task["id"])
-                            if loaded_task is not None:
-                                break
+                        loaded_task = await self._retry_load_task(task["id"])
+
                     if loaded_task is None:
-                        missing_event = {
-                            "kind": "status-update",
-                            "task_id": str(task["id"]),
-                            "context_id": str(context_id),
-                            "status": {
-                                "state": "failed",
-                                "timestamp": datetime.now(timezone.utc).isoformat(),
-                            },
-                            "final": True,
-                            "error": f"Task {task['id']} not found while streaming",
-                        }
-                        yield self._sse_event(missing_event)
+                        yield self._sse_event(
+                            {
+                                "kind": "status-update",
+                                "task_id": str(task["id"]),
+                                "context_id": str(context_id),
+                                "status": {
+                                    "state": "failed",
+                                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                                },
+                                "final": True,
+                                "error": f"Task {task['id']} not found while streaming",
+                            }
+                        )
                         return
 
+                    if "status" not in loaded_task:
+                        await anyio.sleep(poll_interval)
+                        continue
+
                     status = loaded_task["status"]["state"]
+
                     if status != seen_status:
-                        status_event = {
-                            "kind": "status-update",
-                            "task_id": str(task["id"]),
-                            "context_id": str(context_id),
-                            "status": loaded_task["status"],
-                            "final": status in app_settings.agent.terminal_states,
-                        }
-                        yield self._sse_event(status_event)
+                        yield self._sse_event(
+                            {
+                                "kind": "status-update",
+                                "task_id": str(task["id"]),
+                                "context_id": str(context_id),
+                                "status": loaded_task["status"],
+                                "final": status
+                                in app_settings.agent.terminal_states,
+                            }
+                        )
                         seen_status = status
 
                     for artifact in loaded_task.get("artifacts", []):
                         artifact_id = str(artifact["artifact_id"])
                         if artifact_id in seen_artifact_ids:
                             continue
+
                         seen_artifact_ids.add(artifact_id)
 
-                        artifact_event = {
-                            "kind": "artifact-update",
-                            "task_id": str(task["id"]),
-                            "context_id": str(context_id),
-                            "artifact": artifact,
-                            "append": artifact.get("append", False),
-                            "last_chunk": artifact.get("last_chunk", False),
-                        }
-                        yield self._sse_event(artifact_event)
+                        yield self._sse_event(
+                            {
+                                "kind": "artifact-update",
+                                "task_id": str(task["id"]),
+                                "context_id": str(context_id),
+                                "artifact": artifact,
+                                "append": artifact.get("append", False),
+                                "last_chunk": artifact.get("last_chunk", False),
+                            }
+                        )
 
                     if status in app_settings.agent.terminal_states:
                         return
 
-                    if status in ("input-required", "auth-required"):
-                        # Re-check once before returning to avoid missing a quick
-                        # transition into a terminal state.
-                        latest_task = await self.storage.load_task(task["id"])
-                        if latest_task:
-                            latest_status = latest_task["status"]["state"]
-                            if latest_status != seen_status:
-                                yield self._sse_event(
-                                    {
-                                        "kind": "status-update",
-                                        "task_id": str(task["id"]),
-                                        "context_id": str(context_id),
-                                        "status": latest_task["status"],
-                                        "final": latest_status
-                                        in app_settings.agent.terminal_states,
-                                    }
-                                )
-                                seen_status = latest_status
-                                if latest_status in app_settings.agent.terminal_states:
-                                    return
-                        return
-
                     await anyio.sleep(poll_interval)
+
             except cancelled_exc:
                 logger.debug(f"Streaming client disconnected for task {task['id']}")
                 return
+
             except Exception as e:
                 logger.error(
-                     "Unhandled stream error",
-                      extra = {"task_id": str(task["id"])},
-                      exc_info = True,
+                    "Stream processing failed",
+                    extra={"task_id": str(task["id"])},
+                    exc_info=True,
                 )
-                timestamp = datetime.now(timezone.utc).isoformat()
-                current_state = "failed"
-                try:
-                    loaded_task = await self.storage.load_task(task["id"])
-                except Exception as load_err:
-                    loaded_task = None
-                    logger.error(
-                        f"Failed to load task {task['id']} during stream error handling: {load_err}",
-                        exc_info=True,
-                    )
 
-                if loaded_task:
-                    current_state = loaded_task["status"]["state"]
-                    timestamp = loaded_task["status"]["timestamp"]
-                    if current_state not in app_settings.agent.terminal_states:
-                        try:
-                            updated = await self.storage.update_task(
-                                task["id"], state="failed"
-                            )
-                            if updated and "status" in updated:
-                                current_state = updated["status"]["state"]
-                                timestamp = updated["status"]["timestamp"]
-                        except Exception as update_err:
-                            logger.error(
-                                f"Failed to update task {task['id']} to failed state during error handling: {update_err}",
-                                exc_info=True,
-                            )
-
-                error_event = {
-                    "kind": "status-update",
-                    "task_id": str(task["id"]),
-                    "context_id": str(context_id),
-                    "status": {
-                        "state": current_state,
-                        "timestamp": timestamp,
-                    },
-                    "final": current_state in app_settings.agent.terminal_states,
-                    "error": str(e),
-                }
-                yield self._sse_event(error_event)
+                yield self._sse_event(
+                    {
+                        "kind": "status-update",
+                        "task_id": str(task["id"]),
+                        "context_id": str(context_id),
+                        "status": {
+                            "state": "failed",
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                        },
+                        "final": True,
+                        "error": str(e),
+                    }
+                )
 
         return StreamingResponse(
             stream_generator(),
