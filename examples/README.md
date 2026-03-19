@@ -45,6 +45,7 @@ For full URL override, use `BINDU_DEPLOYMENT_URL` (e.g. `http://127.0.0.1:5001`)
 - `beginner/beginner_zero_config_agent.py` - Zero-config agent with web search
 - `beginner/agno_simple_example.py` - Joke generator
 - `beginner/agno_example.py` - Research assistant with DuckDuckGo
+- `beginner/ollama_local_agent.py` - **Local LLM agent via Ollama (no API key!)** ([README](beginner/OLLAMA_AGENT_README.md))
 - `beginner/faq_agent.py` - Documentation search agent
 - `beginner/agno_notion_agent.py` - Notion integration
 
