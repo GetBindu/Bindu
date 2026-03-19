@@ -468,6 +468,9 @@ class ManifestWorker(Worker):
 
             await self._notify_lifecycle(task["id"], task["context_id"], state, True)
 
+            # Clean up checkpoint after successful completion
+            await self.storage.delete_checkpoint(task["id"])
+
         elif state in ("failed", "rejected"):
             # Failure/Rejection: Message only (explanation), NO artifacts
             error_message = MessageConverter.to_protocol_messages(
@@ -481,10 +484,16 @@ class ManifestWorker(Worker):
             )
             await self._notify_lifecycle(task["id"], task["context_id"], state, True)
 
+            # Clean up checkpoint after failure
+            await self.storage.delete_checkpoint(task["id"])
+
         elif state == "canceled":
             # Canceled: State change only, NO new content
             await self.storage.update_task(task["id"], state=state)
             await self._notify_lifecycle(task["id"], task["context_id"], state, True)
+
+            # Clean up checkpoint after cancellation
+            await self.storage.delete_checkpoint(task["id"])
 
     async def _handle_task_failure(self, task: dict[str, Any], error: str) -> None:
         """Handle task execution failure.

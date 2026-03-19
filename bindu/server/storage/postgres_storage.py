@@ -58,6 +58,7 @@ from .helpers import (
 from .helpers.db_operations import get_current_utc_timestamp
 from .schema import (
     contexts_table,
+    task_checkpoints_table,
     task_feedback_table,
     tasks_table,
     webhook_configs_table,
@@ -1036,3 +1037,191 @@ class PostgresStorage(Storage[ContextT]):
                 return {row.task_id: row.config for row in rows}
 
         return await self._retry_on_connection_error(_load_all)
+
+    # -------------------------------------------------------------------------
+    # Checkpoint Operations (for pause/resume support)
+    # -------------------------------------------------------------------------
+
+    async def save_checkpoint(
+        self,
+        task_id: UUID,
+        checkpoint_data: dict[str, Any],
+        step_number: int = 0,
+        step_label: str | None = None,
+    ) -> None:
+        """Save a checkpoint for task pause/resume using SQLAlchemy.
+
+        Stores execution state that can be restored when resuming a paused task.
+
+        Args:
+            task_id: Task to save checkpoint for
+            checkpoint_data: Execution state to persist
+            step_number: Current step in execution
+            step_label: Optional label for current step
+
+        Raises:
+            TypeError: If task_id is not UUID or checkpoint_data is not dict
+        """
+        task_id = validate_uuid_type(task_id, "task_id")
+
+        if not isinstance(checkpoint_data, dict):
+            raise TypeError(
+                f"checkpoint_data must be dict, got {type(checkpoint_data).__name__}"
+            )
+
+        self._ensure_connected()
+
+        async def _save():
+            async with self._get_session_with_schema() as session:
+                async with session.begin():
+                    serialized_data = serialize_for_jsonb(checkpoint_data)
+                    stmt = insert(task_checkpoints_table).values(
+                        task_id=task_id,
+                        checkpoint_data=serialized_data,
+                        step_number=step_number,
+                        step_label=step_label,
+                    )
+                    await session.execute(stmt)
+                    logger.debug(
+                        f"Saved checkpoint for task {task_id} at step {step_number}"
+                    )
+
+        await self._retry_on_connection_error(_save)
+
+    async def get_checkpoint(self, task_id: UUID) -> dict[str, Any] | None:
+        """Load the latest checkpoint for a task using SQLAlchemy.
+
+        Args:
+            task_id: Task to load checkpoint for
+
+        Returns:
+            Checkpoint data if found, None otherwise
+
+        Raises:
+            TypeError: If task_id is not UUID
+        """
+        task_id = validate_uuid_type(task_id, "task_id")
+
+        self._ensure_connected()
+
+        async def _get():
+            async with self._get_session_with_schema() as session:
+                stmt = (
+                    select(task_checkpoints_table)
+                    .where(task_checkpoints_table.c.task_id == task_id)
+                    .order_by(task_checkpoints_table.c.created_at.desc())
+                    .limit(1)
+                )
+                result = await session.execute(stmt)
+                row = result.first()
+
+                if row is None:
+                    return None
+
+                return {
+                    "checkpoint_data": row.checkpoint_data,
+                    "step_number": row.step_number,
+                    "step_label": row.step_label,
+                    "created_at": row.created_at.isoformat()
+                    if row.created_at
+                    else None,
+                }
+
+        return await self._retry_on_connection_error(_get)
+
+    async def delete_checkpoint(self, task_id: UUID) -> None:
+        """Delete checkpoint(s) for a task using SQLAlchemy.
+
+        Args:
+            task_id: Task to delete checkpoint(s) for
+
+        Raises:
+            TypeError: If task_id is not UUID
+        """
+        task_id = validate_uuid_type(task_id, "task_id")
+
+        self._ensure_connected()
+
+        async def _delete():
+            async with self._get_session_with_schema() as session:
+                async with session.begin():
+                    stmt = delete(task_checkpoints_table).where(
+                        task_checkpoints_table.c.task_id == task_id
+                    )
+                    result = await session.execute(stmt)
+                    if result.rowcount > 0:
+                        logger.debug(f"Deleted checkpoint(s) for task {task_id}")
+
+        await self._retry_on_connection_error(_delete)
+
+    async def list_checkpoints(
+        self, task_id: UUID | None = None, limit: int = 100
+    ) -> list[dict[str, Any]]:
+        """List checkpoints, optionally filtered by task_id.
+
+        Args:
+            task_id: Optional task ID to filter by
+            limit: Maximum number of checkpoints to return
+
+        Returns:
+            List of checkpoint records
+        """
+        self._ensure_connected()
+
+        async def _list():
+            async with self._get_session_with_schema() as session:
+                stmt = select(task_checkpoints_table).order_by(
+                    task_checkpoints_table.c.created_at.desc()
+                )
+
+                if task_id is not None:
+                    task_id = validate_uuid_type(task_id, "task_id")
+                    stmt = stmt.where(task_checkpoints_table.c.task_id == task_id)
+
+                stmt = stmt.limit(limit)
+                result = await session.execute(stmt)
+                rows = result.fetchall()
+
+                return [
+                    {
+                        "id": row.id,
+                        "task_id": row.task_id,
+                        "checkpoint_data": row.checkpoint_data,
+                        "step_number": row.step_number,
+                        "step_label": row.step_label,
+                        "created_at": row.created_at.isoformat()
+                        if row.created_at
+                        else None,
+                    }
+                    for row in rows
+                ]
+
+        return await self._retry_on_connection_error(_list)
+
+    async def cleanup_old_checkpoints(self, days_old: int = 7) -> int:
+        """Delete checkpoints older than specified days.
+
+        Args:
+            days_old: Delete checkpoints older than this many days
+
+        Returns:
+            Number of checkpoints deleted
+        """
+        self._ensure_connected()
+
+        async def _cleanup():
+            async with self._get_session_with_schema() as session:
+                async with session.begin():
+                    stmt = delete(task_checkpoints_table).where(
+                        task_checkpoints_table.c.created_at
+                        < func.now() - func.make_interval(days=days_old)
+                    )
+                    result = await session.execute(stmt)
+                    deleted_count = result.rowcount
+                    if deleted_count > 0:
+                        logger.info(
+                            f"Cleaned up {deleted_count} checkpoints older than {days_old} days"
+                        )
+                    return deleted_count
+
+        return await self._retry_on_connection_error(_cleanup)

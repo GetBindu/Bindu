@@ -378,6 +378,7 @@ class AgentSettings(BaseSettings):
             "working",  # Agent actively processing
             "input-required",  # Waiting for user input
             "auth-required",  # Waiting for authentication
+            "suspended",  # Task is paused and can be resumed
         }
     )
 
@@ -388,6 +389,15 @@ class AgentSettings(BaseSettings):
             "failed",  # Failed due to error
             "canceled",  # Canceled by user
             "rejected",  # Rejected by agent
+        }
+    )
+
+    # Pausable states: Tasks can be paused from these states
+    pausable_states: frozenset[str] = frozenset(
+        {
+            "submitted",  # Task submitted, awaiting execution
+            "working",  # Agent actively processing
+            "input-required",  # Waiting for user input
         }
     )
 
