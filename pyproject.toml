@@ -57,6 +57,7 @@ dependencies = [
     # Security
     "detect-secrets==1.5.0",
     "python-dotenv>=1.1.0",
+    "pypdf>=6.9.1",
 ]
 
 [project.optional-dependencies]

@@ -16,6 +16,8 @@ from bindu.common.protocol.types import (
 from bindu.settings import app_settings
 from bindu.extensions.did import DIDAgentExtension
 
+from bindu.utils.file_handler import process_agent_messages
+
 # Type aliases for better readability
 ChatMessage = dict[str, str]
 ProtocolMessage = Message
@@ -59,7 +61,7 @@ class MessageConverter:
                 if content:
                     result.append({"role": role, "content": content})
 
-        return result
+        return process_agent_messages(result)
 
     @staticmethod
     def to_protocol_messages(
