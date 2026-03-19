@@ -1,0 +1,46 @@
+id: data-analysis-skill
+name: data-analysis-skill
+version: 1.0.0
+author: your.email@example.com
+description: |
+  Advanced data science skill that provides comprehensive dataset analysis,
+  statistical summaries, and autonomous visual chart generation.
+
+  Features:
+  - CSV parsing and structural analysis
+  - Statistical summaries (mean, median, standard deviation)
+  - Missing value detection and data type inference
+  - Autonomous data visualization (Bar, Line, and Scatter charts)
+  - Markdown-formatted analytical reporting
+
+  Uses Pandas for heavy data manipulation and a thread-safe 
+  Matplotlib/Seaborn backend (Agg) for background image generation.
+tags:
+  - data-science
+  - analytics
+  - visualization
+  - pandas
+  - csv
+  - statistics
+input_modes:
+  - application/json
+output_modes:
+  - application/json
+examples:
+  - "Please analyze the dataset located at sample_sales.csv"
+  - "Give me a brief summary of the data, and generate a bar chart showing Sales by Product"
+  - "Are there any missing values in this dataset?"
+  - "Create a scatter plot comparing Revenue and Marketing Spend"
+capabilities_detail:
+  dataset_parsing:
+    supported: true
+    description: "Ability to ingest and read CSV file structures"
+  statistical_analysis:
+    supported: true
+    description: "Computes core statistics and identifies data anomalies/nulls"
+  data_visualization:
+    supported: true
+    description: "Generates custom PNG charts based on user prompts and data trends"
+  markdown_reporting:
+    supported: true
+    description: "Synthesizes data findings into highly readable Markdown reports"

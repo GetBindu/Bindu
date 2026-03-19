@@ -1,5 +1,6 @@
 # |---------------------------------------------------------|
 # |                                                         |
+
 # |                 Give Feedback / Get Help                |
 # | https://github.com/getbindu/Bindu/issues/new/choose    |
 # |                                                         |
@@ -91,10 +92,13 @@ class MessageHandlers:
             message["metadata"] = {}
             message_metadata = message["metadata"]
 
-        if "_payment_context" in message_metadata:
-            scheduler_params["payment_context"] = message_metadata["_payment_context"]
-            del message_metadata["_payment_context"]
+        # FIXED payment context handling
+        if isinstance(message_metadata, dict):
+            payment_context = message_metadata.pop("_payment_context", None)
+            if payment_context is not None:
+                scheduler_params["payment_context"] = payment_context
 
+     
 
         await self.scheduler.run_task(scheduler_params)
         return task, context_id

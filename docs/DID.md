@@ -134,7 +134,7 @@ sequenceDiagram
 
 **Step 2: Registration**
 - DID document is created with public key and metadata
-- Document is published to Bindu Directory
+- Document is published to GetBindu.com
 
 **Step 3: Resolution**
 - Anyone can query the DID to get the public document
@@ -457,9 +457,9 @@ is_valid = await verify_task_response(task_response)
 import httpx
 
 async def find_pdf_agents():
-    # Search Bindu Directory
+    # Search GetBindu.com
     response = await httpx.get(
-        "https://bindus.directory/api/agents",
+        "https://getbindu.com/api/agents",
         params={"skill": "pdf-processing", "verified": True}
     )
 
@@ -886,4 +886,4 @@ GET /.well-known/agent.json
 - [Authentication Guide](./AUTHENTICATION.md) - OAuth2 and token-based auth
 - [Payment Integration](./PAYMENT.md) - X402 payment protocol with DIDs
 - [W3C DID Specification](https://www.w3.org/TR/did-core/)
-- [Bindu Directory](https://bindus.directory)
+- [GetBindu.com](https://getbindu.com)

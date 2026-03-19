@@ -1,18 +1,19 @@
 """Base authentication middleware interface for Bindu server.
 
 Provides an abstract base class for authentication middleware.
+Refactored to Pure ASGI for high throughput, WebSocket support, and DoS resistance.
 """
 
 from __future__ import annotations as _annotations
 
 import fnmatch
-import json
+import re
+import inspect
 from abc import ABC, abstractmethod
 from typing import Any, Callable
 
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
-from starlette.responses import JSONResponse, Response
+from starlette.requests import HTTPConnection
+from starlette.websockets import WebSocket
 
 from bindu.common.protocol.types import (
     AuthenticationRequiredError,
@@ -26,8 +27,8 @@ from bindu.utils.request_utils import extract_error_fields, jsonrpc_error
 logger = get_logger("bindu.server.middleware.auth.base")
 
 
-class AuthMiddleware(BaseHTTPMiddleware, ABC):
-    """Abstract authentication middleware for Bindu server.
+class AuthMiddleware(ABC):
+    """Abstract authentication middleware for Bindu server (Pure ASGI).
 
     Handles token extraction, validation, and user context attachment.
     Subclasses implement provider-specific validation logic.
@@ -37,11 +38,20 @@ class AuthMiddleware(BaseHTTPMiddleware, ABC):
         """Initialize authentication middleware.
 
         Args:
-            app: ASGI application
+            app: The next ASGI application in the pipeline
             auth_config: Provider-specific authentication configuration
         """
-        super().__init__(app)
+        self.app = app
         self.config = auth_config
+
+        # 1. Performance Optimization: Compile regex patterns on startup
+        # instead of evaluating fnmatch on every incoming request.
+        self._public_patterns = []
+        public_endpoints = getattr(self.config, "public_endpoints", [])
+        for pattern in public_endpoints:
+            regex_str = fnmatch.translate(pattern)
+            self._public_patterns.append(re.compile(regex_str))
+
         self._initialize_provider()
 
     # Abstract methods - Provider-specific implementation required
@@ -54,176 +64,155 @@ class AuthMiddleware(BaseHTTPMiddleware, ABC):
     def _validate_token(self, token: str) -> dict[str, Any]:
         """Validate authentication token.
 
-        Args:
-            token: Authentication token (JWT, opaque token, etc.)
-
-        Returns:
-            Decoded token payload
-
-        Raises:
-            Exception: If token is invalid, expired, or verification fails
+        Can be synchronous or asynchronous.
         """
 
     @abstractmethod
     def _extract_user_info(self, token_payload: dict[str, Any]) -> dict[str, Any]:
-        """Extract standardized user information from token payload.
-
-        Args:
-            token_payload: Decoded and validated token payload
-
-        Returns:
-            User info dict with keys: sub, is_m2m, permissions, email, name
-        """
+        """Extract standardized user information from token payload."""
 
     # Token extraction and validation helpers
 
     def _is_public_endpoint(self, path: str) -> bool:
-        """Check if request path is a public endpoint.
+        """O(1) Check if request path is a public endpoint using pre-compiled regex."""
+        return any(pattern.match(path) for pattern in self._public_patterns)
 
-        Args:
-            path: Request path (e.g., "/agent.html")
+    def _extract_token(self, conn: HTTPConnection) -> str | None:
+        """Extract token from Header, WebSocket subprotocol, or Query Params."""
+        # 1. Standard Authorization Header
+        auth_header = conn.headers.get("Authorization")
+        if auth_header:
+            parts = auth_header.split()
+            if len(parts) == 2 and parts[0].lower() == "bearer":
+                return parts[1]
 
-        Returns:
-            True if endpoint is public, False otherwise
-        """
-        public_endpoints = getattr(self.config, "public_endpoints", [])
-        return any(fnmatch.fnmatch(path, pattern) for pattern in public_endpoints)
+        # 2. Query Parameter Fallback (Essential for strict WebSocket/SSE clients)
+        token_query = conn.query_params.get("token")
+        if token_query:
+            return token_query
 
-    def _extract_token(self, request: Request) -> str | None:
-        """Extract Bearer token from Authorization header.
-
-        Args:
-            request: HTTP request
-
-        Returns:
-            Token string or None if not found
-        """
-        auth_header = request.headers.get("Authorization")
-        if not auth_header:
-            return None
-
-        parts = auth_header.split()
-        if len(parts) == 2 and parts[0].lower() == "bearer":
-            return parts[1]
+        # 3. WebSocket Protocol Fallback
+        if conn.scope["type"] == "websocket":
+            protocols = conn.headers.get("sec-websocket-protocol", "")
+            for protocol in protocols.split(","):
+                protocol = protocol.strip()
+                if protocol.startswith("bearer-"):
+                    return protocol[7:]
 
         return None
 
-    # Main middleware dispatch
+    # Main ASGI Dispatch
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        """Process request through authentication middleware.
+    async def __call__(
+        self, scope: dict[str, Any], receive: Callable, send: Callable
+    ) -> None:
+        """Pure ASGI implementation bypassing BaseHTTPMiddleware limitations."""
+        # We only care about HTTP and WebSocket connections
+        if scope["type"] not in ("http", "websocket"):
+            await self.app(scope, receive, send)
+            return
 
-        Flow:
-        1. Check if endpoint is public
-        2. Extract and validate token
-        3. Extract user info and attach to request state
-        4. Continue to next middleware/endpoint
-
-        Args:
-            request: Incoming HTTP request
-            call_next: Next middleware/endpoint in chain
-
-        Returns:
-            Response from endpoint or error response
-        """
-        path = request.url.path
+        # HTTPConnection is a lightweight wrapper that handles both HTTP and WS scopes safely
+        conn = HTTPConnection(scope)
+        path = conn.url.path
 
         # Skip authentication for public endpoints
         if self._is_public_endpoint(path):
             logger.debug(f"Public endpoint: {path}")
-            return await call_next(request)
+            await self.app(scope, receive, send)
+            return
 
         # Extract token
-        token = self._extract_token(request)
+        token = self._extract_token(conn)
         if not token:
             logger.warning(f"No token provided for {path}")
-            return await self._auth_required_error(request)
+            await self._send_error(
+                scope, receive, send, AuthenticationRequiredError, 401
+            )
+            return
 
         # Validate token
         try:
-            token_payload = self._validate_token(token)
+            # Safely support both async (Hydra) and sync validation implementations
+            result = self._validate_token(token)
+            if inspect.isawaitable(result):
+                token_payload = await result
+            else:
+                token_payload = result
         except Exception as e:
             logger.warning(f"Token validation failed for {path}: {e}")
-            return self._handle_validation_error(e, path)
+            await self._handle_validation_error(e, path, scope, receive, send)
+            return
 
         # Extract user info
         try:
             user_info = self._extract_user_info(token_payload)
         except Exception as e:
             logger.error(f"Failed to extract user info for {path}: {e}")
-            code, message = extract_error_fields(InvalidTokenError)
-            return jsonrpc_error(code=code, message=message, status=401)
+            await self._send_error(scope, receive, send, InvalidTokenError, 401)
+            return
 
-        # Attach context to request state
-        self._attach_user_context(request, user_info, token_payload)
+        # Attach context to ASGI state
+        self._attach_user_context(scope, user_info, token_payload)
 
         logger.debug(
             f"Authenticated {path} - sub={user_info.get('sub')}, m2m={user_info.get('is_m2m', False)}"
         )
 
-        return await call_next(request)
+        # Pass the unconsumed stream to the next application
+        await self.app(scope, receive, send)
 
     # Error handling and utilities
 
-    async def _auth_required_error(self, request: Request) -> JSONResponse:
-        """Return authentication required error response.
+    async def _send_error(
+        self,
+        scope: dict[str, Any],
+        receive: Callable,
+        send: Callable,
+        error_type: Any,
+        status: int,
+        data: Any = None,
+    ) -> None:
+        """Send error response safely for both HTTP and WebSockets without parsing the body."""
+        code, message = extract_error_fields(error_type)
 
-        Args:
-            request: HTTP request
-
-        Returns:
-            JSON-RPC error response
-        """
-        request_id = await self._extract_request_id(request)
-        code, message = extract_error_fields(AuthenticationRequiredError)
-        return jsonrpc_error(
-            code=code, message=message, request_id=request_id, status=401
+        # JSON-RPC 2.0 states ID must be null on parse/auth errors
+        # This prevents the DoS vector of parsing massive unauthenticated bodies
+        response = jsonrpc_error(
+            code=code, message=message, request_id=None, data=data, status=status
         )
 
-    async def _extract_request_id(self, request: Request) -> Any:
-        """Extract request ID from JSON-RPC request body.
-
-        Args:
-            request: HTTP request
-
-        Returns:
-            Request ID or None if not found
-        """
-        try:
-            body = await request.body()
-            if body:
-                data = json.loads(body)
-                return data.get("id")
-        except Exception:
-            return None
+        if scope["type"] == "websocket":
+            # Safely reject unauthenticated websockets
+            ws = WebSocket(scope, receive, send)
+            await ws.accept()
+            await ws.close(code=1008, reason=message)  # 1008 = Policy Violation
+        else:
+            await response(scope, receive, send)
 
     def _attach_user_context(
-        self, request: Request, user_info: dict[str, Any], token_payload: dict[str, Any]
+        self,
+        scope: dict[str, Any],
+        user_info: dict[str, Any],
+        token_payload: dict[str, Any],
     ) -> None:
-        """Attach user context to request state.
+        """Attach user context to ASGI state dictionary."""
+        scope.setdefault("state", {})
+        scope["state"]["user"] = user_info
+        scope["state"]["authenticated"] = True
+        scope["state"]["token_payload"] = token_payload
 
-        Args:
-            request: HTTP request
-            user_info: Extracted user information
-            token_payload: Decoded token payload
-        """
-        request.state.user = user_info
-        request.state.authenticated = True
-        request.state.token_payload = token_payload
-
-    def _handle_validation_error(self, error: Exception, path: str) -> JSONResponse:
-        """Handle token validation errors with appropriate error responses.
-
-        Args:
-            error: Validation exception
-            path: Request path
-
-        Returns:
-            JSON-RPC error response
-        """
+    async def _handle_validation_error(
+        self,
+        error: Exception,
+        path: str,
+        scope: dict[str, Any],
+        receive: Callable,
+        send: Callable,
+    ) -> None:
+        """Handle token validation errors with appropriate error responses."""
         error_str = str(error).lower()
 
-        # Map error patterns to error types
         if "expired" in error_str:
             error_type = TokenExpiredError
         elif "signature" in error_str:
@@ -231,9 +220,5 @@ class AuthMiddleware(BaseHTTPMiddleware, ABC):
         else:
             error_type = InvalidTokenError
 
-        code, message = extract_error_fields(error_type)
-
-        # Include details for non-expired errors
         data = None if "expired" in error_str else f"Token validation failed: {error}"
-
-        return jsonrpc_error(code=code, message=message, data=data, status=401)
+        await self._send_error(scope, receive, send, error_type, 401, data=data)

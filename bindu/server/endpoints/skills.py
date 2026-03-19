@@ -15,9 +15,13 @@ from bindu.extensions.x402.extension import (
     add_activation_header as x402_add_header,
 )
 from bindu.server.applications import BinduApplication
-from bindu.utils.request_utils import handle_endpoint_errors
 from bindu.utils.logging import get_logger
-from bindu.utils.request_utils import extract_error_fields, get_client_ip, jsonrpc_error
+from bindu.utils.request_utils import (
+    extract_error_fields,
+    get_client_ip,
+    handle_endpoint_errors,
+    jsonrpc_error,
+)
 from bindu.utils.skill_utils import find_skill_by_id
 
 logger = get_logger("bindu.server.endpoints.skills")

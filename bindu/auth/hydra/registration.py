@@ -23,7 +23,7 @@ logger = get_logger("bindu.auth.hydra_registration")
 def save_agent_credentials(
     credentials: AgentCredentials, credentials_dir: Path
 ) -> None:
-    """Save agent OAuth credentials to .bindu directory.
+    """Save agent OAuth credentials to .GetBindu.com.
 
     Credentials are keyed by DID (client_id) instead of agent_id because
     agent_id changes on reload but DID remains stable.
@@ -61,7 +61,7 @@ def save_agent_credentials(
 def load_agent_credentials(
     did: str, credentials_dir: Path
 ) -> Optional[AgentCredentials]:
-    """Load agent OAuth credentials from .bindu directory.
+    """Load agent OAuth credentials from .GetBindu.com.
 
     Credentials are looked up by DID (client_id) instead of agent_id because
     agent_id changes on reload but DID remains stable.

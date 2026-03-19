@@ -176,6 +176,49 @@ async def test_send_message_with_push_notification_config(mock_push_manager):
 
 
 @pytest.mark.asyncio
+async def test_send_message_file_part_missing_text_fails():
+    """MessageHandlers do not validate part contents; they simply forward the
+    request to storage/scheduler.  Schema checks happen earlier in the A2A
+    endpoint, so a malformed message will still be accepted at this layer.
+    """
+    storage = InMemoryStorage()
+    handlers = _make_handlers(storage)
+
+    message = create_test_message()
+    # append a minimally malformed file part
+    malformed: dict = {
+        "kind": "file",
+        "file": {"bytes": "dGVzdA==", "mimeType": "text/plain", "name": "test.txt"},
+    }
+    message["parts"].append(malformed)  # type: ignore[index]
+
+    request = _send_request(message)
+    response = await handlers.send_message(request)
+    # Should still be treated as a success because validation is the
+    # responsibility of the endpoint wrapper, not the handler itself.
+    assert_jsonrpc_success(response)
+
+
+@pytest.mark.asyncio
+async def test_send_message_file_part_with_text_succeeds():
+    """Conversely, including a valid text field should allow the message through."""
+    storage = InMemoryStorage()
+    handlers = _make_handlers(storage)
+
+    message = create_test_message()
+    valid_file: dict = {
+        "kind": "file",
+        "text": "test.txt",
+        "file": {"bytes": "dGVzdA==", "mimeType": "text/plain", "name": "test.txt"},
+    }
+    message["parts"].append(valid_file)  # type: ignore[index]
+
+    request = _send_request(message)
+    response = await handlers.send_message(request)
+    assert_jsonrpc_success(response)
+
+
+@pytest.mark.asyncio
 async def test_send_message_payment_context_injected_and_stripped_flow():
     """
     Simulate endpoint injecting full _payment_context and ensure:

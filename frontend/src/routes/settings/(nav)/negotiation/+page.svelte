@@ -50,7 +50,7 @@
 	let taskDetails = $state(
 		"Need to process multiple invoice PDFs and extract structured data including line items, totals, and vendor information"
 	);
-	let inputMimeTypes = $state("application/pdf");
+	let inputMimeTypes = $state("application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document");
 	let outputMimeTypes = $state("application/json");
 	let maxLatencyMs = $state(5000);
 	let maxCostAmount = $state("0.001");
@@ -198,7 +198,7 @@
 						id="input-mime"
 						type="text"
 						bind:value={inputMimeTypes}
-						placeholder="application/pdf, text/plain"
+						placeholder="application/pdf, application/vnd.openxmlformats-officedocument.wordprocessingml.document, text/plain"
 						class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 font-mono text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-500"
 					/>
 				</div>

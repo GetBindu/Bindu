@@ -3,6 +3,7 @@
 import pytest
 from unittest.mock import AsyncMock, patch
 
+from bindu.server.storage.base import Storage
 from bindu.server.storage.factory import create_storage, close_storage
 from bindu.server.storage.memory_storage import InMemoryStorage
 from bindu.settings import app_settings
@@ -55,25 +56,21 @@ class TestStorageFactory:
     @pytest.mark.asyncio
     async def test_close_postgres_storage(self):
         """Test closing PostgreSQL storage."""
-        with patch(
-            "bindu.server.storage.factory.PostgresStorage", create=True
-        ) as mock_postgres_class:
-            # Create a mock instance that will pass isinstance check
-            mock_storage = AsyncMock()
-            mock_storage.disconnect = AsyncMock()
-            mock_postgres_class.return_value = mock_storage
+        # FIX: Replaced dangerous isinstance mocking with proper ABC spec mocking
+        # and aligned with the polymorphic .close() contract.
+        mock_storage = AsyncMock(spec=Storage)
 
-            # Make isinstance return True for our mock
-            with patch("bindu.server.storage.factory.isinstance", return_value=True):
-                await close_storage(mock_storage)
+        await close_storage(mock_storage)
 
-            mock_storage.disconnect.assert_called_once()
+        mock_storage.close.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_close_storage_with_error(self):
         """Test that close_storage handles errors gracefully."""
-        mock_storage = AsyncMock()
-        mock_storage.close = AsyncMock(side_effect=Exception("Close failed"))
+        # FIX: Removed false positive bypass. Factory does not swallow exceptions,
+        # so we must explicitly assert the exception bubbles up.
+        mock_storage = AsyncMock(spec=Storage)
+        mock_storage.close.side_effect = Exception("Close failed")
 
-        # Should not raise an error
-        await close_storage(mock_storage)
+        with pytest.raises(Exception, match="Close failed"):
+            await close_storage(mock_storage)

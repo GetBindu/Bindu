@@ -21,7 +21,7 @@ Workers implement the hybrid pattern by:
 from __future__ import annotations as _annotations
 
 from abc import ABC, abstractmethod
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, nullcontext
 from dataclasses import dataclass
 from typing import Any, AsyncIterator
 
@@ -124,8 +124,10 @@ class Worker(ABC):
         }
 
         try:
-            # Preserve trace context from scheduler
-            with use_span(task_operation["_current_span"]):
+            # Preserve trace context from scheduler (if available)
+            span = task_operation.get("_current_span")
+            ctx_manager = use_span(span) if span else nullcontext()
+            with ctx_manager:
                 with tracer.start_as_current_span(
                     f"{task_operation['operation']} task",
                     attributes={"logfire.tags": ["bindu"]},

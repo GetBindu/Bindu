@@ -6,7 +6,7 @@ This module defines the configuration settings for the application using pydanti
 from pydantic import Field, computed_field, BaseModel, HttpUrl
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import AliasChoices
-from typing import Literal, Optional
+from typing import Literal
 
 
 class ProjectSettings(BaseSettings):
@@ -545,7 +545,7 @@ class OAuthProviderConfig(BaseModel):
     client_secret: str = Field(..., description="OAuth client secret")
     auth_url: HttpUrl = Field(..., description="Authorization URL")
     token_url: HttpUrl = Field(..., description="Token URL")
-    userinfo_url: Optional[HttpUrl] = Field(None, description="User info URL")
+    userinfo_url: HttpUrl | None = Field(None, description="User info URL")
     scope: str = Field(..., description="Default scope")
     redirect_uri: HttpUrl = Field(..., description="Redirect URI")
 

@@ -2,6 +2,7 @@
 
 from typing import cast
 from uuid import uuid4
+import pytest
 
 from bindu.common.protocol.types import (
     Artifact,
@@ -325,11 +326,17 @@ class TestPartTypes:
         assert part["metadata"]["language"] == "en"
 
     def test_file_part_with_bytes(self):
-        """Test FilePart with bytes."""
+        """Test FilePart with bytes.
+
+        The protocol requires a `text` field (inherited from TextPart); make
+        sure our typical usage includes it.  This is the same issue that caused
+        frontend uploads to fail validation in production.
+        """
         part = cast(
             FilePart,
             {
                 "kind": "file",
+                "text": "test.txt",
                 "file": {
                     "bytes": "base64encodedcontent",
                     "mimeType": "text/plain",
@@ -340,6 +347,41 @@ class TestPartTypes:
 
         assert part["kind"] == "file"
         assert part["file"]["name"] == "test.txt"
+
+    def test_file_part_requires_text_validation(self):
+        """Attempting to validate a FilePart without text should fail.
+
+        The pydantic models are responsible for enforcing the `text` field; we
+        verify that a Message containing such a part triggers an invalid-params
+        error when parsed.
+        """
+        # The easiest way to trigger the same validation logic used by the
+
+    # A2A endpoint is to construct a raw request dict and run it through the
+    # `a2a_request_ta` adapter.  Omitting `text` should result in a
+    # ValidationError.
+
+    invalid_part = {"kind": "file", "file": {"bytes": "foo", "mimeType": "text/plain"}}
+
+    request_dict = {
+        "jsonrpc": "2.0",
+        "id": str(uuid4()),
+        "method": "message/send",
+        "params": {
+            "message": {
+                "messageId": str(uuid4()),
+                "contextId": str(uuid4()),
+                "taskId": str(uuid4()),
+                "kind": "message",
+                "parts": [invalid_part],
+                "role": "user",
+            },
+            "configuration": {"acceptedOutputModes": ["application/json"]},
+        },
+    }
+
+    with pytest.raises(Exception):
+        a2a_request_ta.validate_python(request_dict)
 
     def test_file_part_with_uri(self):
         """Test FilePart with URI."""

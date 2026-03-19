@@ -8,4 +8,10 @@ export const TEXT_MIME_ALLOWLIST = [
 	"application/csv",
 ] as const;
 
+// non‑image document types we permit as attachments (not previewed as text)
+export const DOCUMENT_MIME_ALLOWLIST = [
+	"application/pdf",
+	"application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+] as const;
+
 export const IMAGE_MIME_ALLOWLIST_DEFAULT = ["image/jpeg", "image/png"] as const;

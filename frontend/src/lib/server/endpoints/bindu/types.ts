@@ -16,6 +16,7 @@ export interface TextPart {
 
 export interface FilePart {
 	kind: "file";
+	text: string;
 	file: {
 		name?: string;
 		mimeType?: string;

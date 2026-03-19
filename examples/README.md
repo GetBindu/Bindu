@@ -51,6 +51,7 @@ For full URL override, use `BINDU_DEPLOYMENT_URL` (e.g. `http://127.0.0.1:5001`)
 ### Specialized
 - `summarizer/` - Text summarization agent
 - `weather-research/` - Weather intelligence agent
+- `web-scraping-agent/` - AI web scraping agent with ScrapeGraph + Mem0 memory
 - `premium-advisor/` - Paid agent with X402 payments (0.01 USDC per query)
 
 ### Advanced
@@ -121,7 +122,6 @@ if __name__ == "__main__":
 ## Documentation
 
 - [Bindu Docs](https://docs.getbindu.com)
-- [API Reference](../openapi.yaml)
 - [Payment Guide](../docs/PAYMENT.md)
 - [DID Guide](../docs/DID.md)
 - [Skills Guide](../docs/SKILLS.md)
@@ -135,4 +135,4 @@ if __name__ == "__main__":
 
 ## License
 
-See [LICENSE.md](LICENSE.md)
+See [LICENSE.md](../LICENSE.md)

@@ -17,7 +17,7 @@
 	</div>
 	<div class="flex items-center gap-4">
 		<a
-			href="https://bindus.directory"
+			href="https://getbindu.com"
 			target="_blank"
 			class="text-gray-500 transition-colors hover:text-blue-500 dark:text-gray-400"
 			>Directory</a
@@ -44,7 +44,7 @@
 				target="_blank"
 				class="font-semibold text-gray-900 transition-colors hover:text-blue-500 dark:text-gray-100"
 				>Bindus</a
-			> in Amsterdam
+			> in Amsterdam && India
 		</span>
 	</div>
 </footer>

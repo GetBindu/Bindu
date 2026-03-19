@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict, is_dataclass
+from typing import Any
+
 from starlette.requests import Request
 from starlette.responses import Response
 
@@ -22,6 +25,27 @@ from bindu.extensions.x402.extension import (
 )
 
 logger = get_logger("bindu.server.endpoints.a2a_protocol")
+
+
+def _serialize_state_obj(obj: Any) -> dict:
+    """Safely serialize a payment state object to a plain dict.
+
+    Tries, in order:
+    1. Pydantic ``model_dump()``
+    2. ``dataclasses.asdict()`` for dataclass instances
+    3. ``dict()`` coercion as a last resort
+
+    Raises:
+        TypeError: propagated from ``dict()`` if the object is not coercible
+            to a mapping (i.e. does not implement ``keys()``/``__getitem__``).
+        RuntimeError: propagated from any of the above strategies if the
+            object raises during serialization.
+    """
+    if hasattr(obj, "model_dump"):
+        return obj.model_dump()
+    if is_dataclass(obj) and not isinstance(obj, type):
+        return asdict(obj)
+    return dict(obj)
 
 
 async def agent_run_endpoint(app: BinduApplication, request: Request) -> Response:
@@ -108,32 +132,41 @@ async def agent_run_endpoint(app: BinduApplication, request: Request) -> Respons
 
         handler = getattr(app.task_manager, handler_name)
 
-        # Pass payment details from middleware to handler if available
-        # Payment context is passed through the metadata field in params
+        # Pass payment details from middleware to handler if available.
+        # Payment context is passed through the metadata field in params.
+        # All three state fields are set atomically by X402Middleware only after
+        # successful payment validation.  Use explicit ``is not None`` guards so
+        # that a falsy-but-present value (e.g. zero-amount payload) is not
+        # accidentally skipped, and wrap serialization in a try/except so that
+        # an unexpected type never produces a 500 for the caller.
         if method == "message/send":
             payment_payload = getattr(request.state, "payment_payload", None)
             payment_requirements = getattr(request.state, "payment_requirements", None)
             verify_response = getattr(request.state, "verify_response", None)
 
-            if payment_payload and payment_requirements and verify_response:
+            if (
+                payment_payload is not None
+                and payment_requirements is not None
+                and verify_response is not None
+            ):
                 if "params" in a2a_request and "message" in a2a_request["params"]:
-                    message = a2a_request["params"]["message"]
-                    message.setdefault("metadata", {})
-
-                    from dataclasses import asdict, is_dataclass
-
-                    def serialize_to_dict(obj):
-                        if hasattr(obj, "model_dump"):
-                            return obj.model_dump()
-                        elif is_dataclass(obj):
-                            return asdict(obj)
-                        return dict(obj)
-
-                    message["metadata"]["_payment_context"] = {
-                        "payment_payload": serialize_to_dict(payment_payload),
-                        "payment_requirements": serialize_to_dict(payment_requirements),
-                        "verify_response": serialize_to_dict(verify_response),
-                    }
+                    msg_obj = a2a_request["params"]["message"]
+                    msg_obj.setdefault("metadata", {})
+                    try:
+                        msg_obj["metadata"]["_payment_context"] = {
+                            "payment_payload": _serialize_state_obj(payment_payload),
+                            "payment_requirements": _serialize_state_obj(
+                                payment_requirements
+                            ),
+                            "verify_response": _serialize_state_obj(verify_response),
+                        }
+                    except Exception as _ser_err:
+                        # Serialization failure must not abort the request;
+                        # log and continue without attaching the payment context.
+                        logger.warning(
+                            "Failed to serialize payment context into message metadata"
+                            f" – payment context will be omitted: {_ser_err}"
+                        )
 
         jsonrpc_response = await handler(a2a_request)
 

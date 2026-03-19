@@ -115,12 +115,6 @@ async def close_storage(storage: Storage) -> None:
         >>> # ... use storage ...
         >>> await close_storage(storage)
     """
-    if (
-        POSTGRES_AVAILABLE
-        and PostgresStorage is not None
-        and isinstance(storage, PostgresStorage)
-    ):
-        await storage.disconnect()
-        logger.info("PostgreSQL storage connection closed")
-    else:
-        logger.debug(f"Storage {type(storage).__name__} does not require cleanup")
+    # FIX: Replaced broken isinstance check and .disconnect() with polymorphic .close()
+    await storage.close()
+    logger.info(f"Storage connection for {type(storage).__name__} closed gracefully")
