@@ -39,6 +39,10 @@ from bindu.server.storage import Storage
 
 logger = get_logger("bindu.server.handlers.message_handlers")
 
+# Constants
+PAUSED_STATES = ("input-required", "auth-required")
+SSE_HEADERS = {"Cache-Control": "no-cache"}
+
 
 @dataclass
 class MessageHandlers:
@@ -50,6 +54,63 @@ class MessageHandlers:
     workers: list[Any] | None = None
     context_id_parser: Any = None
     push_manager: Any | None = None
+
+    async def _handle_stream_error(
+        self,
+        task: Task,
+        context_id: Any,
+        error: Exception,
+        terminal_states: set[str] | frozenset[str],
+    ) -> dict:
+        """Handle streaming errors and return error event.
+
+        Args:
+            task: The task being streamed
+            context_id: Context ID for the task
+            error: The exception that occurred
+            terminal_states: Set of terminal task states
+
+        Returns:
+            Error event dict for SSE stream
+        """
+        timestamp = datetime.now(timezone.utc).isoformat()
+        current_state = "failed"
+
+        try:
+            loaded_task = await self.storage.load_task(task["id"])
+        except Exception as load_err:
+            loaded_task = None
+            logger.error(
+                f"Failed to load task {task['id']} during stream error handling: {load_err}",
+                exc_info=True,
+            )
+
+        if loaded_task:
+            current_state = loaded_task["status"]["state"]
+            timestamp = loaded_task["status"]["timestamp"]
+            if current_state not in terminal_states:
+                try:
+                    updated = await self.storage.update_task(task["id"], state="failed")
+                    if updated and "status" in updated:
+                        current_state = updated["status"]["state"]
+                        timestamp = updated["status"]["timestamp"]
+                except Exception as update_err:
+                    logger.error(
+                        f"Failed to update task {task['id']} to failed state during error handling: {update_err}",
+                        exc_info=True,
+                    )
+
+        return {
+            "kind": "status-update",
+            "task_id": str(task["id"]),
+            "context_id": str(context_id),
+            "status": {
+                "state": current_state,
+                "timestamp": timestamp,
+            },
+            "final": current_state in terminal_states,
+            "error": str(error),
+        }
 
     async def _submit_and_schedule_task(
         self, request_params: dict[str, Any]
@@ -141,6 +202,7 @@ class MessageHandlers:
                 app_settings.agent.stream_missing_task_retry_delay_seconds,
                 0.0,
             )
+            terminal_states = app_settings.agent.terminal_states
 
             submitted_event = {
                 "kind": "status-update",
@@ -203,10 +265,10 @@ class MessageHandlers:
                         }
                         yield self._sse_event(artifact_event)
 
-                    if status in app_settings.agent.terminal_states:
+                    if status in terminal_states:
                         return
 
-                    if status in ("input-required", "auth-required"):
+                    if status in PAUSED_STATES:
                         # Re-check once before returning to avoid missing a quick
                         # transition into a terminal state.
                         latest_task = await self.storage.load_task(task["id"])
@@ -219,12 +281,11 @@ class MessageHandlers:
                                         "task_id": str(task["id"]),
                                         "context_id": str(context_id),
                                         "status": latest_task["status"],
-                                        "final": latest_status
-                                        in app_settings.agent.terminal_states,
+                                        "final": latest_status in terminal_states,
                                     }
                                 )
                                 seen_status = latest_status
-                                if latest_status in app_settings.agent.terminal_states:
+                                if latest_status in terminal_states:
                                     return
                         return
 
@@ -236,49 +297,13 @@ class MessageHandlers:
                 logger.error(
                     f"Unhandled stream error for task {task['id']}: {e}", exc_info=True
                 )
-                timestamp = datetime.now(timezone.utc).isoformat()
-                current_state = "failed"
-                try:
-                    loaded_task = await self.storage.load_task(task["id"])
-                except Exception as load_err:
-                    loaded_task = None
-                    logger.error(
-                        f"Failed to load task {task['id']} during stream error handling: {load_err}",
-                        exc_info=True,
-                    )
-
-                if loaded_task:
-                    current_state = loaded_task["status"]["state"]
-                    timestamp = loaded_task["status"]["timestamp"]
-                    if current_state not in app_settings.agent.terminal_states:
-                        try:
-                            updated = await self.storage.update_task(
-                                task["id"], state="failed"
-                            )
-                            if updated and "status" in updated:
-                                current_state = updated["status"]["state"]
-                                timestamp = updated["status"]["timestamp"]
-                        except Exception as update_err:
-                            logger.error(
-                                f"Failed to update task {task['id']} to failed state during error handling: {update_err}",
-                                exc_info=True,
-                            )
-
-                error_event = {
-                    "kind": "status-update",
-                    "task_id": str(task["id"]),
-                    "context_id": str(context_id),
-                    "status": {
-                        "state": current_state,
-                        "timestamp": timestamp,
-                    },
-                    "final": current_state in app_settings.agent.terminal_states,
-                    "error": str(e),
-                }
+                error_event = await self._handle_stream_error(
+                    task, context_id, e, terminal_states
+                )
                 yield self._sse_event(error_event)
 
         return StreamingResponse(
             stream_generator(),
             media_type="text/event-stream",
-            headers={"Cache-Control": "no-cache"},
+            headers=SSE_HEADERS,
         )

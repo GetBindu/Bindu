@@ -6,14 +6,10 @@ including getting tokens for agents and validating tokens.
 
 from __future__ import annotations as _annotations
 
-import asyncio
 from typing import Optional
 
-import aiohttp
-
-from bindu.auth.hydra.registration import load_agent_credentials
 from bindu.settings import app_settings
-from bindu.utils.http_client import http_client
+from .client import http_client
 from bindu.utils.logging import get_logger
 
 logger = get_logger("bindu.utils.token_utils")
@@ -66,39 +62,9 @@ async def get_client_credentials_token(
                 )
                 return None
 
-    except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+    except Exception as e:
         logger.error(f"Failed to get client credentials token: {e}")
         return None
-
-
-async def get_agent_token_from_credentials_file(
-    agent_id: str, credentials_dir
-) -> Optional[str]:
-    """Get access token for agent from saved credentials.
-
-    Args:
-        agent_id: Agent identifier
-        credentials_dir: Directory containing oauth_credentials.json
-
-    Returns:
-        Access token string or None
-    """
-    # Load credentials from file
-    credentials = load_agent_credentials(agent_id, credentials_dir)
-    if not credentials:
-        logger.error(f"No credentials found for agent: {agent_id}")
-        return None
-
-    # Get token
-    scope = " ".join(credentials.scopes)
-    token_response = await get_client_credentials_token(
-        credentials.client_id, credentials.client_secret, scope
-    )
-
-    if token_response:
-        return token_response.get("access_token")
-
-    return None
 
 
 async def introspect_token(token: str) -> Optional[dict]:
@@ -122,7 +88,7 @@ async def introspect_token(token: str) -> Optional[dict]:
             result = await hydra.introspect_token(token)
             return result
 
-    except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as e:
+    except Exception as e:
         logger.error(f"Failed to introspect token: {e}")
         return None
 
@@ -147,35 +113,6 @@ async def revoke_token(token: str) -> bool:
         ) as hydra:
             return await hydra.revoke_token(token)
 
-    except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as e:
+    except Exception as e:
         logger.error(f"Failed to revoke token: {e}")
         return False
-
-
-def create_bearer_header(token: str) -> dict:
-    """Create Authorization header with Bearer token.
-
-    Args:
-        token: Access token
-
-    Returns:
-        Dict with Authorization header
-    """
-    return {"Authorization": f"Bearer {token}"}
-
-
-async def validate_token_and_get_subject(token: str) -> Optional[str]:
-    """Validate token and extract subject (user/client ID).
-
-    Args:
-        token: Access token
-
-    Returns:
-        Subject (sub claim) if valid, None otherwise
-    """
-    result = await introspect_token(token)
-
-    if result and result.get("active"):
-        return result.get("sub")
-
-    return None

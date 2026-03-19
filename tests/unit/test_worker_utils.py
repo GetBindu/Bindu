@@ -225,22 +225,3 @@ class TestTaskStateManager:
 
         with pytest.raises(ValueError, match="already processed"):
             await TaskStateManager.validate_task_state(task, "submitted")
-
-    def test_build_response_messages_string(self):
-        """Test building response messages from string."""
-        result = "Test response"
-
-        messages = TaskStateManager.build_response_messages(result)
-
-        assert len(messages) == 1
-        assert messages[0]["role"] == "agent"
-        assert messages[0]["kind"] == "message"
-
-    def test_build_response_messages_list(self):
-        """Test building response messages from list."""
-        result = ["Message 1", "Message 2"]
-
-        messages = TaskStateManager.build_response_messages(result)
-
-        assert len(messages) == 2
-        assert all(m["role"] == "agent" for m in messages)

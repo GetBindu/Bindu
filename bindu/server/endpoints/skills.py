@@ -7,22 +7,20 @@ intelligent agent selection and routing decisions.
 from __future__ import annotations
 
 from starlette.requests import Request
-from starlette.responses import JSONResponse, Response
+from starlette.responses import Response
 
 from bindu.common.protocol.types import SkillNotFoundError
-from bindu.extensions.x402.extension import (
-    is_activation_requested as x402_is_requested,
-    add_activation_header as x402_add_header,
-)
 from bindu.server.applications import BinduApplication
 from bindu.utils.logging import get_logger
-from bindu.utils.request_utils import (
+from .utils import (
+    create_response_with_x402,
     extract_error_fields,
     get_client_ip,
+    get_skill_or_error,
     handle_endpoint_errors,
     jsonrpc_error,
+    validate_manifest,
 )
-from bindu.utils.skill_utils import find_skill_by_id
 
 logger = get_logger("bindu.server.endpoints.skills")
 
@@ -37,10 +35,9 @@ async def skills_list_endpoint(app: BinduApplication, request: Request) -> Respo
     logger.debug(f"Serving skills list to {client_ip}")
 
     # Ensure manifest exists
-    if app.manifest is None:
-        return JSONResponse(
-            content={"error": "Agent manifest not configured"}, status_code=500
-        )
+    error_resp = validate_manifest(app)
+    if error_resp:
+        return error_resp
 
     # Get skills from manifest
     skills = app.manifest.skills or []
@@ -69,10 +66,7 @@ async def skills_list_endpoint(app: BinduApplication, request: Request) -> Respo
 
     response_data = {"skills": skills_summary, "total": len(skills_summary)}
 
-    resp = JSONResponse(content=response_data)
-    if x402_is_requested(request):
-        resp = x402_add_header(resp)
-    return resp
+    return create_response_with_x402(request, response_data)
 
 
 @handle_endpoint_errors("skill detail")
@@ -92,21 +86,19 @@ async def skill_detail_endpoint(app: BinduApplication, request: Request) -> Resp
     logger.debug(f"Serving skill detail for '{skill_id}' to {client_ip}")
 
     # Ensure manifest exists
-    if app.manifest is None:
-        code, message = extract_error_fields(SkillNotFoundError)
-        return jsonrpc_error(code, "Agent manifest not configured", status=500)
+    error_resp = validate_manifest(
+        app, client_ip, use_jsonrpc=True, error_type=SkillNotFoundError
+    )
+    if error_resp:
+        return error_resp
 
     # Find skill in manifest
-    skills = app.manifest.skills or []
-    skill = find_skill_by_id(skills, skill_id)
-
-    if not skill:
-        logger.warning(f"Skill not found: {skill_id}")
-        code, message = extract_error_fields(SkillNotFoundError)
-        return jsonrpc_error(code, f"Skill not found: {skill_id}", status=404)
+    skill, error_resp = get_skill_or_error(app, skill_id)
+    if error_resp:
+        return error_resp
 
     # Return full skill data (excluding documentation_content for size)
-    skill_detail = dict(skill)
+    skill_detail = dict(skill) if skill else {}
 
     # Remove documentation_content from response (too large)
     # Clients should use /agent/skills/{skill_id}/documentation for that
@@ -116,10 +108,7 @@ async def skill_detail_endpoint(app: BinduApplication, request: Request) -> Resp
     else:
         skill_detail["has_documentation"] = False
 
-    resp = JSONResponse(content=skill_detail)
-    if x402_is_requested(request):
-        resp = x402_add_header(resp)
-    return resp
+    return create_response_with_x402(request, skill_detail)
 
 
 @handle_endpoint_errors("skill documentation")
@@ -141,18 +130,16 @@ async def skill_documentation_endpoint(
     logger.debug(f"Serving skill documentation for '{skill_id}' to {client_ip}")
 
     # Ensure manifest exists
-    if app.manifest is None:
-        code, message = extract_error_fields(SkillNotFoundError)
-        return jsonrpc_error(code, "Agent manifest not configured", status=500)
+    error_resp = validate_manifest(
+        app, client_ip, use_jsonrpc=True, error_type=SkillNotFoundError
+    )
+    if error_resp:
+        return error_resp
 
     # Find skill in manifest
-    skills = app.manifest.skills or []
-    skill = find_skill_by_id(skills, skill_id)
-
-    if not skill:
-        logger.warning(f"Skill not found: {skill_id}")
-        code, message = extract_error_fields(SkillNotFoundError)
-        return jsonrpc_error(code, f"Skill not found: {skill_id}", status=404)
+    skill, error_resp = get_skill_or_error(app, skill_id)
+    if error_resp:
+        return error_resp
 
     # Get documentation content
     documentation = skill.get("documentation_content")
@@ -165,7 +152,6 @@ async def skill_documentation_endpoint(
         )
 
     # Return as YAML
-    resp = Response(content=documentation, media_type="application/yaml")
-    if x402_is_requested(request):
-        resp = x402_add_header(resp)
-    return resp
+    return create_response_with_x402(
+        request, documentation, response_type=Response, media_type="application/yaml"
+    )

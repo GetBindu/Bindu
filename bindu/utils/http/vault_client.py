@@ -6,15 +6,12 @@ from HashiCorp Vault, ensuring persistence across pod restarts.
 
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
 from typing import Any, Optional
 
-import aiohttp
-
 from bindu.common.models import AgentCredentials
 from bindu.settings import app_settings
-from bindu.utils.http_client import AsyncHTTPClient
+from .client import AsyncHTTPClient
 from bindu.utils.logging import get_logger
 
 logger = get_logger("bindu.utils.vault_client")
@@ -104,7 +101,7 @@ class VaultClient:
 
             return await response.json()
 
-        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as e:
+        except Exception as e:
             logger.error(f"Vault request error: {e}")
             return None
 

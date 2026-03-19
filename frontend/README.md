@@ -6,7 +6,7 @@ A modern chat interface for interacting with Bindu AI agents using the A2A (Agen
 
 ```bash
 npm install
-npm run dev 
+npm run dev
 ```
 
 Visit `http://localhost:5173` and start chatting with your Bindu agent.

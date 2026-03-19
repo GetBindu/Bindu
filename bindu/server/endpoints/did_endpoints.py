@@ -13,11 +13,32 @@ from bindu.common.protocol.types import (
     JSONParseError,
 )
 from bindu.server.applications import BinduApplication
-from bindu.utils.request_utils import handle_endpoint_errors
 from bindu.utils.logging import get_logger
-from bindu.utils.request_utils import extract_error_fields, get_client_ip, jsonrpc_error
+from .utils import (
+    handle_endpoint_errors,
+    extract_error_fields,
+    get_client_ip,
+    jsonrpc_error,
+    validate_manifest,
+)
 
 logger = get_logger("bindu.server.endpoints.did_endpoints")
+
+
+def _did_not_found_error(did: str, reason: str, client_ip: str) -> Response:
+    """Return DID not found error response.
+
+    Args:
+        did: Requested DID
+        reason: Reason for error (for logging)
+        client_ip: Client IP for logging
+
+    Returns:
+        JSON-RPC error response
+    """
+    logger.warning(f"{reason} (requested by {client_ip})")
+    code, message = extract_error_fields(InternalError)
+    return jsonrpc_error(code, message, f"DID '{did}' not found", status=404)
 
 
 @handle_endpoint_errors("DID resolve")
@@ -46,35 +67,30 @@ async def did_resolve_endpoint(app: BinduApplication, request: Request) -> Respo
         return jsonrpc_error(code, message, "Missing 'did' parameter")
 
     # Ensure manifest exists
-    if app.manifest is None:
-        logger.warning(f"Manifest not configured (requested by {client_ip})")
-        code, message = extract_error_fields(InternalError)
-        return jsonrpc_error(code, message, "Agent manifest not configured", status=500)
+    error_resp = validate_manifest(app, client_ip, use_jsonrpc=True)
+    if error_resp:
+        return error_resp
 
     # Get DID extension
     did_extension = app.manifest.did_extension
 
-    # First check if DID extension exists and has 'did' attribute
+    # Validate DID extension exists and has 'did' attribute
     if not did_extension or not hasattr(did_extension, "did"):
-        logger.warning(f"DID extension not configured (requested by {client_ip})")
-        code, message = extract_error_fields(InternalError)
-        return jsonrpc_error(code, message, f"DID '{did}' not found", status=404)
+        return _did_not_found_error(did, "DID extension not configured", client_ip)
 
     # Check if requested DID matches our DID
     if did_extension.did != did:
-        logger.warning(
-            f"DID mismatch - requested: {did}, our DID: {did_extension.did} (from {client_ip})"
+        return _did_not_found_error(
+            did,
+            f"DID mismatch - requested: {did}, our DID: {did_extension.did}",
+            client_ip,
         )
-        code, message = extract_error_fields(InternalError)
-        return jsonrpc_error(code, message, f"DID '{did}' not found", status=404)
 
     # Validate DID extension has required method
     if not hasattr(did_extension, "get_did_document"):
-        logger.warning(
-            f"DID extension missing 'get_did_document' method (requested by {client_ip})"
+        return _did_not_found_error(
+            did, "DID extension missing 'get_did_document' method", client_ip
         )
-        code, message = extract_error_fields(InternalError)
-        return jsonrpc_error(code, message, f"DID '{did}' not found", status=404)
 
     logger.debug(f"Resolving DID {did} for {client_ip}")
     did_document = did_extension.get_did_document()

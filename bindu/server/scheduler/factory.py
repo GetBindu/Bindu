@@ -24,6 +24,11 @@ except ImportError:
 
 logger = get_logger("bindu.server.scheduler.factory")
 
+# Constants
+DEFAULT_REDIS_HOST = "localhost"
+DEFAULT_REDIS_PORT = 6379
+DEFAULT_REDIS_DB = 0
+
 
 async def create_scheduler(config: SchedulerConfig | None = None) -> Scheduler:
     """Create scheduler backend based on configuration.
@@ -46,10 +51,10 @@ async def create_scheduler(config: SchedulerConfig | None = None) -> Scheduler:
             config = SchedulerConfig(
                 type="redis",
                 redis_url=scheduler_settings.redis_url,
-                redis_host=scheduler_settings.redis_host or "localhost",
-                redis_port=scheduler_settings.redis_port or 6379,
+                redis_host=scheduler_settings.redis_host or DEFAULT_REDIS_HOST,
+                redis_port=scheduler_settings.redis_port or DEFAULT_REDIS_PORT,
                 redis_password=scheduler_settings.redis_password,
-                redis_db=scheduler_settings.redis_db or 0,
+                redis_db=scheduler_settings.redis_db or DEFAULT_REDIS_DB,
                 queue_name=scheduler_settings.queue_name,
                 max_connections=scheduler_settings.max_connections,
                 retry_on_timeout=scheduler_settings.retry_on_timeout,

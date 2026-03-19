@@ -151,6 +151,8 @@ def extract_signature_headers(headers: dict) -> Optional[Dict[str, Any]]:
     if not all([did, signature, timestamp_str]):
         return None
 
+    # Type narrowing: timestamp_str is guaranteed to be truthy here
+    assert timestamp_str is not None
     try:
         timestamp = int(timestamp_str)
     except (ValueError, TypeError):
@@ -158,78 +160,3 @@ def extract_signature_headers(headers: dict) -> Optional[Dict[str, Any]]:
         return None
 
     return {"did": did, "signature": signature, "timestamp": timestamp}
-
-
-def validate_timestamp(timestamp: int, max_age_seconds: int = 300) -> bool:
-    """Validate request timestamp to prevent replay attacks.
-
-    Args:
-        timestamp: Unix timestamp from request
-        max_age_seconds: Maximum age in seconds (default 5 minutes)
-
-    Returns:
-        True if timestamp is valid, False otherwise
-    """
-    current_time = int(time.time())
-    age = abs(current_time - timestamp)
-
-    if age > max_age_seconds:
-        logger.warning(f"Request timestamp expired: age={age}s, max={max_age_seconds}s")
-        return False
-
-    return True
-
-
-async def get_public_key_from_hydra(client_did: str, hydra_client) -> Optional[str]:
-    """Get client's public key from Hydra metadata.
-
-    Args:
-        client_did: Client's DID (used as client_id)
-        hydra_client: HydraClient instance
-
-    Returns:
-        Public key (multibase encoded) or None
-    """
-    try:
-        client = await hydra_client.get_oauth_client(client_did)
-        if not client:
-            logger.error(f"Client not found in Hydra: {client_did}")
-            return None
-
-        public_key = client.get("metadata", {}).get("public_key")
-        if not public_key:
-            logger.warning(f"No public key found for client: {client_did}")
-            return None
-
-        return public_key
-
-    except (ValueError, TypeError, KeyError, ConnectionError, Exception) as e:
-        logger.error(f"Failed to get public key from Hydra: {e}")
-        return None
-
-
-def create_signed_request_headers(
-    body: str | bytes | dict, did: str, did_extension, bearer_token: str
-) -> Dict[str, str]:
-    """Create complete headers for signed request with OAuth token.
-
-    Args:
-        body: Request body
-        did: Client's DID
-        did_extension: DIDExtension instance
-        bearer_token: OAuth2 access token
-
-    Returns:
-        Dict with all required headers
-    """
-    # Get DID signature headers
-    signature_headers = sign_request(body, did, did_extension)
-
-    # Combine with OAuth token
-    headers = {
-        "Authorization": f"Bearer {bearer_token}",
-        "Content-Type": "application/json",
-        **signature_headers,
-    }
-
-    return headers

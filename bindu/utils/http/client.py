@@ -12,20 +12,27 @@ from typing import Any
 
 import aiohttp
 
+from bindu.utils.exceptions import (
+    HTTPConnectionError,
+    HTTPTimeoutError,
+    HTTPClientError,
+    HTTPServerError,
+)
 from bindu.utils.logging import get_logger
+from bindu.utils.retry import create_retry_decorator
 
 logger = get_logger("bindu.utils.http_client")
 
 
 class AsyncHTTPClient:
-    """Async HTTP client with automatic retry, session management, and error handling.
+    """Async HTTP client with session management and error handling.
 
     Features:
     - Automatic session management with context manager support
-    - Exponential backoff retry logic
     - SSL verification control
     - Configurable timeouts
     - Request/response logging
+    - Retry logic via decorators on public methods
     """
 
     def __init__(
@@ -42,7 +49,7 @@ class AsyncHTTPClient:
             base_url: Base URL for all requests (e.g., https://api.example.com)
             timeout: Request timeout in seconds
             verify_ssl: Whether to verify SSL certificates
-            max_retries: Maximum number of retry attempts for failed requests
+            max_retries: Maximum number of retry attempts (used by retry decorators)
             default_headers: Default headers to include in all requests
         """
         self.base_url = base_url.rstrip("/")
@@ -89,10 +96,11 @@ class AsyncHTTPClient:
         data: dict[str, Any] | None = None,
         json: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
-        retry_on_status: list[int] | None = None,
         **kwargs,
     ) -> aiohttp.ClientResponse:
-        """Make HTTP request with retry logic.
+        """Make an HTTP request with single attempt.
+
+        Retry logic is handled by decorators on public methods.
 
         Args:
             method: HTTP method (GET, POST, PUT, DELETE, etc.)
@@ -101,16 +109,19 @@ class AsyncHTTPClient:
             data: Form data to send
             json: JSON data to send
             headers: Additional headers for this request
-            retry_on_status: List of status codes to retry on (default: 5xx)
             **kwargs: Additional arguments for aiohttp request
 
         Returns:
             HTTP response
 
         Raises:
-            aiohttp.ClientError: If request fails after all retries
+            HTTPClientError: For 4xx client errors
+            HTTPServerError: For 5xx server errors
+            HTTPConnectionError: If connection fails
+            HTTPTimeoutError: If request times out
         """
         await self._ensure_session()
+        assert self._session is not None
 
         # Build full URL
         url = (
@@ -122,57 +133,54 @@ class AsyncHTTPClient:
         # Merge headers
         request_headers = {**self.default_headers, **(headers or {})}
 
-        # Default retry on server errors
-        retry_statuses = retry_on_status or list(range(500, 600))
-
-        for attempt in range(self.max_retries):
-            try:
-                async with self._session.request(
-                    method,
-                    url,
-                    params=params,
-                    data=data,
-                    json=json,
-                    headers=request_headers,
-                    **kwargs,
-                ) as response:
-                    # Check if we should retry
-                    if (
-                        response.status in retry_statuses
-                        and attempt < self.max_retries - 1
-                    ):
-                        wait_time = 2**attempt  # Exponential backoff
-                        logger.warning(
-                            f"{method} {url} returned {response.status}, "
-                            f"retrying in {wait_time}s (attempt {attempt + 1}/{self.max_retries})"
-                        )
-                        await asyncio.sleep(wait_time)
-                        continue
-
-                    # Read response body before context manager closes
-                    response_data = await response.read()
-                    # Store data in response for later access
-                    response._body = response_data
-
-                    logger.debug(f"{method} {url} -> {response.status}")
-                    return response
-
-            except (aiohttp.ClientConnectorError, aiohttp.ServerDisconnectedError) as e:
-                if attempt < self.max_retries - 1:
-                    wait_time = 2**attempt
-                    logger.warning(
-                        f"Connection error: {e}, retrying in {wait_time}s "
-                        f"(attempt {attempt + 1}/{self.max_retries})"
+        try:
+            async with self._session.request(
+                method,
+                url,
+                params=params,
+                data=data,
+                json=json,
+                headers=request_headers,
+                **kwargs,
+            ) as response:
+                # Check for client/server errors and raise appropriate exceptions
+                if 400 <= response.status < 500:
+                    error_text = await response.text()
+                    logger.error(f"{method} {url} -> {response.status}: {error_text}")
+                    raise HTTPClientError(
+                        f"Client error: {error_text}",
+                        status=response.status,
+                        url=url,
                     )
-                    await asyncio.sleep(wait_time)
-                else:
-                    logger.error(
-                        f"Request failed after {self.max_retries} retries: {e}"
+                elif response.status >= 500:
+                    error_text = await response.text()
+                    logger.warning(f"{method} {url} -> {response.status}: {error_text}")
+                    raise HTTPServerError(
+                        f"Server error: {error_text}",
+                        status=response.status,
+                        url=url,
                     )
-                    raise
 
-        raise aiohttp.ClientError(f"Request failed after {self.max_retries} retries")
+                # Read response body before context manager closes
+                response_data = await response.read()
+                # Store data in response for later access
+                response._body = response_data
 
+                logger.debug(f"{method} {url} -> {response.status}")
+                return response
+
+        except asyncio.TimeoutError as e:
+            logger.warning(f"{method} {url} timed out")
+            raise HTTPTimeoutError("Request timed out", url=url) from e
+
+        except (
+            aiohttp.ClientConnectorError,
+            aiohttp.ServerDisconnectedError,
+        ) as e:
+            logger.warning(f"{method} {url} connection failed: {e}")
+            raise HTTPConnectionError(f"Connection failed: {str(e)}", url=url) from e
+
+    @create_retry_decorator("api")
     async def get(
         self,
         endpoint: str,
@@ -181,7 +189,7 @@ class AsyncHTTPClient:
         headers: dict[str, str] | None = None,
         **kwargs,
     ) -> aiohttp.ClientResponse:
-        """Make GET request.
+        """Make GET request with automatic retry.
 
         Args:
             endpoint: API endpoint
@@ -196,6 +204,7 @@ class AsyncHTTPClient:
             "GET", endpoint, params=params, headers=headers, **kwargs
         )
 
+    @create_retry_decorator("api")
     async def post(
         self,
         endpoint: str,
@@ -205,7 +214,7 @@ class AsyncHTTPClient:
         headers: dict[str, str] | None = None,
         **kwargs,
     ) -> aiohttp.ClientResponse:
-        """Make POST request.
+        """Make POST request with automatic retry.
 
         Args:
             endpoint: API endpoint
@@ -221,6 +230,7 @@ class AsyncHTTPClient:
             "POST", endpoint, data=data, json=json, headers=headers, **kwargs
         )
 
+    @create_retry_decorator("api")
     async def put(
         self,
         endpoint: str,
@@ -230,7 +240,7 @@ class AsyncHTTPClient:
         headers: dict[str, str] | None = None,
         **kwargs,
     ) -> aiohttp.ClientResponse:
-        """Make PUT request.
+        """Make PUT request with automatic retry.
 
         Args:
             endpoint: API endpoint
@@ -246,6 +256,7 @@ class AsyncHTTPClient:
             "PUT", endpoint, data=data, json=json, headers=headers, **kwargs
         )
 
+    @create_retry_decorator("api")
     async def delete(
         self,
         endpoint: str,
@@ -253,7 +264,7 @@ class AsyncHTTPClient:
         headers: dict[str, str] | None = None,
         **kwargs,
     ) -> aiohttp.ClientResponse:
-        """Make DELETE request.
+        """Make DELETE request with automatic retry.
 
         Args:
             endpoint: API endpoint
@@ -265,6 +276,7 @@ class AsyncHTTPClient:
         """
         return await self.request("DELETE", endpoint, headers=headers, **kwargs)
 
+    @create_retry_decorator("api")
     async def patch(
         self,
         endpoint: str,
@@ -274,7 +286,7 @@ class AsyncHTTPClient:
         headers: dict[str, str] | None = None,
         **kwargs,
     ) -> aiohttp.ClientResponse:
-        """Make PATCH request.
+        """Make PATCH request with automatic retry.
 
         Args:
             endpoint: API endpoint

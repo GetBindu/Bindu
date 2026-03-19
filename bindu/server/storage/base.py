@@ -16,7 +16,7 @@ from bindu.common.protocol.types import (
     TaskState,
 )
 
-ContextT = TypeVar("ContextT", default=Any)
+ContextT = TypeVar("ContextT", default=dict[str, Any])
 
 
 class Storage(ABC, Generic[ContextT]):
