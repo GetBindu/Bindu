@@ -369,9 +369,16 @@ class TestDIDAgentExtension:
 
         private_key_stat = did_extension.private_key_path.stat()
         private_key_mode = stat.S_IMODE(private_key_stat.st_mode)
-        assert private_key_mode == 0o600
+        import os
+        private_key_mode = os.stat(did_extension.private_key_path).st_mode & 0o777
+        public_key_mode = os.stat(did_extension.public_key_path).st_mode & 0o777
+        if os.name == "nt":
+            # Windows doesn't fully support POSIX permissions
+            assert private_key_mode in (0o600, 0o666)
+            assert public_key_mode in (0o644, 0o666)
+        else:
+            assert private_key_mode == 0o600
+            assert public_key_mode == 0o644
+    
 
-        # Check public key permissions (should be 0o644)
-        public_key_stat = did_extension.public_key_path.stat()
-        public_key_mode = stat.S_IMODE(public_key_stat.st_mode)
-        assert public_key_mode == 0o644
+

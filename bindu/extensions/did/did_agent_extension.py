@@ -200,17 +200,45 @@ class DIDAgentExtension:
 
         private_pem, public_pem = self._generate_key_pair_data()
 
-        # Write keys using Path methods
-        self.private_key_path.write_bytes(private_pem)
-        self.public_key_path.write_bytes(public_pem)
 
-        # Set appropriate file permissions (owner read/write only for private key)
-        self.private_key_path.chmod(0o600)
-        self.public_key_path.chmod(0o644)
+
+        import os
+        import stat
+
+# Create private key 
+        fd = os.open(self.private_key_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "wb") as f:
+            f.write(private_pem)
+        
+        try:
+            os.chmod(self.private_key_path, 0o600)
+        except Exception:
+            pass    
+    
+
+# Public key
+        fd_pub = os.open(self.public_key_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644)
+        with os.fdopen(fd_pub, "wb") as f:
+            f.write(public_pem)
+    
+        try:
+            os.chmod(self.public_key_path, 0o644)
+        except Exception:
+            pass
+           
+        
+
+# Validation
+        if not self.private_key_path.exists():
+            raise OSError("Failed to create private key file")
+    
+        if not self.public_key_path.exists():
+            raise OSError("Failed to create public key file")
+    
 
         return {
             "private_key_path": str(self.private_key_path),
-            "public_key_path": str(self.public_key_path),
+            "public_key_path": str(self.public_key_path),   
         }
 
     def _load_key_from_file(self, key_path: Path, key_type: str) -> bytes:

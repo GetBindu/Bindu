@@ -101,7 +101,7 @@ from .scheduler import Scheduler
 from .storage import Storage
 from .workers import ManifestWorker
 
-logger = get_logger("pebbling.server.task_manager")
+logger = get_logger("bindu.server.task_manager")
 
 
 @dataclass
@@ -205,15 +205,16 @@ class TaskManager:
             except ValueError:
                 # Log the issue so we know bad data is coming in, but don't crash
                 logger.warning(
-                    f"Received malformed context_id: '{context_id}'. Generating new UUID fallback."
+                    "Received malformed context_id, generating fallback UUID",
+                    extra = {"context_id": str(context_id)},
                 )
-                pass
+                
 
         return uuid.uuid4()
 
     def _jsonrpc_error(
         self, response_class: type, request_id: Any, message: str, code: int = -32001
-    ):
+    ) -> Any:
         return response_class(
             jsonrpc="2.0", id=request_id, error={"code": code, "message": message}
         )
