@@ -15,5 +15,17 @@ class TranslatorAgent:
         )
 
     async def run(self, text: str):
-        response = self.agent.run(text)
-        return response.content
+        """
+        Execute translation task.
+        """
+
+        try:
+            response = self.agent.run(text)
+
+            if response and hasattr(response, "content"):
+                return response.content
+
+            return "No response generated."
+
+        except Exception as e:
+            return f"Translator agent error: {str(e)}"

@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
 load_dotenv()
 
+import asyncio
 from bindu.penguin.bindufy import bindufy
 from orchestrator import Orchestrator
 from typing import List, Dict, Any
@@ -37,7 +38,8 @@ def handler(messages: list[dict[str, str]]) -> str:
     # -------- Swarm Execution --------
 
     try:
-        result = orchestrator.run(user_input)
+        # FIX: Run async orchestrator properly
+        result = asyncio.run(orchestrator.run(user_input))
         return result
 
     except Exception as e:
@@ -48,7 +50,7 @@ if __name__ == "__main__":
     config = {
         "author": "yatirajkulkarni143@gmail.com",
         "name": "agent-marketplace-swarm",
-        "description": "Skill-based agent marketplace demonstrating routing between research, summarization, and translation agents using Bindu.",
+        "description": "Skill-based agent marketplace demonstrating routing between summarization and translation agents using Bindu.",
         "capabilities": {"streaming": True},
         "deployment": {
             "url": "http://localhost:3773",
