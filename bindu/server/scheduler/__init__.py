@@ -46,7 +46,6 @@ from .base import Scheduler, TaskOperation
 
 # Export all scheduler implementations
 from .memory_scheduler import InMemoryScheduler
-from .redis_scheduler import RedisScheduler
 
 __all__ = [
     # Base interface
@@ -54,5 +53,13 @@ __all__ = [
     "TaskOperation",
     # Scheduler implementations
     "InMemoryScheduler",
-    "RedisScheduler",
 ]
+
+# Conditionally export RedisScheduler if the optional 'redis' dependency is installed.
+# This prevents fatal crashes on boot for users utilizing the InMemoryScheduler.
+try:
+    from .redis_scheduler import RedisScheduler  # noqa: F401
+
+    __all__.append("RedisScheduler")
+except ImportError:
+    pass

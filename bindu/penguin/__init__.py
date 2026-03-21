@@ -12,7 +12,7 @@
 For us each agent/agentic team/agentic workflow is a penguin.
 
 The heart of bindu - where any AI agent becomes a networked, secure, discoverable entity.
-Transform agents from any framework (Agno, CrewAI, LangChain) into production-ready services.
+Transform agents from any framework (AG2, Agno, CrewAI, LangChain) into production-ready services.
 
 """
 

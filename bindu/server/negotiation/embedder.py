@@ -15,18 +15,22 @@ to enable semantic similarity matching during negotiation.
 
 from __future__ import annotations
 
-import httpx
-from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from bindu.settings import app_settings
+from bindu.utils.http import AsyncHTTPClient
 from bindu.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from bindu.common.protocol.types import Skill
 
 logger = get_logger("bindu.server.negotiation.embedder")
+
+# Constants
+OPENROUTER_API_URL = "https://openrouter.ai/api/v1"
+EMBEDDING_REQUEST_TIMEOUT_SECONDS = 30
+MAX_TASK_EMBEDDING_CACHE_SIZE = 1000
 
 
 class SkillEmbedder:
@@ -47,14 +51,20 @@ class SkillEmbedder:
         self._provider = app_settings.negotiation.embedding_provider
         self._client = None
 
-    def _get_client(self) -> httpx.Client:
-        """Get or create HTTP client."""
+    def _get_client(self) -> AsyncHTTPClient:
+        """Get or create async HTTP client.
+
+        Using AsyncHTTPClient prevents the OpenRouter HTTP call from blocking
+        the event loop while the `/agent/negotiation` endpoint awaits the response.
+        """
         if self._client is None:
-            self._client = httpx.Client(timeout=30.0)
+            self._client = AsyncHTTPClient(
+                base_url=OPENROUTER_API_URL, timeout=EMBEDDING_REQUEST_TIMEOUT_SECONDS
+            )
         return self._client
 
-    def _embed_with_openrouter(self, texts: list[str]) -> np.ndarray:
-        """Embed texts using OpenRouter API.
+    async def _embed_with_openrouter(self, texts: list[str]) -> np.ndarray:
+        """Embed texts using OpenRouter API (async).
 
         Args:
             texts: List of texts to embed
@@ -71,8 +81,8 @@ class SkillEmbedder:
         client = self._get_client()
 
         try:
-            response = client.post(
-                "https://openrouter.ai/api/v1/embeddings",
+            response = await client.post(
+                "/embeddings",
                 headers={
                     "Authorization": f"Bearer {self._api_key}",
                     "Content-Type": "application/json",
@@ -82,21 +92,17 @@ class SkillEmbedder:
                     "input": texts,
                 },
             )
-            response.raise_for_status()
-            data = response.json()
+            data = await response.json()
 
             # Extract embeddings from response
             embeddings = [item["embedding"] for item in data["data"]]
             return np.array(embeddings, dtype=np.float32)
 
-        except httpx.HTTPError as e:
-            logger.error(f"OpenRouter API error: {e}")
-            raise
         except Exception as e:
             logger.error(f"Failed to get embeddings from OpenRouter: {e}")
             raise
 
-    def embed_text(self, text: str) -> np.ndarray:
+    async def embed_text(self, text: str) -> np.ndarray:
         """Embed a single text string.
 
         Args:
@@ -105,9 +111,10 @@ class SkillEmbedder:
         Returns:
             Embedding vector as numpy array
         """
-        return self.embed_texts([text])[0]
+        results = await self.embed_texts([text])
+        return results[0]
 
-    def embed_texts(self, texts: list[str]) -> np.ndarray:
+    async def embed_texts(self, texts: list[str]) -> np.ndarray:
         """Embed multiple text strings in batch.
 
         Args:
@@ -121,20 +128,16 @@ class SkillEmbedder:
 
         # Route to appropriate provider
         if self._provider == "openrouter":
-            return self._embed_with_openrouter(texts)
-        elif self._provider == "sentence-transformers":
-            logger.warning(
-                f"Unknown embedding provider: {self._provider}, falling back to OpenRouter"
-            )
-            return self._embed_with_openrouter(texts)
-            # return self._embed_with_sentence_transformers(texts)
+            return await self._embed_with_openrouter(texts)
         else:
-            logger.warning(
-                f"Unknown embedding provider: {self._provider}, falling back to OpenRouter"
-            )
-            return self._embed_with_openrouter(texts)
+            # Fallback to OpenRouter for unknown providers
+            if self._provider != "openrouter":
+                logger.warning(
+                    f"Unknown embedding provider: {self._provider}, falling back to OpenRouter"
+                )
+            return await self._embed_with_openrouter(texts)
 
-    def compute_skill_embeddings(
+    async def compute_skill_embeddings(
         self, skills: list[Skill]
     ) -> dict[str, dict[str, Any]]:
         """Compute embeddings for all skills.
@@ -204,7 +207,7 @@ class SkillEmbedder:
 
         # Compute embeddings in batch
         logger.debug(f"Computing embeddings for {len(skills)} skills")
-        embeddings = self.embed_texts(skill_texts)
+        embeddings = await self.embed_texts(skill_texts)
 
         # Build result dict
         result = {}
@@ -220,11 +223,13 @@ class SkillEmbedder:
         logger.info(f"Computed embeddings for {len(result)} skills")
         return result
 
-    @lru_cache(maxsize=1000)
-    def embed_task_cached(
+    async def embed_task_cached(
         self, task_summary: str, task_details: str = ""
     ) -> np.ndarray:
-        """Embed task with LRU caching.
+        """Embed task text, using an in-instance dict cache for deduplication.
+
+        ``lru_cache`` cannot be applied to async methods, so we maintain a
+        plain dict cache on the instance instead.
 
         Args:
             task_summary: Task summary text
@@ -236,7 +241,18 @@ class SkillEmbedder:
         text = task_summary
         if task_details:
             text = f"{task_summary} {task_details}"
-        return self.embed_text(text)
+
+        if not hasattr(self, "_task_embedding_cache"):
+            self._task_embedding_cache: dict[str, np.ndarray] = {}
+
+        if text not in self._task_embedding_cache:
+            self._task_embedding_cache[text] = await self.embed_text(text)
+            # Evict oldest entry when cache exceeds limit
+            if len(self._task_embedding_cache) > MAX_TASK_EMBEDDING_CACHE_SIZE:
+                oldest = next(iter(self._task_embedding_cache))
+                del self._task_embedding_cache[oldest]
+
+        return self._task_embedding_cache[text]
 
 
 def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:

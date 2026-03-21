@@ -196,8 +196,8 @@
 	});
 
 	onMount(() => {
-		// Fetch agent card for DID
-		fetch("/api/agent-card")
+		// Fetch agent card for DID directly from agent endpoint
+		fetch("http://localhost:3773/.well-known/agent.json")
 			.then((res) => {
 				if (res.ok) {
 					return res.json();

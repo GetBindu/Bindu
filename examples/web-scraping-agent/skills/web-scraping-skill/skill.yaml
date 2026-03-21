@@ -1,0 +1,65 @@
+id: web-scraping-skill
+name: web-scraping-skill
+version: 1.0.0
+author: bindu.builder@getbindu.com
+description: |
+  AI-enabled web scraping skill that crawls web pages, extracts structured data,
+  cleans and formats outputs, and prepares datasets for analysis or integration.
+
+tags:
+  - web-scraping
+  - data-processing
+  - extraction
+  - crawler
+  - scrape
+  - structured-data
+
+input_modes:
+  - application/json
+
+output_modes:
+  - application/json
+
+examples:
+  - "Extract product listings from this e-commerce site: https://example.com/products"
+  - "Scrape blog titles and publish dates from https://example.com/blog"
+  - "Get all article headlines from this news page"
+
+capabilities_detail:
+  web_scraping:
+    supported: true
+    description: "Crawl and extract structured data from any public web page"
+  data_processing:
+    supported: true
+    description: "Clean, normalize, and format extracted content into structured JSON"
+  memory:
+    supported: true
+    description: "Remember previously scraped URLs and extraction profiles via Mem0"
+  deduplication:
+    supported: true
+    description: "Avoid re-scraping already processed URLs"
+
+assessment:
+  keywords:
+    - scrape
+    - crawl
+    - extract
+    - web
+    - website
+    - product listings
+    - blog titles
+    - data collection
+    - html
+    - structured data
+
+  specializations:
+    - domain: e_commerce_extraction
+      confidence_boost: 0.3
+    - domain: content_aggregation
+      confidence_boost: 0.2
+
+  anti_patterns:
+    - "pdf extraction"
+    - "database query"
+    - "audio transcription"
+    - "image generation"

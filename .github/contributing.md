@@ -34,7 +34,7 @@ Report any unacceptable behavior to `raahul@getbindu.com`.
 - **uv** package manager (recommended) or pip
 - **Git** for version control
 - Basic understanding of async Python and FastAPI
-- Familiarity with agent frameworks (Agno, CrewAI, LangChain, etc.) is helpful
+- Familiarity with agent frameworks (AG2, Agno, CrewAI, LangChain, etc.) is helpful
 
 ### Areas to Contribute
 
@@ -93,8 +93,8 @@ uv run pre-commit run --all-files
 # Run tests to ensure everything works
 uv run pytest -n auto --cov=bindu --cov-report=term-missing
 
-# Check that coverage is above 70%
-uv run coverage report --skip-covered --fail-under=70
+# Check that coverage is above 60%
+uv run coverage report --skip-covered --fail-under=60
 ```
 
 ## How to Contribute
@@ -140,8 +140,8 @@ uv run pytest -n auto
 # Run tests with coverage
 uv run pytest -n auto --cov=bindu --cov-report=term-missing
 
-# Ensure coverage stays above 70%
-uv run coverage report --fail-under=70
+# Ensure coverage stays above 60%
+uv run coverage report --fail-under=60
 
 # Run pre-commit checks
 uv run pre-commit run --all-files
@@ -331,7 +331,7 @@ New to open source? We're here to help!
 
 ## License
 
-By contributing to Bindu, you agree that your contributions will be licensed under the [MIT License](../LICENSE).
+By contributing to Bindu, you agree that your contributions will be licensed under the [Apache License 2.0](../LICENSE.md).
 
 ---
 

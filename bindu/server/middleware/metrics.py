@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import time
 from typing import Callable
 
@@ -13,6 +14,15 @@ from bindu.server.metrics import get_metrics
 from bindu.utils.logging import get_logger
 
 logger = get_logger("bindu.server.middleware.metrics")
+
+# Constants
+METRICS_ENDPOINT_PATH = "/metrics"
+
+# Pre-compiled regex patterns for endpoint sanitization
+UUID_PATTERN = re.compile(
+    r"/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+)
+NUMERIC_ID_PATTERN = re.compile(r"/\d+")
 
 
 class MetricsMiddleware(BaseHTTPMiddleware):
@@ -29,7 +39,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             HTTP response
         """
         # Skip metrics collection for the metrics endpoint itself
-        if request.url.path == "/metrics":
+        if request.url.path == METRICS_ENDPOINT_PATH:
             return await call_next(request)
 
         metrics = get_metrics()
@@ -68,15 +78,9 @@ class MetricsMiddleware(BaseHTTPMiddleware):
                 method = request.method
                 # Sanitize endpoint to avoid high cardinality
                 # Replace UUIDs and numeric IDs with placeholders
-                import re
-
                 endpoint = request.url.path
-                endpoint = re.sub(
-                    r"/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
-                    "/:id",
-                    endpoint,
-                )
-                endpoint = re.sub(r"/\d+", "/:id", endpoint)
+                endpoint = UUID_PATTERN.sub("/:id", endpoint)
+                endpoint = NUMERIC_ID_PATTERN.sub("/:id", endpoint)
 
                 status = str(response.status_code)
 
