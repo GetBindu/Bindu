@@ -13,6 +13,7 @@ Backward compatibility maintained through re-exports.
 # Core utilities (kept at top level)
 from .capabilities import (
     add_extension_to_capabilities,
+    get_voice_extension_from_capabilities,
     get_x402_extension_from_capabilities,
 )
 from .exceptions import (
@@ -41,6 +42,7 @@ __all__ = [
     "find_skill_by_id",
     # Capability utilities
     "add_extension_to_capabilities",
+    "get_voice_extension_from_capabilities",
     "get_x402_extension_from_capabilities",
     # DID utilities
     "validate_did_extension",
