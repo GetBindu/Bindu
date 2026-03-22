@@ -110,6 +110,9 @@ class BinduApplication(Starlette):
 
         # Setup middleware chain
         x402_ext = get_x402_extension_from_capabilities(manifest)
+        from bindu.utils import get_voice_extension_from_capabilities
+
+        voice_ext = get_voice_extension_from_capabilities(manifest)
         payment_requirements_for_middleware = None
         if x402_ext:
             # Type narrowing: if x402_ext exists, manifest must exist
@@ -147,6 +150,8 @@ class BinduApplication(Starlette):
         self._scheduler: Scheduler | None = None
         self._agent_card_json_schema: bytes | None = None
         self._x402_ext = x402_ext
+        self._voice_ext = voice_ext
+        self._voice_session_manager = None
         self._payment_session_manager = None
         self._payment_requirements = None
         self._paywall_config = None
@@ -239,6 +244,9 @@ class BinduApplication(Starlette):
         if self._x402_ext:
             self._register_payment_endpoints()
 
+        if self._voice_ext:
+            self._register_voice_endpoints()
+
     def _register_payment_endpoints(self) -> None:
         """Register payment session endpoints."""
         from .endpoints import (
@@ -264,6 +272,39 @@ class BinduApplication(Starlette):
             payment_status_endpoint,
             ["GET"],
             with_app=True,
+        )
+
+    def _register_voice_endpoints(self) -> None:
+        """Register voice session REST + WebSocket endpoints."""
+        from starlette.routing import WebSocketRoute
+
+        from .endpoints.voice_endpoints import (
+            voice_session_end,
+            voice_session_start,
+            voice_session_status,
+            voice_websocket,
+        )
+
+        self._add_route(
+            "/voice/session/start",
+            voice_session_start,
+            ["POST"],
+            with_app=True,
+        )
+        self._add_route(
+            "/voice/session/{session_id}",
+            voice_session_end,
+            ["DELETE"],
+            with_app=True,
+        )
+        self._add_route(
+            "/voice/session/{session_id}/status",
+            voice_session_status,
+            ["GET"],
+            with_app=True,
+        )
+        self.router.routes.append(
+            WebSocketRoute("/ws/voice/{session_id}", voice_websocket)
         )
 
     def _add_route(
@@ -368,6 +409,17 @@ class BinduApplication(Starlette):
             if app._payment_session_manager:
                 await app._payment_session_manager.start_cleanup_task()
 
+            # Initialize voice session manager if voice extension is enabled
+            if app._voice_ext:
+                from bindu.extensions.voice.session_manager import VoiceSessionManager
+
+                app._voice_session_manager = VoiceSessionManager(
+                    max_sessions=app_settings.voice.max_concurrent_sessions,
+                    session_timeout=app_settings.voice.session_timeout,
+                )
+                await app._voice_session_manager.start_cleanup_loop()
+                logger.info("✅ Voice session manager started")
+
             # Start TaskManager
             if manifest:
                 logger.info("🔧 Starting TaskManager...")
@@ -385,6 +437,11 @@ class BinduApplication(Starlette):
             # Stop payment session manager cleanup task
             if app._payment_session_manager:
                 await app._payment_session_manager.stop_cleanup_task()
+
+            # Stop voice session manager cleanup loop
+            if app._voice_session_manager:
+                await app._voice_session_manager.stop_cleanup_loop()
+                logger.info("🛑 Voice session manager stopped")
 
             # Cleanup storage
             logger.info("🧹 Cleaning up storage...")
