@@ -92,6 +92,12 @@ grpc = [
     "protobuf>=4.25.0",
 ]
 
+# Voice agent support (use: pip install bindu[voice])
+voice = [
+    "pipecat-ai[deepgram,elevenlabs,silero]>=0.0.105",
+    "websockets>=14.0",
+]
+
 # Minimal core only (use: pip install bindu[core] --only-deps)
 core = [
     "uvicorn>=0.35",
