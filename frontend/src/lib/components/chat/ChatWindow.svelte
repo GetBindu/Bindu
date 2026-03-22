@@ -6,7 +6,10 @@
 	import IconMic from "~icons/lucide/mic";
 
 	import ChatInput from "./ChatInput.svelte";
+	import { sendAgentMessage } from "$lib/utils/agentMessageHandler";
 	import VoiceRecorder from "./VoiceRecorder.svelte";
+	import VoiceCallButton from "$lib/components/voice/VoiceCallButton.svelte";
+	import VoiceCallPanel from "$lib/components/voice/VoiceCallPanel.svelte";
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
 	import type { Model } from "$lib/types/Model";
 	import FileDropzone from "./FileDropzone.svelte";
@@ -41,6 +44,11 @@
 		isMessageToolResultUpdate,
 	} from "$lib/utils/messageUpdates";
 	import type { ToolFront } from "$lib/types/Tool";
+	import {
+		startVoiceSession,
+		voiceSessionId,
+		voiceError,
+	} from "$lib/stores/voice";
 
 	interface Props {
 		messages?: Message[];
@@ -138,10 +146,29 @@
 		!!(page.data as { transcriptionEnabled?: boolean }).transcriptionEnabled
 	);
 	let isTouchDevice = $derived(browser && navigator.maxTouchPoints > 0);
+	let agentContextId = $derived.by(() => {
+		const data = page.data as { conversation?: { id?: string } } | undefined;
+		const fromConversation = data?.conversation?.id;
+		const fromRoute = (page.params as { id?: string } | undefined)?.id;
+		// Only return string or undefined, never null
+		return fromConversation ?? fromRoute ?? undefined;
+	});
 
-	const handleSubmit = () => {
+
+	import { sendMessage } from "$lib/stores/chat";
+
+	const handleSubmit = async () => {
 		if (requireAuthUser() || loading || !draft) return;
-		onmessage?.(draft);
+		// Await all file sources (file parts)
+		const fileParts = sources ? await Promise.all(sources) : [];
+		// Only include file parts that are not null/undefined
+		const validFileParts = fileParts.filter(Boolean);
+		// Build the parts array: text part first, then file parts
+		const parts = [
+			{ kind: 'text', text: draft },
+			...validFileParts
+		];
+		sendMessage(parts);
 		draft = "";
 	};
 
@@ -251,7 +278,7 @@
 	});
 
 	let sources = $derived(
-		files?.map<Promise<MessageFile>>((file) =>
+		files?.map((file) =>
 			file2base64(file).then((value) => ({
 				type: "base64",
 				value,
@@ -309,15 +336,15 @@
 	import { TEXT_MIME_ALLOWLIST, IMAGE_MIME_ALLOWLIST_DEFAULT, DOCUMENT_MIME_ALLOWLIST } from "$lib/constants/mime";
 
 	let activeMimeTypes = $derived(
-		Array.from(
-			new Set([
-				...TEXT_MIME_ALLOWLIST,
-				...DOCUMENT_MIME_ALLOWLIST,
-				...(modelIsMultimodal
-					? (currentModel.multimodalAcceptedMimetypes ?? [...IMAGE_MIME_ALLOWLIST_DEFAULT])
-					: []),
-			])
-		)
+	       Array.from(
+		       new Set([
+			       ...TEXT_MIME_ALLOWLIST,
+			       ...DOCUMENT_MIME_ALLOWLIST,
+			       ...(modelIsMultimodal
+				       ? (currentModel.multimodalAcceptedMimetypes ?? [...IMAGE_MIME_ALLOWLIST_DEFAULT])
+				       : []),
+		       ])
+	       )
 	);
 	let isFileUploadEnabled = $derived(activeMimeTypes.length > 0);
 	let focused = $state(false);
@@ -387,6 +414,25 @@
 		isRecording = false;
 		$error = message;
 	}
+
+	async function toggleVoiceSession() {
+		if ($voiceSessionId) {
+			return;
+		}
+
+		try {
+			await startVoiceSession(agentContextId ?? undefined);
+		} catch (err) {
+			console.error("Voice session error:", err);
+			$error = (err as Error).message || "Failed to start voice session";
+		}
+	}
+
+	$effect(() => {
+		if ($voiceError) {
+			$error = $voiceError;
+		}
+	});
 </script>
 
 <svelte:window
@@ -495,6 +541,10 @@
 		<ScrollToBottomBtn class="fixed bottom-36 right-4 lg:right-10" scrollNode={chatContainer} />
 	</div>
 
+	{#if $voiceSessionId}
+		<VoiceCallPanel />
+	{/if}
+
 	<div
 		class="pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full
 			max-w-3xl flex-col items-center justify-end bg-transparent
@@ -509,10 +559,13 @@
 				{#each sources as source, index}
 					{#await source then src}
 						<UploadedFile
-							file={src}
-							onclose={() => {
-								files = files.filter((_, i) => i !== index);
-							}}
+							 file={{
+								 ...src,
+								 type: "base64" as const
+							 }}
+							 onclose={() => {
+									 files = files.filter((_, i) => i !== index);
+							 }}
 						/>
 					{/await}
 				{/each}
@@ -520,7 +573,11 @@
 		{/if}
 
 		<div class="w-full">
-			<!-- pills removed from here to prevent absolute overlap -->
+			{#if $voiceError && !$voiceSessionId}
+				<p class="mb-2 rounded-md bg-red-50 px-2 py-1 text-xs text-red-700 dark:bg-red-950/40 dark:text-red-300">
+					{$voiceError}
+				</p>
+			{/if}
 
 			<div class="flex w-full *:mb-3">
 				{#if !loading && lastIsError}
@@ -566,55 +623,72 @@
 				{:else if onDrag && isFileUploadEnabled}
 					<FileDropzone bind:files bind:onDrag mimeTypes={activeMimeTypes} />
 				{:else}
-					{#if lastIsError}
-						<ChatInput value="Sorry, something went wrong. Please try again." disabled={true} />
-					{:else}
-						<ChatInput
-							placeholder={isReadOnly ? "This conversation is read-only." : "Ask anything"}
-							{loading}
-							bind:value={draft}
-							bind:files
-							mimeTypes={activeMimeTypes}
-							onsubmit={handleSubmit}
-							{onPaste}
-							disabled={isReadOnly || lastIsError}
-							{modelIsMultimodal}
-							{modelSupportsTools}
-							bind:focused
-						>
-							{#if loading}
-								<StopGeneratingBtn
-									onClick={() => onstop?.()}
-									showBorder={true}
-									classNames="composer-btn icon-btn"
-								/>
-							{:else}
-								{#if transcriptionEnabled}
-									<button
-										type="button"
-										class="composer-btn"
-										disabled={isReadOnly}
-										onclick={() => {
-											isRecording = true;
-										}}
-										aria-label="Start voice recording"
-									>
-										<IconMic class="size-3.5" />
-										<span>Voice</span>
-									</button>
-								{/if}
+					<div
+						class="flex w-full flex-1 rounded-xl border-none bg-transparent"
+						class:paste-glow={pastedLongContent}
+					>
+						{#if lastIsError}
+							<ChatInput value="Sorry, something went wrong. Please try again." disabled={true} />
+						{:else}
+									       <ChatInput
+										       placeholder={isReadOnly ? "This conversation is read-only." : "Imagine and Question"}
+										       {loading}
+										       bind:value={draft}
+										       bind:files
+										       mimeTypes={activeMimeTypes}
+											       on:submit={async (event) => {
+												       const { message, fileParts } = event.detail;
+												       // agentContextId may be null, but sendAgentMessage expects string | undefined
+												       const contextId = agentContextId ?? undefined;
+												       await sendAgentMessage(message, contextId, undefined, undefined, undefined, undefined, fileParts);
+											       }}
+										       {onPaste}
+										       disabled={isReadOnly || lastIsError}
+										       {modelIsMultimodal}
+										       {modelSupportsTools}
+										       bind:focused
+									       />
+						{/if}
+
+						{#if loading}
+							<StopGeneratingBtn
+								onClick={() => onstop?.()}
+								showBorder={true}
+								classNames="absolute bottom-2 right-2 size-8 sm:size-7 self-end rounded-full border bg-white text-black shadow transition-none dark:border-transparent dark:bg-gray-600 dark:text-white"
+							/>
+						{:else}
+							{#if transcriptionEnabled}
 								<button
-									class="send-btn"
-									disabled={!draft || isReadOnly}
-									type="submit"
-									aria-label="Send message"
-									name="submit"
+									type="button"
+									class="btn absolute bottom-2 right-10 mr-1.5 size-8 self-end rounded-full border bg-white/50 text-gray-500 transition-none hover:bg-gray-50 hover:text-gray-700 dark:border-transparent dark:bg-gray-600/50 dark:text-gray-300 dark:hover:bg-gray-500 dark:hover:text-white sm:right-9 sm:size-7"
+									disabled={isReadOnly}
+									onclick={() => {
+										isRecording = true;
+									}}
+									aria-label="Start voice recording"
 								>
-									<IconArrowUp class="size-4" />
+									<IconMic class="size-4" />
 								</button>
 							{/if}
-						</ChatInput>
-					{/if}
+							<VoiceCallButton
+								disabled={isReadOnly}
+								active={!!$voiceSessionId}
+								onclick={toggleVoiceSession}
+							/>
+							<button
+								class="btn absolute bottom-2 right-2 size-8 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:enabled:bg-black sm:size-7 {!draft ||
+								isReadOnly
+									? ''
+									: '!bg-black !text-white dark:!bg-white dark:!text-black'}"
+								disabled={!draft || isReadOnly}
+								type="submit"
+								aria-label="Send message"
+								name="submit"
+							>
+								<IconArrowUp />
+							</button>
+						{/if}
+					</div>
 				{/if}
 			</form>
 		</div>
