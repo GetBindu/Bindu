@@ -493,6 +493,15 @@ def _bindufy_core(
         # Add x402 extension to capabilities
         capabilities = add_extension_to_capabilities(capabilities, x402_extension)
 
+    # Voice extension (optional)
+    voice_config = validated_config.get("voice")
+    if voice_config and isinstance(voice_config, dict):
+        from bindu.extensions.voice import VoiceAgentExtension
+
+        voice_extension = VoiceAgentExtension(**voice_config)
+        capabilities = add_extension_to_capabilities(capabilities, voice_extension)
+        logger.info(f"Voice extension created: {voice_extension}")
+
     # Create agent manifest with loaded skills
     _manifest = create_manifest(
         agent_function=handler_callable,
