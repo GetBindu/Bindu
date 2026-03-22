@@ -226,7 +226,7 @@ export async function clearContext(ctxId: string) {
   }
 }
 
-export async function sendMessage(text: string) {
+export async function sendMessage(parts: any[]) {
   const currentState = get(currentTaskState);
   const currentTask = get(currentTaskId);
   const currentContext = get(contextId);
@@ -256,8 +256,9 @@ export async function sendMessage(text: string) {
   const useContextId = currentContext || generateUUID();
 
   try {
-    // Add user message immediately
-    addMessage(text, 'user', taskId);
+    // Add user message immediately (text part only for display)
+    const textPart = parts.find((p) => p.kind === 'text');
+    addMessage(textPart?.text || '', 'user', taskId);
     replyToTaskId.set(null);
     isThinking.set(true);
 
@@ -265,7 +266,7 @@ export async function sendMessage(text: string) {
     const task = await agentAPI.sendMessage({
       message: {
         role: 'user' as const,
-        parts: [{ kind: 'text' as const, text }],
+        parts,
         kind: 'message' as const,
         messageId,
         contextId: useContextId,
