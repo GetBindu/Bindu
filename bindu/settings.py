@@ -1016,6 +1016,53 @@ class GrpcSettings(BaseSettings):
     )
 
 
+class VoiceSettings(BaseSettings):
+    """Voice agent configuration settings.
+
+    Configures the real-time voice pipeline powered by Pipecat,
+    including STT (Deepgram), TTS (ElevenLabs), VAD, and session management.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="VOICE__",
+        extra="allow",
+    )
+
+    # Master toggle
+    enabled: bool = False
+
+    # Speech-to-Text
+    stt_provider: Literal["deepgram"] = "deepgram"
+    stt_api_key: str = ""
+    stt_model: str = "nova-3"
+    stt_language: str = "en"
+
+    # Text-to-Speech
+    tts_provider: Literal["elevenlabs"] = "elevenlabs"
+    tts_api_key: str = ""
+    tts_voice_id: str = "21m00Tcm4TlvDq8ikWAM"  # ElevenLabs "Rachel"
+    tts_model: str = "eleven_turbo_v2_5"
+
+    # Audio format
+    sample_rate: int = 16000
+    audio_channels: int = 1
+    audio_encoding: str = "linear16"  # PCM 16-bit
+
+    # Voice Activity Detection
+    vad_enabled: bool = True
+    vad_threshold: float = 0.5
+
+    # Behavior
+    allow_interruptions: bool = True
+    session_timeout: int = 300  # seconds (5 min)
+    max_concurrent_sessions: int = 10
+
+    # Extension metadata
+    extension_uri: str = "bindu://voice"
+    extension_description: str = "Real-time voice conversation for Bindu agents"
+
+
 class Settings(BaseSettings):
     """Main settings class that aggregates all configuration components."""
 
@@ -1044,6 +1091,7 @@ class Settings(BaseSettings):
     negotiation: NegotiationSettings = NegotiationSettings()
     sentry: SentrySettings = SentrySettings()
     grpc: GrpcSettings = GrpcSettings()
+    voice: VoiceSettings = VoiceSettings()
 
 
 app_settings = Settings()
