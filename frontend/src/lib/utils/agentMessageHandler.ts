@@ -61,9 +61,19 @@ export async function submitTaskFeedback(
 	return result.result;
 }
 
+
+interface FilePart {
+	kind: 'file';
+	type: 'base64';
+	value: string;
+	mime: string;
+	name: string;
+}
+
+
 interface AgentMessage {
 	role: 'user' | 'agent';
-	parts: Array<{ kind: 'text'; text: string }>;
+	parts: Array<{ kind: 'text'; text: string } | FilePart>;
 	kind: 'message';
 	messageId: string;
 	contextId: string;
@@ -164,7 +174,8 @@ export async function* sendAgentMessage(
 	abortSignal?: AbortSignal,
 	currentTaskId?: string,
 	taskState?: string,
-	replyToTaskId?: string
+	replyToTaskId?: string,
+	files?: Array<{ name: string; mime: string; value: string }>
 ): AsyncGenerator<MessageUpdate, void, unknown> {
 	const token = typeof window !== 'undefined' ? localStorage.getItem('bindu_oauth_token') : null;
 	const headers: Record<string, string> = {
@@ -213,16 +224,31 @@ export async function* sendAgentMessage(
 		? (contextId.length === 24 ? contextId.padEnd(32, '0') : contextId)
 		: generateId();
 
-	// Build message with optional referenceTaskIds
-	const agentMessage: AgentMessage = {
-		role: 'user',
-		parts: [{ kind: 'text', text: message }],
-		kind: 'message',
-		messageId,
-		contextId: newContextId,
-		taskId,
-		...(referenceTaskIds.length > 0 && { referenceTaskIds })
-	};
+
+	       // Build message with optional referenceTaskIds
+	       const parts: AgentMessage["parts"] = [
+		       { kind: 'text', text: message }
+	       ];
+	       if (files && files.length > 0) {
+		       for (const f of files) {
+			       parts.push({
+				       kind: 'file',
+				       type: 'base64',
+				       value: f.value,
+				       mime: f.mime,
+				       name: f.name
+			       });
+		       }
+	       }
+	       const agentMessage: AgentMessage = {
+		       role: 'user',
+		       parts,
+		       kind: 'message',
+		       messageId,
+		       contextId: newContextId,
+		       taskId,
+		       ...(referenceTaskIds.length > 0 && { referenceTaskIds })
+	       };
 
 	// Step 1: Send message
 	yield { type: MessageUpdateType.Status, status: MessageUpdateStatus.Started };
