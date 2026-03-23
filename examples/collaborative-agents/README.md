@@ -1,228 +1,243 @@
-# 🌐 Bindu Collaborative Agents
-### A Multi-Agent AI System with Semantic Memory using the Bindu Ecosystem
+# Bindu Collaborative Agents
 
-This project demonstrates a **collaborative AI agent system** inspired by the **Bindu Framework** and the concept of the **Internet of Agents**.
+A working multi-agent system demonstrating the **Internet of Agents** using the Bindu framework.
 
-The system contains multiple agents that **communicate, collaborate, and learn over time using semantic memory**.
-
----
-
-# 🚀 Features
-
-✅ Multi-Agent Collaboration  
-✅ Semantic Vector Memory  
-✅ Agent Orchestration  
-✅ Knowledge Retrieval with Embeddings  
-✅ Dynamic Learning System  
-
-The system demonstrates how **agents can research, store knowledge, and recall it later**.
+Three specialized agents collaborate to answer questions — each with its own DID identity,
+communicating over the A2A protocol.
 
 ---
 
-# 🧠 System Architecture
-```text
+## System Architecture
+
+```
 User Query
     ↓
-Coordinator Agent
-    ↓
-Memory Agent (Semantic Search)
-    ↓
-If Found → Return Memory
-If Not Found → Research Agent
-    ↓
-Store Knowledge
-    ↓
-Return Response
+Coordinator Agent (port 3775)
+    ↓               ↓
+Memory Agent    Research Agent
+(port 3774)     (port 3773)
+    ↓               ↓
+Semantic        DuckDuckGo
+Retrieval       Web Search
 ```
 
-
-This architecture demonstrates **agent collaboration and knowledge persistence**.
-
----
-
-# 🤖 Agents in the System
-
-### 1️⃣ Coordinator Agent
-Acts as the **central orchestrator**.
-
-Responsibilities:
-
-- Receives user queries
-- Checks semantic memory
-- Delegates research tasks
-- Stores new knowledge
+**Flow:**
+1. User sends query to Coordinator
+2. Coordinator checks Memory Agent (semantic similarity search)
+3. If found in memory → return instantly
+4. If not found → Research Agent searches the web
+5. Answer stored in Memory Agent for future queries
+6. Response returned to user
 
 ---
 
-### 2️⃣ Research Agent
-Responsible for **generating knowledge**.
+## Agents
 
-Capabilities:
+### Research Agent (port 3773)
+Searches the web using DuckDuckGo and answers questions using an LLM via OpenRouter.
+Specialized in the Bindu AI framework and Internet of Agents concepts.
 
-- Uses LLM reasoning
-- Generates explanations
-- Provides structured information
+### Memory Agent (port 3774)
+Stores and retrieves knowledge using vector embeddings and cosine similarity.
+Uses `text-embedding-3-small` via OpenRouter. Threshold of 0.75 similarity
+ensures only relevant memories are returned.
+
+Commands:
+- `store:<text>` — stores text in semantic memory
+- `retrieve:<query>` — retrieves most similar memory
+
+### Coordinator Agent (port 3775)
+Orchestrates the other two agents. Checks memory first, falls back to research,
+stores new knowledge automatically. Each call uses the A2A `message/send` protocol.
 
 ---
 
-### 3️⃣ Memory Agent
-Handles **semantic knowledge storage**.
+## Prerequisites
 
-Capabilities:
-
-- Generates embeddings
-- Stores vector memory
-- Retrieves relevant knowledge using cosine similarity
+- Python 3.12+
+- OpenRouter API key (free tier works): https://openrouter.ai
 
 ---
 
-# 📦 Project Structure
+## Installation
+
 ```bash
-bindu-collaborative-agents
-│
-├── coordinator_agent.py
-├── research_agent.py
-├── memory_agent.py
-├── run_system.py
-│
-├── utils
-│   └── semantic_memory.py
-│
-└── requirements.txt
+git clone https://github.com/Subhajitdas99/bindu-collaborative-agents.git
+cd bindu-collaborative-agents
+pip install -r requirements.txt
 ```
 
-# ⚙️ Installation
+Set your API key:
 
-### 1️⃣ Clone the repository
-git clone https://github.com/Subhajitdas99/bindu-collaborative-agents.git
-
-cd bindu-collaborative-agents
-
-
----
-
-### 2️⃣ Install dependencies
-pip install -r requirements.txt
-
-
----
-
-### 3️⃣ Set API Key
-
-This project uses **OpenRouter for LLM access**.
+```bash
+# Linux/macOS
 export OPENROUTER_API_KEY="your-api-key"
 
-Windows PowerShell:
+# Windows PowerShell
 $env:OPENROUTER_API_KEY="your-api-key"
+```
 
+Or create a `.env` file:
 
----
-
-# ▶️ Run the System
-python run_system.py
-
-
-Example:
-User > What is the Bindu Framework?
-
-Coordinator thinking...
-
-📚 Stored memory: The Bindu Framework is a platform for interoperable AI agents...
-
-Agent > The Bindu Framework enables agents to communicate within the Internet of Agents.
-
+```
+OPENROUTER_API_KEY=your-api-key
+BINDU_AUTHOR=your.email@example.com
+```
 
 ---
 
-# 🧪 Example Interaction
+## Running
 
+Open **3 separate terminals** and run one agent in each:
 
-User > What is the Bindu Framework?
+**Terminal 1 — Research Agent**
+```bash
+python research_agent.py
+```
 
-Coordinator thinking...
-📚 Stored memory...
+**Terminal 2 — Memory Agent**
+```bash
+python memory_agent.py
+```
 
-Agent > Explanation about Bindu.
-
-User > What is Bindu again?
-
-Coordinator thinking...
-🧠 Retrieved knowledge from memory.
-
-Agent > (From Memory) The Bindu Framework...
-
-
-This demonstrates **semantic memory retrieval**.
-
----
-
-# 🌍 Internet of Agents
-
-Bindu promotes a future where AI agents:
-
-- communicate with each other
-- collaborate across systems
-- exchange value
-- operate autonomously
-
-This project demonstrates a **simple prototype of that vision**.
+**Terminal 3 — Coordinator Agent**
+```bash
+python coordinator_agent.py
+```
 
 ---
 
-# 🔧 Technologies Used
+## Testing
 
-- Python
-- OpenRouter API
-- OpenAI Embeddings
-- NumPy
-- Vector Similarity Search
+Send a query to the coordinator (Terminal 4):
+
+**Linux/macOS:**
+```bash
+curl -X POST http://localhost:3775/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "message/send",
+    "params": {
+      "message": {
+        "role": "user",
+        "parts": [{"kind": "text", "text": "What is Bindu?"}],
+        "kind": "message",
+        "messageId": "11111111-1111-1111-1111-111111111111",
+        "contextId": "11111111-1111-1111-1111-111111111112",
+        "taskId": "11111111-1111-1111-1111-111111111113"
+      },
+      "configuration": {"acceptedOutputModes": ["application/json"]}
+    },
+    "id": "11111111-1111-1111-1111-111111111114"
+  }'
+```
+
+**Windows PowerShell:**
+```powershell
+Invoke-WebRequest -Uri "http://localhost:3775/" `
+  -Method POST `
+  -ContentType "application/json" `
+  -UseBasicParsing `
+  -Body '{"jsonrpc":"2.0","method":"message/send","params":{"message":{"role":"user","parts":[{"kind":"text","text":"What is Bindu?"}],"kind":"message","messageId":"11111111-1111-1111-1111-111111111111","contextId":"11111111-1111-1111-1111-111111111112","taskId":"11111111-1111-1111-1111-111111111113"},"configuration":{"acceptedOutputModes":["application/json"]}},"id":"11111111-1111-1111-1111-111111111114"}' | Select-Object -ExpandProperty Content
+```
+
+Wait 15-20 seconds (research takes time), then poll for the result:
+
+**Linux/macOS:**
+```bash
+curl -X POST http://localhost:3775/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "tasks/get",
+    "params": {"taskId": "11111111-1111-1111-1111-111111111113"},
+    "id": "11111111-1111-1111-1111-111111111115"
+  }'
+```
+
+**Windows PowerShell:**
+```powershell
+Invoke-WebRequest -Uri "http://localhost:3775/" `
+  -Method POST `
+  -ContentType "application/json" `
+  -UseBasicParsing `
+  -Body '{"jsonrpc":"2.0","method":"tasks/get","params":{"taskId":"11111111-1111-1111-1111-111111111113"},"id":"11111111-1111-1111-1111-111111111115"}' | Select-Object -ExpandProperty Content
+```
 
 ---
 
-# 🎯 Use Cases
+## Expected Output
 
-This architecture can be extended to build:
+First query (cache miss — researches the web):
+```json
+{
+  "result": {
+    "status": {"state": "completed"},
+    "artifacts": [{
+      "parts": [{
+        "kind": "text",
+        "text": "The Bindu AI Framework is designed to facilitate the creation of
+                 intelligent and interoperable AI agents..."
+      }]
+    }]
+  }
+}
+```
 
-- Autonomous research agents
-- Collaborative AI assistants
-- Knowledge-learning AI systems
-- Multi-agent decision systems
+Second identical query (cache hit — served from memory instantly):
+```json
+{
+  "result": {
+    "artifacts": [{
+      "parts": [{"kind": "text", "text": "(From Memory) The Bindu AI Framework..."}]
+    }]
+  }
+}
+```
 
 ---
 
-# 🏆 Bindu AI Agent Challenge
+## What This Demonstrates
 
-This project was created for the **Bindu AI Agent Competition** celebrating **International Women's Day**.
-
-Goal:
-
-Build an AI agent system demonstrating the **Internet of Agents**.
-
----
-
-# 📚 Resources
-
-Bindu Documentation  
-https://docs.getbindu.com
-
-Bindu GitHub  
-https://github.com/GetBindu/Bindu
+- **Agent-to-Agent (A2A) communication** over HTTP using the Bindu protocol
+- **DID identity** — each agent gets a unique Decentralized Identifier
+- **Semantic memory** — knowledge retrieved by meaning, not keyword matching
+- **Coordinator pattern** — orchestration without tight coupling
+- **Internet of Agents** — agents discovering and calling each other
 
 ---
 
-# 👨‍💻 Author
+## Project Structure
+
+```
+collaborative-agents/
+├── coordinator_agent.py     — orchestrates research + memory agents
+├── research_agent.py        — web search via DuckDuckGo
+├── memory_agent.py          — semantic memory store/retrieve
+├── requirements.txt
+├── .env                     — API keys (not committed)
+├── .gitignore
+└── utils/
+    └── semantic_memory.py   — embeddings + cosine similarity
+```
+
+---
+
+## Technologies
+
+- [Bindu](https://github.com/getbindu/bindu) — Internet of Agents framework
+- [Agno](https://github.com/agno-agi/agno) — agent framework
+- [OpenRouter](https://openrouter.ai) — LLM + embeddings API
+- [DuckDuckGo](https://pypi.org/project/duckduckgo-search/) — web search
+- NumPy — cosine similarity computation
+
+---
+
+## Author
 
 **Subhajit Das**
-Final Year B.Tech AI/ML Student 
+Final Year B.Tech AI/ML Student
 Interested in Multi-Agent Systems, AI Infrastructure, and Autonomous Agents.
 
----
-
-# ⭐ Support
-
-If you found this project interesting:
-
-⭐ Star the repository  
-🚀 Share with the AI community  
-
-Let's build the **Internet of Agents** together.
+GitHub: [@Subhajitdas99](https://github.com/Subhajitdas99)
