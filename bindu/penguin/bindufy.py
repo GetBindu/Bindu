@@ -15,7 +15,7 @@ import os
 from pathlib import Path
 from typing import Any, Callable, Dict
 from urllib.parse import urlparse
-from uuid import uuid4
+from uuid import UUID
 
 from bindu.common.models import (
     AgentManifest,
@@ -27,23 +27,264 @@ from bindu.penguin.did_setup import initialize_did_extension
 from bindu.penguin.manifest import create_manifest, validate_agent_function
 from bindu.settings import app_settings
 from bindu.utils import add_extension_to_capabilities
-from bindu.utils.config_loader import (
+from bindu.utils.config import (
+    create_auth_config_from_env,
     create_storage_config_from_env,
     create_scheduler_config_from_env,
     create_sentry_config_from_env,
+    create_vault_config_from_env,
     load_config_from_env,
+    resolve_key_directory,
     update_auth_settings,
+    update_vault_settings,
 )
 from bindu.utils.display import prepare_server_display
 from bindu.utils.logging import get_logger
-from bindu.utils.path_resolver import (
-    resolve_key_directory,
-)
 from bindu.utils.server_runner import run_server as start_uvicorn_server
-from bindu.utils.skill_loader import load_skills
+from bindu.utils.skills import load_skills
 
 # Configure logging for the module
 logger = get_logger("bindu.penguin.bindufy")
+
+# Payment defaults for X402 extension
+DEFAULT_TOKEN = "USDC"
+DEFAULT_NETWORK = "base-sepolia"
+
+# Default protocol version
+DEFAULT_PROTOCOL_VERSION = "1.0.0"
+
+
+def _generate_agent_id(validated_config: Dict[str, Any]) -> UUID:
+    """Generate deterministic agent ID from author + name.
+
+    Args:
+        validated_config: Validated configuration dictionary
+
+    Returns:
+        UUID: Deterministic agent ID
+    """
+    import hashlib
+
+    author = validated_config.get("author", "")
+    agent_name = validated_config.get("name", "")
+
+    # Create deterministic ID from author + agent_name
+    deterministic_string = f"{author}:{agent_name}"
+    agent_id_hex = hashlib.sha256(deterministic_string.encode()).hexdigest()[:32]
+    # Convert to UUID for type compatibility
+    agent_id = UUID(agent_id_hex)
+    logger.info(f"Generated deterministic agent_id from author+name: {agent_id}")
+    return agent_id
+
+
+def _normalize_execution_costs(execution_cost: Any) -> list[dict[str, Any]]:
+    """Normalize execution_cost to list of cost entries.
+
+    Args:
+        execution_cost: Single dict or list of dicts
+
+    Returns:
+        List of normalized cost dictionaries
+
+    Raises:
+        ValueError: If execution_cost format is invalid
+    """
+    # Normalize to list
+    if isinstance(execution_cost, dict):
+        cost_entries = [execution_cost]
+    elif isinstance(execution_cost, list):
+        if not execution_cost:
+            raise ValueError("execution_cost list cannot be empty when configured")
+        cost_entries = execution_cost
+    else:
+        raise ValueError("execution_cost must be either a dict or a list of dicts")
+
+    normalized_costs: list[dict[str, Any]] = []
+
+    for idx, cost in enumerate(cost_entries):
+        if not isinstance(cost, dict):
+            raise ValueError("Each entry in execution_cost list must be a dictionary")
+
+        amount = cost.get("amount")
+        token = cost.get("token", DEFAULT_TOKEN)
+        network = cost.get("network", DEFAULT_NETWORK)
+        pay_to_address = cost.get("pay_to_address")
+
+        if not amount:
+            raise ValueError(
+                "execution_cost.amount is required when execution_cost is configured"
+            )
+
+        logger.info(f"Execution cost option {idx + 1}: {amount} {token} on {network}")
+
+        normalized_costs.append(
+            {
+                "amount": amount,
+                "token": token,
+                "network": network,
+                "pay_to_address": pay_to_address,
+            }
+        )
+
+    return normalized_costs
+
+
+def _setup_x402_extension(normalized_costs: list[dict[str, Any]]) -> X402AgentExtension:
+    """Create X402 extension from normalized costs.
+
+    Args:
+        normalized_costs: List of normalized cost dictionaries
+
+    Returns:
+        X402AgentExtension instance
+    """
+    primary = normalized_costs[0]
+    x402_extension = X402AgentExtension(
+        amount=primary["amount"],
+        token=primary.get("token", DEFAULT_TOKEN),
+        network=primary.get("network", DEFAULT_NETWORK),
+        pay_to_address=primary.get("pay_to_address") or "",
+        required=True,
+        payment_options=normalized_costs,
+    )
+
+    logger.info(f"X402 extension created: {x402_extension}")
+    return x402_extension
+
+
+def _register_in_hydra(
+    agent_id_str: str,
+    validated_config: Dict[str, Any],
+    agent_url: str,
+    did_extension: Any,
+    caller_dir: Path,
+) -> Any | None:
+    """Register agent in Hydra OAuth2 server if enabled.
+
+    Args:
+        agent_id_str: Agent ID as string
+        validated_config: Validated configuration dictionary
+        agent_url: Agent URL
+        did_extension: DID extension instance
+        caller_dir: Caller directory path
+
+    Returns:
+        AgentCredentials if successful, None otherwise
+    """
+    if not (app_settings.auth.enabled and app_settings.auth.provider == "hydra"):
+        return None
+
+    logger.info(
+        "Registering agent in Hydra OAuth2 server with DID-based authentication..."
+    )
+    import asyncio
+    from bindu.auth.hydra.registration import register_agent_in_hydra
+
+    credentials = asyncio.run(
+        register_agent_in_hydra(
+            agent_id=agent_id_str,
+            agent_name=validated_config["name"],
+            agent_url=agent_url,
+            did=did_extension.did,
+            credentials_dir=caller_dir / app_settings.did.pki_dir,
+            did_extension=did_extension,
+        )
+    )
+
+    if credentials:
+        logger.info(
+            f"✅ Agent registered with OAuth client ID: {credentials.client_id}"
+        )
+    else:
+        logger.warning(
+            "⚠️  Agent registration in Hydra failed or was skipped. "
+            "Authentication may not work correctly."
+        )
+
+    return credentials
+
+
+def _setup_tunnel(
+    tunnel_config: Any,
+    port: int,
+    manifest: AgentManifest,
+    bindu_app: Any,
+) -> str | None:
+    """Set up tunnel if enabled and update URLs.
+
+    Args:
+        tunnel_config: Tunnel configuration
+        port: Local port number
+        manifest: Agent manifest to update
+        bindu_app: Bindu application to update
+
+    Returns:
+        Tunnel URL if successful, None otherwise
+    """
+    if not (tunnel_config and tunnel_config.enabled):
+        return None
+
+    from bindu.tunneling.manager import TunnelManager
+
+    logger.info("Tunnel enabled, creating public URL...")
+    tunnel_config.local_port = port
+
+    try:
+        tunnel_manager = TunnelManager()
+        tunnel_url = tunnel_manager.create_tunnel(
+            local_port=port,
+            config=tunnel_config,
+            subdomain=tunnel_config.subdomain,
+        )
+        logger.info(f"✅ Tunnel created: {tunnel_url}")
+
+        # Update manifest URL to use tunnel URL
+        manifest.url = tunnel_url
+
+        # Update BinduApplication URL to use tunnel URL
+        bindu_app.url = tunnel_url
+
+        # Invalidate cached agent card so it gets regenerated with new URL
+        bindu_app._agent_card_json_schema = None
+
+        return tunnel_url
+
+    except Exception as e:
+        logger.error(f"Failed to create tunnel: {e}")
+        logger.warning("Continuing with local-only server...")
+        return None
+
+
+def _create_telemetry_config(validated_config: Dict[str, Any]) -> TelemetryConfig:
+    """Create telemetry configuration from validated config.
+
+    Args:
+        validated_config: Validated configuration dictionary
+
+    Returns:
+        TelemetryConfig instance
+    """
+    return TelemetryConfig(
+        enabled=validated_config["telemetry"],
+        endpoint=validated_config.get("oltp_endpoint"),
+        service_name=validated_config.get("oltp_service_name"),
+        headers=validated_config.get("oltp_headers"),
+        verbose_logging=validated_config.get("oltp_verbose_logging", False),
+        service_version=validated_config.get("oltp_service_version", "1.0.0"),
+        deployment_environment=validated_config.get(
+            "oltp_deployment_environment", "production"
+        ),
+        batch_max_queue_size=validated_config.get("oltp_batch_max_queue_size", 2048),
+        batch_schedule_delay_millis=validated_config.get(
+            "oltp_batch_schedule_delay_millis", 5000
+        ),
+        batch_max_export_batch_size=validated_config.get(
+            "oltp_batch_max_export_batch_size", 512
+        ),
+        batch_export_timeout_millis=validated_config.get(
+            "oltp_batch_export_timeout_millis", 30000
+        ),
+    )
 
 
 def _parse_deployment_url(
@@ -82,11 +323,16 @@ def _create_deployment_config(
     if not deploy_dict:
         return None
 
-    if "url" not in deploy_dict or "expose" not in deploy_dict:
-        logger.warning(
-            "Deployment config missing required fields (url, expose), using defaults"
-        )
-        return None
+    missing = []
+
+    if "url" not in deploy_dict:
+        missing.append("deployment.url")
+
+    if "expose" not in deploy_dict:
+        missing.append("deployment.expose")
+
+    if missing:
+        raise ValueError(f"Missing required config field(s): {', '.join(missing)}")
 
     return DeploymentConfig(
         url=deploy_dict["url"],
@@ -103,6 +349,7 @@ def bindufy(
     handler: Callable[[list[dict[str, str]]], Any],
     run_server: bool = True,
     key_dir: str | Path | None = None,
+    launch: bool = False,
 ) -> AgentManifest:
     """Transform an agent instance and handler into a bindu-compatible agent.
 
@@ -137,6 +384,8 @@ def bindufy(
                    immediately for testing/programmatic usage (default: True)
         key_dir: Directory for storing DID keys. If None, attempts to detect from caller's
                 directory (may fail in REPL/notebooks). Falls back to current working directory.
+        launch: If True, creates a public tunnel via FRP to expose the server to the internet
+               with an auto-generated subdomain (default: False)
 
     Returns:
         AgentManifest: The manifest for the bindufied agent
@@ -152,12 +401,16 @@ def bindufy(
             "description": "A helpful assistant",
             "capabilities": {"streaming": True},
             "deployment": {"url": "http://localhost:3773", "protocol_version": "1.0.0"},
-            "storage": {"type": "memory"},
-            "scheduler": {"type": "memory"}
         }
 
         manifest = bindufy(agent, config, my_handler)
     """
+    if not isinstance(config, dict):
+        raise TypeError("config must be a dictionary")
+
+    if not callable(handler):
+        raise TypeError("handler must be callable")
+
     # Load capability-specific configs from environment variables (webhooks, negotiation)
     config = load_config_from_env(config)
 
@@ -166,19 +419,46 @@ def bindufy(
 
     validated_config = ConfigValidator.validate_and_process(config)
 
-    # Update app_settings.auth based on config
-    auth_config = validated_config.get("auth")
-    if auth_config is not None:
-        update_auth_settings(auth_config)
+    # Early validation for required author field
+    if (
+        not validated_config.get("author")
+        or not str(validated_config["author"]).strip()
+    ):
+        raise ValueError("'author' is required in config and cannot be empty.")
 
     # Generate agent_id if not provided
-    agent_id = validated_config.get("id", uuid4().hex)
+    if "id" not in validated_config:
+        agent_id = _generate_agent_id(validated_config)
+    else:
+        # Convert string ID to UUID if needed
+        id_value = validated_config["id"]
+        agent_id = UUID(id_value) if isinstance(id_value, str) else id_value
+
+    # Convert to string once for reuse
+    agent_id_str = str(agent_id)
 
     # Create config objects directly from environment and validated config
     deployment_config = _create_deployment_config(validated_config)
     storage_config = create_storage_config_from_env(validated_config)
     scheduler_config = create_scheduler_config_from_env(validated_config)
     sentry_config = create_sentry_config_from_env(validated_config)
+    vault_config = create_vault_config_from_env(validated_config)
+    auth_config = create_auth_config_from_env(validated_config)
+
+    # Update vault settings before DID initialization (needed for key restoration)
+    if vault_config:
+        update_vault_settings(vault_config)
+
+    # Create tunnel config only if launch parameter is True
+    tunnel_config = None
+    if launch:
+        from bindu.tunneling.config import TunnelConfig
+
+        tunnel_config = TunnelConfig(enabled=True)
+
+    # Update app_settings.auth based on config
+    if auth_config is not None:
+        update_auth_settings(auth_config)
 
     # Validate that this is a protocol-compliant function
     handler_name = getattr(handler, "__name__", "<unknown>")
@@ -234,28 +514,8 @@ def bindufy(
     x402_extension = None
 
     if execution_cost:
-        # Create X402 extension with payment configuration
-        amount = execution_cost.get("amount")
-        token = execution_cost.get("token", "USDC")
-        network = execution_cost.get("network", "base-sepolia")
-        pay_to_address = execution_cost.get("pay_to_address")
-
-        if not amount:
-            raise ValueError(
-                "execution_cost.amount is required when execution_cost is configured"
-            )
-
-        logger.info(f"Execution cost configured: {amount} {token} on {network}")
-
-        x402_extension = X402AgentExtension(
-            amount=amount,
-            token=token,
-            network=network,
-            required=True,  # Payment is required for paid agents
-            pay_to_address=pay_to_address,
-        )
-
-        logger.info(f"X402 extension created: {x402_extension}")
+        normalized_costs = _normalize_execution_costs(execution_cost)
+        x402_extension = _setup_x402_extension(normalized_costs)
 
         # Add x402 extension to capabilities
         capabilities = add_extension_to_capabilities(capabilities, x402_extension)
@@ -274,7 +534,7 @@ def bindufy(
         url=agent_url,
         protocol_version=deployment_config.protocol_version
         if deployment_config
-        else "1.0.0",
+        else DEFAULT_PROTOCOL_VERSION,
         kind=validated_config["kind"],
         debug_mode=validated_config["debug_mode"],
         debug_level=validated_config["debug_level"],
@@ -301,6 +561,11 @@ def bindufy(
         f"Manifest: {_manifest.name} v{_manifest.version} | {_manifest.kind} | {skill_count} skills | {_manifest.url}"
     )
 
+    # Register agent in Hydra if authentication is enabled with Hydra provider
+    credentials = _register_in_hydra(
+        agent_id_str, validated_config, agent_url, did_extension, caller_dir
+    )
+
     logger.info(f"Starting deployment for agent: {agent_id}")
 
     # Import server components (deferred to avoid circular import)
@@ -310,27 +575,7 @@ def bindufy(
     # No need to create instances here - just pass the config
 
     # Create telemetry configuration
-    telemetry_config = TelemetryConfig(
-        enabled=validated_config["telemetry"],
-        endpoint=validated_config.get("oltp_endpoint"),
-        service_name=validated_config.get("oltp_service_name"),
-        headers=validated_config.get("oltp_headers"),
-        verbose_logging=validated_config.get("oltp_verbose_logging", False),
-        service_version=validated_config.get("oltp_service_version", "1.0.0"),
-        deployment_environment=validated_config.get(
-            "oltp_deployment_environment", "production"
-        ),
-        batch_max_queue_size=validated_config.get("oltp_batch_max_queue_size", 2048),
-        batch_schedule_delay_millis=validated_config.get(
-            "oltp_batch_schedule_delay_millis", 5000
-        ),
-        batch_max_export_batch_size=validated_config.get(
-            "oltp_batch_max_export_batch_size", 512
-        ),
-        batch_export_timeout_millis=validated_config.get(
-            "oltp_batch_export_timeout_millis", 30000
-        ),
-    )
+    telemetry_config = _create_telemetry_config(validated_config)
 
     # Create Bindu application with configs
     bindu_app = BinduApplication(
@@ -342,16 +587,26 @@ def bindufy(
         storage_config=storage_config,
         scheduler_config=scheduler_config,
         sentry_config=sentry_config,
+        cors_origins=deployment_config.cors_origins if deployment_config else None,
     )
 
     # Parse deployment URL
     host, port = _parse_deployment_url(deployment_config)
 
+    # Create tunnel if enabled
+    tunnel_url = _setup_tunnel(tunnel_config, port, _manifest, bindu_app)
+
     # Start server if requested (blocking), otherwise return manifest immediately
     if run_server:
         # Display server startup banner
         prepare_server_display(
-            host=host, port=port, agent_id=agent_id, agent_did=did_extension.did
+            host=host,
+            port=port,
+            agent_id=agent_id_str,
+            agent_did=did_extension.did,
+            client_id=credentials.client_id if credentials else None,
+            client_secret=credentials.client_secret if credentials else None,
+            tunnel_url=tunnel_url,
         )
 
         # Run server with graceful shutdown handling

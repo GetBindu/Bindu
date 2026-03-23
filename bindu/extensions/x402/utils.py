@@ -5,32 +5,11 @@ These utilities keep metadata writes consistent and centralized.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 from bindu.settings import app_settings
 
 
-def merge_task_metadata(task: dict, updates: Dict[str, Any]) -> dict:
-    """Merge metadata updates into a task dict in-place and return it."""
-    if "metadata" not in task or task["metadata"] is None:
-        task["metadata"] = {}
-    task["metadata"].update(updates)
-    return task
-
-
-def build_payment_required_metadata(required: dict) -> dict:
-    """Build metadata dict for payment-required state."""
-    return {
-        app_settings.x402.meta_status_key: app_settings.x402.status_required,
-        app_settings.x402.meta_required_key: required,
-    }
-
-
-def build_payment_verified_metadata() -> dict:
-    """Build metadata dict for payment-verified state."""
-    return {app_settings.x402.meta_status_key: app_settings.x402.status_verified}
-
-
-def build_payment_completed_metadata(receipt: dict) -> dict:
+def build_payment_completed_metadata(receipt: dict) -> dict[str, Any]:
     """Build metadata dict for payment-completed state."""
     return {
         app_settings.x402.meta_status_key: app_settings.x402.status_completed,
@@ -38,9 +17,11 @@ def build_payment_completed_metadata(receipt: dict) -> dict:
     }
 
 
-def build_payment_failed_metadata(error: str, receipt: Optional[dict] = None) -> dict:
+def build_payment_failed_metadata(
+    error: str, receipt: Optional[dict] = None
+) -> dict[str, Any]:
     """Build metadata dict for payment-failed state."""
-    md = {
+    md: dict[str, Any] = {
         app_settings.x402.meta_status_key: app_settings.x402.status_failed,
         app_settings.x402.meta_error_key: error,
     }

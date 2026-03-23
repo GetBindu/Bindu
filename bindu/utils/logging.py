@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Optional, cast
+from typing import Optional
 
 from loguru import logger
 from rich.console import Console
@@ -43,20 +43,18 @@ def _get_console() -> Console:
             width=app_settings.logging.traceback_width,
         )
     # Type narrowing: _console is guaranteed to be Console here
-    return cast(Console, _console)
+    return _console
 
 
 def configure_logger(
     docker_mode: bool = False,
     log_level: Optional[str] = None,
-    show_banner: bool = True,
 ) -> None:
     """Configure loguru logger with Rich integration.
 
     Args:
         docker_mode: Optimize for Docker environment (no file logging)
         log_level: Minimum log level (uses settings default if not provided)
-        show_banner: Show startup banner
     """
     global _is_logging_configured
 
@@ -102,7 +100,7 @@ def configure_logger(
     _is_logging_configured = True
 
 
-def get_logger(name: Optional[str] = None) -> type[logger]:
+def get_logger(name: Optional[str] = None):
     """Get a configured logger instance with automatic name inference.
 
     Args:

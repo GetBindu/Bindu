@@ -10,15 +10,11 @@ providing complete logical separation between different agents.
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncConnection
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from bindu.utils.logging import get_logger
-
-if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncEngine
 
 logger = get_logger("bindu.utils.schema_manager")
 
@@ -26,45 +22,45 @@ logger = get_logger("bindu.utils.schema_manager")
 def sanitize_did_for_schema(did: str) -> str:
     """Sanitize a DID string to be used as a PostgreSQL schema name.
 
-    PostgreSQL schema names must:
-    - Start with a letter or underscore
-    - Contain only letters, digits, and underscores
-    - Be <= 63 characters
-    - Not be a reserved keyword
-
-    For long DIDs (>63 chars), uses a hash suffix to maintain uniqueness
-    while keeping the schema name readable and within PostgreSQL limits.
+    Steps:
+    1. Normalize/Lowering
+    2. Character Replacement
+    3. Handling numeric prefixes
+    4. Length truncation with hashing
 
     Args:
         did: DID string (e.g., "did:bindu:alice:agent1:abc123")
 
     Returns:
         Sanitized schema name (e.g., "did_bindu_alice_agent1_abc123")
-
-    Examples:
-        >>> sanitize_did_for_schema("did:bindu:alice:agent1:abc123")
-        'did_bindu_alice_agent1_abc123'
-        >>> sanitize_did_for_schema("did:bindu:very_long_email_address:agent:uuid")
-        'did_bindu_very_long_email_address_agent_uuid_a1b2c3d4'
     """
     import hashlib
 
-    # Replace colons and other special characters with underscores
-    sanitized = re.sub(r"[^a-zA-Z0-9_]", "_", did.lower())
+    # Step 1: Normalize/Lowering
+    normalized_did = did.lower()
 
-    # Ensure it starts with a letter or underscore
-    if sanitized and sanitized[0].isdigit():
-        sanitized = f"schema_{sanitized}"
+    # Step 2: Character Replacement (all non-alphanumeric or underscore replaced with _)
+    replaced_chars_did = re.sub(r"[^a-zA-Z0-9_]", "_", normalized_did)
 
-    # Truncate if too long (PostgreSQL limit is 63 chars)
-    # Use hash suffix to maintain uniqueness
-    if len(sanitized) > 63:
-        # Generate 8-character hash from the full sanitized string
-        hash_suffix = hashlib.sha256(sanitized.encode()).hexdigest()[:8]
-        # Keep first 54 chars + underscore + 8 char hash = 63 chars total
-        sanitized = f"{sanitized[:54]}_{hash_suffix}"
+    # Step 3: Ensure starts with letter or underscore (add prefix if first char is digit)
+    if replaced_chars_did and replaced_chars_did[0].isdigit():
+        schema_candidate = f"schema_{replaced_chars_did}"
+    else:
+        schema_candidate = replaced_chars_did
 
-    return sanitized
+    # Step 4: Truncate to 63 characters (PostgreSQL limit), using hash for uniqueness if needed
+    if len(schema_candidate) > 63:
+        # Generate a hash suffix for uniqueness
+        hash_suffix = hashlib.sha256(schema_candidate.encode()).hexdigest()[:8]
+        # Truncate to fit hash and underscore, keeping total 63 characters
+        # 63 total - 1 (underscore) - 8 (hash) = 54 characters for the prefix
+        max_prefix_length = 63 - 1 - 8
+        truncated = schema_candidate[:max_prefix_length]
+        final_schema_name = f"{truncated}_{hash_suffix}"
+    else:
+        final_schema_name = schema_candidate
+
+    return final_schema_name
 
 
 async def create_schema_if_not_exists(
@@ -106,48 +102,6 @@ async def create_schema_if_not_exists(
     return True
 
 
-async def drop_schema_if_exists(
-    connection: AsyncConnection, schema_name: str, cascade: bool = False
-) -> bool:
-    """Drop a PostgreSQL schema if it exists.
-
-    Args:
-        connection: SQLAlchemy async connection
-        schema_name: Name of the schema to drop
-        cascade: If True, drop all objects in the schema as well
-
-    Returns:
-        True if schema was dropped, False if it didn't exist
-
-    Raises:
-        Exception: If schema drop fails
-
-    Warning:
-        This is a destructive operation. Use with caution!
-    """
-    # Check if schema exists
-    result = await connection.execute(
-        text(
-            "SELECT schema_name FROM information_schema.schemata "
-            "WHERE schema_name = :schema_name"
-        ),
-        {"schema_name": schema_name},
-    )
-    exists = result.first() is not None
-
-    if not exists:
-        logger.debug(f"Schema '{schema_name}' does not exist")
-        return False
-
-    # Drop schema
-    cascade_clause = "CASCADE" if cascade else "RESTRICT"
-    await connection.execute(text(f'DROP SCHEMA "{schema_name}" {cascade_clause}'))
-    await connection.commit()
-
-    logger.warning(f"Dropped schema '{schema_name}' ({cascade_clause})")
-    return True
-
-
 async def set_search_path(
     connection: AsyncConnection, schema_name: str, include_public: bool = False
 ) -> None:
@@ -173,50 +127,6 @@ async def set_search_path(
 
     await connection.execute(text(f"SET search_path TO {search_path}"))
     logger.debug(f"Set search_path to: {search_path}")
-
-
-async def list_schemas(connection: AsyncConnection) -> list[str]:
-    """List all non-system schemas in the database.
-
-    Args:
-        connection: SQLAlchemy async connection
-
-    Returns:
-        List of schema names (excluding pg_* and information_schema)
-    """
-    result = await connection.execute(
-        text(
-            "SELECT schema_name FROM information_schema.schemata "
-            "WHERE schema_name NOT LIKE 'pg_%' "
-            "AND schema_name != 'information_schema' "
-            "ORDER BY schema_name"
-        )
-    )
-    return [row[0] for row in result.fetchall()]
-
-
-async def get_tables_in_schema(
-    connection: AsyncConnection, schema_name: str
-) -> list[str]:
-    """Get all table names in a specific schema.
-
-    Args:
-        connection: SQLAlchemy async connection
-        schema_name: Schema to query
-
-    Returns:
-        List of table names in the schema
-    """
-    result = await connection.execute(
-        text(
-            "SELECT table_name FROM information_schema.tables "
-            "WHERE table_schema = :schema_name "
-            "AND table_type = 'BASE TABLE' "
-            "ORDER BY table_name"
-        ),
-        {"schema_name": schema_name},
-    )
-    return [row[0] for row in result.fetchall()]
 
 
 async def initialize_did_schema(

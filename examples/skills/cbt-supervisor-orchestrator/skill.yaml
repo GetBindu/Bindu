@@ -1,0 +1,43 @@
+id: cbt-supervisor-orchestrator-v0
+name: cbt-supervisor-orchestrator
+version: 0.1.0
+author: imdanishakhtar7@gmail.com
+description: |
+  Orchestrates a CBT session workflow by routing to specialized worker agents:
+  Drafter -> Safety Guardian -> Clinical Critic, then composes a final response.
+tags:
+  - cbt
+  - orchestration
+  - multi-agent
+  - workflow
+input_modes:
+  - text/plain
+output_modes:
+  - application/json
+examples:
+  - "Given a user statement, produce a draft + safety verdict + critique + final response."
+capabilities_detail:
+  orchestration:
+    supported: true
+    workers:
+      - cbt-drafter
+      - cbt-safety-guardian
+      - cbt-clinical-critic
+  reduction:
+    supported: true
+    outputs:
+      - final_response
+      - trace
+requirements:
+  packages:
+    - httpx
+performance:
+  avg_processing_time_ms: 700
+  concurrent_requests: 3
+assessment:
+  keywords:
+    - orchestrate
+    - route
+    - reduce
+    - multi-agent
+    - cbt

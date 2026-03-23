@@ -1,0 +1,659 @@
+{
+	"info": {
+		"_postman_id": "bindu-agent-api-collection",
+		"name": "Bindu Agent API",
+		"description": "A2A Protocol compliant API for Bindu agents supporting JSON-RPC 2.0 methods for agent communication, task management, context management, DID resolution, and payment processing.\n\n**Base URL:** `http://localhost:3773`\n\n**Authentication:** Bearer token in Authorization header",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "JSON-RPC",
+			"description": "JSON-RPC 2.0 endpoints for agent communication. All JSON-RPC methods are sent as POST requests to the root endpoint.",
+			"item": [
+				{
+					"name": "message/send - Send Message",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{api_key}}",
+								"description": "Optional - JWT token for authentication"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"message/send\",\n  \"params\": {\n    \"message\": {\n      \"role\": \"user\",\n      \"parts\": [\n        {\n          \"kind\": \"text\",\n          \"text\": \"provide sunset quote\"\n        }\n      ],\n      \"kind\": \"message\",\n      \"messageId\": \"550e8400-e29b-41d4-a716-446655440038\",\n      \"contextId\": \"550e8400-e29b-41d4-a716-446655440038\",\n      \"taskId\": \"550e8400-e29b-41d4-a716-446655440078\"\n    },\n    \"configuration\": {\n      \"acceptedOutputModes\": [\n        \"application/json\"\n      ]\n    }\n  },\n  \"id\": \"550e8400-e29b-41d4-a716-446655440024\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								""
+							]
+						},
+						"description": "Send a message to the agent. This is the primary method for interacting with the agent."
+					}
+				},
+				{
+					"name": "message/send - With Payment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{api_key}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"message/send\",\n  \"params\": {\n    \"message\": {\n      \"role\": \"user\",\n      \"parts\": [\n        {\n          \"kind\": \"text\",\n          \"text\": \"provide sunset quote\"\n        }\n      ],\n      \"kind\": \"message\",\n      \"messageId\": \"550e8400-e29b-41d4-a716-446655440039\",\n      \"contextId\": \"550e8400-e29b-41d4-a716-446655440038\",\n      \"taskId\": \"550e8400-e29b-41d4-a716-446655440078\",\n      \"metadata\": {\n        \"x402.payment.status\": \"payment-submitted\",\n        \"x402.payment.payload\": {\n          \"resource\": \"/agent/first Agent\",\n          \"scheme\": \"exact\",\n          \"network\": \"base-sepolia\",\n          \"asset\": \"0x036CbD53842c5426634e7929541eC2318f3dCF7e\",\n          \"payTo\": \"0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0\",\n          \"amount\": \"10000000000\",\n          \"signature\": \"0x<YOUR_WALLET_SIGNATURE_HERE>\",\n          \"timestamp\": \"2025-10-26T14:47:52.183416+00:00\",\n          \"payer\": \"0x<YOUR_WALLET_ADDRESS>\"\n        }\n      }\n    },\n    \"configuration\": {\n      \"acceptedOutputModes\": [\n        \"application/json\"\n      ]\n    }\n  },\n  \"id\": \"550e8400-e29b-41d4-a716-446655440025\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								""
+							]
+						},
+						"description": "Send a message with x402 payment metadata for paid agent services."
+					}
+				},
+				{
+					"name": "message/send - With Reference",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{api_key}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"message/send\",\n  \"params\": {\n    \"message\": {\n      \"role\": \"user\",\n      \"parts\": [\n        {\n          \"kind\": \"text\",\n          \"text\": \"make it shorter\"\n        }\n      ],\n      \"kind\": \"message\",\n      \"messageId\": \"550e8400-e29b-41d4-a716-446655440027\",\n      \"contextId\": \"550e8400-e29b-41d4-a716-446655440027\",\n      \"taskId\": \"550e8400-e29b-41d4-a716-446655440042\",\n      \"referenceTaskIds\": [\n        \"550e8400-e29b-41d4-a716-446655440041\"\n      ]\n    },\n    \"configuration\": {\n      \"acceptedOutputModes\": [\n        \"application/json\"\n      ]\n    }\n  },\n  \"id\": \"550e8400-e29b-41d4-a716-446655440024\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								""
+							]
+						},
+						"description": "Send a message with reference to a previous task for context continuation."
+					}
+				},
+				{
+					"name": "tasks/get - Get Task Status",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{api_key}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"tasks/get\",\n  \"params\": {\n    \"taskId\": \"550e8400-e29b-41d4-a716-446655440013\"\n  },\n  \"id\": \"550e8400-e29b-41d4-a716-446655440014\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								""
+							]
+						},
+						"description": "Get the status and details of a specific task by its ID."
+					}
+				},
+				{
+					"name": "tasks/list - List All Tasks",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{api_key}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"tasks/list\",\n  \"params\": {},\n  \"id\": \"550e8400-e29b-41d4-a716-446655440099\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								""
+							]
+						},
+						"description": "List all tasks. Optional params: limit (1-100), offset (0+)."
+					}
+				},
+				{
+					"name": "tasks/cancel - Cancel Task",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{api_key}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"tasks/cancel\",\n  \"params\": {\n    \"taskId\": \"550e8400-e29b-41d4-a716-446655440042\"\n  },\n  \"id\": \"550e8400-e29b-41d4-a716-446655440042\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								""
+							]
+						},
+						"description": "Cancel a running or pending task. Tasks can only be canceled while pending or running."
+					}
+				},
+				{
+					"name": "tasks/feedback - Submit Feedback",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{api_key}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"tasks/feedback\",\n  \"params\": {\n    \"taskId\": \"550e8400-e29b-41d4-a716-446655440045\",\n    \"feedback\": \"Great job! The response was very helpful and accurate.\",\n    \"rating\": 5,\n    \"metadata\": {\n      \"category\": \"quality\",\n      \"source\": \"user\",\n      \"helpful\": true\n    }\n  },\n  \"id\": \"550e8400-e29b-41d4-a716-446655440024\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								""
+							]
+						},
+						"description": "Submit feedback for a completed task. Rating is 1-5."
+					}
+				},
+				{
+					"name": "contexts/list - List Contexts",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{api_key}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"contexts/list\",\n  \"params\": {\n    \"length\": 10\n  },\n  \"id\": \"550e8400-e29b-41d4-a716-446655440025\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								""
+							]
+						},
+						"description": "List conversation contexts. Optional param: length (1-100)."
+					}
+				},
+				{
+					"name": "contexts/clear - Clear Context",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{api_key}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"contexts/clear\",\n  \"params\": {\n    \"contextId\": \"550e8400-e29b-41d4-a716-446655440037\"\n  },\n  \"id\": \"550e8400-e29b-41d4-a716-446655440025\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								""
+							]
+						},
+						"description": "Clear a specific conversation context by its ID."
+					}
+				}
+			]
+		},
+		{
+			"name": "Agent Discovery",
+			"description": "Agent metadata and capability discovery endpoints.",
+			"item": [
+				{
+					"name": "Get Agent Card",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/.well-known/agent.json",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								".well-known",
+								"agent.json"
+							]
+						},
+						"description": "Returns the agent's metadata card following the A2A Protocol specification. Includes agent capabilities, supported features, and discovery information. No authentication required."
+					}
+				},
+				{
+					"name": "Root Redirect",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								""
+							]
+						},
+						"description": "GET request to root redirects to the agent card at /.well-known/agent.json (302 redirect)."
+					}
+				}
+			]
+		},
+		{
+			"name": "DID Resolution",
+			"description": "Decentralized Identifier resolution endpoints.",
+			"item": [
+				{
+					"name": "Resolve DID (POST)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"did\": \"did:bindu:raahul_at_getbindu_com:first_agent:e091ddb0b2c84bd8991fdfd1ecbb9da6\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/did/resolve",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"did",
+								"resolve"
+							]
+						},
+						"description": "Resolves a Decentralized Identifier (DID) to its W3C-compliant DID document. Supports custom Bindu DID format: did:bindu:{author}:{agent_name}:{agent_id}. No authentication required."
+					}
+				},
+				{
+					"name": "Resolve DID (GET)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/did/resolve?did=did:bindu:raahul_at_getbindu_com:first_agent:e091ddb0b2c84bd8991fdfd1ecbb9da6",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"did",
+								"resolve"
+							],
+							"query": [
+								{
+									"key": "did",
+									"value": "did:bindu:raahul_at_getbindu_com:first_agent:e091ddb0b2c84bd8991fdfd1ecbb9da6",
+									"description": "The DID to resolve"
+								}
+							]
+						},
+						"description": "Resolves a Decentralized Identifier (DID) via GET request with query parameter."
+					}
+				}
+			]
+		},
+		{
+			"name": "Skills",
+			"description": "Agent skills and capabilities endpoints.",
+			"item": [
+				{
+					"name": "List Agent Skills",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/agent/skills",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"agent",
+								"skills"
+							]
+						},
+						"description": "Returns a list of all skills supported by the agent. No authentication required."
+					}
+				},
+				{
+					"name": "Get Skill Details",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/agent/skills/:skillId",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"agent",
+								"skills",
+								":skillId"
+							],
+							"variable": [
+								{
+									"key": "skillId",
+									"value": "question-answering-v1",
+									"description": "The skill identifier"
+								}
+							]
+						},
+						"description": "Returns detailed information about a specific skill including input/output schemas."
+					}
+				},
+				{
+					"name": "Get Skill Documentation",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/agent/skills/:skillId/documentation",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"agent",
+								"skills",
+								":skillId",
+								"documentation"
+							],
+							"variable": [
+								{
+									"key": "skillId",
+									"value": "question-answering-v1",
+									"description": "The skill identifier"
+								}
+							]
+						},
+						"description": "Returns human-readable documentation for a specific skill in Markdown format."
+					}
+				}
+			]
+		},
+		{
+			"name": "Negotiation",
+			"description": "Capability assessment endpoint for task negotiation.",
+			"item": [
+				{
+					"name": "Assess Task Capability",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"task_summary\": \"Answer questions about machine learning concepts\",\n  \"task_details\": \"User needs help understanding neural networks and deep learning\",\n  \"input_mime_types\": [\"text/plain\", \"application/json\"],\n  \"output_mime_types\": [\"application/json\"],\n  \"max_latency_ms\": 5000,\n  \"max_cost_amount\": 0.01,\n  \"required_tools\": [],\n  \"forbidden_tools\": [],\n  \"min_score\": 0.5,\n  \"weights\": {\n    \"skill_match\": 0.55,\n    \"io_compatibility\": 0.20,\n    \"performance\": 0.15,\n    \"load\": 0.05,\n    \"cost\": 0.05\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/agent/negotiation",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"agent",
+								"negotiation"
+							]
+						},
+						"description": "Assess agent's capability to handle a task. Evaluates skill match, IO compatibility, performance, load, and cost to produce an acceptance decision with confidence and detailed scoring.\n\n**Required fields:**\n- task_summary (string, max 10000 chars)\n\n**Optional fields:**\n- task_details, input_mime_types, output_mime_types, max_latency_ms, max_cost_amount, required_tools, forbidden_tools, min_score, weights"
+					}
+				}
+			]
+		},
+		{
+			"name": "Payment",
+			"description": "x402 payment protocol endpoints for paid agent services.",
+			"item": [
+				{
+					"name": "Start Payment Session",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{api_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/start-payment-session",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"start-payment-session"
+							]
+						},
+						"description": "Initiates a payment session for x402 protocol. Returns payment requirements, session ID, browser URL for payment capture, and expiration time."
+					}
+				},
+				{
+					"name": "Get Payment Status",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{api_key}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/payment-status/:sessionId?wait=false",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"payment-status",
+								":sessionId"
+							],
+							"query": [
+								{
+									"key": "wait",
+									"value": "false",
+									"description": "Set to 'true' to wait for completion (up to 5 minutes)"
+								}
+							],
+							"variable": [
+								{
+									"key": "sessionId",
+									"value": "",
+									"description": "The payment session identifier"
+								}
+							]
+						},
+						"description": "Retrieves the status of a payment session. Used to verify payment completion. The payment token is returned but NOT consumed - it can be used for the actual API call.\n\n**Query Parameters:**\n- wait: Set to 'true' to wait for completion (up to 5 minutes)"
+					}
+				},
+				{
+					"name": "Payment Capture Page",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/payment-capture?session_id=",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"payment-capture"
+							],
+							"query": [
+								{
+									"key": "session_id",
+									"value": "",
+									"description": "The payment session ID"
+								}
+							]
+						},
+						"description": "Browser page to capture payment. Shows paywall UI and captures payment token when completed. This is typically opened in a browser, not called programmatically."
+					}
+				}
+			]
+		},
+		{
+			"name": "Health & Monitoring",
+			"description": "Health check and monitoring endpoints.",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/health",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"health"
+							]
+						},
+						"description": "Health check endpoint for service monitoring. Returns service status, uptime, version information, and readiness state."
+					}
+				},
+				{
+					"name": "Prometheus Metrics",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/metrics",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"metrics"
+							]
+						},
+						"description": "Prometheus metrics endpoint for scraping. Returns metrics in Prometheus text format.\n\n**Metrics exposed:**\n- http_requests_total: Total HTTP requests by method, endpoint, and status\n- http_request_duration_seconds: HTTP request latency histogram\n- agent_tasks_active: Currently active tasks per agent\n- agent_tasks_completed_total: Total completed tasks per agent and status"
+					}
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:3773",
+			"type": "string"
+		},
+		{
+			"key": "api_key",
+			"value": "",
+			"type": "string"
+		}
+	]
+}

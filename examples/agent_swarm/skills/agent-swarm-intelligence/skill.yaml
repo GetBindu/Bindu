@@ -1,0 +1,65 @@
+id: agent-swarm-intelligence
+name: Agent Swarm Intelligence
+version: 1.0.0
+author: nivasm2823@gmail.com
+description: |
+  Advanced multi-agent intelligence system that orchestrates specialized AI agents
+  for comprehensive research, analysis, and content generation.
+
+  Features:
+  - Multi-agent orchestration with 6 specialized agents
+  - Deep research capabilities across multiple domains
+  - Intelligent planning and task decomposition
+  - Quality assurance through critic and reflection agents
+  - Structured summarization and content refinement
+  - Collaborative intelligence emergence
+
+  Agent Swarm Architecture:
+  - Planner Agent: Breaks down complex tasks into structured steps
+  - Researcher Agent: Conducts deep research and information gathering
+  - Summarizer Agent: Creates concise, structured summaries
+  - Critic Agent: Provides quality assessment and content improvement
+  - Reflection Agent: Evaluates output quality and suggests improvements
+  - Orchestrator: Coordinates all agents and manages workflow
+
+  This system demonstrates the future of AI - collaborative agent societies
+  working together to produce high-quality, comprehensive outputs.
+tags:
+  - multi-agent
+  - research
+  - analysis
+  - planning
+  - summarization
+  - quality-assurance
+  - collaboration
+  - intelligence
+  - orchestration
+input_modes:
+  - application/json
+output_modes:
+  - application/json
+examples:
+  - "What is quantum computing and how does it work?"
+  - "Explain the impact of artificial intelligence on healthcare"
+  - "Research the latest developments in renewable energy"
+  - "Analyze the current state of blockchain technology"
+  - "Provide a comprehensive overview of machine learning"
+capabilities_detail:
+  multi_agent_orchestration:
+    supported: true
+    description: "Coordinates 6 specialized agents for comprehensive task execution"
+  deep_research:
+    supported: true
+    description: "Conducts thorough research across multiple domains and sources"
+  intelligent_planning:
+    supported: true
+    description: "Automatically decomposes complex tasks into structured workflows"
+  quality_assurance:
+    supported: true
+    description: "Multi-layer quality evaluation through critic and reflection agents"
+  content_synthesis:
+    supported: true
+    description: "Creates structured, high-quality content from research findings"
+  collaborative_intelligence:
+    supported: true
+    description: "Emerges intelligent outputs through agent collaboration"

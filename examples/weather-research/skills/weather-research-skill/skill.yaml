@@ -1,0 +1,48 @@
+id: weather-research-skill
+name: weather-research-skill
+version: 1.0.0
+author: bindu.builder@getbindu.com
+description: |
+  Advanced weather research skill that provides comprehensive weather information,
+  forecasts, and meteorological analysis for any location worldwide.
+
+  Features:
+  - Real-time weather data via search
+  - Multi-day forecasting with confidence levels
+  - Historical weather pattern analysis
+  - Travel recommendations based on weather
+  - Severe weather alerts
+  - Climate information and trends
+
+  Uses DuckDuckGo search to find current weather conditions
+  and provides detailed analysis with both metric and imperial units.
+tags:
+  - weather
+  - forecast
+  - meteorology
+  - research
+  - climate
+  - travel
+input_modes:
+  - application/json
+output_modes:
+  - application/json
+examples:
+  - "Get current weather conditions for New York City"
+  - "Provide 5-day weather forecast for London"
+  - "Analyze weather patterns for Tokyo"
+  - "What's the weather like in Dehradun?"
+  - "Give travel recommendations for Paris this weekend"
+capabilities_detail:
+  weather_research:
+    supported: true
+    description: "Comprehensive weather research and forecasting capabilities"
+  search_integration:
+    supported: true
+    description: "Real-time weather data search via DuckDuckGo"
+  forecasting:
+    supported: true
+    description: "Multi-day weather forecasts with confidence levels"
+  analysis:
+    supported: true
+    description: "Weather pattern analysis and trends"

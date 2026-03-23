@@ -1,0 +1,57 @@
+id: speech-recognition-v1
+name: speech-recognition
+version: 1.0.0
+author: raahul@getbindu.com
+description: |
+  An AI transcription skill that converts audio files and live speech into structured text.
+  Supports multiple audio formats and provides speaker detection and formatting.
+
+tags:
+  - speech
+  - transcription
+  - audio
+  - voice-to-text
+  - recognition
+
+input_modes:
+  - audio/wav
+  - audio/mpeg
+  - audio/mp3
+  - audio/m4a
+
+output_modes:
+  - text/plain
+  - application/json
+
+examples:
+  - "Transcribe this podcast episode."
+  - "Convert lecture audio into text notes."
+  - "Extract text from this voice recording."
+
+capabilities_detail:
+  transcription:
+    supported: true
+    formats: ["wav", "mp3", "m4a"]
+    features:
+      - duration_detection
+      - simple_formatting
+  speaker_detection:
+    supported: true
+    description: "Identifies different speakers in the audio stream"
+  formatting:
+    supported: true
+    description: "Formats transcribed text into paragraphs and documents"
+
+assessment:
+  keywords:
+    - transcribe
+    - transcription
+    - speech
+    - audio
+    - voice
+    - notes
+  specializations:
+    - domain: podcast_transcription
+      confidence_boost: 0.2
+    - domain: lecture_notes
+      confidence_boost: 0.2

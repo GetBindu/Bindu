@@ -68,6 +68,31 @@ from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
 from typing import Any
 
+from bindu.common.protocol.types import (
+    CancelTaskRequest,
+    CancelTaskResponse,
+    ClearContextsRequest,
+    ClearContextsResponse,
+    DeleteTaskPushNotificationConfigRequest,
+    DeleteTaskPushNotificationConfigResponse,
+    GetTaskPushNotificationRequest,
+    GetTaskPushNotificationResponse,
+    GetTaskRequest,
+    GetTaskResponse,
+    ListContextsRequest,
+    ListContextsResponse,
+    ListTaskPushNotificationConfigRequest,
+    ListTaskPushNotificationConfigResponse,
+    ListTasksRequest,
+    ListTasksResponse,
+    SendMessageRequest,
+    SendMessageResponse,
+    SetTaskPushNotificationRequest,
+    SetTaskPushNotificationResponse,
+    StreamMessageRequest,
+    TaskFeedbackRequest,
+    TaskFeedbackResponse,
+)
 
 from ..utils.logging import get_logger
 from .handlers import ContextHandlers, MessageHandlers, TaskHandlers
@@ -77,6 +102,10 @@ from .storage import Storage
 from .workers import ManifestWorker
 
 logger = get_logger("pebbling.server.task_manager")
+
+# Constants
+JSONRPC_VERSION = "2.0"
+DEFAULT_JSONRPC_ERROR_CODE = -32001
 
 
 @dataclass
@@ -158,63 +187,94 @@ class TaskManager:
     ) -> Any:
         """Create a standardized error response."""
         return response_class(
-            jsonrpc="2.0",
+            jsonrpc=JSONRPC_VERSION,
             id=request_id,
-            error=error_class(code=-32001, message=message),
+            error=error_class(code=DEFAULT_JSONRPC_ERROR_CODE, message=message),
         )
 
     def _parse_context_id(self, context_id: Any) -> uuid.UUID:
-        """Parse and validate context_id, generating a new one if needed."""
+        """Parse and validate context_id, generating a new one if needed.
+
+        Fix applied: Handles malformed UUID strings to prevent server crashes (DoS vector).
+        """
         if context_id is None:
             return uuid.uuid4()
-        if isinstance(context_id, str):
-            return uuid.UUID(context_id)
+
         if isinstance(context_id, uuid.UUID):
             return context_id
+
+        if isinstance(context_id, str):
+            try:
+                return uuid.UUID(context_id)
+            except ValueError:
+                # Log the issue so we know bad data is coming in, but don't crash
+                logger.warning(
+                    f"Received malformed context_id: '{context_id}'. Generating new UUID fallback."
+                )
+                pass
+
         return uuid.uuid4()
 
-    def _jsonrpc_error(
-        self, response_class: type, request_id: Any, message: str, code: int = -32001
-    ):
-        return response_class(
-            jsonrpc="2.0", id=request_id, error={"code": code, "message": message}
+    # Message handler methods
+    async def send_message(self, request: SendMessageRequest) -> SendMessageResponse:
+        """Send a message using the A2A protocol."""
+        return await self._message_handlers.send_message(request)
+
+    async def stream_message(self, request: StreamMessageRequest):
+        """Stream messages using Server-Sent Events."""
+        return await self._message_handlers.stream_message(request)
+
+    # Task handler methods
+    async def get_task(self, request: GetTaskRequest) -> GetTaskResponse:
+        """Get a task and return it to the client."""
+        return await self._task_handlers.get_task(request)
+
+    async def list_tasks(self, request: ListTasksRequest) -> ListTasksResponse:
+        """List all tasks in storage."""
+        return await self._task_handlers.list_tasks(request)
+
+    async def cancel_task(self, request: CancelTaskRequest) -> CancelTaskResponse:
+        """Cancel a running task."""
+        return await self._task_handlers.cancel_task(request)
+
+    async def task_feedback(self, request: TaskFeedbackRequest) -> TaskFeedbackResponse:
+        """Submit feedback for a completed task."""
+        return await self._task_handlers.task_feedback(request)
+
+    # Context handler methods
+    async def list_contexts(self, request: ListContextsRequest) -> ListContextsResponse:
+        """List all contexts in storage."""
+        return await self._context_handlers.list_contexts(request)
+
+    async def clear_context(
+        self, request: ClearContextsRequest
+    ) -> ClearContextsResponse:
+        """Clear a context from storage."""
+        return await self._context_handlers.clear_context(request)
+
+    # Push notification handler methods
+    async def set_task_push_notification(
+        self, request: SetTaskPushNotificationRequest
+    ) -> SetTaskPushNotificationResponse:
+        """Set push notification settings for a task."""
+        return await self._push_manager.set_task_push_notification(
+            request, self.storage.load_task
         )
 
-    def __getattr__(self, name: str):
-        """Automatically delegate method calls to appropriate handlers.
+    async def get_task_push_notification(
+        self, request: GetTaskPushNotificationRequest
+    ) -> GetTaskPushNotificationResponse:
+        """Get push notification settings for a task."""
+        return await self._push_manager.get_task_push_notification(request)
 
-        This DRY approach routes method calls to the correct handler based on method name.
-        """
-        # Message handler methods
-        if name in ("send_message", "stream_message"):
-            return getattr(self._message_handlers, name)
+    async def list_task_push_notifications(
+        self, request: ListTaskPushNotificationConfigRequest
+    ) -> ListTaskPushNotificationConfigResponse:
+        """List push notification configurations for a task."""
+        return await self._push_manager.list_task_push_notifications(request)
 
-        # Task handler methods
-        if name in ("get_task", "list_tasks", "cancel_task", "task_feedback"):
-            return getattr(self._task_handlers, name)
-
-        # Context handler methods
-        if name in ("list_contexts", "clear_context"):
-            return getattr(self._context_handlers, name)
-
-        # Special case for set_task_push_notification which needs storage
-        if name == "set_task_push_notification":
-
-            async def _set_with_storage(request):
-                return await self._push_manager.set_task_push_notification(
-                    request, self.storage.load_task
-                )
-
-            return _set_with_storage
-
-        # Other push notification handler methods
-        if name in (
-            "get_task_push_notification",
-            "list_task_push_notifications",
-            "delete_task_push_notification",
-        ):
-            return getattr(self._push_manager, name)
-
-        raise AttributeError(
-            f"'{type(self).__name__}' object has no attribute '{name}'"
-        )
+    async def delete_task_push_notification(
+        self, request: DeleteTaskPushNotificationConfigRequest
+    ) -> DeleteTaskPushNotificationConfigResponse:
+        """Delete a push notification configuration for a task."""
+        return await self._push_manager.delete_task_push_notification(request)

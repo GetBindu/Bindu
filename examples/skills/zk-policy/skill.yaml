@@ -3,7 +3,7 @@ name: zk-policy-verification
 version: 0.1.0
 author: baljots1000@gmail.com
 description: |
-  Validates message content against safety policies and generates a 
+  Validates message content against safety policies and generates a
   Zero-Knowledge Proof (mock) of compliance without revealing the underlying rules.
 
 tags:

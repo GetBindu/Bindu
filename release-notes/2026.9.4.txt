@@ -1,0 +1,232 @@
+Release: Vault Integration for Persistent Agent Identity
+Version: 2026.9.4
+Date: February 25, 2026
+
+OVERVIEW
+--------
+Major feature release adding HashiCorp Vault integration for persistent storage
+of DID keys and Hydra OAuth2 credentials. This solves the critical issue where
+pod restarts in Kubernetes deployments resulted in new agent identities and
+orphaned Hydra OAuth clients.
+
+PROBLEM SOLVED
+--------------
+Before this release, when a pod died and restarted:
+❌ New DID keys were generated → different agent identity
+❌ New Hydra OAuth client was registered → orphaned clients in Hydra
+❌ Authentication broke → clients couldn't authenticate with new credentials
+
+After this release, with Vault enabled:
+✅ DID keys are restored from Vault → same agent identity
+✅ Hydra credentials are reused → no duplicate clients
+✅ Authentication persists → seamless pod restarts
+
+FEATURES
+--------
+
+1. Vault Client Module (bindu/utils/vault_client.py)
+   - Store and retrieve DID private/public keys
+   - Store and retrieve Hydra OAuth2 credentials
+   - Automatic backup and restore functionality
+   - Graceful fallback when Vault is unavailable
+   - Reuses existing AsyncHTTPClient for efficiency (no duplicate HTTP clients)
+   - Proper async session cleanup to prevent memory leaks
+
+2. Deterministic Agent Identity
+   - Agent ID generated deterministically from SHA256(author:agent_name)
+   - Same author + name → same agent_id → same DID every time
+   - No need to hardcode agent IDs in configuration
+   - Automatic persistent identity without manual intervention
+
+3. DID Setup Integration
+   - Changed default: recreate_keys=False (was True)
+   - Checks Vault for existing keys before generating new ones
+   - Automatically backs up newly generated keys to Vault
+   - Restores keys from Vault on pod restart
+   - Uses correct filenames from settings (private.pem, public.pem)
+
+4. Hydra Registration Integration
+   - Priority 1: Check Vault for existing credentials
+   - Priority 2: Check local filesystem
+   - Priority 3: Generate new credentials
+   - Automatic backup of credentials to Vault
+   - Reuses client_secret from Vault when recreating clients
+   - Proper VaultClient session cleanup in all code paths
+
+5. Configuration
+   - Environment variables: VAULT__ENABLED, VAULT__URL, VAULT__TOKEN
+   - Alternative names: VAULT_ADDR, VAULT_TOKEN
+   - Updated VaultSettings with comprehensive documentation
+   - Vault config loaded from environment before DID initialization
+
+6. Documentation
+   - Complete guide: docs/VAULT_INTEGRATION.md
+   - Example configuration: .env.vault.example
+   - Kubernetes deployment examples
+   - Vault setup instructions
+   - Troubleshooting guide
+
+7. Testing
+   - Comprehensive unit tests: tests/unit/test_vault_integration.py
+   - Tests for all Vault operations
+   - Mock-based testing for CI/CD compatibility
+   - Updated tests to use correct DID key filenames
+
+8. Type Safety & Code Quality
+   - Proper UUID type handling throughout codebase
+   - Type-safe agent_id conversion (UUID for internal, str for display)
+   - No unclosed aiohttp client sessions
+   - Removed unused dependencies (agno, openai, ddgs)
+
+TECHNICAL DETAILS
+-----------------
+
+Storage Hierarchy:
+vault/secret/bindu/
+├── agents/{agent_id}/did-keys
+│   ├── private_key (PEM)
+│   ├── public_key (PEM)
+│   └── did
+└── hydra/credentials/{did}/
+    ├── client_id
+    ├── client_secret
+    ├── agent_id
+    ├── created_at
+    └── scopes
+
+Agent ID Generation:
+1. If no explicit ID in config: SHA256(author:agent_name)[:32] → UUID
+2. Same author + name = same deterministic agent_id every time
+3. Agent ID used in DID: did:bindu:{author}:{agent_name}:{agent_id}
+
+Startup Flow:
+1. Generate deterministic agent_id from author:agent_name
+2. Check Vault for DID keys → restore if found → generate if not found
+3. Check Vault for Hydra credentials → reuse if found → register if not found
+4. Backup all credentials to Vault
+5. Start agent with persistent identity
+
+CONFIGURATION
+-------------
+
+Environment Variables:
+```bash
+# Enable Vault
+VAULT__ENABLED=true
+
+# Vault server URL
+VAULT__URL=http://vault:8200
+
+# Vault authentication token
+VAULT__TOKEN=hvs.CAESIJ...
+```
+
+Kubernetes Example:
+```yaml
+env:
+- name: VAULT__ENABLED
+  value: "true"
+- name: VAULT__URL
+  value: "http://vault.vault.svc.cluster.local:8200"
+- name: VAULT__TOKEN
+  valueFrom:
+    secretKeyRef:
+      name: bindu-vault-token
+      key: token
+```
+
+BREAKING CHANGES
+----------------
+- DID setup default changed: recreate_keys=False (was True)
+  - Impact: Existing keys are preserved by default
+  - Migration: No action needed, this is the desired behavior
+  - Override: Set recreate_keys=True to force regeneration
+
+MIGRATION NOTES
+---------------
+
+For Existing Deployments:
+1. Enable Vault in configuration: VAULT__ENABLED=true
+2. Set Vault URL and token
+3. Restart agents - they will automatically backup existing keys
+4. Verify keys are in Vault
+5. Test by deleting and recreating pods
+
+For New Deployments:
+1. Set up Vault (see docs/VAULT_INTEGRATION.md)
+2. Configure environment variables
+3. Deploy agents - keys will be automatically stored in Vault
+
+Vault Setup:
+```bash
+# Enable KV v2 secrets engine
+vault secrets enable -path=secret kv-v2
+
+# Create policy
+vault policy write bindu bindu-policy.hcl
+
+# Generate token
+vault token create -policy=bindu -ttl=720h
+```
+
+SECURITY CONSIDERATIONS
+-----------------------
+- Use Kubernetes auth instead of static tokens in production
+- Rotate Vault tokens regularly
+- Enable Vault audit logging
+- Use TLS for Vault communication
+- Never commit Vault tokens to git
+
+PERFORMANCE IMPACT
+------------------
+- Startup time: +100-200ms for Vault lookups
+- Network: Requires Vault connectivity
+- Caching: Local files cached after Vault restore
+- Failover: Falls back to local files if Vault unavailable
+
+TESTING
+-------
+✅ Unit tests for VaultClient operations
+✅ DID key backup and restore
+✅ Hydra credential backup and restore
+✅ Graceful degradation when Vault disabled
+✅ Error handling for network failures
+✅ All existing tests passing
+
+FILES CHANGED
+-------------
+New Files:
+- bindu/utils/vault_client.py (VaultClient implementation)
+- docs/VAULT_INTEGRATION.md (comprehensive integration guide)
+- .env.vault.example (example Vault configuration)
+- tests/unit/test_vault_integration.py (unit tests)
+- release-notes/2026.9.4.txt (this file)
+
+Modified Files:
+- bindu/penguin/did_setup.py (Vault restore/backup integration)
+- bindu/penguin/bindufy.py (deterministic agent_id, Vault config loading)
+- bindu/auth/hydra/registration.py (Vault credential restore/backup, session cleanup)
+- bindu/settings.py (VaultSettings documentation)
+- bindu/penguin/config_validator.py (recreate_keys default changed to False)
+- bindu/utils/config_loader.py (Vault config loading from environment)
+- examples/beginner/.env (DATABASE_URL SSL fix)
+- examples/beginner/.env.example (Vault configuration example)
+- pyproject.toml (removed unused dependencies: agno, openai, ddgs)
+
+DOCUMENTATION
+-------------
+- Complete integration guide: docs/VAULT_INTEGRATION.md
+- Configuration examples: .env.vault.example
+- API documentation in code docstrings
+- Kubernetes deployment examples
+- Troubleshooting guide
+
+CONTRIBUTORS
+------------
+- Raahul Dutta
+
+REFERENCES
+----------
+- HashiCorp Vault: https://www.vaultproject.io/docs
+- Kubernetes Auth: https://www.vaultproject.io/docs/auth/kubernetes
+- KV Secrets Engine: https://www.vaultproject.io/docs/secrets/kv/kv-v2

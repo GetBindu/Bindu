@@ -26,6 +26,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, cast
+from uuid import UUID
 
 from bindu.common.protocol.types import (
     Artifact,
@@ -50,10 +51,17 @@ if TYPE_CHECKING:
 
 logger = get_logger("pebbling.server.notifications.push_manager")
 
+# Constants
+JSONRPC_VERSION = "2.0"
+JSONRPC_INTERNAL_ERROR_CODE = -32001
+JSONRPC_PUSH_NOT_SUPPORTED_CODE = -32005
+
 PUSH_NOT_SUPPORTED_MESSAGE = (
     "Push notifications are not supported by this server configuration. Please use polling to check task status. "
     "See: GET /tasks/{id}"
 )
+PUSH_CONFIG_NOT_FOUND_MESSAGE = "Push notification configuration not found for task."
+PUSH_CONFIG_ID_MISMATCH_MESSAGE = "Push notification configuration identifier mismatch."
 
 
 @dataclass
@@ -235,6 +243,41 @@ class PushNotificationManager:
         self._notification_sequences[task_id] = current
         return current
 
+    def _log_notification_error(
+        self,
+        error_type: str,
+        task_id: UUID,
+        context_id: UUID,
+        exc: Exception,
+        **extra_context,
+    ) -> None:
+        """Log notification delivery errors with appropriate level.
+
+        Args:
+            error_type: Type of notification (e.g., "lifecycle", "artifact")
+            task_id: Task ID
+            context_id: Context ID
+            exc: The exception that occurred
+            **extra_context: Additional context to log
+        """
+        if isinstance(exc, NotificationDeliveryError):
+            logger.warning(
+                f"{error_type.capitalize()} notification delivery failed",
+                task_id=str(task_id),
+                context_id=str(context_id),
+                status=exc.status,
+                message=str(exc),
+                **extra_context,
+            )
+        else:
+            logger.error(
+                f"Unexpected error delivering {error_type} notification",
+                task_id=str(task_id),
+                context_id=str(context_id),
+                error=str(exc),
+                **extra_context,
+            )
+
     def build_lifecycle_event(
         self, task_id: uuid.UUID, context_id: uuid.UUID, state: str, final: bool
     ) -> dict[str, Any]:
@@ -266,23 +309,8 @@ class PushNotificationManager:
         event = self.build_lifecycle_event(task_id, context_id, state, final)
         try:
             await self.notification_service.send_event(config, event)
-        except NotificationDeliveryError as exc:
-            logger.warning(
-                "Push notification delivery failed",
-                task_id=str(task_id),
-                context_id=str(context_id),
-                state=state,
-                status=exc.status,
-                message=str(exc),
-            )
-        except Exception as exc:  # pragma: no cover - defensive logging
-            logger.error(
-                "Unexpected error delivering push notification",
-                task_id=str(task_id),
-                context_id=str(context_id),
-                state=state,
-                error=str(exc),
-            )
+        except Exception as exc:
+            self._log_notification_error("push", task_id, context_id, exc, state=state)
 
     def build_artifact_event(
         self,
@@ -323,23 +351,10 @@ class PushNotificationManager:
         event = self.build_artifact_event(task_id, context_id, artifact)
         try:
             await self.notification_service.send_event(config, event)
-        except NotificationDeliveryError as exc:
-            logger.warning(
-                "Artifact notification delivery failed",
-                task_id=str(task_id),
-                context_id=str(context_id),
-                artifact_name=artifact.get("name")
-                if isinstance(artifact, dict)
-                else None,
-                status=exc.status,
-                message=str(exc),
-            )
-        except Exception as exc:  # pragma: no cover - defensive logging
-            logger.error(
-                "Unexpected error delivering artifact notification",
-                task_id=str(task_id),
-                context_id=str(context_id),
-                error=str(exc),
+        except Exception as exc:
+            artifact_name = artifact.get("name") if isinstance(artifact, dict) else None
+            self._log_notification_error(
+                "artifact", task_id, context_id, exc, artifact_name=artifact_name
             )
 
     def schedule_notification(
@@ -356,29 +371,42 @@ class PushNotificationManager:
         asyncio.create_task(self.notify_lifecycle(task_id, context_id, state, final))
 
     def _jsonrpc_error(
-        self, response_class: type, request_id: Any, message: str, code: int = -32001
+        self,
+        response_class: type,
+        request_id: Any,
+        message: str,
+        code: int = JSONRPC_INTERNAL_ERROR_CODE,
     ):
         """Create a JSON-RPC error response."""
         return response_class(
-            jsonrpc="2.0", id=request_id, error={"code": code, "message": message}
+            jsonrpc=JSONRPC_VERSION,
+            id=request_id,
+            error={"code": code, "message": message},
         )
 
     def _push_not_supported_response(self, response_class: type, request_id: Any):
         """Create a 'push not supported' error response."""
         return response_class(
-            jsonrpc="2.0",
+            jsonrpc=JSONRPC_VERSION,
             id=request_id,
-            error={"code": -32005, "message": PUSH_NOT_SUPPORTED_MESSAGE},
+            error={
+                "code": JSONRPC_PUSH_NOT_SUPPORTED_CODE,
+                "message": PUSH_NOT_SUPPORTED_MESSAGE,
+            },
         )
 
     def _create_error_response(
-        self, response_class: type, request_id: str, error_class: type, message: str
+        self,
+        response_class: type,
+        request_id: UUID | str,
+        error_class: type,
+        message: str,
     ) -> Any:
         """Create a standardized error response."""
         return response_class(
-            jsonrpc="2.0",
+            jsonrpc=JSONRPC_VERSION,
             id=request_id,
-            error=error_class(code=-32001, message=message),
+            error=error_class(code=JSONRPC_INTERNAL_ERROR_CODE, message=message),
         )
 
     async def set_task_push_notification(
@@ -435,7 +463,7 @@ class PushNotificationManager:
             subscriber=str(push_config.get("id")),
         )
         return SetTaskPushNotificationResponse(
-            jsonrpc="2.0",
+            jsonrpc=JSONRPC_VERSION,
             id=request["id"],
             result=self.build_task_push_config(task_id),
         )
@@ -454,11 +482,11 @@ class PushNotificationManager:
             return self._jsonrpc_error(
                 GetTaskPushNotificationResponse,
                 request["id"],
-                "Push notification configuration not found for task.",
+                PUSH_CONFIG_NOT_FOUND_MESSAGE,
             )
 
         return GetTaskPushNotificationResponse(
-            jsonrpc="2.0",
+            jsonrpc=JSONRPC_VERSION,
             id=request["id"],
             result=self.build_task_push_config(task_id),
         )
@@ -477,11 +505,11 @@ class PushNotificationManager:
             return self._jsonrpc_error(
                 ListTaskPushNotificationConfigResponse,
                 request["id"],
-                "Push notification configuration not found for task.",
+                PUSH_CONFIG_NOT_FOUND_MESSAGE,
             )
 
         return ListTaskPushNotificationConfigResponse(
-            jsonrpc="2.0",
+            jsonrpc=JSONRPC_VERSION,
             id=request["id"],
             result=self.build_task_push_config(task_id),
         )
@@ -511,14 +539,14 @@ class PushNotificationManager:
             return self._jsonrpc_error(
                 DeleteTaskPushNotificationConfigResponse,
                 request["id"],
-                "Push notification configuration not found for task.",
+                PUSH_CONFIG_NOT_FOUND_MESSAGE,
             )
 
         if existing.get("id") != config_id:
             return self._jsonrpc_error(
                 DeleteTaskPushNotificationConfigResponse,
                 request["id"],
-                "Push notification configuration identifier mismatch.",
+                PUSH_CONFIG_ID_MISMATCH_MESSAGE,
             )
 
         removed = await self.remove_push_config(
@@ -528,7 +556,7 @@ class PushNotificationManager:
             return self._jsonrpc_error(
                 DeleteTaskPushNotificationConfigResponse,
                 request["id"],
-                "Push notification configuration not found for task.",
+                PUSH_CONFIG_NOT_FOUND_MESSAGE,
             )
 
         logger.debug(
@@ -538,7 +566,7 @@ class PushNotificationManager:
         )
 
         return DeleteTaskPushNotificationConfigResponse(
-            jsonrpc="2.0",
+            jsonrpc=JSONRPC_VERSION,
             id=request["id"],
             result={
                 "id": task_id,

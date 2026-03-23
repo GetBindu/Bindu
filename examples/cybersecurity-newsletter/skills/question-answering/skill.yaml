@@ -1,0 +1,48 @@
+# Question Answering Skill
+# Provides intelligent question answering capabilities for cybersecurity topics
+
+id: question-answering-v1
+name: question-answering
+version: 1.0.0
+author: your.email@example.com
+
+description: |
+  Provides intelligent question answering capabilities for cybersecurity topics.
+  Use when users ask factual questions about threats, CVEs, or security best practices.
+
+tags:
+  - qa
+  - knowledge
+  - cybersecurity
+  - reasoning
+
+input_modes:
+  - text/plain
+  - application/json
+
+output_modes:
+  - text/plain
+  - application/json
+
+examples:
+  - "What is a zero-day vulnerability?"
+  - "How does ransomware work?"
+  - "What is a CVE?"
+
+requirements:
+  packages: []
+  system: []
+  min_memory_mb: 100
+
+assessment:
+  keywords:
+    - question
+    - answer
+    - what
+    - why
+    - how
+    - who
+    - explain
+    - knowledge
+    - fact
+    - cybersecurity

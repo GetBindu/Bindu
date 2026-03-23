@@ -1,0 +1,62 @@
+id: text-summarization-skill
+name: Text Summarization Skill
+version: 1.0.0
+author: gaurikasethi88@gmail.com
+description: |
+  Advanced text summarization agent that creates concise, coherent summaries
+  of any input text while preserving key information and context.
+
+  Features:
+  - Intelligent content condensation
+  - Key point extraction and preservation
+  - Context-aware summarization
+  - Coherent narrative flow
+  - Multi-format text support
+  - Rapid processing with OpenRouter integration
+
+  Capabilities:
+  - Long-form text summarization
+  - Article and document condensation
+  - Key point extraction
+  - Context preservation
+  - Coherent summary generation
+
+  Uses OpenRouter's `openai/gpt-oss-120b` model for high-quality
+  summarization with excellent comprehension and generation capabilities.
+
+  Perfect for quickly understanding lengthy documents, articles,
+  reports, or any text content that needs to be condensed efficiently.
+tags:
+  - summarization
+  - text-processing
+  - content-condensation
+  - information-extraction
+  - document-analysis
+  - reading-assistance
+  - productivity
+input_modes:
+  - application/json
+output_modes:
+  - application/json
+examples:
+  - "Summarize this article about climate change"
+  - "Create a summary of the quarterly report"
+  - "Condense this research paper into key points"
+  - "Summarize the meeting transcript"
+  - "Extract main points from this email thread"
+capabilities_detail:
+  text_summarization:
+    supported: true
+    description: "Creates concise 2-3 sentence summaries of any input text"
+  key_point_extraction:
+    supported: true
+    description: "Identifies and preserves the most important information"
+  context_preservation:
+    supported: true
+    description: "Maintains context and coherence in summaries"
+  multi_format_support:
+    supported: true
+    description: "Handles various text formats and structures"
+  rapid_processing:
+    supported: true
+    description: "Fast summarization using OpenRouter's efficient model"

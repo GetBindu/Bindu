@@ -1,0 +1,43 @@
+id: cbt-safety-guardian-v0
+name: cbt-safety-guardian
+version: 0.1.0
+author: imdanishakhtar7@gmail.com
+description: |
+  Performs safety screening on CBT content and user statements.
+  Flags potential self-harm risk and disallowed medical advice.
+tags:
+  - cbt
+  - safety
+  - moderation
+  - risk
+input_modes:
+  - application/json
+  - text/plain
+output_modes:
+  - application/json
+examples:
+  - "User statement + drafter output -> safety verdict"
+capabilities_detail:
+  risk_screening:
+    supported: true
+    outputs:
+      - risk_level
+      - requires_escalation
+      - safe_to_continue
+requirements:
+  packages: []
+  system: []
+performance:
+  avg_processing_time_ms: 150
+  concurrent_requests: 10
+assessment:
+  keywords:
+    - self-harm
+    - suicide
+    - safety
+    - crisis
+    - escalation
+  anti_patterns:
+    - "provide methods"
+    - "medical advice"
+    - "encourage harm"

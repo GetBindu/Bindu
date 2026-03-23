@@ -16,7 +16,7 @@ from bindu.common.protocol.types import (
     TaskState,
 )
 
-ContextT = TypeVar("ContextT", default=Any)
+ContextT = TypeVar("ContextT", default=dict[str, Any])
 
 
 class Storage(ABC, Generic[ContextT]):
@@ -90,25 +90,44 @@ class Storage(ABC, Generic[ContextT]):
         """
 
     @abstractmethod
-    async def list_tasks(self, length: int | None = None) -> list[Task]:
+    async def list_tasks(
+        self, length: int | None = None, offset: int = 0
+    ) -> list[Task]:
         """List all tasks in storage.
 
         Args:
             length: Optional limit on number of tasks to return (most recent)
+            offset: Optional offset for pagination
 
         Returns:
             List of tasks
         """
 
     @abstractmethod
+    async def count_tasks(self, status: TaskState | None = None) -> int:
+        """Count number of tasks, optionally filtered by status.
+
+        Args:
+            status: Optional strict TaskState to filter by (e.g. 'submitted', 'working')
+
+        Returns:
+            Count of matching tasks
+
+        Note:
+            Must be implemented by subclasses to ensure efficient DB-level counting
+            (e.g., SELECT COUNT(*)) rather than loading all records into Python memory.
+        """
+
+    @abstractmethod
     async def list_tasks_by_context(
-        self, context_id: UUID, length: int | None = None
+        self, context_id: UUID, length: int | None = None, offset: int = 0
     ) -> list[Task]:
         """List tasks belonging to a specific context.
 
         Args:
             context_id: Context to filter tasks by
             length: Optional limit on number of tasks to return (most recent)
+            offset: Optional offset for pagination
 
         Returns:
             List of tasks in the context
@@ -152,18 +171,21 @@ class Storage(ABC, Generic[ContextT]):
         """
 
     @abstractmethod
-    async def list_contexts(self, length: int | None = None) -> list[dict]:
+    async def list_contexts(
+        self, length: int | None = None, offset: int = 0
+    ) -> list[ContextT]:
         """List all contexts in storage.
 
         Args:
             length: Optional limit on number of contexts to return (most recent)
+            offset: Optional offset for pagination
 
         Returns:
-            List of context objects
+            List of strictly typed ContextT objects
         """
 
     # -------------------------------------------------------------------------
-    # Utility Operations
+    # Utility & Lifecycle Operations
     # -------------------------------------------------------------------------
 
     @abstractmethod
@@ -183,6 +205,13 @@ class Storage(ABC, Generic[ContextT]):
         Warning: This is a destructive operation.
         """
 
+    @abstractmethod
+    async def close(self) -> None:
+        """Safely close database connection pools and cleanup resources.
+
+        Ensures graceful shutdown for persistent storage engines.
+        """
+
     # -------------------------------------------------------------------------
     # Feedback Operations (Optional)
     # -------------------------------------------------------------------------
@@ -199,7 +228,6 @@ class Storage(ABC, Generic[ContextT]):
             task_id: Task to associate feedback with
             feedback_data: Feedback content (rating, comments, etc.)
         """
-        # Optional - override in subclass if feedback storage is needed
         pass
 
     async def get_task_feedback(self, task_id: UUID) -> list[dict[str, Any]] | None:
@@ -211,7 +239,6 @@ class Storage(ABC, Generic[ContextT]):
         Returns:
             List of feedback entries or None if no feedback exists
         """
-        # Optional - override in subclass if feedback retrieval is needed
         return None
 
     # -------------------------------------------------------------------------
