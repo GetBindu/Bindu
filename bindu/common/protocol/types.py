@@ -99,6 +99,7 @@ TrustLevel: TypeAlias = Literal[
 
 IdentityProvider: TypeAlias = Literal[
     "hydra",  # Ory Hydra OAuth2 provider <NotPartOfA2A>
+    "custom",  # Custom identity provider for standalone agents <NotPartOfA2A>
 ]
 
 CONTACT_ADDRESS_DATA_KEY = "contact_picker.ContactAddress"
@@ -435,10 +436,8 @@ class TaskStatus(TypedDict):
 
     message: NotRequired[Message]
     state: Required[TaskState]
-    timestamp: Required[str] = Field(
-        examples=["2025-10-10T10:00:00Z"],
-        description="ISO datetime value of when the status was updated.",
-    )
+    timestamp: Required[str]
+    """ISO datetime value of when the status was updated."""
 
 
 @pydantic.with_config(ConfigDict(alias_generator=to_camel))
@@ -570,6 +569,9 @@ class TaskSendParams(TypedDict):
 
     metadata: NotRequired[dict[str, Any]]
     """Additional metadata."""
+
+    payment_context: NotRequired[dict[str, Any]]
+    """Payment context for X402 extension (optional)."""
 
 
 @pydantic.with_config(ConfigDict(alias_generator=to_camel))
@@ -740,14 +742,11 @@ class Context(TypedDict):
     role: Required[str]
     """Role of the context."""
 
-    created_at: Required[str] = Field(
-        examples=["2023-10-27T10:00:00Z"],
-        description="ISO datetime when context was created",
-    )
-    updated_at: Required[str] = Field(
-        examples=["2023-10-27T10:00:00Z"],
-        description="ISO datetime when context was last updated",
-    )
+    created_at: Required[str]
+    """ISO datetime when context was created."""
+
+    updated_at: Required[str]
+    """ISO datetime when context was last updated."""
 
     status: NotRequired[Literal["active", "paused", "completed", "archived"]]
     """Context status."""
@@ -1514,7 +1513,7 @@ ListContextsResponse = JSONRPCResponse[
 
 ClearContextsRequest = JSONRPCRequest[Literal["contexts/clear"], ContextIdParams]
 ClearContextsResponse = JSONRPCResponse[
-    Context, JSONRPCError[ContextNotFoundError, ContextNotCancelableError]
+    Context, Union[ContextNotFoundError, ContextNotCancelableError]
 ]
 
 SetTaskPushNotificationRequest = JSONRPCRequest[
@@ -1626,10 +1625,10 @@ class KeycloakRole(TypedDict):
     realm_name: Required[str]
     """The realm name of the role."""
 
-    external_mappings: NotRequired[Dict[str, str]] = {}
+    external_mappings: NotRequired[Dict[str, str]]
     """The external mappings of the role."""
 
-    operation_permissions: NotRequired[Dict[str, TrustLevel]] = {}
+    operation_permissions: NotRequired[Dict[str, TrustLevel]]
     """The operation permissions of the role."""
 
 
@@ -1765,9 +1764,19 @@ class Skill(TypedDict):
     """
 
     documentation_content: NotRequired[str]
-    """Full content of the SKILL.md file.
+    """Full raw content of the skill definition file (skill.yaml or SKILL.md).
 
-    Loaded at runtime for orchestrator discovery and agent selection.
+    Loaded at runtime so the skill is self-contained and can be transmitted
+    over the network (e.g. via gRPC) without needing filesystem access.
+    """
+
+    markdown_content: NotRequired[str]
+    """Rich markdown documentation body from SKILL.md (excluding frontmatter).
+
+    When a skill is defined via SKILL.md, this contains the markdown body
+    after the YAML frontmatter. When both skill.yaml and SKILL.md exist,
+    this contains the SKILL.md body for rich documentation while
+    documentation_content holds the raw skill.yaml content.
     """
 
     capabilities_detail: NotRequired[dict[str, Any]]
@@ -1804,6 +1813,9 @@ class Skill(TypedDict):
 
     version: NotRequired[str]
     """Skill version for compatibility tracking."""
+
+    author: NotRequired[str]
+    """Author of the skill (e.g. email or name)."""
 
     allowed_tools: NotRequired[list[str]]
     """List of tools/capabilities this skill is allowed to use.

@@ -1,87 +1,121 @@
 <div align="center" id="top">
-  <a href="https://getbindu.com">
-    <picture>
-      <img src="assets/bindu.png" alt="Bindu" width="300">
-    </picture>
-  </a>
+<a href="[https://getbindu.com](https://getbindu.com)">
+<picture>
+<img src="assets/bindu.png" alt="Bindu" width="300">
+</picture>
+</a>
 </div>
 
 <p align="center">
-  <em>AI एजेंट्स के लिए पहचान, संचार और भुगतान लेयर</em>
+<em>AI एजेंटों के लिए पहचान, संचार और भुगतान लेयर</em>
 </p>
 
 <p align="center">
-  <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
-  <a href="https://hits.sh/github.com/getbindu/Bindu.svg"><img src="https://hits.sh/github.com/getbindu/Bindu.svg" alt="Hits"></a>
-  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="Python Version"></a>
-  <a href="https://pepy.tech/projects/bindu"><img src="https://static.pepy.tech/personalized-badge/bindu?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads" alt="PyPI Downloads"></a>
-  <a href="https://pypi.org/project/bindu/"><img src="https://img.shields.io/pypi/v/bindu.svg" alt="PyPI version"></a>
-  <a href="https://pypi.org/project/bindu/"><img src="https://img.shields.io/pypi/dm/bindu" alt="PyPI Downloads"></a>
-  <a href="https://coveralls.io/github/getbindu/Bindu?branch=v0.3.18"><img src="https://coveralls.io/repos/github/getbindu/Bindu/badge.svg?branch=v0.3.18" alt="Coverage"></a>
-  <a href="https://github.com/getbindu/Bindu/actions/workflows/release.yml"><img src="https://github.com/getbindu/Bindu/actions/workflows/release.yml/badge.svg" alt="Tests"></a>
-  <a href="https://discord.gg/3w5zuYUuwt"><img src="https://img.shields.io/badge/Join%20Discord-7289DA?logo=discord&logoColor=white" alt="Discord"></a>
-  <a href="https://github.com/getbindu/Bindu/graphs/contributors"><img src="https://img.shields.io/github/contributors/getbindu/Bindu" alt="Contributors"></a>
+<a href="README.md">🇬🇧 English</a> •
+<a href="README.de.md">🇩🇪 Deutsch</a> •
+<a href="README.es.md">🇪🇸 Español</a> •
+<a href="README.fr.md">🇫🇷 Français</a> •
+<a href="README.hi.md">🇮🇳 हिंदी</a> •
+<a href="README.bn.md">🇮🇳 বাংলা</a> •
+<a href="README.zh.md">🇨🇳 中文</a> •
+<a href="README.nl.md">🇳🇱 Nederlands</a> •
+<a href="README.ta.md">🇮🇳 தமிழ்</a>
 </p>
-
----
-
-**Bindu** (उच्चारण: _बिंदु_) AI एजेंट्स के लिए एक ऑपरेटिंग लेयर है जो पहचान, संचार और भुगतान क्षमताएं प्रदान करता है। यह एक प्रोडक्शन-रेडी सर्विस है जो सुविधाजनक API के साथ डिस्ट्रिब्यूटेड सिस्टम्स में एजेंट्स को कनेक्ट, ऑथेंटिकेट और ऑर्केस्ट्रेट करती है – ओपन प्रोटोकॉल का उपयोग करते हुए: **A2A**, **AP2**, और **X402**।
-
-डिस्ट्रिब्यूटेड आर्किटेक्चर (Task Manager, scheduler, storage) के साथ बनाया गया, Bindu तेज़ी से डेवलप करना और किसी भी AI फ्रेमवर्क के साथ इंटीग्रेट करना आसान बनाता है। किसी भी एजेंट फ्रेमवर्क को Internet of Agents में संचार, सहयोग और कॉमर्स के लिए पूरी तरह से इंटरऑपरेबल सर्विस में बदल दें।
 
 <p align="center">
-  <strong>🌟 <a href="https://bindus.directory">अपना एजेंट रजिस्टर करें</a> • 🌻 <a href="https://docs.getbindu.com">डॉक्यूमेंटेशन</a> • 💬 <a href="https://discord.gg/3w5zuYUuwt">Discord कम्युनिटी</a></strong>
+<a href="[https://opensource.org/licenses/Apache-2.0](https://opensource.org/licenses/Apache-2.0)"><img src="[https://img.shields.io/badge/license-Apache%202.0-blue.svg](https://img.shields.io/badge/license-Apache%202.0-blue.svg)" alt="License"></a>
+<a href="[https://hits.sh/github.com/Saptha-me/Bindu.svg](https://hits.sh/github.com/Saptha-me/Bindu.svg)"><img src="[https://hits.sh/github.com/Saptha-me/Bindu.svg](https://hits.sh/github.com/Saptha-me/Bindu.svg)" alt="Hits"></a>
+<a href="[https://www.python.org/downloads/](https://www.python.org/downloads/)"><img src="[https://img.shields.io/badge/python-3.12+-blue.svg](https://img.shields.io/badge/python-3.12+-blue.svg)" alt="Python Version"></a>
+<a href="[https://pepy.tech/projects/bindu](https://pepy.tech/projects/bindu)"><img src="[https://static.pepy.tech/personalized-badge/bindu?period=total\&units=INTERNATIONAL_SYSTEM\&left_color=BLACK\&right_color=GREEN\&left_text=downloads](https://static.pepy.tech/personalized-badge/bindu?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads)" alt="PyPI Downloads"></a>
+<a href="[https://pypi.org/project/bindu/](https://pypi.org/project/bindu/)"><img src="[https://img.shields.io/pypi/v/bindu.svg](https://img.shields.io/pypi/v/bindu.svg)" alt="PyPI version"></a>
+<a href="[https://pypi.org/project/bindu/](https://pypi.org/project/bindu/)"><img src="[https://img.shields.io/pypi/dm/bindu](https://img.shields.io/pypi/dm/bindu)" alt="PyPI Downloads"></a>
+<a href="[https://coveralls.io/github/Saptha-me/Bindu?branch=v0.3.18](https://coveralls.io/github/Saptha-me/Bindu?branch=v0.3.18)"><img src="[https://coveralls.io/repos/github/Saptha-me/Bindu/badge.svg?branch=v0.3.18](https://coveralls.io/repos/github/Saptha-me/Bindu/badge.svg?branch=v0.3.18)" alt="Coverage"></a>
+<a href="[https://github.com/getbindu/Bindu/actions/workflows/release.yml](https://github.com/getbindu/Bindu/actions/workflows/release.yml)"><img src="[https://github.com/getbindu/Bindu/actions/workflows/release.yml/badge.svg](https://github.com/getbindu/Bindu/actions/workflows/release.yml/badge.svg)" alt="Tests"></a>
+<a href="[https://discord.gg/3w5zuYUuwt](https://discord.gg/3w5zuYUuwt)"><img src="[https://img.shields.io/badge/Join%20Discord-7289DA?logo=discord\&logoColor=white](https://img.shields.io/badge/Join%20Discord-7289DA?logo=discord&logoColor=white)" alt="Discord"></a>
+<a href="[https://github.com/getbindu/Bindu/graphs/contributors](https://github.com/getbindu/Bindu/graphs/contributors)"><img src="[https://img.shields.io/github/contributors/getbindu/Bindu](https://img.shields.io/github/contributors/getbindu/Bindu)" alt="Contributors"></a>
 </p>
 
----
+<br>
 
-<br/>
+<p align="center">
+<img src="assets/sunflower-mountains.jpeg" alt="Bindu — The Internet of Agents" width="720" />
+</p>
+
+<p align="center">
+  <strong>🌟 <a href="https://getbindu.com">अपना एजेंट रजिस्टर करें</a> • 🌻 <a href="https://docs.getbindu.com">डॉक्यूमेंटेशन</a> • 💬 <a href="https://discord.gg/3w5zuYUuwt">Discord कम्युनिटी</a></strong>
+</p>
+
+<br>
+
+<div align="center">
+  <h3>एक लाइन में अपने एजेंट को ऑनबोर्ड करें</h3>
+</div>
+
+<div align="center">
+  <pre><code>curl -fsSL https://getbindu.com/install-bindu.sh | bash</code></pre>
+</div>
+
+-----
+
+**Bindu** (उच्चारण: *बिन्दू*) AI एजेंटों के लिए एक ऑपरेटिंग लेयर है जो पहचान, संचार और भुगतान क्षमताएं प्रदान करता है। यह खुले प्रोटोकॉल: **A2A**, **AP2**, और **X402** का उपयोग करके डिस्ट्रिब्यूटेड सिस्टम्स में एजेंटों को जोड़ने, प्रमाणित करने और व्यवस्थित करने के लिए एक सुविधाजनक API के साथ प्रोडक्शन-रेडी सेवा प्रदान करता है।
+
+एक डिस्ट्रिब्यूटेड आर्किटेक्चर (Task Manager, scheduler, storage) के साथ निर्मित, Bindu इसे तेज़ी से विकसित करना और किसी भी AI framework के साथ एकीकृत करना आसान बनाता है। किसी भी एजेंट framework को Internet of Agents में संचार, सहयोग और वाणिज्य के लिए पूरी तरह से इंटरऑपरेबल सेवा में बदलें।
+
+<p align="center">
+<strong>🌟 <a href="[https://bindus.directory](https://bindus.directory)">अपना एजेंट रजिस्टर करें</a> • 🌻 <a href="[https://docs.getbindu.com](https://docs.getbindu.com)">दस्तावेज़</a> • 💬 <a href="[https://discord.gg/3w5zuYUuwt](https://discord.gg/3w5zuYUuwt)">Discord कम्युनिटी</a></strong>
+</p>
+
+-----
+
+<br>
 
 ## 🎥 Bindu को एक्शन में देखें
 
 <div align="center">
-  <a href="https://www.youtube.com/watch?v=qppafMuw_KI" target="_blank">
-    <img src="https://img.youtube.com/vi/qppafMuw_KI/maxresdefault.jpg" alt="Bindu Demo" width="640" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
-  </a>
+<a href="[https://www.youtube.com/watch?v=qppafMuw_KI](https://www.youtube.com/watch?v=qppafMuw_KI)" target="_blank">
+<img src="[https://img.youtube.com/vi/qppafMuw_KI/maxresdefault.jpg](https://img.youtube.com/vi/qppafMuw_KI/maxresdefault.jpg)" alt="Bindu Demo" width="640" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
+</a>
 </div>
 
-## 📋 आवश्यकताएं
+<br>
 
-Bindu इंस्टॉल करने से पहले सुनिश्चित करें कि आपके पास है:
+## 📋 पूर्व-आवश्यकताएं (Prerequisites)
 
-- **Python 3.12 या उससे ऊपर** - [यहां डाउनलोड करें](https://www.python.org/downloads/)
-- **UV Package Manager** - [इंस्टॉलेशन गाइड](https://github.com/astral-sh/uv)
-- **API Key आवश्यक**: अपने environment variables में `OPENROUTER_API_KEY` या `OPENAI_API_KEY` सेट करें। टेस्टिंग के लिए फ्री OpenRouter models उपलब्ध हैं।
+Bindu इंस्टॉल करने से पहले, सुनिश्चित करें कि आपके पास है:
 
-### अपना सेटअप वेरिफाई करें
+  - **Python 3.12 या उससे उच्च** - [यहाँ से डाउनलोड करें](https://www.python.org/downloads/)
+  - **uv पैकेज मैनेजर** - [इंस्टालेशन गाइड](https://github.com/astral-sh/uv)
+  - **API Key आवश्यक**: अपने एनवायरनमेंट वेरिएबल्स में `OPENROUTER_API_KEY` या `OPENAI_API_KEY` सेट करें। टेस्टिंग के लिए मुफ्त OpenRouter मॉडल उपलब्ध हैं।
+
+### अपना सेटअप सत्यापित करें
 
 ```bash
 # Python वर्जन चेक करें
-uv run python --version  # 3.12 या उससे ऊपर दिखाना चाहिए
+uv run python --version  # 3.12 या उससे उच्च दिखना चाहिए
 
-# UV इंस्टॉलेशन चेक करें
+# UV इंस्टालेशन चेक करें
 uv --version
 ```
 
----
+-----
 
-<br/>
+<br>
 
-## 📦 इंस्टॉलेशन
+## 📦 इंस्टालेशन (Installation)
 
 <details>
-<summary><b>Windows यूजर्स के लिए नोट (Git & GitHub Desktop)</b></summary>
+<summary><b>उपयोगकर्ता नोट (Git और GitHub Desktop)</b></summary>
 
-कुछ Windows सिस्टम्स पर, इंस्टॉलेशन के बाद भी Command Prompt में git को पहचाना नहीं जा सकता – PATH कॉन्फ़िगरेशन समस्याओं के कारण।
+कुछ Windows सिस्टम पर, इंस्टालेशन के बाद भी PATH कॉन्फ़िगरेशन समस्याओं के कारण Command Prompt में git की पहचान नहीं हो पाती है।
 
 यदि आप इस समस्या का सामना करते हैं, तो आप विकल्प के रूप में *GitHub Desktop* का उपयोग कर सकते हैं:
 
-1. https://desktop.github.com/ से GitHub Desktop इंस्टॉल करें
-2. अपने GitHub अकाउंट से साइन इन करें
-3. रिपॉजिटरी URL का उपयोग करके क्लोन करें:
-   https://github.com/getbindu/Bindu.git
+1.  [https://desktop.github.com/](https://desktop.github.com/) से GitHub Desktop इंस्टॉल करें
+2.  अपने GitHub अकाउंट से साइन इन करें
+3.  रिपॉजिटरी URL का उपयोग करके रिपॉजिटरी को क्लोन करें:
+    [https://github.com/getbindu/Bindu.git](https://github.com/getbindu/Bindu.git)
 
-GitHub Desktop आपको कमांड लाइन के बिना रिपॉजिटरी क्लोन करने, ब्रांच मैनेज करने, चेंजेस कमिट करने और pull request खोलने की सुविधा देता है।
+GitHub Desktop आपको कमांड लाइन का उपयोग किए बिना क्लोन करने, ब्रांच मैनेज करने, बदलाव कमिट करने और pull requests खोलने की अनुमति देता है।
 
 </details>
 
@@ -89,7 +123,7 @@ GitHub Desktop आपको कमांड लाइन के बिना र
 # Bindu इंस्टॉल करें
 uv add bindu
 
-# डेवलपमेंट के लिए (यदि आप Bindu में कंट्रिब्यूट कर रहे हैं)
+# डेवलपमेंट के लिए (यदि Bindu में योगदान दे रहे हैं)
 # वर्चुअल एनवायरनमेंट बनाएं और एक्टिवेट करें
 uv venv --python 3.12.9
 source .venv/bin/activate  # macOS/Linux पर
@@ -99,63 +133,41 @@ uv sync --dev
 ```
 
 <details>
-<summary><b>सामान्य इंस्टॉलेशन समस्याएं</b> (विस्तार के लिए क्लिक करें)</summary>
+<summary><b>सामान्य इंस्टालेशन समस्याएं</b> (विस्तार के लिए क्लिक करें)</summary>
 
-<br/>
+<br>
 
 | समस्या | समाधान |
 |-------|----------|
-| `uv: command not found` | UV इंस्टॉल करने के बाद टर्मिनल रीस्टार्ट करें। Windows पर PowerShell का उपयोग करें |
+| `uv: command not found` | uv इंस्टॉल करने के बाद अपना टर्मिनल रीस्टार्ट करें। Windows पर, PowerShell का उपयोग करें |
 | `Python version not supported` | [python.org](https://www.python.org/downloads/) से Python 3.12+ इंस्टॉल करें |
-| वर्चुअल एनवायरनमेंट एक्टिवेट नहीं हो रहा (Windows) | PowerShell का उपयोग करें और `.venv\Scripts\activate` रन करें |
+| वर्चुअल एनवायरनमेंट एक्टिवेट नहीं हो रहा (Windows) | PowerShell का उपयोग करें और `.venv\Scripts\activate` चलाएं |
 | `Microsoft Visual C++ required` | [Visual C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) डाउनलोड करें |
-| `ModuleNotFoundError` | venv एक्टिवेट करें और `uv sync --dev` रन करें |
+| `ModuleNotFoundError` | venv एक्टिवेट करें और `uv sync --dev` चलाएं |
 
 </details>
 
----
+-----
 
-<br/>
+<br>
 
-## 🚀 त्वरित शुरुआत
+## 🚀 क्विक स्टार्ट
 
-### विकल्प 1: Cookiecutter का उपयोग करें (अनुशंसित)
-
-**पहले एजेंट तक का समय: ~2 मिनट ⏱️**
-
-```bash
-# Cookiecutter इंस्टॉल करें
-uv add cookiecutter
-
-# अपना Bindu एजेंट बनाएं
-uvx cookiecutter https://github.com/getbindu/create-bindu-agent.git
-```
-
-## 🎥 मिनटों में प्रोडक्शन-रेडी एजेंट बनाएं
-
-<div align="center">
-  <a href="https://youtu.be/obY1bGOoWG8?si=uEeDb0XWrtYOQTL7" target="_blank">
-    <img src="https://img.youtube.com/vi/obY1bGOoWG8/maxresdefault.jpg" alt="Bindu Demo" width="640" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
-  </a>
-</div>
-
-बस हो गया! आपका लोकल एजेंट अब एक लाइव, सिक्योर और डिस्कवरेबल सर्विस है। [और जानें →](https://docs.getbindu.com/bindu/create-bindu-agent/overview)
-
-> **💡 प्रो टिप:** Cookiecutter से बनाए गए एजेंट्स में GitHub Actions होते हैं जो आपके रिपॉजिटरी में push करने पर स्वचालित रूप से [Bindu Directory](https://bindus.directory) में एजेंट को रजिस्टर कर देते हैं। मैनुअल रजिस्ट्रेशन की जरूरत नहीं!
-
-### विकल्प 2: मैनुअल सेटअप
+### विकल्प 1: मैन्युअल सेटअप
 
 अपनी एजेंट स्क्रिप्ट `my_agent.py` बनाएं:
 
 ```python
+import os
+
 from bindu.penguin.bindufy import bindufy
 from agno.agent import Agent
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.models.openai import OpenAIChat
 
-# अपना एजेंट डिफाइन करें
+# अपना एजेंट परिभाषित करें
 agent = Agent(
-    instructions="आप एक रिसर्च असिस्टेंट हैं जो जानकारी खोजते और सारांशित करते हैं।",
+    instructions="You are a research assistant that finds and summarizes information.",
     model=OpenAIChat(id="gpt-4o"),
     tools=[DuckDuckGoTools()],
 )
@@ -164,17 +176,20 @@ agent = Agent(
 config = {
     "author": "your.email@example.com",
     "name": "research_agent",
-    "description": "एक रिसर्च असिस्टेंट एजेंट",
-    "deployment": {"url": "http://localhost:3773", "expose": True},
+    "description": "A research assistant agent",
+    "deployment": {
+        "url": os.getenv("BINDU_DEPLOYMENT_URL", "http://localhost:3773"),
+        "expose": True,
+    },
     "skills": ["skills/question-answering", "skills/pdf-processing"]
 }
 
-# Handler फंक्शन
+# हैंडलर फंक्शन
 def handler(messages: list[dict[str, str]]):
-    """मैसेज प्रोसेस करता है और एजेंट का रिस्पॉन्स रिटर्न करता है।
+    """संदेशों को प्रोसेस करें और एजेंट रिस्पॉन्स वापस करें।
 
     Args:
-        messages: बातचीत के इतिहास के साथ मैसेज डिक्शनरी की लिस्ट
+        messages: बातचीत का इतिहास रखने वाली मैसेज डिक्शनरी की लिस्ट
 
     Returns:
         एजेंट रिस्पॉन्स रिजल्ट
@@ -182,24 +197,45 @@ def handler(messages: list[dict[str, str]]):
     result = agent.run(input=messages)
     return result
 
-# Bindu-फाई करें
+# इसे Bindu-fy करें
 bindufy(config, handler)
+
+# अपने एजेंट को इंटरनेट पर एक्सपोज़ करने के लिए टनल का उपयोग करें
+# bindufy(config, handler, launch=True)
 ```
 
-![Sample Agent](assets/agno-simple.png)
+आपका एजेंट अब `deployment.url` में कॉन्फ़िगर किए गए URL पर लाइव है।
 
-आपका एजेंट अब `http://localhost:3773` पर लाइव है और दूसरे एजेंट्स के साथ कम्युनिकेट करने के लिए तैयार है।
+बिना कोड बदले कस्टम पोर्ट सेट करें:
 
----
+```bash
+# Linux/macOS
+export BINDU_PORT=4000
 
-### विकल्प 3: मिनिमल Echo एजेंट (टेस्टिंग)
+# Windows PowerShell
+$env:BINDU_PORT="4000"
+```
+
+मौजूदा उदाहरण जो `http://localhost:3773` का उपयोग करते हैं, `BINDU_PORT` सेट होने पर स्वचालित रूप से ओवरराइड हो जाते हैं।
+
+### विकल्प 2: Zero-Config स्थानीय एजेंट
+
+बिना PostgreSQL, Redis, या किसी क्लाउड सेवा को सेटअप किए Bindu आज़माएं। in-memory storage और scheduler का उपयोग करके पूरी तरह से स्थानीय स्तर पर चलता है।
+
+```bash
+python examples/beginner_zero_config_agent.py
+```
+
+### विकल्प 3: मिनिमल इको (Echo) एजेंट (टेस्टिंग के लिए)
 
 <details>
-<summary><b>मिनिमल उदाहरण देखें</b> (विस्तार के लिए क्लिक करें)</summary>
+<summary><b>न्यूनतम उदाहरण देखें</b> (क्लिक करें)</summary>
 
-सबसे छोटा काम करने वाला एजेंट:
+सबसे छोटा संभव वर्किंग एजेंट:
 
 ```python
+import os
+
 from bindu.penguin.bindufy import bindufy
 
 def handler(messages):
@@ -208,29 +244,36 @@ def handler(messages):
 config = {
     "author": "your.email@example.com",
     "name": "echo_agent",
-    "description": "त्वरित टेस्टिंग के लिए एक बेसिक echo एजेंट।",
-    "deployment": {"url": "http://localhost:3773", "expose": True},
+    "description": "A basic echo agent for quick testing.",
+    "deployment": {
+        "url": os.getenv("BINDU_DEPLOYMENT_URL", "http://localhost:3773"),
+        "expose": True,
+    },
     "skills": []
 }
 
 bindufy(config, handler)
+
+# अपने एजेंट को इंटरनेट पर एक्सपोज़ करने के लिए टनल का उपयोग करें
+# bindufy(config, handler, launch=True)
 ```
 
-**रन और टेस्ट करें:**
+**एजेंट चलाएं:**
 
 ```bash
-# एजेंट स्टार्ट करें
+# एजेंट शुरू करें
 python examples/echo_agent.py
 ```
 
 </details>
 
 <details>
-<summary><b>curl के साथ एजेंट टेस्ट करें</b> (विस्तार के लिए क्लिक करें)</summary>
+<summary><b>curl के साथ एजेंट का परीक्षण करें</b> (क्लिक करें)</summary>
 
-<br/>
+<br>
 
 इनपुट:
+
 ```bash
 curl --location 'http://localhost:3773/' \
 --header 'Content-Type: application/json' \
@@ -262,6 +305,7 @@ curl --location 'http://localhost:3773/' \
 ```
 
 आउटपुट:
+
 ```bash
 {
     "jsonrpc": "2.0",
@@ -293,7 +337,8 @@ curl --location 'http://localhost:3773/' \
 }
 ```
 
-Task का स्टेटस चेक करें
+टास्क का स्टेटस चेक करें
+
 ```bash
 curl --location 'http://localhost:3773/' \
 --header 'Content-Type: application/json' \
@@ -308,6 +353,7 @@ curl --location 'http://localhost:3773/' \
 ```
 
 आउटपुट:
+
 ```bash
 {
     "jsonrpc": "2.0",
@@ -369,490 +415,137 @@ curl --location 'http://localhost:3773/' \
 
 </details>
 
----
-
-<br/>
-
-## [Postgres Storage](https://docs.getbindu.com/bindu/learn/storage/overview)
-
-Bindu प्रोडक्शन डिप्लॉयमेंट के लिए PostgreSQL को अपने persistent storage backend के रूप में उपयोग करता है। Storage लेयर SQLAlchemy के async engine के साथ बनाई गई है और protocol TypedDicts के साथ imperative mapping का उपयोग करती है।
-
-यह वैकल्पिक है - डिफ़ॉल्ट रूप से InMemoryStorage का उपयोग किया जाता है।
-
-### 📊 Storage स्ट्रक्चर
-
-Storage लेयर तीन मुख्य टेबल्स का उपयोग करती है:
-
-1. **tasks_table**: JSONB history और artifacts के साथ सभी tasks को स्टोर करता है
-2. **contexts_table**: Context metadata और message history को बनाए रखता है
-3. **task_feedback_table**: Tasks के लिए वैकल्पिक feedback storage
-
-### ⚙️ कॉन्फ़िगरेशन
-
-<details>
-<summary><b>कॉन्फ़िगरेशन उदाहरण देखें</b> (विस्तार के लिए क्लिक करें)</summary>
-
-अपने environment या settings में PostgreSQL connection कॉन्फ़िगर करें:
-एजेंट के config में connection string प्रदान करें।
-
-```json
-config = {
-    "author": "your.email@example.com",
-    "name": "research_agent",
-    "description": "एक रिसर्च असिस्टेंट एजेंट",
-    "deployment": {"url": "http://localhost:3773", "expose": True},
-    "skills": ["skills/question-answering", "skills/pdf-processing"],
-    "storage": {
-        "type": "postgres",
-        "database_url": "postgresql+asyncpg://bindu:bindu@localhost:5432/bindu",  # pragma: allowlist secret
-        "run_migrations_on_startup": False,
-    },
-}
-```
-
-</details>
-
-**💡 Task-First Pattern**: Storage Bindu के task-first approach को सपोर्ट करता है जहां non-terminal tasks में messages जोड़कर tasks को जारी रखा जा सकता है, जो incremental refinements और multi-turn conversations को सक्षम बनाता है।
-
----
-
-<br/>
-
-## [Redis Scheduler](https://docs.getbindu.com/bindu/learn/scheduler/overview)
-
-Bindu कई workers और processes में काम को समन्वित करने के लिए Redis को अपने distributed task scheduler के रूप में उपयोग करता है। Scheduler कुशल task distribution के लिए blocking operations के साथ Redis lists का उपयोग करता है।
-
-यह वैकल्पिक है - डिफ़ॉल्ट रूप से InMemoryScheduler का उपयोग किया जाता है।
-
-### ⚙️ कॉन्फ़िगरेशन
-
-<details>
-<summary><b>कॉन्फ़िगरेशन उदाहरण देखें</b> (विस्तार के लिए क्लिक करें)</summary>
-
-अपने एजेंट config में Redis connection कॉन्फ़िगर करें:
-
-```json
-config = {
-    "author": "your.email@example.com",
-    "name": "research_agent",
-    "description": "एक रिसर्च असिस्टेंट एजेंट",
-    "deployment": {"url": "http://localhost:3773", "expose": True},
-    "skills": ["skills/question-answering", "skills/pdf-processing"],
-     "scheduler": {
-        "type": "redis",
-        "redis_url": "redis://localhost:6379/0",
-    },
-}
-```
-
-</details>
-
-सभी operations Redis में queue किए जाते हैं और उपलब्ध workers द्वारा blocking pop mechanism का उपयोग करके प्रोसेस किए जाते हैं, जो polling overhead के बिना कुशल distribution सुनिश्चित करता है।
-
----
-
-<br/>
-
-## [Retry Mechanism](https://docs.getbindu.com/bindu/learn/retry/overview)
-
-> लचीले Bindu एजेंट्स के लिए exponential backoff के साथ स्वचालित retry logic
-
-Bindu में एक built-in Tenacity-based retry mechanism है जो workers, storage, schedulers और API calls में transient failures को सुचारू रूप से संभालता है। यह सुनिश्चित करता है कि आपके एजेंट्स प्रोडक्शन environments में लचीले रहें।
-
-### ⚙️ डिफ़ॉल्ट सेटिंग्स
-
-यदि कॉन्फ़िगर नहीं किया गया है, तो Bindu इन defaults का उपयोग करता है:
-
-| Operation Type | Max Attempts | Min Wait | Max Wait |
-| -------------- | ------------ | -------- | -------- |
-| Worker         | 3            | 1.0s     | 10.0s    |
-| Storage        | 5            | 0.5s     | 5.0s     |
-| Scheduler      | 3            | 1.0s     | 8.0s     |
-| API            | 4            | 1.0s     | 15.0s    |
-
----
-
-<br/>
-
-## [Sentry Integration](https://docs.getbindu.com/bindu/learn/sentry/overview)
-
-> Bindu एजेंट्स के लिए रियल-टाइम error tracking और performance monitoring
-
-Sentry एक रियल-टाइम error tracking और performance monitoring platform है जो आपको प्रोडक्शन में समस्याओं की पहचान करने, निदान करने और ठीक करने में मदद करता है। Bindu में आपके AI एजेंट्स के लिए व्यापक observability प्रदान करने के लिए built-in Sentry integration है।
-
-### ⚙️ कॉन्फ़िगरेशन
-
-<details>
-<summary><b>कॉन्फ़िगरेशन उदाहरण देखें</b> (विस्तार के लिए क्लिक करें)</summary>
-
-अपने `bindufy()` config में सीधे Sentry कॉन्फ़िगर करें:
-
-```python
-config = {
-    "author": "gaurikasethi88@gmail.com",
-    "name": "echo_agent",
-    "description": "त्वरित टेस्टिंग के लिए एक बेसिक echo एजेंट।",
-    "deployment": {"url": "http://localhost:3773", "expose": True},
-    "skills": [],
-    "storage": {
-        "type": "postgres",
-        "database_url": "postgresql+asyncpg://bindu:bindu@localhost:5432/bindu",  # pragma: allowlist secret
-        "run_migrations_on_startup": False,
-    },
-    # Scheduler कॉन्फ़िगरेशन (वैकल्पिक)
-    # Single-process के लिए "memory" (default) या distributed multi-process के लिए "redis" का उपयोग करें
-    "scheduler": {
-        "type": "redis",
-        "redis_url": "redis://localhost:6379/0",
-    },
-    # Sentry error tracking (वैकल्पिक)
-    # Environment variables के बजाय code में सीधे Sentry कॉन्फ़िगर करें
-    "sentry": {
-        "enabled": True,
-        "dsn": "https://252c0197ddeafb621f91abdbb59fa819@o4510504294612992.ingest.de.sentry.io/4510504299069520",
-        "environment": "development",
-        "traces_sample_rate": 1.0,
-        "profiles_sample_rate": 0.1,
-    },
-}
-
-def handler(messages):
-    # आपका एजेंट logic
-    pass
-
-bindufy(config, handler)
-```
-
-</details>
-
-### 🚀 शुरुआत करना
-
-1. **Sentry Account बनाएं**: [sentry.io](https://sentry.io) पर साइन अप करें
-2. **अपना DSN प्राप्त करें**: Project settings से कॉपी करें
-3. **Bindu कॉन्फ़िगर करें**: `sentry` config जोड़ें (ऊपर देखें)
-4. **अपना एजेंट रन करें**: Sentry स्वचालित रूप से initialize होता है
-
-> 📚 पूर्ण विवरण के लिए [पूर्ण Sentry डॉक्यूमेंटेशन](https://docs.getbindu.com/bindu/learn/sentry/overview) देखें।
-
----
-
-<br/>
-
-## [Skills System](https://docs.getbindu.com/bindu/skills/introduction/overview)
-
-> बुद्धिमान एजेंट orchestration के लिए समृद्ध capability advertisement
-
-Bindu Skills System बुद्धिमान orchestration और एजेंट discovery के लिए समृद्ध एजेंट capability advertisement प्रदान करता है। Claude की skills architecture से प्रेरित, यह एजेंट्स को उनकी क्षमताओं के बारे में विस्तृत documentation प्रदान करने में सक्षम बनाता है ताकि orchestrators सूचित routing निर्णय ले सकें।
-
-### 💡 Skills क्या हैं?
-
-Bindu में Skills **समृद्ध advertisement metadata** के रूप में कार्य करते हैं जो orchestrators की मदद करते हैं:
-
-* 🔍 **खोजने** में एक task के लिए सही एजेंट
-* 📖 **समझने** में विस्तृत क्षमताएं और सीमाएं
-* ✅ **सत्यापित करने** में execution से पहले requirements
-* 📊 **अनुमान लगाने** में performance और resource needs
-* 🔗 **Chain करने** में कई एजेंट्स को बुद्धिमानी से
-
-> **नोट**: Skills executable code नहीं हैं—वे structured metadata हैं जो वर्णन करते हैं कि आपका एजेंट क्या कर सकता है।
-
-### 🔌 API Endpoints
-
-**सभी Skills की सूची बनाएं**:
-```bash
-GET /agent/skills
-```
-
-**Skill विवरण प्राप्त करें**:
-```bash
-GET /agent/skills/{skill_id}
-```
-
-**Skill डॉक्यूमेंटेशन प्राप्त करें**:
-```bash
-GET /agent/skills/{skill_id}/documentation
-```
-
-> 📚 पूर्ण उदाहरणों के लिए [Skills डॉक्यूमेंटेशन](https://github.com/getbindu/Bindu/tree/main/examples/skills) देखें।
-
----
-
-<br/>
-
-## Negotiation
-
-> बुद्धिमान orchestration के लिए capability-based एजेंट selection
-
-Bindu का negotiation system orchestrators को कई एजेंट्स को query करने और skills, performance, load और cost के आधार पर बुद्धिमानी से एक task के लिए सबसे अच्छा एजेंट चुनने में सक्षम बनाता है।
-
-### 🔄 यह कैसे काम करता है
-
-1. **Orchestrator broadcasts** कई एजेंट्स को assessment request
-2. **एजेंट्स self-assess** skill matching और load analysis का उपयोग करके capability
-3. **Orchestrator ranks** multi-factor scoring का उपयोग करके responses
-4. **सबसे अच्छा एजेंट चुना जाता है** और task execute किया जाता है
-
-### 🔌 Assessment Endpoint
-
-<details>
-<summary><b>API विवरण देखें</b> (विस्तार के लिए क्लिक करें)</summary>
-
-```bash
-POST /agent/negotiation
-```
-
-**Request:**
-```json
-{
-  "task_summary": "PDF invoices से tables extract करें",
-  "task_details": "Invoice PDFs को process करें और structured data extract करें",
-  "input_mime_types": ["application/pdf"],
-  "output_mime_types": ["application/json"],
-  "max_latency_ms": 5000,
-  "max_cost_amount": "0.001",
-  "min_score": 0.7,
-  "weights": {
-    "skill_match": 0.6,
-    "io_compatibility": 0.2,
-    "performance": 0.1,
-    "load": 0.05,
-    "cost": 0.05
-  }
-}
-```
-
-**Response:**
-```json
-{
-  "accepted": true,
-  "score": 0.89,
-  "confidence": 0.95,
-  "skill_matches": [
-    {
-      "skill_id": "pdf-processing-v1",
-      "skill_name": "pdf-processing",
-      "score": 0.92,
-      "reasons": [
-        "semantic similarity: 0.95",
-        "tags: pdf, tables, extraction",
-        "capabilities: text_extraction, table_extraction"
-      ]
-    }
-  ],
-  "matched_tags": ["pdf", "tables", "extraction"],
-  "matched_capabilities": ["text_extraction", "table_extraction"],
-  "latency_estimate_ms": 2000,
-  "queue_depth": 2,
-  "subscores": {
-    "skill_match": 0.92,
-    "io_compatibility": 1.0,
-    "performance": 0.85,
-    "load": 0.90,
-    "cost": 1.0
-  }
-}
-```
-
-</details>
-
-### 📊 Scoring Algorithm
-
-एजेंट्स कई factors के आधार पर एक confidence score की गणना करते हैं:
-
-```python
-score = (
-    skill_match * 0.6 +        # Primary: skill matching
-    io_compatibility * 0.2 +   # Input/output format support
-    performance * 0.1 +        # Speed और reliability
-    load * 0.05 +              # वर्तमान availability
-    cost * 0.05                # Pricing
-)
-```
-
-> 📚 पूर्ण विवरण के लिए [Negotiation डॉक्यूमेंटेशन](https://docs.getbindu.com/bindu/negotiation/overview) देखें।
-
----
-
-<br/>
-
-## Task Feedback और DSPy
-
-Bindu DSPy optimization के माध्यम से निरंतर सुधार को सक्षम करने के लिए task executions पर user feedback एकत्र करता है। Ratings और metadata के साथ feedback स्टोर करके, आप वास्तविक interactions से golden datasets बना सकते हैं और अपने एजेंट के prompts और behavior को स्वचालित रूप से optimize करने के लिए DSPy का उपयोग कर सकते हैं।
-
-### Feedback सबमिट करना
-
-`tasks/feedback` method का उपयोग करके किसी भी task पर feedback प्रदान करें:
-
-```bash
-curl --location 'http://localhost:3773/' \
---header 'Content-Type: application/json' \
---header 'Authorization: Bearer <your-token>' \
---data '{
-    "jsonrpc": "2.0",
-    "method": "tasks/feedback",
-    "params": {
-        "taskId": "550e8400-e29b-41d4-a716-446655440200",
-        "feedback": "बढ़िया काम! रिस्पॉन्स बहुत मददगार और सटीक था।",
-        "rating": 5,
-        "metadata": {
-            "category": "quality",
-            "source": "user",
-            "helpful": true
-        }
-    },
-    "id": "550e8400-e29b-41d4-a716-446655440024"
-}'
-```
-
-Feedback `task_feedback` table में स्टोर किया जाता है और इसका उपयोग किया जा सकता है:
-- Training data के लिए उच्च-गुणवत्ता वाले task interactions को फ़िल्टर करने के लिए
-- सफल बनाम असफल completions में patterns की पहचान करने के लिए
-- DSPy के साथ एजेंट instructions और few-shot examples को optimize करने के लिए
-- हम DsPY पर काम कर रहे हैं - जल्द ही रिलीज़ करेंगे।
-
----
-
-<br/>
-
-## 📬 Push Notifications
-
-Bindu लंबे समय तक चलने वाले tasks के लिए **रियल-टाइम webhook notifications** का समर्थन करता है, [A2A Protocol specification](https://a2a-protocol.org/latest/specification/) का पालन करते हुए। यह clients को polling के बिना task state changes और artifact generation के बारे में push notifications प्राप्त करने में सक्षम बनाता है।
-
-### त्वरित शुरुआत
-
-1. **Webhook receiver स्टार्ट करें:** `python examples/webhook_client_example.py`
-2. **एजेंट कॉन्फ़िगर करें** `examples/echo_agent_with_webhooks.py` में:
-   ```python
-   manifest = {
-       "capabilities": {"push_notifications": True},
-       "global_webhook_url": "http://localhost:8000/webhooks/task-updates",
-       "global_webhook_token": "secret_abc123",
-   }
-   ```
-3. **एजेंट रन करें:** `python examples/echo_agent_with_webhooks.py`
-4. **Tasks भेजें** - webhook notifications स्वचालित रूप से आते हैं
-
-📖 **[पूर्ण डॉक्यूमेंटेशन](docs/long-running-task-notifications.md)** - Architecture, security, examples और troubleshooting के साथ विस्तृत गाइड।
-
----
-
-<br/>
-
-## 🎨 Chat UI
-
-Bindu `http://localhost:3773/docs` पर एक सुंदर chat interface शामिल करता है
+-----
+
+## 🚀 मुख्य विशेषताएं (Core Features)
+
+| विशेषता | विवरण | दस्तावेज़ |
+|---------|-------------|---------------|
+|  **Authentication** | Ory Hydra OAuth2 के साथ सुरक्षित API एक्सेस (डेवलपमेंट के लिए वैकल्पिक) | [गाइड →](https://www.google.com/search?q=docs/AUTHENTICATION.md) |
+| 💰 **Payment Integration (X402)** | प्रोटेक्टेड मेथड्स चलाने से पहले Base ब्लॉकचेन पर USDC भुगतान स्वीकार करें | [गाइड →](https://www.google.com/search?q=docs/PAYMENT.md) |
+| 💾 **PostgreSQL Storage** | प्रोडक्शन परिनियोजन के लिए पर्सिस्टेंट स्टोरेज (वैकल्पिक - डिफ़ॉल्ट रूप से InMemoryStorage) | [गाइड →](https://www.google.com/search?q=docs/STORAGE.md) |
+| 📋 **Redis Scheduler** | मल्टी-वर्कर परिनियोजन के लिए डिस्ट्रिब्यूटेड टास्क शेड्यूलिंग (वैकल्पिक - डिफ़ॉल्ट रूप से InMemoryScheduler) | [गाइड →](https://www.google.com/search?q=docs/SCHEDULER.md) |
+| 🎯 **Skills System** | दोबारा इस्तेमाल होने वाली क्षमताएं जिन्हें एजेंट इंटेलिजेंट टास्क रूटिंग के लिए विज्ञापन (advertise) और निष्पादित करते हैं | [गाइड →](https://www.google.com/search?q=docs/SKILLS.md) |
+| 🤝 **Agent Negotiation** | इंटेलिजेंट ऑर्केस्ट्रेशन के लिए क्षमता-आधारित एजेंट चयन | [गाइड →](https://www.google.com/search?q=docs/NEGOTIATION.md) |
+| 🌐 **Tunneling** | टेस्टिंग के लिए स्थानीय एजेंटों को इंटरनेट पर एक्सपोज़ करें (**केवल स्थानीय डेवलपमेंट के लिए, प्रोडक्शन के लिए नहीं**) | [गाइड →](https://www.google.com/search?q=docs/TUNNELING.md) |
+| 📬 **Push Notifications** | टास्क अपडेट के लिए रीयल-टाइम वेबहुक नोटिफिकेशन - पोलिंग की आवश्यकता नहीं | [गाइड →](https://www.google.com/search?q=docs/NOTIFICATIONS.md) |
+| 📊 **Observability & Monitoring** | OpenTelemetry और Sentry के साथ परफॉरमेंस ट्रैक करें और समस्याओं को डीबग करें | [गाइड →](https://www.google.com/search?q=docs/OBSERVABILITY.md) |
+| 🔄 **Retry Mechanism** | लचीले एजेंटों के लिए एक्सपोनेंशियल बैकऑफ के साथ स्वचालित रिट्राय | [गाइड →](https://docs.getbindu.com/bindu/learn/retry/overview) |
+| 🔑 **Decentralized Identifiers (DIDs)** | सत्यापन योग्य, सुरक्षित एजेंट इंटरैक्शन और भुगतान एकीकरण के लिए क्रिप्टोग्राफ़िक पहचान | [गाइड →](https://www.google.com/search?q=docs/DID.md) |
+| 🏥 **Health Check & Metrics** | इन-बिल्ट एंडपॉइंट्स के साथ एजेंट हेल्थ और परफॉरमेंस की निगरानी करें | [गाइड →](https://www.google.com/search?q=docs/HEALTH_METRICS.md) |
+
+-----
+
+<br>
+
+## 🎨 चैट UI (Chat UI)
+
+Bindu में `http://localhost:5173` पर एक सुंदर चैट इंटरफ़ेस शामिल है। `frontend` फ़ोल्डर में जाएं और सर्वर शुरू करने के लिए `npm run dev` चलाएं।
 
 <p align="center">
-  <img src="assets/agent-ui.png" alt="Bindu Agent UI" width="640" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
+  <img src="assets/new-ui.png" alt="Bindu Agent UI" width="640" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
 </p>
 
----
+-----
 
-<br/>
+<br>
 
-## 🌐 Bindu Directory
+## 🌐 GetBindu.com
 
-[**Bindu Directory**](https://bindus.directory) सभी Bindu एजेंट्स की एक पब्लिक रजिस्ट्री है, जो उन्हें व्यापक एजेंट इकोसिस्टम में डिस्कवरेबल और एक्सेसिबल बनाती है।
+[**GetBindu.com**](https://getbindu.com) सभी Bindu एजेंट्स की एक पब्लिक रजिस्ट्री है, जो उन्हें व्यापक एजेंट इकोसिस्टम में डिस्कवरेबल और एक्सेसिबल बनाती है।
 
-### ✨ Cookiecutter के साथ ऑटोमैटिक रजिस्ट्रेशन
+### 📝 मैन्युअल पंजीकरण (Manual Registration)
 
-जब आप cookiecutter टेम्पलेट का उपयोग करके एक एजेंट बनाते हैं, तो इसमें एक प्री-कॉन्फ़िगर्ड GitHub Action होता है जो स्वचालित रूप से आपके एजेंट को डायरेक्टरी में रजिस्टर करता है:
+मैन्युअल पंजीकरण प्रक्रिया वर्तमान में विकास के अधीन है।
 
-1. **अपना एजेंट बनाएं** cookiecutter का उपयोग करके
-2. **GitHub पर Push करें** - GitHub Action स्वचालित रूप से ट्रिगर होता है
-3. **आपका एजेंट दिखाई देता है** [Bindu Directory](https://bindus.directory) में
+-----
 
-> **🔑 नोट**: आपको bindus.directory से BINDU_PAT_TOKEN एकत्र करना होगा और अपने एजेंट को रजिस्टर करने के लिए इसका उपयोग करना होगा।
+<br>
 
-### 📝 मैनुअल रजिस्ट्रेशन
-
-हम एक मैनुअल रजिस्ट्रेशन प्रक्रिया पर काम कर रहे हैं।
-
----
-
-<br/>
-
-## 🌌 विजन
+## 🌌 विज़न (The Vision)
 
 ```
-रात के आकाश में एक झलक
+a peek into the night sky
 }}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}
-{{            +             +                  +   @          {{
-}}   |                *           o     +                .    }}
-{{  -O-    o               .               .          +       {{
-}}   |                    _,.-----.,_         o    |          }}
-{{           +    *    .-'.         .'-.          -O-         {{
-}}      *            .'.-'   .---.   `'.'.         |     *    }}
-{{ .                /_.-'   /     \   .'-.\.                   {{
-}}         ' -=*<  |-._.-  |   @   |   '-._|  >*=-    .     + }}
-{{ -- )--           \`-.    \     /    .-'/                   }}
-}}       *     +     `.'.    '---'    .'.'    +       o       }}
-{{                  .  '-._         _.-'  .                   }}
-}}         |               `~~~~~~~`       - --===D       @   }}
-{{   o    -O-      *   .                  *        +          {{
-}}         |                      +         .            +    }}
-{{ jgs          .     @      o                        *       {{
-}}       o                          *          o           .  }}
+{{            +             +                   +   @          {{
+}}   |                 * o     +                 .    }}
+{{  -O-    o                .               .           +       {{
+}}   |                     _,.-----.,_         o    |          }}
+{{           +    * .-'.         .'-.          -O-          {{
+}}      * .'.-'   .---.   `'.'.          |     * }}
+{{ .                 /_.-'   /     \   .'-.\.                   {{
+}}          ' -=*<  |-._.-  |   @   |   '-._|  >*=-    .     + }}
+{{ -- )--            \`-.    \     /    .-'/                   }}
+}}       * +      `.'.    '---'    .'.'    +        o       }}
+{{                   .  '-._         _.-'  .                   }}
+}}         |                `~~~~~~~`        - --===D       @   }}
+{{   o    -O-      * .                   * +          {{
+}}         |                       +         .             +    }}
+{{ jgs           .     @      o                         * {{
+}}       o                           * o            .  }}
 {{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{
 ```
 
-_हर प्रतीक एक एजेंट है – बुद्धिमत्ता की एक चिंगारी। छोटा बिंदु Bindu है, Internet of Agents में उत्पत्ति का बिंदु।_
+*प्रत्येक प्रतीक एक एजेंट है - बुद्धिमत्ता की एक चिंगारी। छोटा बिंदु Bindu है, जो Internet of Agents में मूल बिंदु है।*
 
-### NightSky कनेक्शन [प्रगति में]
+### NightSky कनेक्शन (प्रगति पर)
 
-NightSky एजेंट्स के झुंड को सक्षम बनाता है। प्रत्येक Bindu एक बिंदु है जो A2A, AP2, और X402 की साझा भाषा के साथ एजेंट्स को एनोटेट करता है। एजेंट्स कहीं भी होस्ट किए जा सकते हैं – लैपटॉप, क्लाउड या क्लस्टर में – फिर भी एक ही प्रोटोकॉल बोलते हैं, डिज़ाइन द्वारा एक-दूसरे पर भरोसा करते हैं, और एक एकल, डिस्ट्रिब्यूटेड माइंड के रूप में एक साथ काम करते हैं।
+NightSky एजेंटों के झुंडों (swarms) को सक्षम बनाता है। प्रत्येक Bindu एक बिंदु है जो एजेंटों को A2A, AP2, और X402 की साझा भाषा के साथ एनोटेट करता है। एजेंटों को कहीं भी होस्ट किया जा सकता है—लैपटॉप, क्लाउड, या क्लस्टर—फिर भी वे एक ही प्रोटोकॉल बोलते हैं, डिज़ाइन द्वारा एक-दूसरे पर भरोसा करते हैं, और एकल, डिस्ट्रिब्यूटेड मस्तिष्क के रूप में मिलकर काम करते हैं।
 
-> **💭 प्लान के बिना लक्ष्य सिर्फ एक इच्छा है।**
+> **💭 बिना योजना के लक्ष्य केवल एक इच्छा है।**
 
----
+-----
 
-<br/>
+<br>
 
-## 🛠️ समर्थित एजेंट फ्रेमवर्क्स
+## 🛠️ समर्थित एजेंट Frameworks
 
-Bindu **फ्रेमवर्क-एग्नोस्टिक** है और टेस्ट किया गया है:
+Bindu **framework-agnostic** है और इनके साथ टेस्ट किया गया है:
 
+- **AG2** (पूर्व में AutoGen)
 - **Agno**
 - **CrewAI**
 - **LangChain**
 - **LlamaIndex**
 - **FastAgent**
 
-अपने पसंदीदा फ्रेमवर्क के साथ इंटीग्रेशन चाहते हैं? [Discord पर हमें बताएं](https://discord.gg/3w5zuYUuwt)!
+अपने पसंदीदा framework के साथ एकीकरण चाहते हैं? [हमें Discord पर बताएं](https://discord.gg/3w5zuYUuwt)\!
 
----
+-----
 
-<br/>
+<br>
 
-## 🧪 टेस्टिंग
+## 🧪 टेस्टिंग (Testing)
 
-Bindu **70%+ टेस्ट कवरेज** बनाए रखता है:
+Bindu **70%+ टेस्ट कवरेज** बनाए रखता है (लक्ष्य: 80%+):
 
 ```bash
-pytest -n auto --cov=bindu --cov-report= && coverage report --skip-covered --fail-under=70
+uv run pytest -n auto --cov=bindu --cov-report=term-missing
+uv run coverage report --skip-covered --fail-under=70
 ```
 
----
+-----
 
-<br/>
+<br>
 
-## समस्या निवारण
+## 🔧 समस्या निवारण (Troubleshooting)
 
 <details>
 <summary>सामान्य समस्याएं</summary>
 
-<br/>
+<br>
 
 | समस्या | समाधान |
-|---------|----------|
+|-------|----------|
 | `Python 3.12 not found` | Python 3.12+ इंस्टॉल करें और PATH में सेट करें, या `pyenv` का उपयोग करें |
 | `bindu: command not found` | वर्चुअल एनवायरनमेंट एक्टिवेट करें: `source .venv/bin/activate` |
-| `Port 3773 already in use` | कॉन्फ़िग में पोर्ट बदलें: `"url": "http://localhost:4000"` |
-| Pre-commit फेल होता है | `pre-commit run --all-files` रन करें |
-| टेस्ट फेल होते हैं | Dev डिपेंडेंसी इंस्टॉल करें: `uv sync --dev` |
-| `Permission denied` (macOS) | एक्सटेंडेड एट्रिब्यूट्स क्लियर करने के लिए `xattr -cr .` रन करें |
+| `Port 3773 already in use` | `BINDU_PORT=4000` सेट करें या `BINDU_DEPLOYMENT_URL=http://localhost:4000` के साथ URL ओवरराइड करें |
+| Pre-commit फेल हो रहा है | `pre-commit run --all-files` चलाएं |
+| टेस्ट फेल हो रहे हैं | देव डिपेंडेंसी इंस्टॉल करें: `uv sync --dev` |
+| `Permission denied` (macOS) | विस्तारित विशेषताओं को साफ़ करने के लिए `xattr -cr .` चलाएं |
 
 **एनवायरनमेंट रीसेट करें:**
+
 ```bash
 rm -rf .venv
 uv venv --python 3.12.9
@@ -860,17 +553,20 @@ uv sync --dev
 ```
 
 **Windows PowerShell:**
+
 ```bash
 Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
 </details>
 
-<br/>
+-----
 
-## 🤝 योगदान करें
+<br>
 
-हम योगदान का स्वागत करते हैं! [Discord](https://discord.gg/3w5zuYUuwt) पर हमसे जुड़ें। वह चैनल चुनें जो आपके योगदान से सबसे अच्छा मेल खाता हो।
+## 🤝 योगदान देना (Contributing)
+
+हम योगदान का स्वागत करते हैं\! [Discord](https://discord.gg/3w5zuYUuwt) पर हमसे जुड़ें। वह चैनल चुनें जो आपके योगदान से सबसे अच्छा मेल खाता हो।
 
 ```bash
 git clone https://github.com/getbindu/Bindu.git
@@ -881,141 +577,136 @@ uv sync --dev
 pre-commit run --all-files
 ```
 
-> 📖 [योगदान दिशानिर्देश](.github/contributing.md)
+> 📖 [योगदान दिशा-निर्देश](https://www.google.com/search?q=.github/contributing.md)
 
----
+-----
 
-<br/>
+<br>
 
-## 📜 लाइसेंस
+## 📜 लाइसेंस (License)
 
 Bindu [Apache License 2.0](https://choosealicense.com/licenses/apache-2.0/) के तहत ओपन-सोर्स है।
 
----
+-----
 
-<br/>
+<br>
 
 ## 💬 कम्युनिटी
 
-हम 💛 योगदान! चाहे आप बग्स फिक्स कर रहे हों, डॉक्यूमेंटेशन सुधार रहे हों, या डेमो बना रहे हों – आपका योगदान Bindu को बेहतर बनाता है।
+हम आपके योगदान को 💛 करते हैं\! चाहे आप बग ठीक कर रहे हों, दस्तावेज़ों में सुधार कर रहे हों, या डेमो बना रहे हों—आपका योगदान Bindu को बेहतर बनाता है।
 
-- 💬 चर्चा और सपोर्ट के लिए [Discord जॉइन करें](https://discord.gg/3w5zuYUuwt)
-- ⭐ यदि आपको यह उपयोगी लगे तो [रिपॉजिटरी को स्टार करें](https://github.com/getbindu/Bindu)!
+  - 💬 चर्चा और सहायता के लिए [Discord से जुड़ें](https://discord.gg/3w5zuYUuwt)
+  - ⭐ यदि आपको यह उपयोगी लगे तो [रिपॉजिटरी को स्टार करें](https://github.com/getbindu/Bindu)\!
 
----
+-----
 
-<br/>
+<br>
 
-## 👥 सक्रिय मॉडरेटर्स
+## 👥 सक्रिय मॉडरेटर्स (Active Moderators)
 
 हमारे समर्पित मॉडरेटर्स एक स्वागत योग्य और उत्पादक कम्युनिटी बनाए रखने में मदद करते हैं:
 
 <table>
-  <tr>
-    <td align="center">
-      <a href="https://github.com/raahulrahl">
-        <img src="https://avatars.githubusercontent.com/u/157174139?v=4" width="100px;" alt="Raahul Dutta"/>
-        <br />
-        <sub><b>Raahul Dutta</b></sub>
-      </a>
-      <br />
-    </td>
-    <td align="center">
-      <a href="https://github.com/Paraschamoli">
-        <img src="https://avatars.githubusercontent.com/u/157124537?v=4" width="100px;" alt="Paras Chamoli"/>
-        <br />
-        <sub><b>Paras Chamoli</b></sub>
-      </a>
-      <br />
-    </td>
-    <td align="center">
-      <a href="https://github.com/Gaurika-Sethi">
-        <img src="https://avatars.githubusercontent.com/u/178935569?v=4" width="100px;" alt="Gaurika Sethi"/>
-        <br />
-        <sub><b>Gaurika Sethi</b></sub>
-      </a>
-      <br />
-    </td>
-    <td align="center">
-      <a href="https://github.com/Avngrstark62">
-        <img src="https://avatars.githubusercontent.com/u/133889196?v=4" width="100px;" alt="Abhijeet Singh Thakur"/>
-        <br />
-        <sub><b>Abhijeet Singh Thakur</b></sub>
-      </a>
-      <br />
-    </td>
-  </tr>
+<tr>
+<td align="center">
+<a href="https://github.com/raahulrahl">
+<img src="https://avatars.githubusercontent.com/u/157174139?v=4" width="100px;" alt="Raahul Dutta"/>
+<br />
+<sub><b>Raahul Dutta</b></sub>
+</a>
+<br />
+</td>
+<td align="center">
+<a href="https://github.com/Paraschamoli">
+<img src="https://avatars.githubusercontent.com/u/157124537?v=4" width="100px;" alt="Paras Chamoli"/>
+<br />
+<sub><b>Paras Chamoli</b></sub>
+</a>
+<br />
+</td>
+</tr>
 </table>
 
-> मॉडरेटर बनना चाहते हैं? [Discord](https://discord.gg/3w5zuYUuwt) पर संपर्क करें!
+> मॉडरेटर बनना चाहते हैं? [Discord](https://discord.gg/3w5zuYUuwt) पर संपर्क करें\!
 
----
+-----
 
-<br/>
+<br>
 
-## 🙏 आभार
+## 🙏 आभार (Acknowledgements)
 
-इन प्रोजेक्ट्स के लिए आभारी:
+इन प्रोजेक्ट्स के प्रति आभारी:
 
-- [FastA2A](https://github.com/pydantic/fasta2a)
-- [12 Factor Agents](https://github.com/humanlayer/12-factor-agents/blob/main/content/factor-11-trigger-from-anywhere.md)
-- [A2A](https://github.com/a2aproject/A2A)
-- [AP2](https://github.com/google-agentic-commerce/AP2)
-- [X402](https://github.com/coinbase/x402)
-- [Bindu Logo](https://openmoji.org/library/emoji-1F33B/)
-- [ASCII Space Art](https://www.asciiart.eu/space/other)
+  - [FastA2A](https://github.com/pydantic/fasta2a)
+  - [12 Factor Agents](https://github.com/humanlayer/12-factor-agents/blob/main/content/factor-11-trigger-from-anywhere.md)
+  - [A2A](https://github.com/a2aproject/A2A)
+  - [AP2](https://github.com/google-agentic-commerce/AP2)
+  - [Huggingface chatui](https://github.com/huggingface/chat-ui)
+  - [X402](https://github.com/coinbase/x402)
+  - [Bindu Logo](https://openmoji.org/library/emoji-1F33B/)
+  - [ASCII Space Art](https://www.asciiart.eu/space/other)
 
----
+-----
 
-<br/>
+<br>
 
-## 🗺️ रोडमैप
+## 🗺️ रोडमैप (Roadmap)
 
-- [ ] GRPC ट्रांसपोर्ट सपोर्ट
-- [x] Sentry एरर ट्रैकिंग
-- [x] Ag-UI इंटीग्रेशन
-- [x] Retry मैकेनिज्म
-- [ ] टेस्ट कवरेज को 80% तक बढ़ाना - प्रगति में
-- [x] Redis scheduler इम्प्लीमेंटेशन
-- [x] मेमोरी स्टोरेज के लिए Postgres डेटाबेस
-- [x] Negotiation सपोर्ट
-- [ ] AP2 end-to-end सपोर्ट
-- [ ] DSPy इंटीग्रेशन - प्रगति में
-- [ ] MLTS सपोर्ट
-- [ ] अन्य facilitators के साथ X402 सपोर्ट
+  - [ ] GRPC ट्रांसपोर्ट सपोर्ट
+  - [ ] टेस्ट कवरेज को 80% तक बढ़ाना (प्रगति पर)
+  - [ ] AP2 एंड-टू-एंड सपोर्ट
+  - [ ] DSPy एकीकरण (प्रगति पर)
+  - [ ] MLTS सपोर्ट
+  - [ ] अन्य सुविधाकर्ताओं के साथ X402 सपोर्ट
 
-> 💡 [Discord पर फीचर्स सुझाएं](https://discord.gg/3w5zuYUuwt)!
+> 💡 [Discord पर सुविधाओं का सुझाव दें](https://discord.gg/3w5zuYUuwt)\!
 
----
+-----
 
-<br/>
+<br>
 
-## 🎓 वर्कशॉप्स
+## [हम इन एजेंटों को bindufied बनाएंगे और हमें आपकी मदद की ज़रूरत है।](https://www.notion.so/getbindu/305d3bb65095808eac2bf720368e9804?v=305d3bb6509580189941000cfad83ae7&source=copy_link)
 
-- [AI Native in Action: Agent Symphony](https://www.meetup.com/ai-native-amsterdam/events/311066899/) - [स्लाइड्स](https://docs.google.com/presentation/d/1SqGXI0Gv_KCWZ1Mw2SOx_kI0u-LLxwZq7lMSONdl8oQ/edit)
+-----
 
----
+<br>
 
-<br/>
+## 🎓 कार्यशालाएं (Workshops)
 
-## ⭐ स्टार हिस्ट्री
+- [AI Native in Action: Agent Symphony](https://www.meetup.com/ai-native-Amsterdam && India/events/311066899/) - [स्लाइड्स](https://docs.google.com/presentation/d/1SqGXI0Gv_KCWZ1Mw2SOx_kI0u-LLxwZq7lMSONdl8oQ/edit)
 
-[![Star History Chart](https://api.star-history.com/svg?repos=getbindu/Bindu&type=Date)](https://www.star-history.com/#getbindu/Bindu&Date)
+-----
 
----
+<br>
+
+## ⭐ स्टार इतिहास (Star History)
+
+[](https://www.star-history.com/#getbindu/Bindu&Date)
+
+-----
 
 <p align="center">
-  <strong>Amsterdam से टीम द्वारा 💛 के साथ बनाया गया</strong><br/>
+  <strong>Amsterdam && India से टीम द्वारा 💛 के साथ बनाया गया</strong><br/>
   <em>Happy Bindu! 🌻🚀✨</em>
 </p>
 
 <p align="center">
-  <strong>आइडिया से Internet of Agents तक 2 मिनट में।</strong><br/>
-  <em>आपका एजेंट। आपका फ्रेमवर्क। यूनिवर्सल प्रोटोकॉल्स।</em>
+<strong>विचार से Internet of Agents तक केवल 2 मिनट में।</strong><br>
+<em>आपका एजेंट। आपका framework। यूनिवर्सल प्रोटोकॉल।</em>
 </p>
 
 <p align="center">
-  <a href="https://github.com/getbindu/Bindu">⭐ GitHub पर हमें स्टार करें</a> •
-  <a href="https://discord.gg/3w5zuYUuwt">💬 Discord जॉइन करें</a> •
-  <a href="https://docs.getbindu.com">🌻 डॉक्स पढ़ें</a>
+<a href="[https://github.com/getbindu/Bindu](https://github.com/getbindu/Bindu)">⭐ हमें GitHub पर स्टार करें</a> •
+<a href="[https://discord.gg/3w5zuYUuwt](https://discord.gg/3w5zuYUuwt)">💬 Discord से जुड़ें</a> •
+<a href="[https://docs.getbindu.com](https://docs.getbindu.com)">🌻 दस्तावेज़ पढ़ें</a>
+</p>
+
+<br>
+
+<p align="center">
+<img src="assets/sunflower-footer.jpeg" alt="Bindu" width="720" />
+</p>
+
+<p align="center">
+<em>"हम सूरजमुखी सिद्धांत (sunflower theory) में विश्वास करते हैं - एक साथ खड़े होना, Internet of Agents में आशा और रोशनी लाना।"</em>
 </p>

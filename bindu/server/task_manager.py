@@ -103,6 +103,10 @@ from .workers import ManifestWorker
 
 logger = get_logger("pebbling.server.task_manager")
 
+# Constants
+JSONRPC_VERSION = "2.0"
+DEFAULT_JSONRPC_ERROR_CODE = -32001
+
 
 @dataclass
 class TaskManager:
@@ -183,9 +187,9 @@ class TaskManager:
     ) -> Any:
         """Create a standardized error response."""
         return response_class(
-            jsonrpc="2.0",
+            jsonrpc=JSONRPC_VERSION,
             id=request_id,
-            error=error_class(code=-32001, message=message),
+            error=error_class(code=DEFAULT_JSONRPC_ERROR_CODE, message=message),
         )
 
     def _parse_context_id(self, context_id: Any) -> uuid.UUID:
@@ -210,13 +214,6 @@ class TaskManager:
                 pass
 
         return uuid.uuid4()
-
-    def _jsonrpc_error(
-        self, response_class: type, request_id: Any, message: str, code: int = -32001
-    ):
-        return response_class(
-            jsonrpc="2.0", id=request_id, error={"code": code, "message": message}
-        )
 
     # Message handler methods
     async def send_message(self, request: SendMessageRequest) -> SendMessageResponse:

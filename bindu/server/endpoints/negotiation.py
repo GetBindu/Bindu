@@ -15,29 +15,86 @@ based on skills, performance, load, and pricing constraints.
 
 from __future__ import annotations
 
+from typing import Any
+
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-from bindu.extensions.x402.extension import (
-    is_activation_requested as x402_is_requested,
-    add_activation_header as x402_add_header,
-)
 from bindu.server.applications import BinduApplication
 from bindu.server.negotiation.capability_calculator import (
     CapabilityCalculator,
     ScoringWeights,
 )
-from bindu.utils.request_utils import (
+from .utils import (
+    create_response_with_x402,
     handle_endpoint_errors,
     get_client_ip,
-    extract_error_fields,
-    jsonrpc_error,
+    validate_manifest,
 )
 from bindu.utils.logging import get_logger
 from bindu.utils.capabilities import get_x402_extension_from_capabilities
 from bindu.settings import app_settings
 
 logger = get_logger("bindu.server.endpoints.negotiation")
+
+# Constants
+MAX_TASK_SUMMARY_LENGTH = 10000
+DEFAULT_MIN_SCORE = 0.0
+DEFAULT_SCORING_WEIGHTS = {
+    "skill_match": 0.55,
+    "io_compatibility": 0.20,
+    "performance": 0.15,
+    "load": 0.05,
+    "cost": 0.05,
+}
+
+
+def _build_negotiation_response(result: Any) -> dict:
+    """Build negotiation response from calculation result.
+
+    Args:
+        result: CapabilityCalculator result
+
+    Returns:
+        Response data dict with optional fields included conditionally
+    """
+    response = {
+        "accepted": result.accepted,
+        "score": result.score,
+        "confidence": result.confidence,
+    }
+
+    # Add optional fields if present
+    if result.rejection_reason:
+        response["rejection_reason"] = result.rejection_reason
+
+    if result.skill_matches:
+        response["skill_matches"] = [
+            {
+                "skill_id": m.skill_id,
+                "skill_name": m.skill_name,
+                "score": m.score,
+                "reasons": m.reasons,
+            }
+            for m in result.skill_matches
+        ]
+
+    if result.matched_tags:
+        response["matched_tags"] = result.matched_tags
+
+    if result.matched_capabilities:
+        response["matched_capabilities"] = result.matched_capabilities
+
+    if result.latency_estimate_ms is not None:
+        response["latency_estimate_ms"] = result.latency_estimate_ms
+
+    if result.queue_depth is not None:
+        response["queue_depth"] = result.queue_depth
+
+    if result.subscores:
+        response["subscores"] = result.subscores
+
+    return response
 
 
 def _get_or_create_calculator(app: BinduApplication) -> CapabilityCalculator:
@@ -66,6 +123,7 @@ def _get_or_create_calculator(app: BinduApplication) -> CapabilityCalculator:
         app.manifest
         and hasattr(app.manifest, "negotiation")
         and app.manifest.negotiation
+        and isinstance(app.manifest.negotiation, dict)
     ):
         embedding_api_key = app.manifest.negotiation.get("embedding_api_key")
 
@@ -93,28 +151,10 @@ async def negotiation_endpoint(app: BinduApplication, request: Request) -> Respo
     client_ip = get_client_ip(request)
     logger.debug(f"Negotiation request from {client_ip}")
 
-    # -----------------------------------------------------------------
-    # Authentication guard (protect negotiation when enabled)
-    # -----------------------------------------------------------------
-    if app_settings.auth.enabled:
-        user_info = getattr(request.state, "user_info", None)
-        if not user_info:
-            logger.warning(f"Unauthenticated negotiation request from {client_ip}")
-            from bindu.common.protocol.types import AuthenticationRequiredError
-
-            code, message = extract_error_fields(AuthenticationRequiredError)
-            return jsonrpc_error(
-                code,
-                message,
-                "Authentication required for negotiation",
-                status=401,
-            )
-
     # Early validation: manifest exists
-    if app.manifest is None:
-        return JSONResponse(
-            content={"error": "Agent manifest not configured"}, status_code=500
-        )
+    error_resp = validate_manifest(app)
+    if error_resp:
+        return error_resp
 
     # Early validation: parse request body
     try:
@@ -131,10 +171,10 @@ async def negotiation_endpoint(app: BinduApplication, request: Request) -> Respo
         )
 
     # Early validation: task_summary length
-    if len(task_summary) > 10000:
+    if len(task_summary) > MAX_TASK_SUMMARY_LENGTH:
         return JSONResponse(
             content={
-                "error": "task_summary exceeds maximum length of 10000 characters"
+                "error": f"task_summary exceeds maximum length of {MAX_TASK_SUMMARY_LENGTH} characters"
             },
             status_code=400,
         )
@@ -148,7 +188,7 @@ async def negotiation_endpoint(app: BinduApplication, request: Request) -> Respo
 
     required_tools = body.get("required_tools")
     forbidden_tools = body.get("forbidden_tools")
-    min_score = body.get("min_score", 0.0)
+    min_score = body.get("min_score", DEFAULT_MIN_SCORE)
 
     # Extract custom weights if provided
     weights = None
@@ -156,11 +196,17 @@ async def negotiation_endpoint(app: BinduApplication, request: Request) -> Respo
         w = body["weights"]
         try:
             weights = ScoringWeights(
-                skill_match=w.get("skill_match", 0.55),
-                io_compatibility=w.get("io_compatibility", 0.20),
-                performance=w.get("performance", 0.15),
-                load=w.get("load", 0.05),
-                cost=w.get("cost", 0.05),
+                skill_match=w.get(
+                    "skill_match", DEFAULT_SCORING_WEIGHTS["skill_match"]
+                ),
+                io_compatibility=w.get(
+                    "io_compatibility", DEFAULT_SCORING_WEIGHTS["io_compatibility"]
+                ),
+                performance=w.get(
+                    "performance", DEFAULT_SCORING_WEIGHTS["performance"]
+                ),
+                load=w.get("load", DEFAULT_SCORING_WEIGHTS["load"]),
+                cost=w.get("cost", DEFAULT_SCORING_WEIGHTS["cost"]),
             )
         except ValueError as e:
             return JSONResponse(
@@ -204,49 +250,8 @@ async def negotiation_endpoint(app: BinduApplication, request: Request) -> Respo
         min_score=min_score,
     )
 
-    # Format response (optimized with dict comprehension)
-    response_data = {
-        "accepted": result.accepted,
-        "score": result.score,
-        "confidence": result.confidence,
-        **(
-            {"rejection_reason": result.rejection_reason}
-            if result.rejection_reason
-            else {}
-        ),
-        **(
-            {
-                "skill_matches": [
-                    {
-                        "skill_id": m.skill_id,
-                        "skill_name": m.skill_name,
-                        "score": m.score,
-                        "reasons": m.reasons,
-                    }
-                    for m in result.skill_matches
-                ]
-            }
-            if result.skill_matches
-            else {}
-        ),
-        **({"matched_tags": result.matched_tags} if result.matched_tags else {}),
-        **(
-            {"matched_capabilities": result.matched_capabilities}
-            if result.matched_capabilities
-            else {}
-        ),
-        **(
-            {"latency_estimate_ms": result.latency_estimate_ms}
-            if result.latency_estimate_ms is not None
-            else {}
-        ),
-        **(
-            {"queue_depth": result.queue_depth}
-            if result.queue_depth is not None
-            else {}
-        ),
-        **({"subscores": result.subscores} if result.subscores else {}),
-    }
+    # Build response with optional fields
+    response_data = _build_negotiation_response(result)
 
     logger.info(
         f"Assessment for '{task_summary[:50]}...': "
@@ -254,7 +259,4 @@ async def negotiation_endpoint(app: BinduApplication, request: Request) -> Respo
         f"confidence={result.confidence}"
     )
 
-    resp = JSONResponse(content=response_data)
-    if x402_is_requested(request):
-        resp = x402_add_header(resp)
-    return resp
+    return create_response_with_x402(request, response_data)
