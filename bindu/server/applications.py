@@ -214,6 +214,7 @@ class BinduApplication(Starlette):
             ["GET"],
             with_app=True,
         )
+
         # Register health endpoint (backward-compat, always ready=True)
         self._add_route("/health", health_endpoint, ["GET"], with_app=True)
 
@@ -230,6 +231,13 @@ class BinduApplication(Starlette):
             ["POST"],
             with_app=True,
         )
+
+        # Certificate lifecycle endpoints (mTLS) — opt-in via settings
+        mtls_enabled = getattr(
+            getattr(app_settings, "security", None), "mtls_enabled", False
+        )
+        if mtls_enabled:
+            self._register_certificate_endpoints()
 
         if self._x402_ext:
             self._register_payment_endpoints()
@@ -258,6 +266,40 @@ class BinduApplication(Starlette):
             "/api/payment-status/{session_id}",
             payment_status_endpoint,
             ["GET"],
+            with_app=True,
+        )
+
+    def _register_certificate_endpoints(self) -> None:
+        """Register mTLS certificate lifecycle endpoints.
+
+        Only called when app_settings.security.mtls_enabled is True.
+        Endpoints:
+            POST /api/v1/certificates/issue  - Issue a new certificate for an agent DID
+            POST /api/v1/certificates/renew  - Renew before expiry (80% TTL trigger)
+            POST /api/v1/certificates/revoke - Immediately revoke and kill Hydra binding
+        """
+        from .endpoints.certificates import (
+            issue_certificate_endpoint,
+            renew_certificate_endpoint,
+            revoke_certificate_endpoint,
+        )
+
+        self._add_route(
+            "/api/v1/certificates/issue",
+            issue_certificate_endpoint,
+            ["POST"],
+            with_app=True,
+        )
+        self._add_route(
+            "/api/v1/certificates/renew",
+            renew_certificate_endpoint,
+            ["POST"],
+            with_app=True,
+        )
+        self._add_route(
+            "/api/v1/certificates/revoke",
+            revoke_certificate_endpoint,
+            ["POST"],
             with_app=True,
         )
 
@@ -346,11 +388,9 @@ class BinduApplication(Starlette):
                 self._setup_observability()
 
             # Initialize Sentry error tracking
-            # Override settings if sentry_config is provided
             if self._sentry_config.enabled:
                 logger.info("🔧 Initializing Sentry...")
 
-                # Override app_settings with config values
                 if self._sentry_config.dsn:
                     app_settings.sentry.enabled = True
                     app_settings.sentry.dsn = self._sentry_config.dsn
@@ -379,7 +419,6 @@ class BinduApplication(Starlette):
                 else:
                     logger.debug("Sentry not initialized (disabled or not configured)")
             else:
-                # Try to initialize from environment variables
                 from bindu.observability import init_sentry
 
                 sentry_initialized = init_sentry()
@@ -469,9 +508,6 @@ class BinduApplication(Starlette):
         from x402.types import PaymentRequirements, SupportedNetworks
         from typing import cast
 
-        # When multiple payment options are configured on the extension, create a
-        # PaymentRequirements entry for each one. Otherwise, fall back to the single
-        # amount/network configuration for backward compatibility.
         payment_requirements: list[PaymentRequirements] = []
 
         options: list[dict[str, Any]]
@@ -581,14 +617,10 @@ class BinduApplication(Starlette):
             middleware_list.append(x402_middleware)
 
         # Add authentication middleware if requested or globally enabled
-        # (previous behavior required both flags; we now treat settings as authoritative
-        # so that enabling auth via config always installs the middleware).
         if auth_enabled or app_settings.auth.enabled:
             if app_settings.auth.enabled:
-                # ensure config value drives logging
                 logger.info("Authentication middleware enabled")
             auth_middleware = self._create_auth_middleware()
-            # Add auth middleware after CORS and X402
             middleware_list.append(auth_middleware)
 
         # Add metrics middleware (should be last to capture all requests)
@@ -640,7 +672,6 @@ class BinduApplication(Starlette):
 
         self._payment_session_manager = PaymentSessionManager()
 
-        # Create payment requirements for endpoints (with /payment-capture resource)
         self._payment_requirements = [
             req.model_copy(update={"resource": f"{manifest.url}/payment-capture"})
             for req in payment_requirements_for_middleware
