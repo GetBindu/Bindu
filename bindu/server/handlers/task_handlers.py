@@ -89,6 +89,9 @@ class TaskHandlers:
         await self.scheduler.cancel_task(request["params"])
         task = await self.storage.load_task(task_id)
 
+        # Type narrowing: task should exist since we already validated it above
+        assert task is not None
+
         return CancelTaskResponse(jsonrpc="2.0", id=request["id"], result=task)
 
     @trace_task_operation("list_tasks", include_params=False)
@@ -114,6 +117,7 @@ class TaskHandlers:
                 TaskFeedbackResponse, request["id"], TaskNotFoundError, "Task not found"
             )
 
+        # Timestamp is always stored in UTC ISO-8601 format for consistency
         feedback_data = {
             "task_id": task_id,
             "feedback": request["params"]["feedback"],

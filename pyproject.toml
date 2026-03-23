@@ -62,6 +62,7 @@ dependencies = [
 [project.optional-dependencies]
 # Agent frameworks and tools for examples (use: pip install bindu[agents])
 agents = [
+    "ag2[openai]>=0.11.0",
     "agno>=2.5.2",
     "langchain>=1.2.9",
     "langchain-openai>=1.1.8",
@@ -69,8 +70,13 @@ agents = [
     "ollama>=0.6.1",
     "duckduckgo-search>=8.1.1",
     "openrouter>=0.6.0",
+    "scrapegraph-py>=1.0.0",
+    "mem0ai>=0.1.0",
     "ddgs>=9.10.0",
-    "dotenv>=0.9.9",
+    "python-dotenv>=1.0.0",
+    "pycryptodome>=3.20.0",
+    "web3>=7.0.0",
+    "eth-utils>=5.0.0",
 ]
 
 # Minimal core only (use: pip install bindu[core] --only-deps)
@@ -115,7 +121,6 @@ dev = [
     "types-requests>=2.32.0.20250328",
     "pipreqs>=0.5.0",
     "twine>=6.1.0",
-    "uvx<4.0",
     "ruff>=0.15.0",
 ]
 

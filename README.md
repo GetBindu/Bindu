@@ -35,6 +35,26 @@
   <a href="https://github.com/getbindu/Bindu/graphs/contributors"><img src="https://img.shields.io/github/contributors/getbindu/Bindu" alt="Contributors"></a>
 </p>
 
+<br/>
+
+<p align="center">
+  <img src="assets/sunflower-mountains.jpeg" alt="Bindu — The Internet of Agents" width="720" />
+</p>
+
+<p align="center">
+  <em>"Like sunflowers turning toward the light, agents collaborate in swarms - each one independent, yet together they create something greater."</em>
+</p>
+
+<br/>
+
+<div align="center">
+  <h3>Onboard your agent in one line</h3>
+</div>
+
+<div align="center">
+  <pre><code>curl -fsSL https://getbindu.com/install-bindu.sh | bash</code></pre>
+</div>
+
 ---
 
 **Bindu** (read: _binduu_) is an operating layer for AI agents that provides identity, communication, and payment capabilities. It delivers a production-ready service with a convenient API to connect, authenticate, and orchestrate agents across distributed systems using open protocols: **A2A**, **AP2**, and **X402**.
@@ -42,7 +62,7 @@
 Built with a distributed architecture (Task Manager, scheduler, storage), Bindu makes it fast to develop and easy to integrate with any AI framework. Transform any agent framework into a fully interoperable service for communication, collaboration, and commerce in the Internet of Agents.
 
 <p align="center">
-  <strong>🌟 <a href="https://bindus.directory">Register your agent</a> • 🌻 <a href="https://docs.getbindu.com">Documentation</a> • 💬 <a href="https://discord.gg/3w5zuYUuwt">Discord Community</a></strong>
+  <strong>🌟 <a href="https://getbindu.com">Register your agent</a> • 🌻 <a href="https://docs.getbindu.com">Documentation</a> • 💬 <a href="https://discord.gg/3w5zuYUuwt">Discord Community</a></strong>
 </p>
 
 
@@ -134,33 +154,13 @@ uv sync --dev
 
 ## 🚀 Quick Start
 
-### Option 1: Using Cookiecutter (Recommended)
-
-**Time to first agent: ~2 minutes ⏱️**
-
-```bash
-# Install cookiecutter
-uv add cookiecutter
-
-# Create your Bindu agent
-uvx cookiecutter https://github.com/getbindu/create-bindu-agent.git
-```
-
-<div align="center">
-  <a href="https://youtu.be/obY1bGOoWG8?si=uEeDb0XWrtYOQTL7" target="_blank">
-    <img src="https://img.youtube.com/vi/obY1bGOoWG8/maxresdefault.jpg" alt="Create Production Ready Agent" width="640" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
-  </a>
-</div>
-
-Your local agent becomes a live, secure, discoverable service. [Learn more →](https://docs.getbindu.com/bindu/create-bindu-agent/overview)
-
-> **💡 Pro Tip:** Agents created with cookiecutter include GitHub Actions that automatically register your agent in the [Bindu Directory](https://bindus.directory) when you push to your repository.
-
-### Option 2: Manual Setup
+### Option 1: Manual Setup
 
 Create your agent script `my_agent.py`:
 
 ```python
+import os
+
 from bindu.penguin.bindufy import bindufy
 from agno.agent import Agent
 from agno.tools.duckduckgo import DuckDuckGoTools
@@ -178,7 +178,10 @@ config = {
     "author": "your.email@example.com",
     "name": "research_agent",
     "description": "A research assistant agent",
-    "deployment": {"url": "http://localhost:3773", "expose": True},
+    "deployment": {
+        "url": os.getenv("BINDU_DEPLOYMENT_URL", "http://localhost:3773"),
+        "expose": True,
+    },
     "skills": ["skills/question-answering", "skills/pdf-processing"]
 }
 
@@ -204,9 +207,21 @@ bindufy(config, handler)
 
 ![Sample Agent](assets/agno-simple.png)
 
-Your agent is now live at `http://localhost:3773` and ready to communicate with other agents.
+Your agent is now live at the URL configured in `deployment.url`.
 
-### Option 3: Zero-Config Local Agent
+Set a custom port without code changes:
+
+```bash
+# Linux/macOS
+export BINDU_PORT=4000
+
+# Windows PowerShell
+$env:BINDU_PORT="4000"
+```
+
+Existing examples that use `http://localhost:3773` are automatically overridden when `BINDU_PORT` is set.
+
+### Option 2: Zero-Config Local Agent
 
 Try Bindu without setting up Postgres, Redis, or any cloud services. Runs entirely locally using in-memory storage and scheduler.
 
@@ -215,7 +230,7 @@ python examples/beginner_zero_config_agent.py
 ```
 
 
-### Option 4: Minimal Echo Agent (Testing)
+### Option 3: Minimal Echo Agent (Testing)
 
 <details>
 <summary><b>View minimal example</b> (click to expand)</summary>
@@ -223,6 +238,8 @@ python examples/beginner_zero_config_agent.py
 Smallest possible working agent:
 
 ```python
+import os
+
 from bindu.penguin.bindufy import bindufy
 
 def handler(messages):
@@ -232,7 +249,10 @@ config = {
     "author": "your.email@example.com",
     "name": "echo_agent",
     "description": "A basic echo agent for quick testing.",
-    "deployment": {"url": "http://localhost:3773", "expose": True},
+    "deployment": {
+        "url": os.getenv("BINDU_DEPLOYMENT_URL", "http://localhost:3773"),
+        "expose": True,
+    },
     "skills": []
 }
 
@@ -427,26 +447,16 @@ Output:
 Bindu includes a beautiful chat interface at `http://localhost:5173`. Navigate to the `frontend` folder and run `npm run dev` to start the server.
 
 <p align="center">
-  <img src="assets/agent-ui.png" alt="Bindu Agent UI" width="640" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
+  <img src="assets/new-ui.png" alt="Bindu Agent UI" width="640" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
 </p>
 
 ---
 
 <br/>
 
-## 🌐 Bindu Directory
+## 🌐 GetBindu.com
 
-The [**Bindu Directory**](https://bindus.directory) is a public registry of all Bindu agents, making them discoverable and accessible to the broader agent ecosystem.
-
-### ✨ Automatic Registration with Cookiecutter
-
-When you create an agent using the cookiecutter template, it includes a pre-configured GitHub Action that automatically registers your agent in the directory:
-
-1. **Create your agent** using cookiecutter
-2. **Push to GitHub** - The GitHub Action triggers automatically
-3. **Your agent appears** in the [Bindu Directory](https://bindus.directory)
-
-> **Note**: Collect your `BINDU_PAT_TOKEN` from [bindus.directory](https://bindus.directory) to register your agent.
+The [**GetBindu.com**](https://getbindu.com) is a public registry of all Bindu agents, making them discoverable and accessible to the broader agent ecosystem.
 
 ### 📝 Manual Registration
 
@@ -496,6 +506,7 @@ NightSky enables swarms of agents. Each Bindu is a dot annotating agents with th
 
 Bindu is **framework-agnostic** and tested with:
 
+- **AG2** (formerly AutoGen)
 - **Agno**
 - **CrewAI**
 - **LangChain**
@@ -510,10 +521,11 @@ Want integration with your favorite framework? [Let us know on Discord](https://
 
 ## 🧪 Testing
 
-Bindu maintains **64%+ test coverage**:
+Bindu maintains **70%+ test coverage** (target: 80%+):
 
 ```bash
-uv run pytest -n auto --cov=bindu --cov-report= && coverage report --skip-covered --fail-under=64
+uv run pytest -n auto --cov=bindu --cov-report=term-missing
+uv run coverage report --skip-covered --fail-under=70
 ```
 
 ---
@@ -531,7 +543,7 @@ uv run pytest -n auto --cov=bindu --cov-report= && coverage report --skip-covere
 |-------|----------|
 | `Python 3.12 not found` | Install Python 3.12+ and set in PATH, or use `pyenv` |
 | `bindu: command not found` | Activate virtual environment: `source .venv/bin/activate` |
-| `Port 3773 already in use` | Change port in config: `"url": "http://localhost:4000"` |
+| `Port 3773 already in use` | Set `BINDU_PORT=4000` or override URL with `BINDU_DEPLOYMENT_URL=http://localhost:4000` |
 | Pre-commit fails | Run `pre-commit run --all-files` |
 | Tests fail | Install dev dependencies: `uv sync --dev` |
 | `Permission denied` (macOS) | Run `xattr -cr .` to clear extended attributes |
@@ -613,24 +625,7 @@ Our dedicated moderators help maintain a welcoming and productive community:
         <sub><b>Paras Chamoli</b></sub>
       </a>
       <br />
-    </td>
-    <td align="center">
-      <a href="https://github.com/Gaurika-Sethi">
-        <img src="https://avatars.githubusercontent.com/u/178935569?v=4" width="100px;" alt="Gaurika Sethi"/>
-        <br />
-        <sub><b>Gaurika Sethi</b></sub>
-      </a>
-      <br />
-    </td>
-    <td align="center">
-      <a href="https://github.com/Avngrstark62">
-        <img src="https://avatars.githubusercontent.com/u/133889196?v=4" width="100px;" alt="Abhijeet Singh Thakur"/>
-        <br />
-        <sub><b>Abhijeet Singh Thakur</b></sub>
-      </a>
-      <br />
-    </td>
-  </tr>
+    </tr>
 </table>
 
 > Want to become a moderator? Reach out on [Discord](https://discord.gg/3w5zuYUuwt)!
@@ -679,7 +674,7 @@ Grateful to these projects:
 
 ## 🎓 Workshops
 
-- [AI Native in Action: Agent Symphony](https://www.meetup.com/ai-native-amsterdam/events/311066899/) - [Slides](https://docs.google.com/presentation/d/1SqGXI0Gv_KCWZ1Mw2SOx_kI0u-LLxwZq7lMSONdl8oQ/edit)
+- [AI Native in Action: Agent Symphony](https://www.meetup.com/ai-native-Amsterdam && India/events/311066899/) - [Slides](https://docs.google.com/presentation/d/1SqGXI0Gv_KCWZ1Mw2SOx_kI0u-LLxwZq7lMSONdl8oQ/edit)
 
 ---
 
@@ -692,7 +687,7 @@ Grateful to these projects:
 ---
 
 <p align="center">
-  <strong>Built with 💛 by the team from Amsterdam </strong><br/>
+  <strong>Built with 💛 by the team from Amsterdam && India </strong><br/>
   <em>Happy Bindu! 🌻🚀✨</em>
 </p>
 
@@ -705,4 +700,14 @@ Grateful to these projects:
   <a href="https://github.com/getbindu/Bindu">⭐ Star us on GitHub</a> •
   <a href="https://discord.gg/3w5zuYUuwt">💬 Join Discord</a> •
   <a href="https://docs.getbindu.com">🌻 Read the Docs</a>
+</p>
+
+<br/>
+
+<p align="center">
+  <img src="assets/sunflower-footer.jpeg" alt="Bindu" width="720" />
+</p>
+
+<p align="center">
+  <em>"We believe in the sunflower theory - standing tall together, bringing hope and light to the Internet of Agents."</em>
 </p>

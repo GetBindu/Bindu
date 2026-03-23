@@ -31,6 +31,9 @@ from bindu.utils.logging import get_logger
 
 logger = get_logger("bindu.penguin.manifest")
 
+# Required parameter name for agent functions
+REQUIRED_PARAM_NAME = "messages"
+
 
 def _create_default_agent_trust() -> AgentTrust:
     """Create a default AgentTrust configuration with minimal required fields.
@@ -65,18 +68,117 @@ def validate_agent_function(agent_function: Callable) -> None:
 
     if not params:
         raise ValueError(
-            "Agent function must have at least 'messages' parameter of type list[binduMessage]"
+            f"Agent function must have at least '{REQUIRED_PARAM_NAME}' parameter of type list[binduMessage]"
         )
 
     if len(params) > 1:
-        raise ValueError("Agent function must have only 'messages' parameter")
-
-    if params[0].name != "messages":
         raise ValueError(
-            f"First parameter must be named 'messages', got '{params[0].name}'"
+            f"Agent function must have only '{REQUIRED_PARAM_NAME}' parameter"
+        )
+
+    if params[0].name != REQUIRED_PARAM_NAME:
+        raise ValueError(
+            f"First parameter must be named '{REQUIRED_PARAM_NAME}', got '{params[0].name}'"
         )
 
     logger.debug(f"Agent function '{func_name}' validated successfully")
+
+
+def _create_run_method(
+    agent_function: Callable,
+    has_context_param: bool,
+    manifest_name: str,
+) -> Callable:
+    """Create the appropriate run method based on function type.
+
+    This function analyzes the agent function and creates a wrapper that:
+    - Handles parameter resolution (with or without context)
+    - Supports async generators, coroutines, sync generators, and regular functions
+    - Maintains protocol compliance while preserving original behavior
+
+    Args:
+        agent_function: The user's agent function to wrap
+        has_context_param: Whether the function accepts a context parameter
+        manifest_name: Name of the manifest for logging
+
+    Returns:
+        Callable: Appropriate run method for the function type
+    """
+
+    def _resolve_params(input_msg: str, **kwargs) -> tuple:
+        """Resolve function parameters based on signature analysis.
+
+        Note: Context is managed at session level via context_id in the architecture.
+        Each session IS a context, so no separate context parameter needed.
+
+        Args:
+            input_msg: The input message to process
+            **kwargs: Additional keyword arguments
+
+        Returns:
+            Tuple of parameters to pass to the agent function
+        """
+        if has_context_param:
+            session_context = kwargs.get("session_context", {})
+            return (input_msg, session_context)
+        else:
+            return (input_msg,)
+
+    # Async generator function (streaming)
+    if inspect.isasyncgenfunction(agent_function):
+        logger.debug(f"Creating async generator run method for '{manifest_name}'")
+
+        async def run(input_msg: str, **kwargs):
+            params = _resolve_params(input_msg, **kwargs)
+            try:
+                gen = agent_function(*params)
+                value = None
+                while True:
+                    value = yield await gen.asend(value)
+            except StopAsyncIteration:
+                pass
+
+        return run
+
+    # Coroutine function (async single/multi result)
+    elif inspect.iscoroutinefunction(agent_function):
+        logger.debug(f"Creating coroutine run method for '{manifest_name}'")
+
+        async def run(input_msg: str, **kwargs):
+            params = _resolve_params(input_msg, **kwargs)
+            result = await agent_function(*params)
+
+            # Handle different result types
+            if hasattr(result, "__aiter__"):
+                async for chunk in result:
+                    yield chunk
+            elif hasattr(result, "__iter__") and not isinstance(result, (str, bytes)):
+                for chunk in result:
+                    yield chunk
+            else:
+                yield result
+
+        return run
+
+    # Sync generator function
+    elif inspect.isgeneratorfunction(agent_function):
+        logger.debug(f"Creating sync generator run method for '{manifest_name}'")
+
+        def run(input_msg: str, **kwargs):
+            params = _resolve_params(input_msg, **kwargs)
+            yield from agent_function(*params)
+
+        return run
+
+    # Regular sync function
+    else:
+        logger.debug(f"Creating sync function run method for '{manifest_name}'")
+
+        def run(input_msg: str, **kwargs):
+            params = _resolve_params(input_msg, **kwargs)
+            return agent_function(*params)
+
+        return run
 
 
 def create_manifest(
@@ -207,83 +309,8 @@ def create_manifest(
         global_webhook_token=global_webhook_token,
     )
 
-    # Create execution method based on function type
-    def _create_run_method():
-        """Create the appropriate run method based on function type."""
-
-        def _resolve_params(input_msg: str, **kwargs) -> tuple:
-            """Resolve function parameters based on signature analysis.
-
-            Note: Context is managed at session level via context_id in the architecture.
-            Each session IS a context, so no separate context parameter needed.
-
-            Args:
-                input_msg: The input message to process
-                **kwargs: Additional keyword arguments
-
-            Returns:
-                Tuple of parameters to pass to the agent function
-            """
-            if has_context_param:
-                session_context = kwargs.get("session_context", {})
-                return (input_msg, session_context)
-            else:
-                return (input_msg,)
-
-        # Async generator function (streaming)
-        if inspect.isasyncgenfunction(agent_function):
-            logger.debug(f"Creating async generator run method for '{manifest_name}'")
-
-            async def run(input_msg: str, **kwargs):
-                params = _resolve_params(input_msg, **kwargs)
-                try:
-                    gen = agent_function(*params)
-                    value = None
-                    while True:
-                        value = yield await gen.asend(value)
-                except StopAsyncIteration:
-                    pass
-
-        # Coroutine function (async single/multi result)
-        elif inspect.iscoroutinefunction(agent_function):
-            logger.debug(f"Creating coroutine run method for '{manifest_name}'")
-
-            async def run(input_msg: str, **kwargs):
-                params = _resolve_params(input_msg, **kwargs)
-                result = await agent_function(*params)
-
-                # Handle different result types
-                if hasattr(result, "__aiter__"):
-                    async for chunk in result:
-                        yield chunk
-                elif hasattr(result, "__iter__") and not isinstance(
-                    result, (str, bytes)
-                ):
-                    for chunk in result:
-                        yield chunk
-                else:
-                    yield result
-
-        # Sync generator function
-        elif inspect.isgeneratorfunction(agent_function):
-            logger.debug(f"Creating sync generator run method for '{manifest_name}'")
-
-            def run(input_msg: str, **kwargs):
-                params = _resolve_params(input_msg, **kwargs)
-                yield from agent_function(*params)
-
-        # Regular sync function
-        else:
-            logger.debug(f"Creating sync function run method for '{manifest_name}'")
-
-            def run(input_msg: str, **kwargs):
-                params = _resolve_params(input_msg, **kwargs)
-                return agent_function(*params)
-
-        return run
-
-    # Attach run method to manifest
-    manifest.run = _create_run_method()
+    # Create and attach run method to manifest
+    manifest.run = _create_run_method(agent_function, has_context_param, manifest_name)
     logger.debug(f"Run method attached to manifest '{manifest_name}'")
 
     # Attach extra metadata attributes if provided
