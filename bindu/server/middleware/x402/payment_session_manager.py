@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from dataclasses import dataclass, field
 
@@ -35,9 +35,9 @@ class PaymentSession:
     """Represents a payment session."""
 
     session_id: str
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     expires_at: datetime = field(
-        default_factory=lambda: datetime.utcnow() + timedelta(minutes=15)
+        default_factory=lambda: datetime.now(timezone.utc) + timedelta(minutes=15)
     )
     payment_payload: Optional[PaymentPayload] = None
     status: str = "pending"  # pending, completed, expired, failed
@@ -45,7 +45,7 @@ class PaymentSession:
 
     def is_expired(self) -> bool:
         """Check if session has expired."""
-        return datetime.utcnow() > self.expires_at
+        return datetime.now(timezone.utc) > self.expires_at
 
     def is_completed(self) -> bool:
         """Check if payment is completed."""
@@ -198,10 +198,10 @@ class PaymentSessionManager:
         Returns:
             PaymentSession if completed, None if timeout or error
         """
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
         timeout = timedelta(seconds=timeout_seconds)
 
-        while datetime.utcnow() - start_time < timeout:
+        while datetime.now(timezone.utc) - start_time < timeout:
             session = self.get_session(session_id)
 
             if session is None:

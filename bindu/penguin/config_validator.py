@@ -15,6 +15,16 @@ from bindu.common.protocol.types import AgentCapabilities, Skill
 class ConfigValidator:
     """Validates and processes agent configuration."""
 
+    # Default port for example configurations
+    DEFAULT_EXAMPLE_PORT = 3773
+
+    # Example configuration for error messages
+    EXAMPLE_CONFIG = """{
+        "author": "you@example.com",
+        "name": "my-agent",
+        "deployment": {"url": "http://localhost:3773"}
+    }"""
+
     DEFAULTS = {
         "name": "bindu-agent",
         "description": "A Bindu agent",
@@ -56,7 +66,7 @@ class ConfigValidator:
     @classmethod
     def validate_and_process(cls, config: Dict[str, Any]) -> Dict[str, Any]:
         """Validate and process agent configuration."""
-        # 🔥 Validate required fields first (fail-fast)
+        # Validate required fields first (fail-fast)
         cls._validate_required_fields(config)
 
         # Start with defaults
@@ -74,7 +84,7 @@ class ConfigValidator:
         return processed_config
 
     # ------------------------------------------------------------------
-    # Required field validation (NEW IMPROVED VERSION)
+    # Required field validation
     # ------------------------------------------------------------------
 
     @classmethod
@@ -100,17 +110,11 @@ class ConfigValidator:
         if missing:
             formatted_fields = "\n".join(f"- {f}" for f in missing)
 
-            example = """{
-  "author": "you@example.com",
-  "name": "my-agent",
-  "deployment": {"url": "http://localhost:3773"}
-}"""
-
             raise ValueError(
                 f"Invalid Bindu configuration.\n\n"
                 f"Missing required field(s):\n"
                 f"{formatted_fields}\n\n"
-                f"Example:\n{example}"
+                f"Example:\n{cls.EXAMPLE_CONFIG}"
             )
 
     # ------------------------------------------------------------------
@@ -139,7 +143,38 @@ class ConfigValidator:
     # ------------------------------------------------------------------
 
     @classmethod
+    def _validate_field_type(
+        cls,
+        config: Dict[str, Any],
+        field: str,
+        expected_type: type,
+        allow_none: bool = False,
+    ) -> None:
+        """Validate a single field's type.
+
+        Args:
+            config: Configuration dictionary
+            field: Field name to validate
+            expected_type: Expected Python type
+            allow_none: Whether None values are allowed
+
+        Raises:
+            ValueError: If field type is invalid
+        """
+        if field not in config:
+            return
+
+        value = config[field]
+        if allow_none and value is None:
+            return
+
+        if not isinstance(value, expected_type):
+            type_name = expected_type.__name__
+            raise ValueError(f"Field '{field}' must be a {type_name}")
+
+    @classmethod
     def _validate_field_types(cls, config: Dict[str, Any]) -> None:
+        # Validate string fields
         string_fields = [
             "author",
             "name",
@@ -148,19 +183,13 @@ class ConfigValidator:
             "kind",
             "key_password",
         ]
-
         for field in string_fields:
-            if (
-                field in config
-                and config[field] is not None
-                and not isinstance(config[field], str)
-            ):
-                raise ValueError(f"Field '{field}' must be a string")
+            cls._validate_field_type(config, field, str, allow_none=True)
 
+        # Validate boolean fields
         bool_fields = ["recreate_keys", "debug_mode", "monitoring", "telemetry"]
         for field in bool_fields:
-            if field in config and not isinstance(config[field], bool):
-                raise ValueError(f"Field '{field}' must be a boolean")
+            cls._validate_field_type(config, field, bool)
 
         if "debug_level" in config:
             if not isinstance(config["debug_level"], int) or config[
@@ -186,10 +215,9 @@ class ConfigValidator:
 
             # Normalize basic type – we accept a dict or list of dicts
             if isinstance(execution_cost, dict):
-                # Single option – nothing else to validate here
-                return
-
-            if isinstance(execution_cost, list):
+                # Single option – valid
+                pass
+            elif isinstance(execution_cost, list):
                 if not execution_cost:
                     raise ValueError("Field 'execution_cost' list cannot be empty")
 
@@ -198,10 +226,11 @@ class ConfigValidator:
                         raise ValueError(
                             "Field 'execution_cost' must be a dict or a list of dicts"
                         )
-                return
-
-            # Any other type is invalid
-            raise ValueError("Field 'execution_cost' must be a dict or a list of dicts")
+            else:
+                # Any other type is invalid
+                raise ValueError(
+                    "Field 'execution_cost' must be a dict or a list of dicts"
+                )
 
     # ------------------------------------------------------------------
     # Auth validation

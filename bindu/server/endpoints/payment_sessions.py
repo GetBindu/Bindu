@@ -17,6 +17,7 @@ Provides REST API endpoints for payment session management:
 
 from __future__ import annotations
 
+import base64
 import json
 
 from starlette.requests import Request
@@ -27,9 +28,12 @@ from x402.types import PaymentPayload
 
 from bindu.server.applications import BinduApplication
 from bindu.utils.logging import get_logger
-from bindu.utils.request_utils import handle_endpoint_errors
+from .utils import handle_endpoint_errors, validate_manifest, validate_payment_manager
 
 logger = get_logger("bindu.server.endpoints.payment_sessions")
+
+# Constants
+PAYMENT_WAIT_TIMEOUT_SECONDS = 300  # 5 minutes
 
 
 @handle_endpoint_errors("start payment session")
@@ -41,17 +45,16 @@ async def start_payment_session_endpoint(
     Returns:
         Session details including browser_url to complete payment
     """
-    if not app._payment_session_manager:
-        return JSONResponse(
-            content={"error": "Payment sessions not enabled"}, status_code=503
-        )
+    error_resp = validate_payment_manager(app)
+    if error_resp:
+        return error_resp
 
     # Ensure manifest exists
-    if app.manifest is None:
-        return JSONResponse(
-            content={"error": "Agent manifest not configured"}, status_code=500
-        )
+    error_resp = validate_manifest(app)
+    if error_resp:
+        return error_resp
 
+    assert app._payment_session_manager is not None  # Validated above
     session = app._payment_session_manager.create_session()
 
     # Construct browser URL using app's base URL
@@ -73,10 +76,13 @@ async def payment_capture_endpoint(app: BinduApplication, request: Request) -> R
 
     Shows paywall UI and captures payment token when completed.
     """
-    if not app._payment_session_manager:
-        return HTMLResponse(
-            content=_get_error_html("Payment sessions not enabled"), status_code=503
-        )
+    error_resp = validate_payment_manager(
+        app, use_html=True, error_html_generator=_get_error_html
+    )
+    if error_resp:
+        return error_resp
+
+    assert app._payment_session_manager is not None  # Validated above
 
     session_id = request.query_params.get("session_id")
     if not session_id:
@@ -155,10 +161,11 @@ async def payment_status_endpoint(app: BinduApplication, request: Request) -> Re
     The payment token is returned but NOT consumed - it can be used
     for the actual API call.
     """
-    if not app._payment_session_manager:
-        return JSONResponse(
-            content={"error": "Payment sessions not enabled"}, status_code=503
-        )
+    error_resp = validate_payment_manager(app)
+    if error_resp:
+        return error_resp
+
+    assert app._payment_session_manager is not None  # Validated above
 
     session_id = request.path_params.get("session_id")
     if not session_id:
@@ -167,9 +174,9 @@ async def payment_status_endpoint(app: BinduApplication, request: Request) -> Re
     wait = request.query_params.get("wait", "false").lower() == "true"
 
     if wait:
-        # Wait for completion (up to 5 minutes)
+        # Wait for completion
         session = await app._payment_session_manager.wait_for_completion(
-            session_id, timeout_seconds=300
+            session_id, timeout_seconds=PAYMENT_WAIT_TIMEOUT_SECONDS
         )
     else:
         # Get current status
@@ -193,8 +200,6 @@ async def payment_status_endpoint(app: BinduApplication, request: Request) -> Re
     if session.is_completed() and session.payment_payload:
         # Return the payment payload as base64-encoded JSON
         # This can be used directly as X-PAYMENT header
-        import base64
-
         payment_json = session.payment_payload.model_dump_json(by_alias=True)
         payment_token = base64.b64encode(payment_json.encode("utf-8")).decode("utf-8")
         response_data["payment_token"] = payment_token

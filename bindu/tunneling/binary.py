@@ -1,4 +1,13 @@
-"""FRP client binary download and management."""
+"""FRP client binary download and management.
+
+NOTE: This module uses httpx instead of AsyncHTTPClient for the following reasons:
+1. Binary downloads are one-time operations during initialization, not runtime requests
+2. httpx provides better synchronous download support with progress tracking
+3. This is not a recurring HTTP operation that needs retry logic or session management
+4. Keeping httpx here avoids adding complexity to AsyncHTTPClient for a single use case
+
+All other HTTP operations in the codebase should use bindu.utils.http_client.AsyncHTTPClient.
+"""
 
 import hashlib
 import os

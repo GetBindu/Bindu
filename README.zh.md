@@ -47,6 +47,14 @@
 
 <br/>
 
+<div align="center">
+  <h3>一行命令接入你的代理</h3>
+</div>
+
+<div align="center">
+  <pre><code>curl -fsSL https://getbindu.com/install-bindu.sh | bash</code></pre>
+</div>
+
 ---
 
 **Bindu** (read: _binduu_) is an operating layer for AI agents that provides identity, communication, and payment capabilities. It delivers a production-ready service with a convenient API to connect, authenticate, and orchestrate agents across distributed systems using open protocols: **A2A**, **AP2**, and **X402**.
@@ -146,29 +154,7 @@ uv sync --dev
 
 ## 🚀 Quick Start
 
-### Option 1: Using Cookiecutter (Recommended)
-
-**Time to first agent: ~2 minutes ⏱️**
-
-```bash
-# Install cookiecutter
-uv add cookiecutter
-
-# Create your Bindu agent
-uvx cookiecutter https://github.com/getbindu/create-bindu-agent.git
-```
-
-<div align="center">
-  <a href="https://youtu.be/obY1bGOoWG8?si=uEeDb0XWrtYOQTL7" target="_blank">
-    <img src="https://img.youtube.com/vi/obY1bGOoWG8/maxresdefault.jpg" alt="Create Production Ready Agent" width="640" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
-  </a>
-</div>
-
-Your local agent becomes a live, secure, discoverable service. [Learn more →](https://docs.getbindu.com/bindu/create-bindu-agent/overview)
-
-> **💡 专业提示：** 使用 Cookiecutter 创建的代理包含 GitHub Actions，当您推送到仓库时会自动将代理注册到 [GetBindu.com](https://getbindu.com)。无需手动注册！
-
-### Option 2: Manual Setup
+### Option 1: Manual Setup
 
 Create your agent script `my_agent.py`:
 
@@ -235,7 +221,7 @@ $env:BINDU_PORT="4000"
 
 Existing examples that use `http://localhost:3773` are automatically overridden when `BINDU_PORT` is set.
 
-### Option 3: Zero-Config Local Agent
+### Option 2: Zero-Config Local Agent
 
 Try Bindu without setting up Postgres, Redis, or any cloud services. Runs entirely locally using in-memory storage and scheduler.
 
@@ -244,7 +230,7 @@ python examples/beginner_zero_config_agent.py
 ```
 
 
-### Option 4: Minimal Echo Agent (Testing)
+### Option 3: Minimal Echo Agent (Testing)
 
 <details>
 <summary><b>View minimal example</b> (click to expand)</summary>
@@ -471,16 +457,6 @@ Bindu includes a beautiful chat interface at `http://localhost:5173`. Navigate t
 ## 🌐 GetBindu.com
 
 [**GetBindu.com**](https://getbindu.com) 是所有 Bindu 代理的公共注册表，使它们在更广泛的代理生态系统中可被发现和访问。
-
-### ✨ Automatic Registration with Cookiecutter
-
-When you create an agent using the cookiecutter template, it includes a pre-configured GitHub Action that automatically registers your agent in the directory:
-
-1. **使用 cookiecutter 创建您的代理**
-2. **推送到 GitHub** - GitHub Action 自动触发
-3. **您的代理出现**在 [GetBindu.com](https://getbindu.com) 中
-
-> **🔑 注意**：您需要从 getbindu.com 收集 BINDU_PAT_TOKEN 并使用它来注册您的代理。
 
 ### 📝 Manual Registration
 

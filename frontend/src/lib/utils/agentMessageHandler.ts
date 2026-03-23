@@ -164,8 +164,7 @@ export async function* sendAgentMessage(
 	abortSignal?: AbortSignal,
 	currentTaskId?: string,
 	taskState?: string,
-	replyToTaskId?: string,
-	files?: Array<{ name: string; mime: string; value: string }>,
+	replyToTaskId?: string
 ): AsyncGenerator<MessageUpdate, void, unknown> {
 	const token = typeof window !== 'undefined' ? localStorage.getItem('bindu_oauth_token') : null;
 	const headers: Record<string, string> = {
@@ -179,38 +178,6 @@ export async function* sendAgentMessage(
 
 	// Generate IDs
 	const messageId = generateId();
-
-	// assemble the message object that will be sent to the agent
-	const messagePayload: AgentMessage = {
-		role: 'user',
-		parts: [],
-		kind: 'message',
-		messageId,
-		contextId: contextId || messageId,
-		taskId: '',
-	};
-
-	// always send the text portion first
-	messagePayload.parts.push({ kind: 'text', text: message });
-
-	// attach any files as base64 parts
-	// NOTE: the A2A protocol requires a `text` field on file parts (inherited from
-	// `TextPart`).  Historically we omitted this, which caused validation
-	// failures on the server side.  We use the filename as a sensible default so
-	// the field is never empty.
-	if (files && files.length > 0) {
-		for (const f of files) {
-			messagePayload.parts.push({
-				kind: 'file',
-				text: f.name || '',
-				file: {
-					bytes: f.value,
-					mimeType: f.mime,
-					name: f.name,
-				},
-			});
-		}
-	}
 
 	// Task ID logic based on A2A protocol:
 	// - Explicit reply: ALWAYS create new task with referenceTaskIds
@@ -246,12 +213,15 @@ export async function* sendAgentMessage(
 		? (contextId.length === 24 ? contextId.padEnd(32, '0') : contextId)
 		: generateId();
 
-	// Build messagePayload into final agentMessage, adding task/refs
+	// Build message with optional referenceTaskIds
 	const agentMessage: AgentMessage = {
-		...messagePayload,
-		taskId,
+		role: 'user',
+		parts: [{ kind: 'text', text: message }],
+		kind: 'message',
+		messageId,
 		contextId: newContextId,
-		...(referenceTaskIds.length > 0 && { referenceTaskIds }),
+		taskId,
+		...(referenceTaskIds.length > 0 && { referenceTaskIds })
 	};
 
 	// Step 1: Send message

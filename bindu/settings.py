@@ -518,6 +518,8 @@ class AuthSettings(BaseSettings):
         "/healthz",  # strict readiness probe for k8s
         "/metrics",
         "/payment-capture",  # x402 payment capture page (browser-based)
+        "/api/start-payment-session",  # x402 payment session creation
+        "/api/payment-status/*",  # x402 payment status check
     ]
 
     # Permission-based access control

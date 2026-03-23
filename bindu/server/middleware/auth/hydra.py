@@ -22,16 +22,20 @@ from starlette.websockets import WebSocket
 
 from bindu.auth.hydra.client import HydraClient
 from bindu.utils.logging import get_logger
-from bindu.utils.request_utils import extract_error_fields, jsonrpc_error
-from bindu.utils.did_signature import (
+from bindu.server.endpoints.utils import extract_error_fields, jsonrpc_error
+from bindu.utils.did import (
     extract_signature_headers,
     verify_signature,
-    get_public_key_from_hydra,
 )
 
 from .base import AuthMiddleware
 
 logger = get_logger("bindu.server.middleware.hydra")
+
+# Constants
+CACHE_TTL_SECONDS = 300  # 5 minutes
+MAX_BODY_SIZE_BYTES = 2 * 1024 * 1024  # 2 MB
+MAX_SIGNATURE_AGE_SECONDS = 300  # 5 minutes
 
 
 class HydraMiddleware(AuthMiddleware):
@@ -43,8 +47,8 @@ class HydraMiddleware(AuthMiddleware):
 
         self._introspection_cache = {}
         self._cache_locks = {}
-        self._cache_ttl = 300  # 5 minutes cache TTL
-        self._max_body_size = 2 * 1024 * 1024  # 2 MB
+        self._cache_ttl = CACHE_TTL_SECONDS
+        self._max_body_size = MAX_BODY_SIZE_BYTES
 
     def _initialize_provider(self) -> None:
         """Initialize Hydra-specific components and HTTP clients."""
@@ -167,13 +171,13 @@ class HydraMiddleware(AuthMiddleware):
         if signature_data["did"] != client_did:
             return False, {"did_verified": False, "reason": "did_mismatch"}, receive
 
-        public_key = await get_public_key_from_hydra(client_did, self.hydra_client)
+        public_key = await self.hydra_client.get_public_key_from_client(client_did)
         if not public_key:
             return True, {"did_verified": False, "reason": "no_public_key"}, receive
 
         # Memory Safety Guard
         content_length = int(headers.get("content-length", 0))
-        if content_length > self._max_body_size:
+        if content_length > MAX_BODY_SIZE_BYTES:
             logger.warning(
                 f"Payload too large for signature verification: {content_length} bytes"
             )
@@ -207,7 +211,7 @@ class HydraMiddleware(AuthMiddleware):
             did=signature_data["did"],
             timestamp=signature_data["timestamp"],
             public_key=public_key,
-            max_age_seconds=300,
+            max_age_seconds=MAX_SIGNATURE_AGE_SECONDS,
         )
 
         verification_result = {

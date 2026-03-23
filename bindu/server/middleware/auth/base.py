@@ -10,7 +10,7 @@ import fnmatch
 import re
 import inspect
 from abc import ABC, abstractmethod
-from typing import Any, Callable
+from typing import Any, Awaitable, Callable
 
 from starlette.requests import HTTPConnection
 from starlette.websockets import WebSocket
@@ -22,7 +22,7 @@ from bindu.common.protocol.types import (
     TokenExpiredError,
 )
 from bindu.utils.logging import get_logger
-from bindu.utils.request_utils import extract_error_fields, jsonrpc_error
+from bindu.server.endpoints.utils import extract_error_fields, jsonrpc_error
 
 logger = get_logger("bindu.server.middleware.auth.base")
 
@@ -61,7 +61,7 @@ class AuthMiddleware(ABC):
         """Initialize provider-specific components (JWKS client, validators, etc.)."""
 
     @abstractmethod
-    def _validate_token(self, token: str) -> dict[str, Any]:
+    def _validate_token(self, token: str) -> dict[str, Any] | Awaitable[dict[str, Any]]:
         """Validate authentication token.
 
         Can be synchronous or asynchronous.
@@ -132,11 +132,14 @@ class AuthMiddleware(ABC):
             return
 
         # Validate token
+        token_payload: dict[str, Any]
         try:
             # Safely support both async (Hydra) and sync validation implementations
             result = self._validate_token(token)
             if inspect.isawaitable(result):
-                token_payload = await result
+                from typing import cast
+
+                token_payload = cast(dict[str, Any], await result)
             else:
                 token_payload = result
         except Exception as e:

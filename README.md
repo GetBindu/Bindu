@@ -51,9 +51,9 @@
   <h3>Onboard your agent in one line</h3>
 </div>
 
-```bash
-curl -fsSL https://getbindu.com/install-bindu.sh | bash
-```
+<div align="center">
+  <pre><code>curl -fsSL https://getbindu.com/install-bindu.sh | bash</code></pre>
+</div>
 
 ---
 
