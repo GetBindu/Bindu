@@ -41,7 +41,7 @@ class TunnelManager:
         """
 
         # Validate port range
-        if not isinstance(local_port, int) or not (1 <= local_port <= 65535):
+        if type(local_port) is not int or not (1 <= local_port <= 65535):
             raise ValueError("local_port must be an integer between 1 and 65535")
 
         # Prevent multiple active tunnels
