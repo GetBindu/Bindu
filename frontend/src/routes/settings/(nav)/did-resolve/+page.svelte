@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { browser } from "$app/environment";
+	import { onMount } from "svelte";
 
 	interface DIDDocument {
 		"@context": string[];
@@ -14,7 +15,7 @@
 	}
 
 	// Form state
-	let didInput = $state("did:bindu:your_email_at_example_com:research_agent:9e84d316dd68482683ca3b3efc9c5500");
+	let didInput = $state("");
 
 	// Response state
 	let resolveStatus = $state<"idle" | "loading" | "success" | "error">("idle");
@@ -26,11 +27,52 @@
 		browser ? localStorage.getItem("bindu_oauth_token") : null
 	);
 
-	// Results section ref for auto-scroll
-	let resultsSection: HTMLDivElement | null = null;
-
 	// Copy feedback state
 	let copiedItems = $state<Record<string, boolean>>({});
+
+	// Fetch agent DID from agent card on mount
+	onMount(async () => {
+		// Try to load cached DID from localStorage first
+		const cachedDID = browser ? localStorage.getItem("bindu_agent_did") : null;
+		if (cachedDID) {
+			console.log("Loading DID from cache:", cachedDID);
+			didInput = cachedDID;
+			return;
+		}
+
+		// If not cached, fetch directly from agent card
+		try {
+			console.log("Fetching agent card directly");
+			// Fetch the agent card to get the DID
+			const agentCardResponse = await fetch("http://localhost:3773/.well-known/agent.json");
+			if (agentCardResponse.ok) {
+				const agentCard = await agentCardResponse.json() as {
+					capabilities?: {
+						extensions?: Array<{ uri?: string; [key: string]: unknown }>;
+					};
+				};
+				console.log("Agent card fetched:", agentCard);
+				// Extract DID from capabilities.extensions
+				const didExtension = agentCard.capabilities?.extensions?.find(
+					(ext) => ext.uri?.startsWith("did:bindu:")
+				);
+				if (didExtension?.uri) {
+					console.log("Found DID:", didExtension.uri);
+					didInput = didExtension.uri;
+					// Cache the DID in localStorage
+					if (browser) {
+						localStorage.setItem("bindu_agent_did", didExtension.uri);
+					}
+				} else {
+					console.warn("No DID extension found in agent card");
+				}
+			} else {
+				console.error("Failed to fetch agent card:", agentCardResponse.status);
+			}
+		} catch (err) {
+			console.error("Failed to fetch agent DID:", err);
+		}
+	});
 
 	function showCopyFeedback(itemId: string) {
 		copiedItems[itemId] = true;
@@ -70,8 +112,9 @@
 
 			// Auto-scroll to results after a short delay
 			setTimeout(() => {
-				if (resultsSection) {
-					resultsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+				const resultsEl = document.getElementById("did-results-section");
+				if (resultsEl) {
+					resultsEl.scrollIntoView({ behavior: "smooth", block: "start" });
 				}
 			}, 100);
 		} catch (err) {
@@ -166,7 +209,7 @@
 	<!-- DID Document Display -->
 	{#if didDocument}
 		<div
-			bind:this={resultsSection}
+			id="did-results-section"
 			class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-800"
 		>
 			<h2 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white">DID Document</h2>

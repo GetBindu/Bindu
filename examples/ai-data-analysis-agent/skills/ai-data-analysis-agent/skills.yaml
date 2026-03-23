@@ -13,7 +13,7 @@ description: |
   - Autonomous data visualization (Bar, Line, and Scatter charts)
   - Markdown-formatted analytical reporting
 
-  Uses Pandas for heavy data manipulation and a thread-safe 
+  Uses Pandas for heavy data manipulation and a thread-safe
   Matplotlib/Seaborn backend (Agg) for background image generation.
 tags:
   - data-science

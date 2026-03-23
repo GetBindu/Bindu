@@ -47,6 +47,7 @@ Inspired by the x402 protocol for enabling economic coordination between autonom
 
 from __future__ import annotations
 
+from .extension import X402ActivationHandler
 from .x402_agent_extension import X402AgentExtension
 
-__all__: list[str] = ["X402AgentExtension"]
+__all__: list[str] = ["X402AgentExtension", "X402ActivationHandler"]

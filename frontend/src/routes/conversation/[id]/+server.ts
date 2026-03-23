@@ -180,8 +180,8 @@ export async function POST({ request, locals, params, getClientAddress }) {
 			}) ?? [];
 
 	// check sizes
-	const maxFileSize = usageLimits?.messageFileSize ?? 10 * 1024 * 1024;
-	if (b64Files.some((file) => file.size > maxFileSize)) {
+	// todo: make configurable
+	if (b64Files.some((file) => file.size > 10 * 1024 * 1024)) {
 		error(413, "File too large, should be <10MB");
 	}
 

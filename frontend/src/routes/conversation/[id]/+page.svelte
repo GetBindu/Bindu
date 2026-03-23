@@ -56,19 +56,6 @@
 		replyToTaskId = null;
 	}
 
-	async function handleClearTasks() {
-		// UI-only: reset local task threading state so next message starts fresh.
-		currentTaskId = null;
-		currentTaskState = null;
-		clearReply();
-	}
-
-	async function handleClearContext() {
-		// Frontend-only: for per-conversation chats, we can at least reset local state.
-		// If the backend/agent is unreachable, we still keep the UI understandable.
-		await handleClearTasks();
-	}
-
 	let conversations = $state(data.conversations);
 	$effect(() => {
 		conversations = data.conversations;
@@ -265,8 +252,7 @@
 					messageUpdatesAbortController.signal,
 					currentTaskId ?? undefined,
 					currentTaskState ?? undefined,
-					replyToTaskId ?? undefined,
-                                        isRetry ? userMessage?.files : base64Files
+					replyToTaskId ?? undefined
 				);
 				// Clear reply after sending
 				clearReply();
@@ -560,8 +546,6 @@
 	onReplyToTask={setReplyTo}
 	replyToTaskId={replyToTaskId}
 	onClearReply={clearReply}
-	onClearContext={handleClearContext}
-	onClearTasks={handleClearTasks}
 	models={data.models}
 	currentModel={findCurrentModel(data.models, data.oldModels, data.model)}
 />

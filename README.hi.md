@@ -47,6 +47,14 @@
 
 <br>
 
+<div align="center">
+  <h3>एक लाइन में अपने एजेंट को ऑनबोर्ड करें</h3>
+</div>
+
+<div align="center">
+  <pre><code>curl -fsSL https://getbindu.com/install-bindu.sh | bash</code></pre>
+</div>
+
 -----
 
 **Bindu** (उच्चारण: *बिन्दू*) AI एजेंटों के लिए एक ऑपरेटिंग लेयर है जो पहचान, संचार और भुगतान क्षमताएं प्रदान करता है। यह खुले प्रोटोकॉल: **A2A**, **AP2**, और **X402** का उपयोग करके डिस्ट्रिब्यूटेड सिस्टम्स में एजेंटों को जोड़ने, प्रमाणित करने और व्यवस्थित करने के लिए एक सुविधाजनक API के साथ प्रोडक्शन-रेडी सेवा प्रदान करता है।
@@ -145,29 +153,7 @@ uv sync --dev
 
 ## 🚀 क्विक स्टार्ट
 
-### विकल्प 1: Cookiecutter का उपयोग करना (अनुशंसित)
-
-**पहले एजेंट तक का समय: \~2 मिनट ⏱️**
-
-```bash
-# cookiecutter इंस्टॉल करें
-uv add cookiecutter
-
-# अपना Bindu एजेंट बनाएं
-uvx cookiecutter https://github.com/getbindu/create-bindu-agent.git
-```
-
-<div align="center">
-<a href="[https://youtu.be/obY1bGOoWG8?si=uEeDb0XWrtYOQTL7](https://youtu.be/obY1bGOoWG8?si=uEeDb0XWrtYOQTL7)" target="_blank">
-<img src="[https://img.youtube.com/vi/obY1bGOoWG8/maxresdefault.jpg](https://img.youtube.com/vi/obY1bGOoWG8/maxresdefault.jpg)" alt="Create Production Ready Agent" width="640" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
-</a>
-</div>
-
-आपका स्थानीय एजेंट एक लाइव, सुरक्षित, और खोजने योग्य सेवा बन जाता है। [अधिक जानें →](https://docs.getbindu.com/bindu/create-bindu-agent/overview)
-
-> **💡 प्रो टिप:** Cookiecutter से बनाए गए एजेंट्स में GitHub Actions होते हैं जो आपके रिपॉजिटरी में push करने पर स्वचालित रूप से [GetBindu.com](https://getbindu.com) में एजेंट को रजिस्टर कर देते हैं। मैनुअल रजिस्ट्रेशन की जरूरत नहीं!
-
-### विकल्प 2: मैन्युअल सेटअप
+### विकल्प 1: मैन्युअल सेटअप
 
 अपनी एजेंट स्क्रिप्ट `my_agent.py` बनाएं:
 
@@ -232,7 +218,7 @@ $env:BINDU_PORT="4000"
 
 मौजूदा उदाहरण जो `http://localhost:3773` का उपयोग करते हैं, `BINDU_PORT` सेट होने पर स्वचालित रूप से ओवरराइड हो जाते हैं।
 
-### विकल्प 3: Zero-Config स्थानीय एजेंट
+### विकल्प 2: Zero-Config स्थानीय एजेंट
 
 बिना PostgreSQL, Redis, या किसी क्लाउड सेवा को सेटअप किए Bindu आज़माएं। in-memory storage और scheduler का उपयोग करके पूरी तरह से स्थानीय स्तर पर चलता है।
 
@@ -240,7 +226,7 @@ $env:BINDU_PORT="4000"
 python examples/beginner_zero_config_agent.py
 ```
 
-### विकल्प 4: मिनिमल इको (Echo) एजेंट (टेस्टिंग के लिए)
+### विकल्प 3: मिनिमल इको (Echo) एजेंट (टेस्टिंग के लिए)
 
 <details>
 <summary><b>न्यूनतम उदाहरण देखें</b> (क्लिक करें)</summary>
@@ -467,16 +453,6 @@ Bindu में `http://localhost:5173` पर एक सुंदर चैट 
 ## 🌐 GetBindu.com
 
 [**GetBindu.com**](https://getbindu.com) सभी Bindu एजेंट्स की एक पब्लिक रजिस्ट्री है, जो उन्हें व्यापक एजेंट इकोसिस्टम में डिस्कवरेबल और एक्सेसिबल बनाती है।
-
-### ✨ Cookiecutter के साथ स्वचालित पंजीकरण (Automatic Registration)
-
-जब आप cookiecutter टेम्पलेट का उपयोग करके एजेंट बनाते हैं, तो इसमें एक पूर्व-कॉन्फ़िगर GitHub Action शामिल होता है जो आपके रिपॉजिटरी में पुश करने पर आपके एजेंट को स्वचालित रूप से डायरेक्टरी में रजिस्टर कर देता है:
-
-1. **अपना एजेंट बनाएं** cookiecutter का उपयोग करके
-2. **GitHub पर Push करें** - GitHub Action स्वचालित रूप से ट्रिगर होता है
-3. **आपका एजेंट दिखाई देता है** [GetBindu.com](https://getbindu.com) में
-
-> **🔑 नोट**: आपको getbindu.com से BINDU_PAT_TOKEN एकत्र करना होगा और अपने एजेंट को रजिस्टर करने के लिए इसका उपयोग करना होगा।
 
 ### 📝 मैन्युअल पंजीकरण (Manual Registration)
 

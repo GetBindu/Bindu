@@ -47,6 +47,14 @@
 
 <br>
 
+<div align="center">
+  <h3>Intégrez votre agent en une seule ligne</h3>
+</div>
+
+<div align="center">
+  <pre><code>curl -fsSL https://getbindu.com/install-bindu.sh | bash</code></pre>
+</div>
+
 -----
 
 **Bindu** (se lit : *binduu*) est une couche opérationnelle pour les agents d'IA qui fournit des capacités d'identité, de communication et de paiement. Il offre un service prêt pour la production avec une API pratique pour connecter, authentifier et orchestrer des agents à travers des systèmes distribués en utilisant des protocoles ouverts : **A2A**, **AP2**, et **X402**.
@@ -145,29 +153,7 @@ uv sync --dev
 
 ## 🚀 Démarrage rapide
 
-### Option 1 : Utilisation de Cookiecutter (Recommandé)
-
-**Temps jusqu'au premier agent : \~2 minutes ⏱️**
-
-```bash
-# Installer cookiecutter
-uv add cookiecutter
-
-# Créer votre agent Bindu
-uvx cookiecutter https://github.com/getbindu/create-bindu-agent.git
-```
-
-<div align="center">
-<a href="[https://youtu.be/obY1bGOoWG8?si=uEeDb0XWrtYOQTL7](https://youtu.be/obY1bGOoWG8?si=uEeDb0XWrtYOQTL7)" target="_blank">
-<img src="[https://img.youtube.com/vi/obY1bGOoWG8/maxresdefault.jpg](https://img.youtube.com/vi/obY1bGOoWG8/maxresdefault.jpg)" alt="Create Production Ready Agent" width="640" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
-</a>
-</div>
-
-Votre agent local devient un service en direct, sécurisé et découvrable. [En savoir plus →](https://docs.getbindu.com/bindu/create-bindu-agent/overview)
-
-> **💡 Conseil pro :** Les agents créés avec Cookiecutter incluent des GitHub Actions qui enregistrent automatiquement votre agent dans le [GetBindu.com](https://getbindu.com) lorsque vous poussez vers votre dépôt. Pas besoin d'enregistrement manuel !
-
-### Option 2 : Configuration manuelle
+### Option 1 : Configuration manuelle
 
 Créez votre script d'agent `my_agent.py` :
 
@@ -232,7 +218,7 @@ $env:BINDU_PORT="4000"
 
 Les exemples existants qui utilisent `http://localhost:3773` sont automatiquement remplacés lorsque `BINDU_PORT` est défini.
 
-### Option 3 : Agent local Zero-Config
+### Option 2 : Agent local Zero-Config
 
 Essayez Bindu sans configurer PostgreSQL, Redis ou tout autre service cloud. Fonctionne entièrement localement en utilisant le stockage et le scheduler en mémoire.
 
@@ -240,7 +226,7 @@ Essayez Bindu sans configurer PostgreSQL, Redis ou tout autre service cloud. Fon
 python examples/beginner_zero_config_agent.py
 ```
 
-### Option 4 : Agent Echo minimal (Test)
+### Option 3 : Agent Echo minimal (Test)
 
 <details>
 <summary><b>Voir l'exemple minimal</b> (cliquez pour agrandir)</summary>
@@ -467,16 +453,6 @@ Bindu inclut une magnifique interface de chat sur `http://localhost:5173`. Navig
 ## 🌐 GetBindu.com
 
 Le [**GetBindu.com**](https://getbindu.com) est un registre public de tous les agents Bindu, les rendant découvrables et accessibles pour l'écosystème d'agents plus large.
-
-### ✨ Enregistrement automatique avec Cookiecutter
-
-Lorsque vous créez un agent à l'aide du modèle cookiecutter, il inclut une GitHub Action préconfigurée qui enregistre automatiquement votre agent dans l'annuaire :
-
-1. **Créez votre agent** en utilisant cookiecutter
-2. **Poussez vers GitHub** - La GitHub Action se déclenche automatiquement
-3. **Votre agent apparaît** dans le [GetBindu.com](https://getbindu.com)
-
-> **🔑 Note** : Vous devez collecter le BINDU_PAT_TOKEN depuis getbindu.com et l'utiliser pour enregistrer votre agent.
 
 ### 📝 Enregistrement manuel
 

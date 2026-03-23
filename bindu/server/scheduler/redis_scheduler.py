@@ -5,15 +5,15 @@ from __future__ import annotations as _annotations
 import json
 import asyncio
 from collections.abc import AsyncIterator
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 import redis.asyncio as redis
-from opentelemetry.trace import get_current_span
 
 from bindu.common.protocol.types import TaskIdParams, TaskSendParams
 from bindu.utils.logging import get_logger
 from bindu.utils.retry import retry_scheduler_operation
+from bindu.utils.tracing import get_trace_context
 
 from .base import (
     Scheduler,
@@ -26,18 +26,17 @@ from .base import (
 
 logger = get_logger("bindu.server.scheduler.redis_scheduler")
 
+# Constants
+REDIS_NOT_INITIALIZED_ERROR = "Redis client not initialized. Use async context manager."
+REDIS_ERROR_BACKOFF_SECONDS = 1
 
-def _get_trace_context() -> tuple[str | None, str | None]:
-    """Extract primitive trace context from the live OpenTelemetry span."""
-    try:
-        span = get_current_span()
-        if span and hasattr(span, "get_span_context"):
-            ctx = span.get_span_context()
-            if ctx and ctx.is_valid:
-                return format(ctx.trace_id, "032x"), format(ctx.span_id, "016x")
-    except Exception:
-        pass
-    return None, None
+# Operation type mapping for deserialization
+OPERATION_TYPES = {
+    "run": _RunTask,
+    "cancel": _CancelTask,
+    "pause": _PauseTask,
+    "resume": _ResumeTask,
+}
 
 
 class RedisScheduler(Scheduler):
@@ -93,6 +92,25 @@ class RedisScheduler(Scheduler):
             logger.info("Redis scheduler connection closed")
             self._redis_client = None
 
+    async def _send_operation(
+        self,
+        operation_class: type,
+        operation: str,
+        params: TaskSendParams | TaskIdParams,
+    ) -> None:
+        """Send task operation with trace context.
+
+        Args:
+            operation_class: The operation class to instantiate
+            operation: Operation type string
+            params: Task parameters
+        """
+        trace_id, span_id = get_trace_context()
+        task_op = operation_class(
+            operation=operation, params=params, trace_id=trace_id, span_id=span_id
+        )
+        await self._push_task_operation(task_op)
+
     @retry_scheduler_operation()
     async def run_task(self, params: TaskSendParams) -> None:
         """Schedule a task to run.
@@ -101,11 +119,7 @@ class RedisScheduler(Scheduler):
             params: Parameters for the task to run
         """
         logger.debug(f"Scheduling run task: {params}")
-        trace_id, span_id = _get_trace_context()
-        task_operation = _RunTask(
-            operation="run", params=params, trace_id=trace_id, span_id=span_id
-        )
-        await self._push_task_operation(task_operation)
+        await self._send_operation(_RunTask, "run", params)
 
     @retry_scheduler_operation()
     async def cancel_task(self, params: TaskIdParams) -> None:
@@ -115,11 +129,7 @@ class RedisScheduler(Scheduler):
             params: Parameters identifying the task to cancel
         """
         logger.debug(f"Scheduling cancel task: {params}")
-        trace_id, span_id = _get_trace_context()
-        task_operation = _CancelTask(
-            operation="cancel", params=params, trace_id=trace_id, span_id=span_id
-        )
-        await self._push_task_operation(task_operation)
+        await self._send_operation(_CancelTask, "cancel", params)
 
     @retry_scheduler_operation()
     async def pause_task(self, params: TaskIdParams) -> None:
@@ -129,11 +139,7 @@ class RedisScheduler(Scheduler):
             params: Parameters identifying the task to pause
         """
         logger.debug(f"Scheduling pause task: {params}")
-        trace_id, span_id = _get_trace_context()
-        task_operation = _PauseTask(
-            operation="pause", params=params, trace_id=trace_id, span_id=span_id
-        )
-        await self._push_task_operation(task_operation)
+        await self._send_operation(_PauseTask, "pause", params)
 
     @retry_scheduler_operation()
     async def resume_task(self, params: TaskIdParams) -> None:
@@ -143,11 +149,7 @@ class RedisScheduler(Scheduler):
             params: Parameters identifying the task to resume
         """
         logger.debug(f"Scheduling resume task: {params}")
-        trace_id, span_id = _get_trace_context()
-        task_operation = _ResumeTask(
-            operation="resume", params=params, trace_id=trace_id, span_id=span_id
-        )
-        await self._push_task_operation(task_operation)
+        await self._send_operation(_ResumeTask, "resume", params)
 
     async def receive_task_operations(self) -> AsyncIterator[TaskOperation]:
         """Receive task operations from the Redis queue.
@@ -159,9 +161,7 @@ class RedisScheduler(Scheduler):
             RuntimeError: If Redis client is not initialized
         """
         if not self._redis_client:
-            raise RuntimeError(
-                "Redis client not initialized. Use async context manager."
-            )
+            raise RuntimeError(REDIS_NOT_INITIALIZED_ERROR)
 
         logger.info(
             f"Starting to receive task operations from queue: {self.queue_name}"
@@ -169,8 +169,12 @@ class RedisScheduler(Scheduler):
 
         while True:
             try:
-                result = await self._redis_client.blpop(
-                    self.queue_name, timeout=self.poll_timeout
+                # Cast to awaitable since we're using async redis client
+                result = await cast(
+                    Any,
+                    self._redis_client.blpop(
+                        [self.queue_name], timeout=self.poll_timeout
+                    ),
                 )
 
                 if result:
@@ -184,7 +188,7 @@ class RedisScheduler(Scheduler):
             except redis.RedisError as e:
                 logger.error(f"Redis error in receive_task_operations: {e}")
                 # FIX: Prevent infinite tight-loop CPU burn if Redis disconnects
-                await asyncio.sleep(1)
+                await asyncio.sleep(REDIS_ERROR_BACKOFF_SECONDS)
                 continue
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to deserialize task operation: {e}")
@@ -195,13 +199,12 @@ class RedisScheduler(Scheduler):
 
     async def _push_task_operation(self, task_operation: TaskOperation) -> None:
         if not self._redis_client:
-            raise RuntimeError(
-                "Redis client not initialized. Use async context manager."
-            )
+            raise RuntimeError(REDIS_NOT_INITIALIZED_ERROR)
 
         try:
             serialized_task = self._serialize_task_operation(task_operation)
-            await self._redis_client.rpush(self.queue_name, serialized_task)
+            # Cast to awaitable since we're using async redis client
+            await cast(Any, self._redis_client.rpush(self.queue_name, serialized_task))
             logger.debug(
                 f"Pushed task operation to queue: {task_operation['operation']}"
             )
@@ -242,24 +245,13 @@ class RedisScheduler(Scheduler):
         trace_id = data.get("trace_id")
         span_id = data.get("span_id")
 
-        if operation_type == "run":
-            return _RunTask(
-                operation="run", params=params, trace_id=trace_id, span_id=span_id
-            )
-        elif operation_type == "cancel":
-            return _CancelTask(
-                operation="cancel", params=params, trace_id=trace_id, span_id=span_id
-            )
-        elif operation_type == "pause":
-            return _PauseTask(
-                operation="pause", params=params, trace_id=trace_id, span_id=span_id
-            )
-        elif operation_type == "resume":
-            return _ResumeTask(
-                operation="resume", params=params, trace_id=trace_id, span_id=span_id
-            )
-        else:
+        operation_class = OPERATION_TYPES.get(operation_type)
+        if not operation_class:
             raise ValueError(f"Unknown operation type: {operation_type}")
+
+        return operation_class(
+            operation=operation_type, params=params, trace_id=trace_id, span_id=span_id
+        )
 
     async def get_queue_length(self) -> int:
         """Get the current length of the task queue.
@@ -271,8 +263,9 @@ class RedisScheduler(Scheduler):
             RuntimeError: If Redis client is not initialized
         """
         if not self._redis_client:
-            raise RuntimeError("Redis client not initialized.")
-        return await self._redis_client.llen(self.queue_name)
+            raise RuntimeError(REDIS_NOT_INITIALIZED_ERROR)
+        # Cast to awaitable since we're using async redis client
+        return await cast(Any, self._redis_client.llen(self.queue_name))
 
     async def clear_queue(self) -> int:
         """Clear all tasks from the queue.
@@ -284,7 +277,7 @@ class RedisScheduler(Scheduler):
             RuntimeError: If Redis client is not initialized
         """
         if not self._redis_client:
-            raise RuntimeError("Redis client not initialized.")
+            raise RuntimeError(REDIS_NOT_INITIALIZED_ERROR)
         return await self._redis_client.delete(self.queue_name)
 
     async def health_check(self) -> bool:
@@ -296,7 +289,8 @@ class RedisScheduler(Scheduler):
         try:
             if not self._redis_client:
                 return False
-            await self._redis_client.ping()
+            # Cast to awaitable since we're using async redis client
+            await cast(Any, self._redis_client.ping())
             return True
         except (redis.RedisError, ConnectionError, TimeoutError, Exception) as e:
             logger.warning(f"Redis health check failed: {e}")

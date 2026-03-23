@@ -43,6 +43,14 @@
 
 <br>
 
+<div align="center">
+  <h3>Onboard je agent in één regel</h3>
+</div>
+
+<div align="center">
+  <pre><code>curl -fsSL https://getbindu.com/install-bindu.sh | bash</code></pre>
+</div>
+
 -----
 
 **Bindu** (spreek uit: *binduu*) is een besturingslaag voor AI-agenten die zorgt voor identiteit, communicatie en betalingsmogelijkheden. Het levert een productieklare service met een handige API om agenten te verbinden, te authenticeren en te orkestreren over gedistribueerde systemen heen met behulp van open protocollen: **A2A**, **AP2**, en **X402**.
@@ -141,29 +149,7 @@ uv sync --dev
 
 ## 🚀 Snelstart
 
-### Optie 1: Cookiecutter gebruiken (Aanbevolen)
-
-**Tijd tot eerste agent: \~2 minuten ⏱️**
-
-```bash
-# Installeer cookiecutter
-uv add cookiecutter
-
-# Maak je Bindu agent
-uvx cookiecutter https://github.com/getbindu/create-bindu-agent.git
-```
-
-<div align="center">
-<a href="[https://youtu.be/obY1bGOoWG8?si=uEeDb0XWrtYOQTL7](https://youtu.be/obY1bGOoWG8?si=uEeDb0XWrtYOQTL7)" target="_blank">
-<img src="[https://img.youtube.com/vi/obY1bGOoWG8/maxresdefault.jpg](https://img.youtube.com/vi/obY1bGOoWG8/maxresdefault.jpg)" alt="Create Production Ready Agent" width="640" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
-</a>
-</div>
-
-Je lokale agent wordt een live, beveiligde en vindbare service. [Leer meer →](https://docs.getbindu.com/bindu/create-bindu-agent/overview)
-
-> **💡 Pro tip:** Agents die met Cookiecutter zijn gemaakt, bevatten GitHub Actions die je agent automatisch registreren in de [GetBindu.com](https://getbindu.com) wanneer je naar je repository pusht. Geen handmatige registratie nodig!
-
-### Optie 2: Handmatige Setup
+### Optie 1: Handmatige Setup
 
 Maak je agent-script `my_agent.py`:
 
@@ -228,7 +214,7 @@ $env:BINDU_PORT="4000"
 
 Bestaande voorbeelden die `http://localhost:3773` gebruiken, worden automatisch overschreven wanneer `BINDU_PORT` is ingesteld.
 
-### Optie 3: Zero-Config Lokale Agent
+### Optie 2: Zero-Config Lokale Agent
 
 Probeer Bindu zonder PostgreSQL, Redis of clouddiensten in te stellen. Draait volledig lokaal met in-memory opslag en scheduler.
 
@@ -236,7 +222,7 @@ Probeer Bindu zonder PostgreSQL, Redis of clouddiensten in te stellen. Draait vo
 python examples/beginner_zero_config_agent.py
 ```
 
-### Optie 4: Minimale Echo Agent (Testen)
+### Optie 3: Minimale Echo Agent (Testen)
 
 <details>
 <summary><b>Bekijk minimaal voorbeeld</b> (klik om uit te klappen)</summary>
@@ -462,16 +448,6 @@ Bindu bevat een prachtige chatinterface op `http://localhost:5173`. Navigeer naa
 ## 🌐 GetBindu.com
 
 De [**GetBindu.com**](https://getbindu.com) is een openbaar register van alle Bindu agents, waardoor ze vindbaar en toegankelijk zijn voor het bredere agent ecosysteem.
-
-### ✨ Automatische Registratie met Cookiecutter
-
-Wanneer je een agent maakt met de cookiecutter-template, bevat deze een vooraf geconfigureerde GitHub Action die je agent automatisch registreert in de directory:
-
-1. **Maak je agent** met cookiecutter
-2. **Push naar GitHub** - De GitHub Action triggert automatisch
-3. **Je agent verschijnt** in de [GetBindu.com](https://getbindu.com)
-
-> **🔑 Opmerking**: Je moet de BINDU_PAT_TOKEN verzamelen van getbindu.com en deze gebruiken om je agent te registreren.
 
 ### 📝 Handmatige Registratie
 

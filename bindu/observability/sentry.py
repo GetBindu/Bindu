@@ -32,6 +32,9 @@ from bindu.utils.logging import get_logger
 
 logger = get_logger("bindu.observability.sentry")
 
+# HTTP 5xx server error status codes to track as failed requests
+HTTP_5XX_STATUS_CODES = set(range(500, 512))
+
 
 def init_sentry() -> bool:
     """Initialize Sentry SDK with configuration from settings.
@@ -65,20 +68,7 @@ def init_sentry() -> bool:
             integrations.append(
                 StarletteIntegration(
                     transaction_style="url",  # Group by URL pattern
-                    failed_request_status_codes={
-                        500,
-                        501,
-                        502,
-                        503,
-                        504,
-                        505,
-                        506,
-                        507,
-                        508,
-                        509,
-                        510,
-                        511,
-                    },  # Track 5xx as errors
+                    failed_request_status_codes=HTTP_5XX_STATUS_CODES,
                 )
             )
 

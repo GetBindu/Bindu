@@ -12,7 +12,7 @@ An AI-enabled web scraping agent that crawls web pages, extracts structured data
 
 ### 🔧 Technical Features
 - **Model**: OpenRouter's `openai/gpt-oss-120b` for advanced synthesis and formatting.
-- **Tools**: 
+- **Tools**:
   - `ScrapeGraphTools`: For intelligent web scraping.
   - `Mem0Tools`: For persistent memory and deduplication.
 - **Environment Loading**: Automatic .env file loading for secure API key management.

@@ -37,15 +37,21 @@ from bindu.common.models import (
     SentryConfig,
 )
 from bindu.settings import app_settings
+from bindu.utils import get_x402_extension_from_capabilities
 from bindu.utils.retry import execute_with_retry
 
-from .middleware.auth import HydraMiddleware
 from .scheduler.base import Scheduler
 from .storage.base import Storage
 from .task_manager import TaskManager
 from bindu.utils.logging import get_logger
 
 logger = get_logger("bindu.server.applications")
+
+# Constants
+UNKNOWN_AUTH_PROVIDER_ERROR = (
+    "Unknown authentication provider: '{provider}'. Supported providers: {supported}"
+)
+TASKMANAGER_NOT_INITIALIZED_ERROR = "TaskManager was not properly initialized."
 
 
 class BinduApplication(Starlette):
@@ -103,15 +109,17 @@ class BinduApplication(Starlette):
             lifespan = self._create_default_lifespan(manifest)
 
         # Setup middleware chain
-        from bindu.utils import get_x402_extension_from_capabilities
-
         x402_ext = get_x402_extension_from_capabilities(manifest)
-        payment_requirements_for_middleware = (
-            self._create_payment_requirements(x402_ext, manifest, resource_suffix="/")
-            if x402_ext
-            else None
-        )
+        payment_requirements_for_middleware = None
+        if x402_ext:
+            # Type narrowing: if x402_ext exists, manifest must exist
+            assert manifest is not None
+            payment_requirements_for_middleware = self._create_payment_requirements(
+                x402_ext, manifest, resource_suffix="/"
+            )
 
+        # Type narrowing: manifest should exist for middleware setup
+        assert manifest is not None
         middleware_list = self._setup_middleware(
             middleware,
             x402_ext,
@@ -170,7 +178,7 @@ class BinduApplication(Starlette):
         )
 
         # Add health endpoint import
-        from .endpoints.health import health_endpoint, healthz_endpoint
+        from .endpoints.health import health_endpoint
 
         # Protocol endpoints
         self._add_route(
@@ -216,9 +224,6 @@ class BinduApplication(Starlette):
         )
         # Register health endpoint (backward-compat, always ready=True)
         self._add_route("/health", health_endpoint, ["GET"], with_app=True)
-
-        # Register strict readiness endpoint for k8s probes (returns 503 until ready)
-        self._add_route("/healthz", healthz_endpoint, ["GET"], with_app=True)
 
         # Register metrics endpoint
         self._add_route("/metrics", metrics_endpoint, ["GET"], with_app=True)
@@ -316,6 +321,8 @@ class BinduApplication(Starlette):
                     app_settings.storage.backend = "memory"
 
             # Retry storage initialization for transient connection failures
+            # Type narrowing: manifest should exist at this point
+            assert self.manifest is not None
             storage = await execute_with_retry(
                 create_storage,
                 max_attempts=app_settings.retry.storage_max_attempts,
@@ -349,44 +356,13 @@ class BinduApplication(Starlette):
             # Override settings if sentry_config is provided
             if self._sentry_config.enabled:
                 logger.info("🔧 Initializing Sentry...")
-
                 # Override app_settings with config values
                 if self._sentry_config.dsn:
-                    app_settings.sentry.enabled = True
-                    app_settings.sentry.dsn = self._sentry_config.dsn
-                    app_settings.sentry.environment = self._sentry_config.environment
-                    if self._sentry_config.release:
-                        app_settings.sentry.release = self._sentry_config.release
-                    app_settings.sentry.traces_sample_rate = (
-                        self._sentry_config.traces_sample_rate
-                    )
-                    app_settings.sentry.profiles_sample_rate = (
-                        self._sentry_config.profiles_sample_rate
-                    )
-                    app_settings.sentry.enable_tracing = (
-                        self._sentry_config.enable_tracing
-                    )
-                    app_settings.sentry.send_default_pii = (
-                        self._sentry_config.send_default_pii
-                    )
-                    app_settings.sentry.debug = self._sentry_config.debug
-
-                from bindu.observability import init_sentry
-
-                sentry_initialized = init_sentry()
-                if sentry_initialized:
-                    logger.info("✅ Sentry initialized successfully")
-                else:
-                    logger.debug("Sentry not initialized (disabled or not configured)")
+                    self._apply_sentry_config(self._sentry_config)
+                self._initialize_sentry()
             else:
                 # Try to initialize from environment variables
-                from bindu.observability import init_sentry
-
-                sentry_initialized = init_sentry()
-                if sentry_initialized:
-                    logger.info("✅ Sentry initialized from environment variables")
-                else:
-                    logger.debug("Sentry not initialized (disabled or not configured)")
+                self._initialize_sentry(source="environment variables")
 
             # Start payment session manager cleanup task if x402 enabled
             if app._payment_session_manager:
@@ -418,6 +394,43 @@ class BinduApplication(Starlette):
             logger.info("✅ Storage cleanup complete")
 
         return lifespan
+
+    def _apply_sentry_config(self, config: SentryConfig) -> None:
+        """Apply Sentry configuration to app settings.
+
+        Args:
+            config: Sentry configuration to apply
+
+        Note:
+            This method should only be called after verifying config.dsn is not None
+        """
+        app_settings.sentry.enabled = True
+        # Type narrowing: dsn is checked before calling this method (line 361)
+        assert config.dsn is not None, "Sentry DSN must be provided"
+        app_settings.sentry.dsn = config.dsn
+        app_settings.sentry.environment = config.environment
+        if config.release:
+            app_settings.sentry.release = config.release
+        app_settings.sentry.traces_sample_rate = config.traces_sample_rate
+        app_settings.sentry.profiles_sample_rate = config.profiles_sample_rate
+        app_settings.sentry.enable_tracing = config.enable_tracing
+        app_settings.sentry.send_default_pii = config.send_default_pii
+        app_settings.sentry.debug = config.debug
+
+    def _initialize_sentry(self, source: str = "") -> None:
+        """Initialize Sentry error tracking.
+
+        Args:
+            source: Optional source description for logging (e.g., 'environment variables')
+        """
+        from bindu.observability import init_sentry
+
+        sentry_initialized = init_sentry()
+        if sentry_initialized:
+            source_msg = f" from {source}" if source else " successfully"
+            logger.info(f"✅ Sentry initialized{source_msg}")
+        else:
+            logger.debug("Sentry not initialized (disabled or not configured)")
 
     def _setup_observability(self) -> None:
         """Set up OpenTelemetry observability."""
@@ -476,7 +489,7 @@ class BinduApplication(Starlette):
 
         options: list[dict[str, Any]]
         if getattr(x402_ext, "payment_options", None):
-            options = list(x402_ext.payment_options)  # type: ignore[assignment]
+            options = list(x402_ext.payment_options)
         else:
             options = [
                 {
@@ -491,6 +504,8 @@ class BinduApplication(Starlette):
             network = opt.get("network") or app_settings.x402.default_network
             pay_to_address = opt.get("pay_to_address") or x402_ext.pay_to_address
 
+            # Type narrowing: amount should be present in payment options
+            assert amount is not None, "Payment amount is required"
             max_amount_required, asset_address, eip712_domain = (
                 process_price_to_atomic_amount(amount, network)
             )
@@ -550,7 +565,7 @@ class BinduApplication(Starlette):
 
             logger.info(f"CORS middleware enabled for origins: {cors_origins}")
             cors_middleware = Middleware(
-                CORSMiddleware,
+                CORSMiddleware,  # type: ignore[arg-type]
                 allow_origins=cors_origins,
                 allow_credentials=True,
                 allow_methods=["*"],
@@ -572,7 +587,7 @@ class BinduApplication(Starlette):
 
             facilitator_config = {"url": app_settings.x402.facilitator_url}
             x402_middleware = Middleware(
-                X402Middleware,
+                X402Middleware,  # type: ignore[arg-type]
                 manifest=manifest,
                 facilitator_config=facilitator_config,
                 x402_ext=x402_ext,
@@ -594,7 +609,7 @@ class BinduApplication(Starlette):
         # Add metrics middleware (should be last to capture all requests)
         from .middleware import MetricsMiddleware
 
-        metrics_middleware = Middleware(MetricsMiddleware)
+        metrics_middleware = Middleware(MetricsMiddleware)  # type: ignore[arg-type]
         middleware_list.append(metrics_middleware)
         logger.info("Metrics middleware enabled for Prometheus monitoring")
 
@@ -609,16 +624,17 @@ class BinduApplication(Starlette):
         Raises:
             ValueError: If authentication provider is unknown
         """
+        from .middleware.auth import HydraMiddleware
+
         provider = app_settings.auth.provider.lower()
 
         if provider == "hydra":
             logger.info("Hydra OAuth2 authentication enabled")
-            return Middleware(HydraMiddleware, auth_config=app_settings.hydra)
+            return Middleware(HydraMiddleware, auth_config=app_settings.hydra)  # type: ignore[arg-type]
         else:
             logger.error(f"Unknown authentication provider: {provider}")
             raise ValueError(
-                f"Unknown authentication provider: '{provider}'. "
-                f"Supported providers: hydra"
+                UNKNOWN_AUTH_PROVIDER_ERROR.format(provider=provider, supported="hydra")
             )
 
     def _setup_payment_session_manager(
@@ -665,5 +681,5 @@ class BinduApplication(Starlette):
             path = scope.get("path", "")
             # Allow observability and probe endpoints through before full startup
             if path not in ("/health", "/healthz", "/metrics"):
-                raise RuntimeError("TaskManager was not properly initialized.")
+                raise RuntimeError(TASKMANAGER_NOT_INITIALIZED_ERROR)
         await super().__call__(scope, receive, send)

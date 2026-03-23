@@ -40,6 +40,24 @@ from bindu.common.models import AgentManifest, VerifyResponse
 
 logger = get_logger("bindu.server.middleware.x402")
 
+# Constants
+PROTECTED_PATH = "/"  # A2A protocol endpoint
+PROTECTED_METHOD = "POST"
+WEB3_RPC_TIMEOUT_SECONDS = 10
+SUPPORTED_X402_VERSION = 1
+SUPPORTED_PAYMENT_SCHEME = "exact"
+
+# ERC-20 balanceOf ABI
+ERC20_BALANCE_OF_ABI = [
+    {
+        "constant": True,
+        "inputs": [{"name": "_owner", "type": "address"}],
+        "name": "balanceOf",
+        "outputs": [{"name": "balance", "type": "uint256"}],
+        "type": "function",
+    }
+]
+
 
 class X402Middleware(BaseHTTPMiddleware):
     """Middleware that enforces x402 payment protocol for agent execution.
@@ -79,7 +97,7 @@ class X402Middleware(BaseHTTPMiddleware):
         self.facilitator = FacilitatorClient(config=facilitator_config)
         self._payment_requirements = payment_requirements
 
-        self.protected_path = "/"  # A2A protocol endpoint
+        self.protected_path = PROTECTED_PATH
 
         # Web3 connection pool for performance optimization
         self._web3_connections: dict[str, Web3] = {}
@@ -121,7 +139,11 @@ class X402Middleware(BaseHTTPMiddleware):
         for rpc_url in rpc_urls:
             try:
                 logger.debug(f"Creating new Web3 connection to {rpc_url}")
-                w3 = Web3(Web3.HTTPProvider(rpc_url, request_kwargs={"timeout": 10}))
+                w3 = Web3(
+                    Web3.HTTPProvider(
+                        rpc_url, request_kwargs={"timeout": WEB3_RPC_TIMEOUT_SECONDS}
+                    )
+                )
 
                 # Test connection
                 chain_id = w3.eth.chain_id
@@ -158,7 +180,7 @@ class X402Middleware(BaseHTTPMiddleware):
         if (
             not self.x402_ext
             or request.url.path != self.protected_path
-            or request.method != "POST"
+            or request.method != PROTECTED_METHOD
         ):
             return await call_next(request)
 
@@ -278,7 +300,10 @@ class X402Middleware(BaseHTTPMiddleware):
         """
         try:
             # 1. Check scheme is 'exact'
-            if payment_payload.x402_version != 1 or payment_payload.scheme != "exact":
+            if (
+                payment_payload.x402_version != SUPPORTED_X402_VERSION
+                or payment_payload.scheme != SUPPORTED_PAYMENT_SCHEME
+            ):
                 return False, f"Unsupported payment scheme: {payment_payload.scheme}"
 
             # 2. Extract authorization details
@@ -330,19 +355,8 @@ class X402Middleware(BaseHTTPMiddleware):
                         f"Contract found at {token_address}, bytecode length: {len(code)} bytes"
                     )
 
-                    # ERC-20 balanceOf ABI
-                    balance_of_abi = [
-                        {
-                            "constant": True,
-                            "inputs": [{"name": "_owner", "type": "address"}],
-                            "name": "balanceOf",
-                            "outputs": [{"name": "balance", "type": "uint256"}],
-                            "type": "function",
-                        }
-                    ]
-
                     token_contract = w3.eth.contract(
-                        address=token_address, abi=balance_of_abi
+                        address=token_address, abi=ERC20_BALANCE_OF_ABI
                     )
 
                     # Check payer balance

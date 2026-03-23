@@ -1,0 +1,162 @@
+"""DID signature utilities for hybrid OAuth2 + DID authentication.
+
+This module provides utilities for signing and verifying requests using
+DID-based cryptographic signatures for enhanced security.
+"""
+
+from __future__ import annotations as _annotations
+
+import json
+import time
+from typing import Any, Dict, Optional
+
+from bindu.utils.logging import get_logger
+
+logger = get_logger("bindu.utils.did_signature")
+
+
+def create_signature_payload(
+    body: str | bytes | dict, did: str, timestamp: Optional[int] = None
+) -> Dict[str, Any]:
+    """Create signature payload for request signing.
+
+    Args:
+        body: Request body (string, bytes, or dict)
+        did: Client's DID
+        timestamp: Unix timestamp (defaults to current time)
+
+    Returns:
+        Signature payload dict
+    """
+    if timestamp is None:
+        timestamp = int(time.time())
+
+    # Convert body to string
+    if isinstance(body, dict):
+        body_str = json.dumps(body, sort_keys=True)
+    elif isinstance(body, bytes):
+        body_str = body.decode("utf-8")
+    else:
+        body_str = str(body)
+
+    return {"body": body_str, "timestamp": timestamp, "did": did}
+
+
+def sign_request(
+    body: str | bytes | dict, did: str, did_extension, timestamp: Optional[int] = None
+) -> Dict[str, str]:
+    """Sign a request with DID private key.
+
+    Args:
+        body: Request body
+        did: Client's DID
+        did_extension: DIDExtension instance with private key
+        timestamp: Unix timestamp (defaults to current time)
+
+    Returns:
+        Dict with signature headers (X-DID, X-DID-Signature, X-DID-Timestamp)
+    """
+    # Create signature payload
+    payload = create_signature_payload(body, did, timestamp)
+    payload_str = json.dumps(payload, sort_keys=True)
+
+    # Sign with private key
+    signature = did_extension.sign_message(payload_str)
+
+    return {
+        "X-DID": did,
+        "X-DID-Signature": signature,
+        "X-DID-Timestamp": str(payload["timestamp"]),
+    }
+
+
+def verify_signature(
+    body: str | bytes | dict,
+    signature: str,
+    did: str,
+    timestamp: int,
+    public_key: str,
+    max_age_seconds: int = 300,
+) -> bool:
+    """Verify DID signature on a request.
+
+    Args:
+        body: Request body
+        signature: DID signature from X-DID-Signature header
+        did: Client's DID from X-DID header
+        timestamp: Timestamp from X-DID-Timestamp header
+        public_key: Client's public key (multibase encoded)
+        max_age_seconds: Maximum age of request in seconds (default 5 minutes)
+
+    Returns:
+        True if signature is valid, False otherwise
+    """
+    try:
+        # Check timestamp to prevent replay attacks
+        current_time = int(time.time())
+        if abs(current_time - timestamp) > max_age_seconds:
+            logger.warning(
+                f"Request timestamp too old: {timestamp} vs {current_time} "
+                f"(max age: {max_age_seconds}s)"
+            )
+            return False
+
+        # Reconstruct signature payload
+        payload = create_signature_payload(body, did, timestamp)
+        payload_str = json.dumps(payload, sort_keys=True)
+
+        # Verify signature with public key
+        import base58
+        from nacl.signing import VerifyKey
+        from nacl.exceptions import BadSignatureError
+
+        # Decode the base58-encoded public key and signature
+        try:
+            public_key_bytes = base58.b58decode(public_key)
+            signature_bytes = base58.b58decode(signature)
+
+            # Create verify key from public key bytes
+            verify_key = VerifyKey(public_key_bytes)
+
+            # Verify the signature
+            verify_key.verify(payload_str.encode("utf-8"), signature_bytes)
+            is_valid = True
+        except (BadSignatureError, ValueError, TypeError, Exception) as e:
+            logger.debug(f"Signature verification failed: {e}")
+            is_valid = False
+
+        if not is_valid:
+            logger.warning(f"Invalid DID signature for {did}")
+
+        return is_valid
+
+    except (ImportError, UnicodeEncodeError, ValueError, TypeError) as e:
+        logger.error(f"Failed to verify DID signature: {e}")
+        return False
+
+
+def extract_signature_headers(headers: dict) -> Optional[Dict[str, Any]]:
+    """Extract DID signature headers from request.
+
+    Args:
+        headers: Request headers dict
+
+    Returns:
+        Dict with did, signature, timestamp or None if missing
+    """
+    did = headers.get("X-DID") or headers.get("x-did")
+    signature = headers.get("X-DID-Signature") or headers.get("x-did-signature")
+    timestamp_str = headers.get("X-DID-Timestamp") or headers.get("x-did-timestamp")
+
+    if not all([did, signature, timestamp_str]):
+        return None
+
+    # Type narrowing: timestamp_str is guaranteed to be truthy here
+    assert timestamp_str is not None
+    try:
+        timestamp = int(timestamp_str)
+    except (ValueError, TypeError):
+        logger.warning(f"Invalid timestamp format: {timestamp_str}")
+        return None
+
+    return {"did": did, "signature": signature, "timestamp": timestamp}

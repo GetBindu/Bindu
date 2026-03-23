@@ -16,6 +16,57 @@ from bindu.utils.logging import get_logger
 logger = get_logger("bindu.penguin.did_setup")
 
 
+def _restore_keys_from_vault(agent_id_str: str, pki_dir: Path) -> Optional[str]:
+    """Restore DID keys from Vault if available.
+
+    Args:
+        agent_id_str: Agent ID as string
+        pki_dir: Directory where keys should be restored
+
+    Returns:
+        Restored DID if successful, None otherwise
+    """
+    from bindu.utils.http.vault_client import restore_did_keys_from_vault
+
+    logger.info(f"Attempting to restore DID keys from Vault for agent: {agent_id_str}")
+    restored_did = asyncio.run(
+        restore_did_keys_from_vault(agent_id=agent_id_str, key_dir=pki_dir)
+    )
+
+    if restored_did:
+        logger.info(f"✅ DID keys restored from Vault: {restored_did}")
+    else:
+        logger.info("No existing DID keys found in Vault, will generate new keys")
+
+    return restored_did
+
+
+def _backup_keys_to_vault(agent_id_str: str, pki_dir: Path, did: str) -> bool:
+    """Backup DID keys to Vault.
+
+    Args:
+        agent_id_str: Agent ID as string
+        pki_dir: Directory containing keys to backup
+        did: DID identifier
+
+    Returns:
+        True if backup successful, False otherwise
+    """
+    from bindu.utils.http.vault_client import backup_did_keys_to_vault
+
+    logger.info(f"Backing up DID keys to Vault for agent: {agent_id_str}")
+    backup_success = asyncio.run(
+        backup_did_keys_to_vault(agent_id=agent_id_str, key_dir=pki_dir, did=did)
+    )
+
+    if backup_success:
+        logger.info("✅ DID keys backed up to Vault")
+    else:
+        logger.warning("⚠️  Failed to backup DID keys to Vault")
+
+    return backup_success
+
+
 def initialize_did_extension(
     agent_id: str | UUID,
     author: Optional[str],
@@ -43,33 +94,22 @@ def initialize_did_extension(
     try:
         logger.info(f"Initializing DID extension for agent: {agent_name}")
 
+        # Convert agent_id to string once
+        agent_id_str = str(agent_id)
         pki_dir = key_dir / app_settings.did.pki_dir
 
         # Try to restore DID keys from Vault if enabled and keys don't exist locally
         if app_settings.vault.enabled and not recreate_keys:
-            from bindu.utils.vault_client import restore_did_keys_from_vault
-
-            # Check if keys already exist locally
-            private_key_exists = (pki_dir / "private_key.pem").exists()
-            public_key_exists = (pki_dir / "public_key.pem").exists()
+            # Check if keys already exist locally using settings constants
+            private_key_exists = (
+                pki_dir / app_settings.did.private_key_filename
+            ).exists()
+            public_key_exists = (
+                pki_dir / app_settings.did.public_key_filename
+            ).exists()
 
             if not (private_key_exists and public_key_exists):
-                logger.info(
-                    f"Attempting to restore DID keys from Vault for agent: {agent_id}"
-                )
-                restored_did = asyncio.run(
-                    restore_did_keys_from_vault(
-                        agent_id=str(agent_id),
-                        key_dir=pki_dir,
-                    )
-                )
-
-                if restored_did:
-                    logger.info(f"✅ DID keys restored from Vault: {restored_did}")
-                else:
-                    logger.info(
-                        "No existing DID keys found in Vault, will generate new keys"
-                    )
+                _restore_keys_from_vault(agent_id_str, pki_dir)
 
         # Create DID extension
         did_extension = DIDAgentExtension(
@@ -77,7 +117,7 @@ def initialize_did_extension(
             key_dir=pki_dir,
             author=author,
             agent_name=agent_name,
-            agent_id=str(agent_id),
+            agent_id=agent_id_str,
             key_password=key_password,
         )
 
@@ -90,27 +130,12 @@ def initialize_did_extension(
             logger.info("✅ DID configuration and keys pass integrity check")
         except ValueError as e:
             logger.error(f"❌ DID integrity check failed: {e}")
-            # We might want to raise here to stop startup, or just log
-            # For now, let's raise to enforce security
+            # Raise to enforce security - DID integrity is critical for agent identity
             raise
 
-        # Backup keys to Vault if enabled and keys were newly generated
+        # Backup keys to Vault if enabled
         if app_settings.vault.enabled:
-            from bindu.utils.vault_client import backup_did_keys_to_vault
-
-            logger.info(f"Backing up DID keys to Vault for agent: {agent_id}")
-            backup_success = asyncio.run(
-                backup_did_keys_to_vault(
-                    agent_id=str(agent_id),
-                    key_dir=pki_dir,
-                    did=did_extension.did,
-                )
-            )
-
-            if backup_success:
-                logger.info("✅ DID keys backed up to Vault")
-            else:
-                logger.warning("⚠️  Failed to backup DID keys to Vault")
+            _backup_keys_to_vault(agent_id_str, pki_dir, did_extension.did)
 
         logger.info(f"DID extension initialized successfully: {did_extension.did}")
         return did_extension

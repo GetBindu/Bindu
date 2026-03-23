@@ -5,16 +5,17 @@ This client handles communication with Ory Hydra's Admin API for token operation
 
 from __future__ import annotations as _annotations
 
-import asyncio
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
 
-import aiohttp
-
-from bindu.utils.http_client import AsyncHTTPClient
+from bindu.utils.http import AsyncHTTPClient
 from bindu.utils.logging import get_logger
 
 logger = get_logger("bindu.auth.hydra_client")
+
+# Default Hydra ports
+DEFAULT_ADMIN_PORT = 4445
+DEFAULT_PUBLIC_PORT = 4444
 
 
 class HydraClient:
@@ -42,7 +43,9 @@ class HydraClient:
         """
         self.admin_url = admin_url.rstrip("/")
         self.public_url = (
-            public_url.rstrip("/") if public_url else admin_url.replace("4445", "4444")
+            public_url.rstrip("/")
+            if public_url
+            else admin_url.replace(str(DEFAULT_ADMIN_PORT), str(DEFAULT_PUBLIC_PORT))
         )
 
         # Use the reusable HTTP client
@@ -110,9 +113,9 @@ class HydraClient:
 
             return result_data
 
-        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as error:
+        except Exception as error:
             logger.error(f"Error during token introspection: {error}")
-            raise ValueError(f"Failed to introspect token: {str(error)}")
+            raise ValueError(f"Failed to introspect token: {str(error)}") from error
 
     async def create_oauth_client(self, client_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new OAuth2 client in Hydra.
@@ -132,7 +135,7 @@ class HydraClient:
 
             return await response.json()
 
-        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as error:
+        except Exception as error:
             logger.error(f"Failed to create OAuth client: {error}")
             raise
 
@@ -145,6 +148,8 @@ class HydraClient:
         Returns:
             Client information or None if not found
         """
+        from bindu.utils.exceptions import HTTPClientError
+
         try:
             # URL-encode client_id to handle DIDs with colons and special characters
             encoded_client_id = quote(client_id, safe="")
@@ -160,9 +165,16 @@ class HydraClient:
                 error_text = await response.text()
                 raise ValueError(f"Failed to get OAuth client: {error_text}")
 
-        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as error:
-            if isinstance(error, aiohttp.ClientResponseError) and error.status == 404:
+        except HTTPClientError as error:
+            # AsyncHTTPClient raises HTTPClientError for 4xx errors including 404
+            if error.status == 404:
+                logger.debug(f"OAuth client not found: {client_id}")
                 return None
+            # Re-raise other client errors
+            logger.error(f"Failed to get OAuth client: {error}")
+            raise
+        except Exception as error:
+            # Other errors (connection, timeout, etc.)
             logger.error(f"Failed to get OAuth client: {error}")
             raise
 
@@ -189,7 +201,7 @@ class HydraClient:
 
             return await response.json()
 
-        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as error:
+        except Exception as error:
             logger.error(f"Failed to list OAuth clients: {error}")
             raise
 
@@ -217,9 +229,9 @@ class HydraClient:
                 error_text = await response.text()
                 raise ValueError(f"Failed to delete OAuth client: {error_text}")
 
-        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as error:
-            if isinstance(error, aiohttp.ClientResponseError) and error.status == 404:
-                return False
+        except Exception as error:
+            # AsyncHTTPClient raises HTTPClientError for 404s
+            # If we get here, it's a different error
             logger.error(f"Failed to delete OAuth client: {error}")
             raise
 
@@ -232,7 +244,7 @@ class HydraClient:
         try:
             response = await self._http_client.get("/admin/health/ready")
             return response.status == 200
-        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as error:
+        except Exception as error:
             logger.warning(f"Hydra health check failed: {error}")
             return False
 
@@ -251,7 +263,7 @@ class HydraClient:
 
             return await response.json()
 
-        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as error:
+        except Exception as error:
             logger.error(f"Failed to get JWKS: {error}")
             raise
 
@@ -268,9 +280,37 @@ class HydraClient:
 
         try:
             response = await self._http_client.post("/admin/oauth2/revoke", data=data)
-
             return response.status in (200, 204)
 
-        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as error:
-            logger.error(f"Failed to revoke token: {error}")
-            return False
+        except Exception as e:
+            logger.error(f"Failed to revoke token: {e}")
+            raise
+
+    async def get_public_key_from_client(self, client_did: str) -> Optional[str]:
+        """Get client's public key from Hydra metadata.
+
+        Args:
+            client_did: Client's DID (used as client_id)
+
+        Returns:
+            Public key (multibase encoded) or None
+        """
+        try:
+            client = await self.get_oauth_client(client_did)
+            if not client:
+                logger.error(f"Client not found in Hydra: {client_did}")
+                return None
+
+            public_key = client.get("metadata", {}).get("public_key")
+            if not public_key:
+                logger.warning(f"No public key found for client: {client_did}")
+                return None
+
+            return public_key
+
+        except (ValueError, TypeError, KeyError) as e:
+            logger.error(f"Data error getting public key from Hydra: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error getting public key from Hydra: {e}")
+            return None

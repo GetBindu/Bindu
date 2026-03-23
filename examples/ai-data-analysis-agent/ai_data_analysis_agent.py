@@ -38,26 +38,26 @@ def generate_visualization(file_path: str, x_column: str, y_column: str, chart_t
         df = pd.read_csv(file_path)
         if x_column not in df.columns or (y_column and y_column not in df.columns):
             return f"Error: Columns '{x_column}' or '{y_column}' not found."
-            
+
         plt.figure(figsize=(10, 6))
         sns.set_theme(style="whitegrid")
-        
+
         if chart_type == "bar":
             sns.barplot(data=df, x=x_column, y=y_column)
         elif chart_type == "line":
             sns.lineplot(data=df, x=x_column, y=y_column)
         else:
             sns.scatterplot(data=df, x=x_column, y=y_column)
-            
+
         plt.title(f"{chart_type.capitalize()} Chart: {y_column} vs {x_column}")
         plt.xticks(rotation=45)
         plt.tight_layout()
-        
+
         os.makedirs("outputs", exist_ok=True)
         output_path = f"outputs/chart_{x_column}_{y_column}.png"
         plt.savefig(output_path)
         plt.close()
-        
+
         return f"Success! Visualization generated and saved to: {output_path}"
     except Exception as e:
         return f"Error generating visualization: {str(e)}"
@@ -67,12 +67,12 @@ def generate_visualization(file_path: str, x_column: str, y_column: str, chart_t
 # -----------------------------
 
 def handler(messages: list[dict]):
-    print("\n[DEBUG] --- Handler Triggered! ---") 
-    
+    print("\n[DEBUG] --- Handler Triggered! ---")
+
     try:
         last_message = messages[-1]
         user_query = ""
-        
+
         # Safely extract text from the Bindu payload
         if "parts" in last_message:
             for part in last_message["parts"]:
@@ -80,10 +80,10 @@ def handler(messages: list[dict]):
                     user_query += part.get("text", "") + "\n"
         elif "content" in last_message:
             user_query = last_message.get("content", "")
-            
+
         user_query = user_query.strip()
         print(f"[DEBUG] Extracted query: {user_query}")
-        
+
         if not user_query:
             return [{"role": "assistant", "content": "Error: No text received."}]
 
@@ -107,7 +107,7 @@ def handler(messages: list[dict]):
         print("[DEBUG] Agent is analyzing the data...")
         result = agent.run(user_query)
         print("[DEBUG] Analysis complete!")
-        
+
         # Agent autonomously saves its own report
         os.makedirs("outputs", exist_ok=True)
         report_path = "outputs/analysis_report.md"
@@ -116,7 +116,7 @@ def handler(messages: list[dict]):
         print(f"[DEBUG] Saved Markdown report to {report_path}")
 
         return [{"role": "assistant", "content": str(result.content)}]
-        
+
     except Exception as e:
         print(f"\n[REAL ERROR CAUGHT]: {str(e)}")
         traceback.print_exc()
