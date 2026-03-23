@@ -1,0 +1,7 @@
+bindu
+agno
+openai
+numpy
+httpx
+python-dotenv
+
