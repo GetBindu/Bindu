@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from bindu.common.protocol.types import Artifact, Part
@@ -21,7 +21,7 @@ class ArtifactBuilder:
     def from_result(
         results: Any,
         artifact_name: str = "result",
-        did_extension: Optional["DIDAgentExtension"] = None,
+        did_extension: DIDAgentExtension | None = None,
     ) -> list[Artifact]:
         """Convert execution result to protocol artifacts.
 
@@ -36,11 +36,7 @@ class ArtifactBuilder:
         # Convert result to appropriate part type
         if isinstance(results, str):
             parts = [{"kind": "text", "text": results}]
-        elif (
-            isinstance(results, (list, tuple))
-            and results
-            and all(isinstance(item, str) for item in results)
-        ):
+        elif isinstance(results, (list, tuple)) and results and all(isinstance(item, str) for item in results):
             # Join streaming results efficiently
             parts = [{"kind": "text", "text": "\n".join(results)}]
         else:
@@ -66,7 +62,5 @@ class ArtifactBuilder:
             parts = typed_parts_list
 
         # Convert dict parts to proper Part types for Artifact
-        final_parts: list[Part] = [
-            PartConverter.dict_to_part(p) if isinstance(p, dict) else p for p in parts
-        ]
+        final_parts: list[Part] = [PartConverter.dict_to_part(p) if isinstance(p, dict) else p for p in parts]
         return [Artifact(artifact_id=uuid4(), name=artifact_name, parts=final_parts)]

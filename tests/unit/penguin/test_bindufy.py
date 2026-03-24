@@ -1,14 +1,15 @@
 """Minimal tests for bindufy module."""
 
 from unittest.mock import Mock
-import pytest
 from uuid import UUID
+
+import pytest
 
 from bindu.penguin.bindufy import (
     _generate_agent_id,
     _normalize_execution_costs,
-    _setup_x402_extension,
     _parse_deployment_url,
+    _setup_x402_extension,
 )
 
 

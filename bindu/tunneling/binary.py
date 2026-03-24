@@ -93,9 +93,7 @@ def download_binary(force: bool = False) -> Path:
             archive_path = tmpdir_path / "frp.tar.gz"
 
             # Download archive
-            with httpx.stream(
-                "GET", BINARY_URL, timeout=60, follow_redirects=True
-            ) as response:
+            with httpx.stream("GET", BINARY_URL, timeout=60, follow_redirects=True) as response:
                 if response.status_code == 404:
                     raise OSError(
                         f"FRP binary not found for platform {SYSTEM}_{MACHINE}. "
@@ -168,9 +166,6 @@ def verify_checksum(binary_path: Path, expected_checksum: str) -> None:
     calculated = sha256.hexdigest()
 
     if calculated != expected_checksum:
-        raise RuntimeError(
-            f"Checksum mismatch for {binary_path}. "
-            f"Expected: {expected_checksum}, Got: {calculated}"
-        )
+        raise RuntimeError(f"Checksum mismatch for {binary_path}. Expected: {expected_checksum}, Got: {calculated}")
 
     logger.debug("Binary checksum verified successfully")

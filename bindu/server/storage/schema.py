@@ -16,7 +16,6 @@ with both ORM queries and the protocol TypedDicts.
 
 from __future__ import annotations as _annotations
 
-
 from sqlalchemy import (
     TIMESTAMP,
     Column,
@@ -29,7 +28,8 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
 # Create metadata instance for table definitions
 metadata = MetaData()

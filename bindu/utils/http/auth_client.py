@@ -8,12 +8,13 @@ from __future__ import annotations as _annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 from urllib.parse import urlparse
 
 from bindu.utils.did import sign_request
-from .client import AsyncHTTPClient
 from bindu.utils.logging import get_logger
+
+from .client import AsyncHTTPClient
 from .tokens import get_client_credentials_token
 
 logger = get_logger("bindu.utils.hybrid_auth_client")
@@ -78,9 +79,7 @@ class HybridAuthClient:
         self.access_token = token_response["access_token"]
         logger.info(f"Access token obtained for {self.credentials.client_id}")
 
-    def _create_signed_request_headers(
-        self, body: str | bytes | dict
-    ) -> Dict[str, str]:
+    def _create_signed_request_headers(self, body: str | bytes | dict) -> dict[str, str]:
         """Create complete headers for signed request with OAuth token.
 
         Args:
@@ -93,9 +92,7 @@ class HybridAuthClient:
         assert self.access_token is not None
 
         # Get DID signature headers
-        signature_headers = sign_request(
-            body, self.credentials.client_id, self.did_extension
-        )
+        signature_headers = sign_request(body, self.credentials.client_id, self.did_extension)
 
         # Combine with OAuth token
         return {
@@ -107,9 +104,9 @@ class HybridAuthClient:
     async def post(
         self,
         url: str,
-        data: Dict[str, Any],
-        headers: Optional[Dict[str, str]] = None,
-    ) -> Dict[str, Any]:
+        data: dict[str, Any],
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
         """Make authenticated POST request with hybrid authentication.
 
         Args:
@@ -163,8 +160,8 @@ class HybridAuthClient:
     async def get(
         self,
         url: str,
-        headers: Optional[Dict[str, str]] = None,
-    ) -> Dict[str, Any]:
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
         """Make authenticated GET request with hybrid authentication.
 
         Args:

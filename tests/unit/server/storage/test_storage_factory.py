@@ -1,9 +1,10 @@
 """Minimal tests for storage factory."""
 
-import pytest
 from unittest.mock import AsyncMock, patch
 
-from bindu.server.storage.factory import create_storage, close_storage
+import pytest
+
+from bindu.server.storage.factory import close_storage, create_storage
 from bindu.server.storage.memory_storage import InMemoryStorage
 
 

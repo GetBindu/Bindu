@@ -1,6 +1,6 @@
 """Custom assertion helpers for common test patterns."""
 
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 
@@ -15,14 +15,10 @@ def assert_task_state(task: dict[str, Any], expected_state: str) -> None:
         AssertionError: If state doesn't match
     """
     actual_state = task.get("state")
-    assert actual_state == expected_state, (
-        f"Expected task state '{expected_state}', got '{actual_state}'"
-    )
+    assert actual_state == expected_state, f"Expected task state '{expected_state}', got '{actual_state}'"
 
 
-def assert_jsonrpc_error(
-    response: dict[str, Any], expected_code: Optional[int] = None
-) -> None:
+def assert_jsonrpc_error(response: dict[str, Any], expected_code: int | None = None) -> None:
     """Assert that a JSON-RPC response contains an error.
 
     Args:
@@ -36,9 +32,7 @@ def assert_jsonrpc_error(
 
     if expected_code is not None:
         actual_code = response["error"].get("code")
-        assert actual_code == expected_code, (
-            f"Expected error code {expected_code}, got {actual_code}"
-        )
+        assert actual_code == expected_code, f"Expected error code {expected_code}, got {actual_code}"
 
 
 def assert_jsonrpc_success(response: dict[str, Any]) -> None:
@@ -50,9 +44,7 @@ def assert_jsonrpc_success(response: dict[str, Any]) -> None:
     Raises:
         AssertionError: If response contains an error
     """
-    assert "error" not in response, (
-        f"Expected successful JSON-RPC response, got error: {response.get('error')}"
-    )
+    assert "error" not in response, f"Expected successful JSON-RPC response, got error: {response.get('error')}"
     assert "result" in response, "Expected 'result' field in JSON-RPC response"
 
 
@@ -84,9 +76,7 @@ def assert_dict_contains(actual: dict[str, Any], expected: dict[str, Any]) -> No
     for key, expected_value in expected.items():
         assert key in actual, f"Expected key '{key}' not found in dict"
         actual_value = actual[key]
-        assert actual_value == expected_value, (
-            f"For key '{key}': expected {expected_value}, got {actual_value}"
-        )
+        assert actual_value == expected_value, f"For key '{key}': expected {expected_value}, got {actual_value}"
 
 
 def assert_list_length(actual: list, expected_length: int) -> None:
@@ -100,6 +90,4 @@ def assert_list_length(actual: list, expected_length: int) -> None:
         AssertionError: If length doesn't match
     """
     actual_length = len(actual)
-    assert actual_length == expected_length, (
-        f"Expected list length {expected_length}, got {actual_length}"
-    )
+    assert actual_length == expected_length, f"Expected list length {expected_length}, got {actual_length}"

@@ -73,10 +73,7 @@ async def create_scheduler(config: SchedulerConfig | None = None) -> Scheduler:
 
     elif backend == "redis":
         if not REDIS_AVAILABLE or RedisScheduler is None:
-            raise ValueError(
-                "Redis scheduler requires redis package. "
-                "Install with: pip install redis[hiredis]"
-            )
+            raise ValueError("Redis scheduler requires redis package. Install with: pip install redis[hiredis]")
 
         logger.info("Using Redis scheduler (distributed, multi-process)")
 
@@ -84,11 +81,7 @@ async def create_scheduler(config: SchedulerConfig | None = None) -> Scheduler:
         redis_url = config.redis_url
         if not redis_url:
             # Try to construct URL from individual components if provided
-            if (
-                config.redis_host
-                and config.redis_port is not None
-                and config.redis_db is not None
-            ):
+            if config.redis_host and config.redis_port is not None and config.redis_db is not None:
                 auth = f":{config.redis_password}@" if config.redis_password else ""
                 redis_url = f"redis://{auth}{config.redis_host}:{config.redis_port}/{config.redis_db}"
             else:
@@ -108,9 +101,7 @@ async def create_scheduler(config: SchedulerConfig | None = None) -> Scheduler:
         return scheduler
 
     else:
-        raise ValueError(
-            f"Unknown scheduler backend: {backend}. Supported backends: memory, redis"
-        )
+        raise ValueError(f"Unknown scheduler backend: {backend}. Supported backends: memory, redis")
 
 
 async def close_scheduler(scheduler: Scheduler) -> None:

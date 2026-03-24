@@ -1,6 +1,6 @@
 """Tests for logging utilities."""
 
-from bindu.utils.logging import get_logger, configure_logger
+from bindu.utils.logging import configure_logger, get_logger
 
 
 class TestLogging:

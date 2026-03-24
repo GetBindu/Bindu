@@ -3,10 +3,10 @@
 This module defines the configuration settings for the application using pydantic models.
 """
 
-from pydantic import Field, computed_field, BaseModel, HttpUrl
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import AliasChoices
 from typing import Literal
+
+from pydantic import AliasChoices, BaseModel, Field, HttpUrl, computed_field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class ProjectSettings(BaseSettings):
@@ -136,9 +136,7 @@ class TunnelSettings(BaseSettings):
     timeout_seconds: int = 30
 
     # Error message for tunnel failures
-    error_message: str = (
-        "Could not create tunnel. Please check the logs below for more information:"
-    )
+    error_message: str = "Could not create tunnel. Please check the logs below for more information:"
 
     # Default FRP server configuration
     default_server_address: str = "142.132.241.44:7000"
@@ -838,9 +836,7 @@ class OAuthSettings(BaseSettings):
     )
     notion_client_secret: str = Field(
         default="",
-        validation_alias=AliasChoices(
-            "OAUTH__NOTION_CLIENT_SECRET", "NOTION_CLIENT_SECRET"
-        ),
+        validation_alias=AliasChoices("OAUTH__NOTION_CLIENT_SECRET", "NOTION_CLIENT_SECRET"),
     )
 
     # Google OAuth (for Gmail)
@@ -850,9 +846,7 @@ class OAuthSettings(BaseSettings):
     )
     google_client_secret: str = Field(
         default="",
-        validation_alias=AliasChoices(
-            "OAUTH__GOOGLE_CLIENT_SECRET", "GOOGLE_CLIENT_SECRET"
-        ),
+        validation_alias=AliasChoices("OAUTH__GOOGLE_CLIENT_SECRET", "GOOGLE_CLIENT_SECRET"),
     )
 
     # GitHub OAuth
@@ -862,9 +856,7 @@ class OAuthSettings(BaseSettings):
     )
     github_client_secret: str = Field(
         default="",
-        validation_alias=AliasChoices(
-            "OAUTH__GITHUB_CLIENT_SECRET", "GITHUB_CLIENT_SECRET"
-        ),
+        validation_alias=AliasChoices("OAUTH__GITHUB_CLIENT_SECRET", "GITHUB_CLIENT_SECRET"),
     )
 
 

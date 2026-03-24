@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import os
+import platform
+import sys
 from time import monotonic
 
 from starlette.requests import Request
@@ -9,13 +12,9 @@ from starlette.responses import JSONResponse
 
 from bindu import __version__
 from bindu.server.applications import BinduApplication
-from .utils import handle_endpoint_errors, get_agent_did, get_runtime_status
 from bindu.utils.logging import get_logger
 
-import os
-import platform
-import sys
-
+from .utils import get_agent_did, get_runtime_status, handle_endpoint_errors
 
 logger = get_logger("bindu.server.endpoints.health")
 

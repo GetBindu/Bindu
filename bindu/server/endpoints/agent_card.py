@@ -9,10 +9,11 @@ from uuid import UUID
 from starlette.requests import Request
 from starlette.responses import Response
 
-from bindu.common.protocol.types import AgentCard, AgentCapabilities, agent_card_ta
+from bindu.common.protocol.types import AgentCapabilities, AgentCard, agent_card_ta
 from bindu.server.applications import BinduApplication
 from bindu.utils.logging import get_logger
-from .utils import create_response_with_x402, handle_endpoint_errors, get_client_ip
+
+from .utils import create_response_with_x402, get_client_ip, handle_endpoint_errors
 
 logger = get_logger("bindu.server.endpoints.agent_card")
 
@@ -120,8 +121,7 @@ def create_agent_card(app: BinduApplication) -> AgentCard:
         capabilities=cast(AgentCapabilities, capabilities),
         kind=manifest.kind,
         num_history_sessions=manifest.num_history_sessions,
-        extra_data=manifest.extra_data
-        or {"created": int(time()), "server_info": "bindu Agent Server"},
+        extra_data=manifest.extra_data or {"created": int(time()), "server_info": "bindu Agent Server"},
         debug_mode=manifest.debug_mode,
         debug_level=manifest.debug_level,
         monitoring=manifest.monitoring,

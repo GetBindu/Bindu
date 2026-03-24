@@ -25,10 +25,8 @@ from bindu.common.protocol.types import (
     ListContextsRequest,
     ListContextsResponse,
 )
-
-from bindu.utils.task_telemetry import trace_context_operation
-
 from bindu.server.storage import Storage
+from bindu.utils.task_telemetry import trace_context_operation
 
 
 @dataclass
@@ -54,9 +52,7 @@ class ContextHandlers:
         return ListContextsResponse(jsonrpc="2.0", id=request["id"], result=contexts)
 
     @trace_context_operation("clear_context")
-    async def clear_context(
-        self, request: ClearContextsRequest
-    ) -> ClearContextsResponse:
+    async def clear_context(self, request: ClearContextsRequest) -> ClearContextsResponse:
         """Clear a context from storage."""
         # Support both contextId (camelCase) and context_id (snake_case)
         params = request.get("params", {})
@@ -66,14 +62,10 @@ class ContextHandlers:
             await self.storage.clear_context(context_id)
         except ValueError as e:
             # Context not found
-            return self.error_response_creator(
-                ClearContextsResponse, request["id"], ContextNotFoundError, str(e)
-            )
+            return self.error_response_creator(ClearContextsResponse, request["id"], ContextNotFoundError, str(e))
 
         return ClearContextsResponse(
             jsonrpc="2.0",
             id=request["id"],
-            result={
-                "message": f"Context {context_id} and all associated tasks cleared successfully"
-            },
+            result={"message": f"Context {context_id} and all associated tasks cleared successfully"},
         )

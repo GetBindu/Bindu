@@ -1,7 +1,8 @@
 """Authentication-related test fixtures."""
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 
 @pytest.fixture

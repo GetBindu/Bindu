@@ -2,8 +2,8 @@
 
 from __future__ import annotations as _annotations
 
-import json
 import asyncio
+import json
 from collections.abc import AsyncIterator
 from typing import Any, cast
 from uuid import UUID
@@ -80,9 +80,7 @@ class RedisScheduler(Scheduler):
             logger.info(f"Redis scheduler connected to {self.redis_url}")
         except redis.RedisError as e:
             logger.error(f"Failed to connect to Redis: {e}")
-            raise ConnectionError(
-                f"Unable to connect to Redis at {self.redis_url}: {e}"
-            )
+            raise ConnectionError(f"Unable to connect to Redis at {self.redis_url}: {e}")
         return self
 
     async def __aexit__(self, exc_type: Any, exc_value: Any, traceback: Any):
@@ -106,9 +104,7 @@ class RedisScheduler(Scheduler):
             params: Task parameters
         """
         trace_id, span_id = get_trace_context()
-        task_op = operation_class(
-            operation=operation, params=params, trace_id=trace_id, span_id=span_id
-        )
+        task_op = operation_class(operation=operation, params=params, trace_id=trace_id, span_id=span_id)
         await self._push_task_operation(task_op)
 
     @retry_scheduler_operation()
@@ -163,26 +159,20 @@ class RedisScheduler(Scheduler):
         if not self._redis_client:
             raise RuntimeError(REDIS_NOT_INITIALIZED_ERROR)
 
-        logger.info(
-            f"Starting to receive task operations from queue: {self.queue_name}"
-        )
+        logger.info(f"Starting to receive task operations from queue: {self.queue_name}")
 
         while True:
             try:
                 # Cast to awaitable since we're using async redis client
                 result = await cast(
                     Any,
-                    self._redis_client.blpop(
-                        [self.queue_name], timeout=self.poll_timeout
-                    ),
+                    self._redis_client.blpop([self.queue_name], timeout=self.poll_timeout),
                 )
 
                 if result:
                     _, task_data = result
                     task_operation = self._deserialize_task_operation(task_data)
-                    logger.debug(
-                        f"Received task operation: {task_operation['operation']}"
-                    )
+                    logger.debug(f"Received task operation: {task_operation['operation']}")
                     yield task_operation
 
             except redis.RedisError as e:
@@ -205,9 +195,7 @@ class RedisScheduler(Scheduler):
             serialized_task = self._serialize_task_operation(task_operation)
             # Cast to awaitable since we're using async redis client
             await cast(Any, self._redis_client.rpush(self.queue_name, serialized_task))
-            logger.debug(
-                f"Pushed task operation to queue: {task_operation['operation']}"
-            )
+            logger.debug(f"Pushed task operation to queue: {task_operation['operation']}")
         except redis.RedisError as e:
             logger.error(f"Failed to push task operation to Redis: {e}")
             raise
@@ -249,9 +237,7 @@ class RedisScheduler(Scheduler):
         if not operation_class:
             raise ValueError(f"Unknown operation type: {operation_type}")
 
-        return operation_class(
-            operation=operation_type, params=params, trace_id=trace_id, span_id=span_id
-        )
+        return operation_class(operation=operation_type, params=params, trace_id=trace_id, span_id=span_id)
 
     async def get_queue_length(self) -> int:
         """Get the current length of the task queue.

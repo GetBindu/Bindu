@@ -32,8 +32,9 @@ class TestCapabilityUtilities:
 
     def test_get_x402_extension_found(self):
         """Test retrieving x402 extension when present."""
-        from bindu.extensions.x402 import X402AgentExtension
         from unittest.mock import Mock
+
+        from bindu.extensions.x402 import X402AgentExtension
 
         x402_ext = X402AgentExtension(amount="1000000", pay_to_address="0x123")
         manifest = Mock()

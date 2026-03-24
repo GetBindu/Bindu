@@ -1,10 +1,11 @@
 """Minimal tests for message handler utilities."""
 
-from unittest.mock import AsyncMock, Mock
-import pytest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import cast
+from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
+
+import pytest
 
 from bindu.common.protocol.types import Task
 from bindu.server.handlers.message_handlers import MessageHandlers
@@ -21,7 +22,7 @@ class TestMessageHandlers:
             "id": "task123",
             "status": {
                 "state": "running",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             },
         }
         mock_storage.load_task.return_value = mock_task
@@ -52,14 +53,14 @@ class TestMessageHandlers:
             "id": "task123",
             "status": {
                 "state": "running",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             },
         }
         updated_task = {
             "id": "task123",
             "status": {
                 "state": "failed",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             },
         }
         mock_storage.load_task.return_value = mock_task
@@ -71,9 +72,7 @@ class TestMessageHandlers:
         error = Exception("Test error")
         terminal_states = frozenset(["completed", "failed", "canceled"])
 
-        result = await handler._handle_stream_error(
-            task, "ctx1", error, terminal_states
-        )
+        result = await handler._handle_stream_error(task, "ctx1", error, terminal_states)
 
         assert result["status"]["state"] == "failed"
         assert result["final"] is True
@@ -91,9 +90,7 @@ class TestMessageHandlers:
         error = Exception("Test error")
         terminal_states = frozenset(["completed", "failed", "canceled"])
 
-        result = await handler._handle_stream_error(
-            task, "ctx1", error, terminal_states
-        )
+        result = await handler._handle_stream_error(task, "ctx1", error, terminal_states)
 
         assert "kind" in result
         assert result["status"]["state"] == "failed"
@@ -111,7 +108,7 @@ class TestMessageHandlers:
             "context_id": context_id,
             "status": {
                 "state": "pending",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             },
         }
         mock_storage.submit_task.return_value = mock_task
@@ -124,9 +121,7 @@ class TestMessageHandlers:
 
         request_params = {"message": {"content": "test", "context_id": str(context_id)}}
 
-        result_task, result_ctx = await handler._submit_and_schedule_task(
-            request_params
-        )
+        result_task, result_ctx = await handler._submit_and_schedule_task(request_params)
 
         assert result_task["id"] == task_id
         assert result_ctx == context_id
@@ -146,7 +141,7 @@ class TestMessageHandlers:
             "context_id": context_id,
             "status": {
                 "state": "pending",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             },
         }
         mock_storage.submit_task.return_value = mock_task
@@ -181,7 +176,7 @@ class TestMessageHandlers:
             "context_id": context_id,
             "status": {
                 "state": "pending",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             },
         }
         mock_storage.submit_task.return_value = mock_task
@@ -204,9 +199,7 @@ class TestMessageHandlers:
 
         await handler._submit_and_schedule_task(request_params)
 
-        mock_push_manager.register_push_config.assert_called_once_with(
-            task_id, push_config, persist=True
-        )
+        mock_push_manager.register_push_config.assert_called_once_with(task_id, push_config, persist=True)
 
     @pytest.mark.asyncio
     async def test_submit_and_schedule_task_with_payment_context(self):
@@ -221,7 +214,7 @@ class TestMessageHandlers:
             "context_id": context_id,
             "status": {
                 "state": "pending",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             },
         }
         mock_storage.submit_task.return_value = mock_task
@@ -297,7 +290,7 @@ class TestMessageHandlers:
             "context_id": context_id,
             "status": {
                 "state": "pending",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             },
         }
         mock_storage.submit_task.return_value = mock_task

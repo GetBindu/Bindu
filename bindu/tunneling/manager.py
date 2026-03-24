@@ -2,7 +2,6 @@
 
 import secrets
 import string
-from typing import Optional
 
 from bindu.tunneling.config import TunnelConfig
 from bindu.tunneling.tunnel import Tunnel
@@ -16,13 +15,13 @@ class TunnelManager:
 
     def __init__(self):
         """Initialize tunnel manager."""
-        self.active_tunnel: Optional[Tunnel] = None
+        self.active_tunnel: Tunnel | None = None
 
     def create_tunnel(
         self,
         local_port: int,
-        config: Optional[TunnelConfig] = None,
-        subdomain: Optional[str] = None,
+        config: TunnelConfig | None = None,
+        subdomain: str | None = None,
     ) -> str:
         """Create a tunnel to expose a local port.
 
@@ -39,9 +38,7 @@ class TunnelManager:
             ValueError: If tunnel creation fails
         """
         if self.active_tunnel is not None:
-            raise RuntimeError(
-                "A tunnel is already active. Stop it before creating a new one."
-            )
+            raise RuntimeError("A tunnel is already active. Stop it before creating a new one.")
 
         # Create config if not provided
         if config is None:
@@ -56,9 +53,7 @@ class TunnelManager:
         elif not config.subdomain:
             config.subdomain = self._generate_subdomain()
 
-        logger.info(
-            f"Creating tunnel for localhost:{local_port} with subdomain '{config.subdomain}'"
-        )
+        logger.info(f"Creating tunnel for localhost:{local_port} with subdomain '{config.subdomain}'")
 
         # Create and start tunnel
         tunnel = Tunnel(config)
@@ -79,7 +74,7 @@ class TunnelManager:
         else:
             logger.debug("No active tunnel to stop")
 
-    def get_public_url(self) -> Optional[str]:
+    def get_public_url(self) -> str | None:
         """Get the public URL of the active tunnel.
 
         Returns:

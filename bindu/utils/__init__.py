@@ -15,20 +15,20 @@ from .capabilities import (
     add_extension_to_capabilities,
     get_x402_extension_from_capabilities,
 )
-from .exceptions import (
-    HTTPError,
-    HTTPConnectionError,
-    HTTPTimeoutError,
-    HTTPClientError,
-    HTTPServerError,
-)
-from .retry import create_retry_decorator
-from .server_runner import run_server, setup_signal_handlers
 
 # Organized packages (new structure)
 from .config import load_config_from_env, update_auth_settings
 from .did import check_did_match, validate_did_extension
-from .skills import load_skills, find_skill_by_id
+from .exceptions import (
+    HTTPClientError,
+    HTTPConnectionError,
+    HTTPError,
+    HTTPServerError,
+    HTTPTimeoutError,
+)
+from .retry import create_retry_decorator
+from .server_runner import run_server, setup_signal_handlers
+from .skills import find_skill_by_id, load_skills
 
 # Note: worker package is NOT imported here to avoid circular dependency with DID extension
 # Import directly from bindu.utils.worker where needed

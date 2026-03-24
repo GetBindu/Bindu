@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Optional
 
 from loguru import logger
 from rich.console import Console
@@ -15,7 +14,7 @@ from rich.traceback import install as install_rich_traceback
 from bindu.settings import app_settings
 
 # Lazy initialization - console created only when needed
-_console: Optional[Console] = None
+_console: Console | None = None
 _is_logging_configured = False
 
 
@@ -48,7 +47,7 @@ def _get_console() -> Console:
 
 def configure_logger(
     docker_mode: bool = False,
-    log_level: Optional[str] = None,
+    log_level: str | None = None,
 ) -> None:
     """Configure loguru logger with Rich integration.
 
@@ -100,7 +99,7 @@ def configure_logger(
     _is_logging_configured = True
 
 
-def get_logger(name: Optional[str] = None):
+def get_logger(name: str | None = None):
     """Get a configured logger instance with automatic name inference.
 
     Args:

@@ -5,7 +5,7 @@ This client handles communication with Ory Hydra's Admin API for token operation
 
 from __future__ import annotations as _annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 from urllib.parse import quote
 
 from bindu.utils.http import AsyncHTTPClient
@@ -27,7 +27,7 @@ class HydraClient:
     def __init__(
         self,
         admin_url: str,
-        public_url: Optional[str] = None,
+        public_url: str | None = None,
         timeout: int = 10,
         verify_ssl: bool = True,
         max_retries: int = 3,
@@ -60,11 +60,9 @@ class HydraClient:
             },
         )
 
-        logger.debug(
-            f"Hydra client initialized: admin={admin_url}, public={self.public_url}"
-        )
+        logger.debug(f"Hydra client initialized: admin={admin_url}, public={self.public_url}")
 
-    async def __aenter__(self) -> "HydraClient":
+    async def __aenter__(self) -> HydraClient:
         """Async context manager entry."""
         await self._http_client._ensure_session()
         return self
@@ -77,7 +75,7 @@ class HydraClient:
         """Close the HTTP client session."""
         await self._http_client.close()
 
-    async def introspect_token(self, token: str) -> Dict[str, Any]:
+    async def introspect_token(self, token: str) -> dict[str, Any]:
         """Introspect OAuth2 token using Hydra Admin API.
 
         Args:
@@ -95,21 +93,15 @@ class HydraClient:
         }
 
         try:
-            response = await self._http_client.post(
-                "/admin/oauth2/introspect", data=data
-            )
+            response = await self._http_client.post("/admin/oauth2/introspect", data=data)
 
             if response.status != 200:
                 error_text = await response.text()
-                logger.error(
-                    f"Token introspection failed: {response.status} - {error_text}"
-                )
+                logger.error(f"Token introspection failed: {response.status} - {error_text}")
                 raise ValueError(f"Hydra introspection failed: {error_text}")
 
             result_data = await response.json()
-            logger.debug(
-                f"Token introspection successful: active={result_data.get('active')}"
-            )
+            logger.debug(f"Token introspection successful: active={result_data.get('active')}")
 
             return result_data
 
@@ -117,7 +109,7 @@ class HydraClient:
             logger.error(f"Error during token introspection: {error}")
             raise ValueError(f"Failed to introspect token: {str(error)}") from error
 
-    async def create_oauth_client(self, client_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def create_oauth_client(self, client_data: dict[str, Any]) -> dict[str, Any]:
         """Create a new OAuth2 client in Hydra.
 
         Args:
@@ -139,7 +131,7 @@ class HydraClient:
             logger.error(f"Failed to create OAuth client: {error}")
             raise
 
-    async def get_oauth_client(self, client_id: str) -> Optional[Dict[str, Any]]:
+    async def get_oauth_client(self, client_id: str) -> dict[str, Any] | None:
         """Get OAuth2 client information.
 
         Args:
@@ -153,9 +145,7 @@ class HydraClient:
         try:
             # URL-encode client_id to handle DIDs with colons and special characters
             encoded_client_id = quote(client_id, safe="")
-            response = await self._http_client.get(
-                f"/admin/clients/{encoded_client_id}"
-            )
+            response = await self._http_client.get(f"/admin/clients/{encoded_client_id}")
 
             if response.status == 200:
                 return await response.json()
@@ -178,9 +168,7 @@ class HydraClient:
             logger.error(f"Failed to get OAuth client: {error}")
             raise
 
-    async def list_oauth_clients(
-        self, limit: int = 100, offset: int = 0
-    ) -> List[Dict[str, Any]]:
+    async def list_oauth_clients(self, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
         """List OAuth2 clients.
 
         Args:
@@ -191,9 +179,7 @@ class HydraClient:
             List of OAuth2 clients
         """
         try:
-            response = await self._http_client.get(
-                f"/admin/clients?limit={limit}&offset={offset}"
-            )
+            response = await self._http_client.get(f"/admin/clients?limit={limit}&offset={offset}")
 
             if response.status != 200:
                 error_text = await response.text()
@@ -217,9 +203,7 @@ class HydraClient:
         try:
             # URL-encode client_id to handle DIDs with colons and special characters
             encoded_client_id = quote(client_id, safe="")
-            response = await self._http_client.delete(
-                f"/admin/clients/{encoded_client_id}"
-            )
+            response = await self._http_client.delete(f"/admin/clients/{encoded_client_id}")
 
             if response.status in (200, 204):
                 return True
@@ -248,7 +232,7 @@ class HydraClient:
             logger.warning(f"Hydra health check failed: {error}")
             return False
 
-    async def get_jwks(self) -> Dict[str, Any]:
+    async def get_jwks(self) -> dict[str, Any]:
         """Get JSON Web Key Set (JWKS) for token validation.
 
         Returns:
@@ -286,7 +270,7 @@ class HydraClient:
             logger.error(f"Failed to revoke token: {e}")
             raise
 
-    async def get_public_key_from_client(self, client_did: str) -> Optional[str]:
+    async def get_public_key_from_client(self, client_did: str) -> str | None:
         """Get client's public key from Hydra metadata.
 
         Args:

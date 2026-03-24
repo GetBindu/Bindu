@@ -1,15 +1,15 @@
 """Focused tests for OpenInference observability setup."""
 
-from unittest.mock import MagicMock, patch, Mock
+from unittest.mock import MagicMock, Mock, patch
 
+from bindu.common.models import AgentFrameworkSpec
 from bindu.observability.openinference import (
-    _detect_framework,
-    _validate_framework_version,
-    _get_package_manager,
     _check_missing_packages,
+    _detect_framework,
+    _get_package_manager,
+    _validate_framework_version,
     setup,
 )
-from bindu.common.models import AgentFrameworkSpec
 
 
 class TestFrameworkDetection:
@@ -72,9 +72,7 @@ class TestVersionValidation:
 
     def test_validate_version_exact_match(self):
         """Test version exactly matching requirement."""
-        spec = AgentFrameworkSpec(
-            "openai", "openinference-instrumentation-openai", "1.69.0"
-        )
+        spec = AgentFrameworkSpec("openai", "openinference-instrumentation-openai", "1.69.0")
         installed = {"openai": Mock(version="1.69.0")}
 
         is_valid, version = _validate_framework_version(spec, installed)
@@ -169,9 +167,7 @@ class TestSetupFunction:
     @patch("bindu.observability.openinference.distributions")
     @patch("bindu.observability.openinference._instrument_framework")
     @patch("bindu.observability.openinference.app_settings")
-    def test_setup_with_valid_framework(
-        self, mock_settings, mock_instrument, mock_distributions, mock_tracer
-    ):
+    def test_setup_with_valid_framework(self, mock_settings, mock_instrument, mock_distributions, mock_tracer):
         """Test successful setup with valid framework."""
         mock_settings.observability.base_packages = []
         mock_settings.observability.instrumentor_map = {"agno": ("module", "Class")}
@@ -231,9 +227,7 @@ class TestSetupEdgeCases:
     @patch("bindu.observability.openinference._setup_tracer_provider")
     @patch("bindu.observability.openinference.distributions")
     @patch("bindu.observability.openinference._instrument_framework")
-    def test_setup_instrumentation_import_error(
-        self, mock_instrument, mock_distributions, mock_tracer
-    ):
+    def test_setup_instrumentation_import_error(self, mock_instrument, mock_distributions, mock_tracer):
         """Test graceful handling of instrumentation import errors."""
         mock_dist = Mock()
         mock_dist.name = "agno"

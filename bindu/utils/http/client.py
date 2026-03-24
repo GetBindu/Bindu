@@ -6,17 +6,16 @@ to avoid duplicating HTTP request logic, retry mechanisms, and session managemen
 
 from __future__ import annotations
 
-import asyncio
 from contextlib import asynccontextmanager
 from typing import Any
 
 import aiohttp
 
 from bindu.utils.exceptions import (
-    HTTPConnectionError,
-    HTTPTimeoutError,
     HTTPClientError,
+    HTTPConnectionError,
     HTTPServerError,
+    HTTPTimeoutError,
 )
 from bindu.utils.logging import get_logger
 from bindu.utils.retry import create_retry_decorator
@@ -61,7 +60,7 @@ class AsyncHTTPClient:
 
         logger.debug(f"HTTP client initialized: base_url={base_url}")
 
-    async def __aenter__(self) -> "AsyncHTTPClient":
+    async def __aenter__(self) -> AsyncHTTPClient:
         """Async context manager entry."""
         await self._ensure_session()
         return self
@@ -124,11 +123,7 @@ class AsyncHTTPClient:
         assert self._session is not None
 
         # Build full URL
-        url = (
-            f"{self.base_url}{endpoint}"
-            if endpoint.startswith("/")
-            else f"{self.base_url}/{endpoint}"
-        )
+        url = f"{self.base_url}{endpoint}" if endpoint.startswith("/") else f"{self.base_url}/{endpoint}"
 
         # Merge headers
         request_headers = {**self.default_headers, **(headers or {})}
@@ -169,7 +164,7 @@ class AsyncHTTPClient:
                 logger.debug(f"{method} {url} -> {response.status}")
                 return response
 
-        except asyncio.TimeoutError as e:
+        except TimeoutError as e:
             logger.warning(f"{method} {url} timed out")
             raise HTTPTimeoutError("Request timed out", url=url) from e
 
@@ -200,9 +195,7 @@ class AsyncHTTPClient:
         Returns:
             HTTP response
         """
-        return await self.request(
-            "GET", endpoint, params=params, headers=headers, **kwargs
-        )
+        return await self.request("GET", endpoint, params=params, headers=headers, **kwargs)
 
     @create_retry_decorator("api")
     async def post(
@@ -226,9 +219,7 @@ class AsyncHTTPClient:
         Returns:
             HTTP response
         """
-        return await self.request(
-            "POST", endpoint, data=data, json=json, headers=headers, **kwargs
-        )
+        return await self.request("POST", endpoint, data=data, json=json, headers=headers, **kwargs)
 
     @create_retry_decorator("api")
     async def put(
@@ -252,9 +243,7 @@ class AsyncHTTPClient:
         Returns:
             HTTP response
         """
-        return await self.request(
-            "PUT", endpoint, data=data, json=json, headers=headers, **kwargs
-        )
+        return await self.request("PUT", endpoint, data=data, json=json, headers=headers, **kwargs)
 
     @create_retry_decorator("api")
     async def delete(
@@ -298,9 +287,7 @@ class AsyncHTTPClient:
         Returns:
             HTTP response
         """
-        return await self.request(
-            "PATCH", endpoint, data=data, json=json, headers=headers, **kwargs
-        )
+        return await self.request("PATCH", endpoint, data=data, json=json, headers=headers, **kwargs)
 
 
 @asynccontextmanager

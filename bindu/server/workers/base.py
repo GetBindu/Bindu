@@ -21,16 +21,16 @@ Workers implement the hybrid pattern by:
 from __future__ import annotations as _annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, nullcontext
 from dataclasses import dataclass
-from typing import Any, AsyncIterator
+from typing import Any
 
 import anyio
 from opentelemetry.trace import get_tracer, use_span
 
-from bindu.server.scheduler import TaskOperation
-
 from bindu.common.protocol.types import Artifact, Message, TaskIdParams, TaskSendParams
+from bindu.server.scheduler import TaskOperation
 from bindu.server.scheduler.base import Scheduler
 from bindu.server.storage.base import Storage
 from bindu.utils.logging import get_logger
@@ -138,9 +138,7 @@ class Worker(ABC):
                     if handler:
                         await handler(task_operation["params"])
                     else:
-                        logger.warning(
-                            f"Unknown operation: {task_operation['operation']}"
-                        )
+                        logger.warning(f"Unknown operation: {task_operation['operation']}")
         except Exception as e:  # noqa: BLE001 - intentionally broad: any unhandled worker failure must mark the task as failed
             # Update task status to failed on any exception
             task_id = self._normalize_uuid(task_operation["params"]["task_id"])

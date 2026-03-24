@@ -44,9 +44,7 @@ class DIDValidation:
     @staticmethod
     def _validate_parts(did: str) -> tuple[bool, str | None, list[str]]:
         """Split and validate DID parts."""
-        parts = did.split(
-            ":", app_settings.did.bindu_parts - 1
-        )  # Max 4 parts for bindu DIDs
+        parts = did.split(":", app_settings.did.bindu_parts - 1)  # Max 4 parts for bindu DIDs
 
         if len(parts) < app_settings.did.min_parts:
             return (
@@ -105,9 +103,7 @@ class DIDValidation:
         return True, None
 
     @staticmethod
-    def _validate_required_field(
-        did_doc: dict[str, Any], field: str, errors: list[str]
-    ) -> None:
+    def _validate_required_field(did_doc: dict[str, Any], field: str, errors: list[str]) -> None:
         """Validate a required field exists."""
         if field not in did_doc:
             errors.append(f"Missing {field} field")
@@ -175,9 +171,7 @@ class DIDValidation:
         return len(errors) == 0, errors
 
     @staticmethod
-    def _validate_service_endpoints(
-        services: list[dict[str, Any]], errors: list[str]
-    ) -> None:
+    def _validate_service_endpoints(services: list[dict[str, Any]], errors: list[str]) -> None:
         """Validate service endpoints match configured URL."""
         try:
             from bindu.settings import app_settings
@@ -190,19 +184,11 @@ class DIDValidation:
                 for service in services:
                     if "serviceEndpoint" in service:
                         endpoint = service.get("serviceEndpoint")
-                        if (
-                            isinstance(endpoint, str)
-                            and endpoint.rstrip("/") != configured_url
-                        ):
-                            errors.append(
-                                f"Service endpoint {endpoint} does not match configured URL {configured_url}"
-                            )
+                        if isinstance(endpoint, str) and endpoint.rstrip("/") != configured_url:
+                            errors.append(f"Service endpoint {endpoint} does not match configured URL {configured_url}")
                         elif isinstance(endpoint, list):
                             for ep in endpoint:
-                                if (
-                                    isinstance(ep, str)
-                                    and ep.rstrip("/") != configured_url
-                                ):
+                                if isinstance(ep, str) and ep.rstrip("/") != configured_url:
                                     errors.append(
                                         f"Service endpoint {ep} does not match configured URL {configured_url}"
                                     )

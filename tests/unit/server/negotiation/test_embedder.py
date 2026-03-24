@@ -1,7 +1,8 @@
 """Minimal tests for skill embedder."""
 
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 from bindu.server.negotiation.embedder import SkillEmbedder
 

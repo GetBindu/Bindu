@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, Callable, Tuple, Type, get_args
+from typing import Any, get_args
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from bindu.common.protocol.types import InternalError
-from bindu.utils.logging import get_logger
 from bindu.settings import app_settings
+from bindu.utils.logging import get_logger
 
 logger = get_logger("bindu.server.endpoints.utils")
 
@@ -27,7 +28,7 @@ def get_client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-def extract_error_fields(err_alias: Type[Any]) -> Tuple[int, str]:
+def extract_error_fields(err_alias: type[Any]) -> tuple[int, str]:
     """Extract error code and message from JSONRPCError type alias.
 
     Given a JSONRPCError[Literal[code], Literal[message]] typing alias,
@@ -105,9 +106,7 @@ def handle_endpoint_errors(endpoint_name: str) -> Callable:
             try:
                 return await func(*args, **kwargs)
             except Exception as e:
-                logger.error(
-                    f"Error serving {endpoint_name} to {client_ip}: {e}", exc_info=True
-                )
+                logger.error(f"Error serving {endpoint_name} to {client_ip}: {e}", exc_info=True)
                 code, message = extract_error_fields(InternalError)
                 return jsonrpc_error(code, message, str(e), status=500)
 
@@ -120,7 +119,7 @@ def validate_manifest(
     app: Any,
     client_ip: str = "unknown",
     use_jsonrpc: bool = False,
-    error_type: Type[Any] = InternalError,
+    error_type: type[Any] = InternalError,
 ) -> JSONResponse | None:
     """Validate manifest exists, return error response if not.
 
@@ -141,9 +140,7 @@ def validate_manifest(
         code, message = extract_error_fields(error_type)
         return jsonrpc_error(code, message, "Agent manifest not configured", status=500)
     else:
-        return JSONResponse(
-            content={"error": "Agent manifest not configured"}, status_code=500
-        )
+        return JSONResponse(content={"error": "Agent manifest not configured"}, status_code=500)
 
 
 def get_agent_did(app: Any) -> str | None:
@@ -155,11 +152,7 @@ def get_agent_did(app: Any) -> str | None:
     Returns:
         Agent DID if available, None otherwise
     """
-    if (
-        app.manifest
-        and hasattr(app.manifest, "did_extension")
-        and app.manifest.did_extension
-    ):
+    if app.manifest and hasattr(app.manifest, "did_extension") and app.manifest.did_extension:
         return app.manifest.did_extension.did
     return None
 
@@ -211,8 +204,10 @@ def create_response_with_x402(
         Response with X402 header if requested
     """
     from bindu.extensions.x402.extension import (
-        is_activation_requested as x402_is_requested,
         add_activation_header as x402_add_header,
+    )
+    from bindu.extensions.x402.extension import (
+        is_activation_requested as x402_is_requested,
     )
 
     resp = response_type(content=content, **kwargs)
@@ -268,8 +263,8 @@ def get_skill_or_error(app: Any, skill_id: str) -> tuple[Any, JSONResponse | Non
     Returns:
         Tuple of (skill, error_response). One will be None.
     """
-    from bindu.utils.skills import find_skill_by_id
     from bindu.common.protocol.types import SkillNotFoundError
+    from bindu.utils.skills import find_skill_by_id
 
     skills = app.manifest.skills or [] if app.manifest else []
     skill = find_skill_by_id(skills, skill_id)
@@ -282,9 +277,7 @@ def get_skill_or_error(app: Any, skill_id: str) -> tuple[Any, JSONResponse | Non
     return skill, None
 
 
-def validate_payment_manager(
-    app: Any, use_html: bool = False, error_html_generator: Any = None
-) -> Response | None:
+def validate_payment_manager(app: Any, use_html: bool = False, error_html_generator: Any = None) -> Response | None:
     """Validate payment session manager exists.
 
     Args:
@@ -308,6 +301,4 @@ def validate_payment_manager(
         )
         return HTMLResponse(content=error_content, status_code=503)
     else:
-        return JSONResponse(
-            content={"error": "Payment sessions not enabled"}, status_code=503
-        )
+        return JSONResponse(content={"error": "Payment sessions not enabled"}, status_code=503)

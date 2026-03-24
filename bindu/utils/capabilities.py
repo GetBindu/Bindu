@@ -1,12 +1,12 @@
 """Utilities for managing agent capabilities and extensions."""
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from bindu.common.protocol.types import AgentCapabilities
 
 
 def add_extension_to_capabilities(
-    capabilities: AgentCapabilities | Dict[str, Any] | None,
+    capabilities: AgentCapabilities | dict[str, Any] | None,
     extension: Any,
 ) -> AgentCapabilities:
     """Add an extension to agent capabilities.
@@ -38,7 +38,7 @@ def add_extension_to_capabilities(
     )
 
 
-def get_x402_extension_from_capabilities(manifest: Any) -> Optional[Any]:
+def get_x402_extension_from_capabilities(manifest: Any) -> Any | None:
     """Extract X402 extension from manifest capabilities.
 
     Args:

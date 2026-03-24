@@ -16,7 +16,7 @@ getting, listing, canceling tasks, and submitting feedback.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from bindu.common.protocol.types import (
@@ -31,12 +31,10 @@ from bindu.common.protocol.types import (
     TaskNotCancelableError,
     TaskNotFoundError,
 )
-from bindu.settings import app_settings
-
-from bindu.utils.task_telemetry import trace_task_operation, track_active_task
-
 from bindu.server.scheduler import Scheduler
 from bindu.server.storage import Storage
+from bindu.settings import app_settings
+from bindu.utils.task_telemetry import trace_task_operation, track_active_task
 
 
 @dataclass
@@ -55,9 +53,7 @@ class TaskHandlers:
         task = await self.storage.load_task(task_id, history_length)
 
         if task is None:
-            return self.error_response_creator(
-                GetTaskResponse, request["id"], TaskNotFoundError, "Task not found"
-            )
+            return self.error_response_creator(GetTaskResponse, request["id"], TaskNotFoundError, "Task not found")
 
         return GetTaskResponse(jsonrpc="2.0", id=request["id"], result=task)
 
@@ -69,9 +65,7 @@ class TaskHandlers:
         task = await self.storage.load_task(task_id)
 
         if task is None:
-            return self.error_response_creator(
-                CancelTaskResponse, request["id"], TaskNotFoundError, "Task not found"
-            )
+            return self.error_response_creator(CancelTaskResponse, request["id"], TaskNotFoundError, "Task not found")
 
         # Check if task is in a cancelable state
         current_state = task["status"]["state"]
@@ -100,9 +94,7 @@ class TaskHandlers:
         tasks = await self.storage.list_tasks(request["params"].get("length"))
 
         if tasks is None:
-            return self.error_response_creator(
-                ListTasksResponse, request["id"], TaskNotFoundError, "No tasks found"
-            )
+            return self.error_response_creator(ListTasksResponse, request["id"], TaskNotFoundError, "No tasks found")
 
         return ListTasksResponse(jsonrpc="2.0", id=request["id"], result=tasks)
 
@@ -113,9 +105,7 @@ class TaskHandlers:
         task = await self.storage.load_task(task_id)
 
         if task is None:
-            return self.error_response_creator(
-                TaskFeedbackResponse, request["id"], TaskNotFoundError, "Task not found"
-            )
+            return self.error_response_creator(TaskFeedbackResponse, request["id"], TaskNotFoundError, "Task not found")
 
         # Timestamp is always stored in UTC ISO-8601 format for consistency
         feedback_data = {
@@ -123,7 +113,7 @@ class TaskHandlers:
             "feedback": request["params"]["feedback"],
             "rating": request["params"]["rating"],
             "metadata": request["params"]["metadata"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
         if hasattr(self.storage, "store_task_feedback"):

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
@@ -14,10 +12,11 @@ from bindu.common.protocol.types import (
 )
 from bindu.server.applications import BinduApplication
 from bindu.utils.logging import get_logger
+
 from .utils import (
-    handle_endpoint_errors,
     extract_error_fields,
     get_client_ip,
+    handle_endpoint_errors,
     jsonrpc_error,
     validate_manifest,
 )
@@ -49,7 +48,7 @@ async def did_resolve_endpoint(app: BinduApplication, request: Request) -> Respo
     # Get DID from query param (GET) or JSON body (POST).
     # Calling request.json() on a GET request raises an exception because
     # GET requests carry no body — always check the method first.
-    did: Optional[str] = None
+    did: str | None = None
     if request.method == "GET":
         did = request.query_params.get("did")
     else:
@@ -88,9 +87,7 @@ async def did_resolve_endpoint(app: BinduApplication, request: Request) -> Respo
 
     # Validate DID extension has required method
     if not hasattr(did_extension, "get_did_document"):
-        return _did_not_found_error(
-            did, "DID extension missing 'get_did_document' method", client_ip
-        )
+        return _did_not_found_error(did, "DID extension missing 'get_did_document' method", client_ip)
 
     logger.debug(f"Resolving DID {did} for {client_ip}")
     did_document = did_extension.get_did_document()

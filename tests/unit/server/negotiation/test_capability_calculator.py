@@ -3,9 +3,9 @@
 import pytest
 
 from bindu.server.negotiation.capability_calculator import (
+    AssessmentResult,
     ScoringWeights,
     SkillMatchResult,
-    AssessmentResult,
 )
 
 
@@ -24,9 +24,7 @@ class TestScoringWeights:
 
     def test_normalized_weights_sum_to_one(self):
         """Test that normalized weights sum to 1.0."""
-        weights = ScoringWeights(
-            skill_match=0.3, io_compatibility=0.2, performance=0.2, load=0.2, cost=0.1
-        )
+        weights = ScoringWeights(skill_match=0.3, io_compatibility=0.2, performance=0.2, load=0.2, cost=0.1)
 
         normalized = weights.normalized
         total = sum(normalized.values())
@@ -40,9 +38,7 @@ class TestScoringWeights:
 
     def test_zero_weights_use_equal_distribution(self):
         """Test that all zero weights result in equal distribution."""
-        weights = ScoringWeights(
-            skill_match=0.0, io_compatibility=0.0, performance=0.0, load=0.0, cost=0.0
-        )
+        weights = ScoringWeights(skill_match=0.0, io_compatibility=0.0, performance=0.0, load=0.0, cost=0.0)
 
         normalized = weights.normalized
 
@@ -64,9 +60,7 @@ class TestSkillMatchResult:
 
     def test_skill_match_result_creation(self):
         """Test creating skill match result."""
-        result = SkillMatchResult(
-            skill_id="skill-123", skill_name="Data Analysis", score=0.85
-        )
+        result = SkillMatchResult(skill_id="skill-123", skill_name="Data Analysis", score=0.85)
 
         assert result.skill_id == "skill-123"
         assert result.skill_name == "Data Analysis"

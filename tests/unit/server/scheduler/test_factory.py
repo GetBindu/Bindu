@@ -1,11 +1,12 @@
 """Minimal tests for scheduler factory."""
 
-import pytest
 from unittest.mock import Mock, patch
 
-from bindu.server.scheduler.factory import create_scheduler, close_scheduler
-from bindu.server.scheduler.memory_scheduler import InMemoryScheduler
+import pytest
+
 from bindu.common.models import SchedulerConfig
+from bindu.server.scheduler.factory import close_scheduler, create_scheduler
+from bindu.server.scheduler.memory_scheduler import InMemoryScheduler
 
 
 class TestSchedulerFactory:
@@ -40,9 +41,7 @@ class TestSchedulerFactory:
     @pytest.mark.asyncio
     async def test_create_redis_scheduler_constructs_url_from_components(self):
         """Test that Redis scheduler can construct URL from components."""
-        config = SchedulerConfig(
-            type="redis", redis_host="localhost", redis_port=6379, redis_db=0
-        )
+        config = SchedulerConfig(type="redis", redis_host="localhost", redis_port=6379, redis_db=0)
 
         with patch("bindu.server.scheduler.factory.REDIS_AVAILABLE", True):
             with patch("bindu.server.scheduler.factory.RedisScheduler") as mock_redis:

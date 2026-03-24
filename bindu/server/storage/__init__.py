@@ -40,11 +40,11 @@ from __future__ import annotations as _annotations
 # Export the base storage interface
 from .base import Storage
 
+# Export factory functions
+from .factory import close_storage, create_storage
+
 # Export all storage implementations
 from .memory_storage import InMemoryStorage
-
-# Export factory functions
-from .factory import create_storage, close_storage
 
 # Export SQLAlchemy schema (tables, not models)
 from .schema import (

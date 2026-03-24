@@ -3,7 +3,6 @@
 import json
 from unittest.mock import MagicMock, patch
 
-
 from bindu.grpc.generated import agent_handler_pb2
 from bindu.grpc.registry import AgentRegistry
 from bindu.grpc.service import BinduServiceImpl, _proto_skills_to_dicts
@@ -150,9 +149,7 @@ class TestBinduServiceImpl:
         service = BinduServiceImpl(registry)
         context = MagicMock()
 
-        request = agent_handler_pb2.HeartbeatRequest(
-            agent_id="agent-1", timestamp=1234567890
-        )
+        request = agent_handler_pb2.HeartbeatRequest(agent_id="agent-1", timestamp=1234567890)
         response = service.Heartbeat(request, context)
 
         assert response.acknowledged is True
@@ -164,9 +161,7 @@ class TestBinduServiceImpl:
         service = BinduServiceImpl(registry)
         context = MagicMock()
 
-        request = agent_handler_pb2.HeartbeatRequest(
-            agent_id="unknown", timestamp=1234567890
-        )
+        request = agent_handler_pb2.HeartbeatRequest(agent_id="unknown", timestamp=1234567890)
         response = service.Heartbeat(request, context)
 
         assert response.acknowledged is False

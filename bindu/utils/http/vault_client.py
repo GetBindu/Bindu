@@ -7,12 +7,13 @@ from HashiCorp Vault, ensuring persistence across pod restarts.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from bindu.common.models import AgentCredentials
 from bindu.settings import app_settings
-from .client import AsyncHTTPClient
 from bindu.utils.logging import get_logger
+
+from .client import AsyncHTTPClient
 
 logger = get_logger("bindu.utils.vault_client")
 
@@ -26,8 +27,8 @@ class VaultClient:
 
     def __init__(
         self,
-        vault_url: Optional[str] = None,
-        vault_token: Optional[str] = None,
+        vault_url: str | None = None,
+        vault_token: str | None = None,
     ) -> None:
         """Initialize Vault client.
 
@@ -60,8 +61,8 @@ class VaultClient:
         self,
         method: str,
         path: str,
-        data: Optional[dict] = None,
-    ) -> Optional[dict[str, Any]]:
+        data: dict | None = None,
+    ) -> dict[str, Any] | None:
         """Make HTTP request to Vault API.
 
         Args:
@@ -94,8 +95,7 @@ class VaultClient:
             if response.status >= 400:
                 error_text = await response.text()
                 logger.error(
-                    f"Vault request failed: {method} {path} - "
-                    f"Status: {response.status} - Response: {error_text}"
+                    f"Vault request failed: {method} {path} - Status: {response.status} - Response: {error_text}"
                 )
                 return None
 
@@ -151,7 +151,7 @@ class VaultClient:
             )
             return False
 
-    async def get_did_keys(self, agent_id: str) -> Optional[dict[str, str]]:
+    async def get_did_keys(self, agent_id: str) -> dict[str, str] | None:
         """Retrieve DID keys from Vault.
 
         Args:
@@ -201,20 +201,16 @@ class VaultClient:
 
         result = await self._make_request("POST", path, data)
         if result:
-            logger.info(
-                f"✅ Hydra credentials stored in Vault for DID: {credentials.client_id}"
-            )
+            logger.info(f"✅ Hydra credentials stored in Vault for DID: {credentials.client_id}")
             return True
         else:
-            logger.error(
-                f"Failed to store Hydra credentials in Vault for DID: {credentials.client_id}"
-            )
+            logger.error(f"Failed to store Hydra credentials in Vault for DID: {credentials.client_id}")
             return False
 
     async def get_hydra_credentials(
         self,
         did: str,
-    ) -> Optional[AgentCredentials]:
+    ) -> AgentCredentials | None:
         """Retrieve Hydra OAuth credentials from Vault.
 
         Args:
@@ -281,16 +277,14 @@ class VaultClient:
             logger.info(f"✅ Hydra credentials deleted from Vault for DID: {did}")
             return True
         else:
-            logger.error(
-                f"Failed to delete Hydra credentials from Vault for DID: {did}"
-            )
+            logger.error(f"Failed to delete Hydra credentials from Vault for DID: {did}")
             return False
 
 
 async def restore_did_keys_from_vault(
     agent_id: str,
     key_dir: Path,
-) -> Optional[str]:
+) -> str | None:
     """Restore DID keys from Vault to local filesystem.
 
     Args:
@@ -355,7 +349,7 @@ async def backup_did_keys_to_vault(
             logger.error(f"Private key not found at {private_key_path}")
             return False
 
-        with open(private_key_path, "r") as f:
+        with open(private_key_path) as f:
             private_key_pem = f.read()
 
         # Read public key using filename from settings
@@ -364,7 +358,7 @@ async def backup_did_keys_to_vault(
             logger.error(f"Public key not found at {public_key_path}")
             return False
 
-        with open(public_key_path, "r") as f:
+        with open(public_key_path) as f:
             public_key_pem = f.read()
 
         # Store in Vault

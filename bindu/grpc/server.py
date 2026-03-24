@@ -87,9 +87,6 @@ def start_grpc_server(
     # Start serving
     server.start()
     logger.info(f"gRPC server started on {bind_address}")
-    logger.info(
-        "Waiting for SDK agent registrations... "
-        "(TypeScript, Kotlin, Rust agents can now connect)"
-    )
+    logger.info("Waiting for SDK agent registrations... (TypeScript, Kotlin, Rust agents can now connect)")
 
     return server

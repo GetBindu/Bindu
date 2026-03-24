@@ -8,16 +8,14 @@ from __future__ import annotations as _annotations
 
 import json
 import time
-from typing import Any, Dict, Optional
+from typing import Any
 
 from bindu.utils.logging import get_logger
 
 logger = get_logger("bindu.utils.did_signature")
 
 
-def create_signature_payload(
-    body: str | bytes | dict, did: str, timestamp: Optional[int] = None
-) -> Dict[str, Any]:
+def create_signature_payload(body: str | bytes | dict, did: str, timestamp: int | None = None) -> dict[str, Any]:
     """Create signature payload for request signing.
 
     Args:
@@ -42,9 +40,7 @@ def create_signature_payload(
     return {"body": body_str, "timestamp": timestamp, "did": did}
 
 
-def sign_request(
-    body: str | bytes | dict, did: str, did_extension, timestamp: Optional[int] = None
-) -> Dict[str, str]:
+def sign_request(body: str | bytes | dict, did: str, did_extension, timestamp: int | None = None) -> dict[str, str]:
     """Sign a request with DID private key.
 
     Args:
@@ -95,10 +91,7 @@ def verify_signature(
         # Check timestamp to prevent replay attacks
         current_time = int(time.time())
         if abs(current_time - timestamp) > max_age_seconds:
-            logger.warning(
-                f"Request timestamp too old: {timestamp} vs {current_time} "
-                f"(max age: {max_age_seconds}s)"
-            )
+            logger.warning(f"Request timestamp too old: {timestamp} vs {current_time} (max age: {max_age_seconds}s)")
             return False
 
         # Reconstruct signature payload
@@ -107,8 +100,8 @@ def verify_signature(
 
         # Verify signature with public key
         import base58
-        from nacl.signing import VerifyKey
         from nacl.exceptions import BadSignatureError
+        from nacl.signing import VerifyKey
 
         # Decode the base58-encoded public key and signature
         try:
@@ -135,7 +128,7 @@ def verify_signature(
         return False
 
 
-def extract_signature_headers(headers: dict) -> Optional[Dict[str, Any]]:
+def extract_signature_headers(headers: dict) -> dict[str, Any] | None:
     """Extract DID signature headers from request.
 
     Args:

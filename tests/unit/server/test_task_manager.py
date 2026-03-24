@@ -1,6 +1,7 @@
 """Minimal tests for TaskManager."""
 
 from unittest.mock import AsyncMock, Mock
+
 import pytest
 
 from bindu.server.task_manager import TaskManager
@@ -14,9 +15,7 @@ class TestTaskManager:
         mock_scheduler = Mock()
         mock_storage = AsyncMock()
 
-        manager = TaskManager(
-            scheduler=mock_scheduler, storage=mock_storage, manifest=None
-        )
+        manager = TaskManager(scheduler=mock_scheduler, storage=mock_storage, manifest=None)
 
         assert manager.scheduler == mock_scheduler
         assert manager.storage == mock_storage
@@ -28,9 +27,7 @@ class TestTaskManager:
         mock_storage = AsyncMock()
         mock_manifest = Mock()
 
-        manager = TaskManager(
-            scheduler=mock_scheduler, storage=mock_storage, manifest=mock_manifest
-        )
+        manager = TaskManager(scheduler=mock_scheduler, storage=mock_storage, manifest=mock_manifest)
 
         assert manager.manifest == mock_manifest
 
@@ -42,9 +39,7 @@ class TestTaskManager:
         mock_scheduler.__aexit__ = AsyncMock(return_value=None)
         mock_storage = AsyncMock()
 
-        manager = TaskManager(
-            scheduler=mock_scheduler, storage=mock_storage, manifest=None
-        )
+        manager = TaskManager(scheduler=mock_scheduler, storage=mock_storage, manifest=None)
 
         async with manager as m:
             assert m == manager
@@ -57,9 +52,7 @@ class TestTaskManager:
         mock_scheduler = Mock()
         mock_storage = AsyncMock()
 
-        manager = TaskManager(
-            scheduler=mock_scheduler, storage=mock_storage, manifest=None
-        )
+        manager = TaskManager(scheduler=mock_scheduler, storage=mock_storage, manifest=None)
 
         assert manager._push_manager is not None
         assert manager._push_manager.storage == mock_storage
@@ -72,9 +65,7 @@ class TestTaskManager:
         mock_scheduler.__aexit__ = AsyncMock(return_value=None)
         mock_storage = AsyncMock()
 
-        manager = TaskManager(
-            scheduler=mock_scheduler, storage=mock_storage, manifest=None
-        )
+        manager = TaskManager(scheduler=mock_scheduler, storage=mock_storage, manifest=None)
 
         async with manager:
             pass
@@ -86,9 +77,7 @@ class TestTaskManager:
         mock_scheduler = Mock()
         mock_storage = AsyncMock()
 
-        manager = TaskManager(
-            scheduler=mock_scheduler, storage=mock_storage, manifest=None
-        )
+        manager = TaskManager(scheduler=mock_scheduler, storage=mock_storage, manifest=None)
 
         assert hasattr(manager, "_push_manager")
 
@@ -97,9 +86,7 @@ class TestTaskManager:
         mock_scheduler = Mock()
         mock_storage = AsyncMock()
 
-        manager = TaskManager(
-            scheduler=mock_scheduler, storage=mock_storage, manifest=None
-        )
+        manager = TaskManager(scheduler=mock_scheduler, storage=mock_storage, manifest=None)
 
         assert manager.storage == mock_storage
 
@@ -108,9 +95,7 @@ class TestTaskManager:
         mock_scheduler = Mock()
         mock_storage = AsyncMock()
 
-        manager = TaskManager(
-            scheduler=mock_scheduler, storage=mock_storage, manifest=None
-        )
+        manager = TaskManager(scheduler=mock_scheduler, storage=mock_storage, manifest=None)
 
         assert manager.scheduler == mock_scheduler
 
@@ -119,9 +104,7 @@ class TestTaskManager:
         mock_scheduler = Mock()
         mock_storage = AsyncMock()
 
-        manager = TaskManager(
-            scheduler=mock_scheduler, storage=mock_storage, manifest=None
-        )
+        manager = TaskManager(scheduler=mock_scheduler, storage=mock_storage, manifest=None)
 
         assert manager.manifest is None
 
@@ -131,9 +114,7 @@ class TestTaskManager:
         mock_storage = AsyncMock()
         mock_manifest = Mock()
 
-        manager = TaskManager(
-            scheduler=mock_scheduler, storage=mock_storage, manifest=mock_manifest
-        )
+        manager = TaskManager(scheduler=mock_scheduler, storage=mock_storage, manifest=mock_manifest)
 
         assert hasattr(manager, "scheduler")
         assert hasattr(manager, "storage")

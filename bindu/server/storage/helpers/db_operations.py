@@ -1,6 +1,6 @@
 """Database operation utilities for PostgreSQL storage."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import cast
@@ -15,7 +15,7 @@ def get_current_utc_timestamp() -> datetime:
     Returns:
         Current datetime in UTC timezone
     """
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def prepare_jsonb_value(data: Any) -> Any:

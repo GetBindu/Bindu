@@ -3,9 +3,9 @@
 from unittest.mock import patch
 
 from bindu.observability.sentry import (
-    init_sentry,
     _before_send,
     _before_send_transaction,
+    init_sentry,
 )
 
 

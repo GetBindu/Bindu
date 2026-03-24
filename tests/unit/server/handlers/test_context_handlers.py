@@ -1,6 +1,7 @@
 """Minimal tests for context handlers."""
 
 from unittest.mock import AsyncMock, Mock
+
 import pytest
 
 from bindu.server.handlers.context_handlers import ContextHandlers
@@ -76,9 +77,7 @@ class TestContextHandlers:
         mock_storage.clear_context.side_effect = ValueError("Context not found")
 
         mock_error_creator = Mock(return_value={"error": "not found"})
-        handler = ContextHandlers(
-            storage=mock_storage, error_response_creator=mock_error_creator
-        )
+        handler = ContextHandlers(storage=mock_storage, error_response_creator=mock_error_creator)
         request = {"jsonrpc": "2.0", "id": "4", "params": {"contextId": "invalid"}}
 
         response = await handler.clear_context(request)

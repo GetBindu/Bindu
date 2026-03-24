@@ -12,17 +12,18 @@ restarts, enabling notifications for tasks that run longer than
 typical request timeouts.
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
+from alembic import op
+
 # revision identifiers, used by Alembic.
 revision: str = "20250614_0001"
-down_revision: Union[str, None] = "ef0d61440935"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "ef0d61440935"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -77,9 +78,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Remove webhook_configs table."""
     # Drop trigger
-    op.execute(
-        "DROP TRIGGER IF EXISTS update_webhook_configs_updated_at ON webhook_configs"
-    )
+    op.execute("DROP TRIGGER IF EXISTS update_webhook_configs_updated_at ON webhook_configs")
 
     # Drop index
     op.drop_index("idx_webhook_configs_created_at", table_name="webhook_configs")

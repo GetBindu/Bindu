@@ -4,14 +4,14 @@ This module prepares configuration dictionaries without directly mutating
 global settings. The caller is responsible for applying these to app_settings.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from bindu.utils.logging import get_logger
 
 logger = get_logger("bindu.utils.config.settings")
 
 
-def prepare_auth_settings(auth_config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def prepare_auth_settings(auth_config: dict[str, Any]) -> dict[str, Any] | None:
     """Prepare auth settings from configuration.
 
     Returns a dictionary of settings to apply, rather than mutating global state.
@@ -50,16 +50,14 @@ def prepare_auth_settings(auth_config: Dict[str, Any]) -> Optional[Dict[str, Any
             "agent_client_prefix": auth_config.get("agent_client_prefix"),
         }
         # Remove None values
-        settings_to_apply["hydra"] = {
-            k: v for k, v in settings_to_apply["hydra"].items() if v is not None
-        }
+        settings_to_apply["hydra"] = {k: v for k, v in settings_to_apply["hydra"].items() if v is not None}
     else:
         logger.warning(f"Unknown authentication provider: {provider}")
 
     return settings_to_apply
 
 
-def prepare_vault_settings(vault_config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def prepare_vault_settings(vault_config: dict[str, Any]) -> dict[str, Any] | None:
     """Prepare vault settings from configuration.
 
     Returns a dictionary of settings to apply, rather than mutating global state.
@@ -83,14 +81,10 @@ def prepare_vault_settings(vault_config: Dict[str, Any]) -> Optional[Dict[str, A
     }
 
     # Remove None values
-    settings_to_apply["vault"] = {
-        k: v for k, v in settings_to_apply["vault"].items() if v is not None
-    }
+    settings_to_apply["vault"] = {k: v for k, v in settings_to_apply["vault"].items() if v is not None}
 
     if settings_to_apply["vault"].get("enabled"):
-        logger.info(
-            f"Vault integration enabled: {settings_to_apply['vault'].get('url')}"
-        )
+        logger.info(f"Vault integration enabled: {settings_to_apply['vault'].get('url')}")
     else:
         logger.debug("Vault integration disabled")
 
@@ -98,7 +92,7 @@ def prepare_vault_settings(vault_config: Dict[str, Any]) -> Optional[Dict[str, A
 
 
 # Backward compatibility - these functions apply settings directly
-def update_auth_settings(auth_config: Dict[str, Any]) -> None:
+def update_auth_settings(auth_config: dict[str, Any]) -> None:
     """Update global auth settings from configuration.
 
     DEPRECATED: Use prepare_auth_settings() instead and apply manually.
@@ -124,7 +118,7 @@ def update_auth_settings(auth_config: Dict[str, Any]) -> None:
             setattr(app_settings.hydra, key, value)
 
 
-def update_vault_settings(vault_config: Dict[str, Any]) -> None:
+def update_vault_settings(vault_config: dict[str, Any]) -> None:
     """Update global vault settings from configuration.
 
     DEPRECATED: Use prepare_vault_settings() instead and apply manually.

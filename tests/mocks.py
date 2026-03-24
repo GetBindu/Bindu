@@ -1,7 +1,8 @@
 """Mock objects for testing."""
 
 import json
-from typing import Any, Callable, Dict, Optional
+from collections.abc import Callable
+from typing import Any
 from uuid import UUID
 
 
@@ -49,11 +50,11 @@ class MockManifest:
 
     def __init__(
         self,
-        agent_fn: Optional[Callable] = None,
+        agent_fn: Callable | None = None,
         name: str = "Test Agent",
         description: str = "A test agent",
         version: str = "1.0.0",
-        capabilities: Optional[Dict[str, Any]] = None,
+        capabilities: dict[str, Any] | None = None,
     ):
         """Initialize mock manifest.
 
@@ -128,7 +129,7 @@ class MockDIDExtension:
         self.public_key = public_key
         self.created = "2025-01-01T00:00:00Z"
 
-    def get_did_document(self) -> Dict[str, Any]:
+    def get_did_document(self) -> dict[str, Any]:
         """Get mock DID document."""
         return {
             "@context": ["https://www.w3.org/ns/did/v1", "https://getbindu.com/ns/v1"],
@@ -159,7 +160,7 @@ class MockDIDExtension:
             ],
         }
 
-    def get_agent_info(self) -> Dict[str, Any]:
+    def get_agent_info(self) -> dict[str, Any]:
         """Get simplified agent info."""
         return {
             "did": self.did,
@@ -190,7 +191,7 @@ class MockNotificationService:
         self.notifications = []
         self.delivery_failures = []
 
-    def validate_config(self, config: Dict[str, Any]) -> None:
+    def validate_config(self, config: dict[str, Any]) -> None:
         """Validate push notification config."""
         if "url" not in config:
             raise ValueError("Missing 'url' in push notification config")
@@ -198,9 +199,9 @@ class MockNotificationService:
     async def send_notification(
         self,
         url: str,
-        event: Dict[str, Any],
-        token: Optional[str] = None,
-        authentication: Optional[Dict[str, Any]] = None,
+        event: dict[str, Any],
+        token: str | None = None,
+        authentication: dict[str, Any] | None = None,
     ) -> bool:
         """Mock send notification."""
         self.notifications.append(

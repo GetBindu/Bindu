@@ -27,10 +27,10 @@ DID documents, enabling agents to establish trust in a decentralized network.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from functools import cached_property
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import base58
 from cryptography.exceptions import InvalidSignature
@@ -56,10 +56,10 @@ class DIDAgentExtension:
         self,
         recreate_keys: bool,
         key_dir: Path,
-        author: Optional[str] = None,
-        agent_name: Optional[str] = None,
-        agent_id: Optional[str] = None,
-        key_password: Optional[str] = None,
+        author: str | None = None,
+        agent_name: str | None = None,
+        agent_id: str | None = None,
+        key_password: str | None = None,
     ):
         """Initialize the DID extension with cryptographic identity.
 
@@ -91,20 +91,15 @@ class DIDAgentExtension:
         self.agent_name = agent_name
         self.agent_id = agent_id  # The unique agent identifier
         self.key_password = key_password.encode() if key_password else None
-        self._created_at = datetime.now(
-            timezone.utc
-        ).isoformat()  # Cache creation timestamp
+        self._created_at = datetime.now(UTC).isoformat()  # Cache creation timestamp
 
         # Store additional metadata that will be included in DID document
-        self.metadata: Dict[str, Any] = {}
+        self.metadata: dict[str, Any] = {}
 
     def __repr__(self) -> str:
         """Return string representation of the extension."""
         did_preview = self.did[:20] + "..." if len(self.did) > 20 else self.did
-        return (
-            f"DIDAgentExtension(did={did_preview}, "
-            f"author={self.author}, agent_name={self.agent_name})"
-        )
+        return f"DIDAgentExtension(did={did_preview}, author={self.author}, agent_name={self.agent_name})"
 
     @staticmethod
     def _sanitize_identifier(value: str) -> str:
@@ -202,11 +197,7 @@ class DIDAgentExtension:
         self._key_dir.mkdir(parents=True, exist_ok=True)
 
         # Skip generation if keys exist and we're not recreating
-        if (
-            not self.recreate_keys
-            and self.private_key_path.exists()
-            and self.public_key_path.exists()
-        ):
+        if not self.recreate_keys and self.private_key_path.exists() and self.public_key_path.exists():
             return {
                 "private_key_path": str(self.private_key_path),
                 "public_key_path": str(self.public_key_path),
@@ -241,9 +232,7 @@ class DIDAgentExtension:
             FileNotFoundError: If key file does not exist
         """
         if not key_path.exists():
-            raise FileNotFoundError(
-                f"{key_type.capitalize()} key file not found: {key_path}"
-            )
+            raise FileNotFoundError(f"{key_type.capitalize()} key file not found: {key_path}")
         return key_path.read_bytes()
 
     @cached_property
@@ -260,9 +249,7 @@ class DIDAgentExtension:
         private_key_pem = self._load_key_from_file(self.private_key_path, "private")
 
         try:
-            private_key = serialization.load_pem_private_key(
-                private_key_pem, password=self.key_password
-            )
+            private_key = serialization.load_pem_private_key(private_key_pem, password=self.key_password)
         except TypeError as e:
             if "Password was not given but private key is encrypted" in str(e):
                 raise ValueError(
@@ -347,26 +334,20 @@ class DIDAgentExtension:
 
         # Fallback to did:key format with multibase encoding
         public_key_bytes = self._get_public_key_raw_bytes()
-        encoded = base58.b58encode(public_key_bytes).decode(
-            app_settings.did.base58_encoding
-        )
+        encoded = base58.b58encode(public_key_bytes).decode(app_settings.did.base58_encoding)
         multibase_encoded = app_settings.did.multibase_prefix + encoded
         return f"did:{app_settings.did.method_key}:{multibase_encoded}"
 
     def _get_public_key_raw_bytes(self) -> bytes:
         """Get raw bytes of public key."""
-        return self.public_key.public_bytes(
-            encoding=serialization.Encoding.Raw, format=serialization.PublicFormat.Raw
-        )
+        return self.public_key.public_bytes(encoding=serialization.Encoding.Raw, format=serialization.PublicFormat.Raw)
 
     @cached_property
     def public_key_base58(self) -> str:
         """Get base58-encoded public key (cached)."""
-        return base58.b58encode(self._get_public_key_raw_bytes()).decode(
-            app_settings.did.base58_encoding
-        )
+        return base58.b58encode(self._get_public_key_raw_bytes()).decode(app_settings.did.base58_encoding)
 
-    def get_did_document(self) -> Dict[str, Any]:
+    def get_did_document(self) -> dict[str, Any]:
         """Generate a complete DID document with all agent information.
 
         Returns:
