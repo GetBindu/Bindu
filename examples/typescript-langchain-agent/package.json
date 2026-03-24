@@ -1,0 +1,18 @@
+{
+  "name": "typescript-langchain-agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "LangChain.js agent bindufied with Bindu TypeScript SDK",
+  "scripts": {
+    "start": "npx tsx index.ts"
+  },
+  "dependencies": {
+    "@bindu/sdk": "file:../../sdks/typescript",
+    "@langchain/openai": "^0.4.0",
+    "dotenv": "^16.4.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0"
+  }
+}

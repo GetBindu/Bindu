@@ -6,7 +6,7 @@ This module defines the configuration settings for the application using pydanti
 from pydantic import Field, computed_field, BaseModel, HttpUrl
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import AliasChoices
-from typing import Literal, Optional
+from typing import Literal
 
 
 class ProjectSettings(BaseSettings):
@@ -356,12 +356,18 @@ class AgentSettings(BaseSettings):
     # Maps JSON-RPC method names to task_manager handler method names
     method_handlers: dict[str, str] = {
         "message/send": "send_message",
+        "message/stream": "stream_message",
         "tasks/get": "get_task",
         "tasks/cancel": "cancel_task",
         "tasks/list": "list_tasks",
         "contexts/list": "list_contexts",
         "contexts/clear": "clear_context",
         "tasks/feedback": "task_feedback",
+        # Push-notification config methods (A2A protocol extension)
+        "tasks/pushNotification/set": "set_task_push_notification",
+        "tasks/pushNotification/get": "get_task_push_notification",
+        "tasks/pushNotification/list": "list_task_push_notifications",
+        "tasks/pushNotification/delete": "delete_task_push_notification",
     }
 
     # Task State Configuration (A2A Protocol)
@@ -384,6 +390,11 @@ class AgentSettings(BaseSettings):
             "rejected",  # Rejected by agent
         }
     )
+
+    # message/stream polling behavior
+    stream_poll_interval_seconds: float = 0.1
+    stream_missing_task_retries: int = 2
+    stream_missing_task_retry_delay_seconds: float = 0.05
 
     # Structured Response System Prompt
     # This prompt instructs LLMs to return structured JSON responses for state transitions
@@ -504,8 +515,11 @@ class AuthSettings(BaseSettings):
         "/agent/skills",
         "/agent/skills/*",
         "/health",
+        "/healthz",  # strict readiness probe for k8s
         "/metrics",
         "/payment-capture",  # x402 payment capture page (browser-based)
+        "/api/start-payment-session",  # x402 payment session creation
+        "/api/payment-status/*",  # x402 payment status check
     ]
 
     # Permission-based access control
@@ -533,7 +547,7 @@ class OAuthProviderConfig(BaseModel):
     client_secret: str = Field(..., description="OAuth client secret")
     auth_url: HttpUrl = Field(..., description="Authorization URL")
     token_url: HttpUrl = Field(..., description="Token URL")
-    userinfo_url: Optional[HttpUrl] = Field(None, description="User info URL")
+    userinfo_url: HttpUrl | None = Field(None, description="User info URL")
     scope: str = Field(..., description="Default scope")
     redirect_uri: HttpUrl = Field(..., description="Redirect URI")
 
@@ -601,6 +615,7 @@ class HydraSettings(BaseSettings):
         "/agent/skills",
         "/agent/skills/*",
         "/health",
+        "/healthz",  # strict readiness probe for k8s
         "/metrics",
         "/payment-capture",
         "/favicon.ico",
@@ -934,6 +949,73 @@ class SentrySettings(BaseSettings):
     debug: bool = False
 
 
+class GrpcSettings(BaseSettings):
+    """gRPC adapter configuration for language-agnostic agent support.
+
+    When enabled, the Bindu core starts a gRPC server alongside the HTTP server.
+    External SDKs (TypeScript, Kotlin, Rust) connect to this gRPC server to
+    register their agents and receive handler calls.
+
+    The gRPC server implements BinduService (registration) and acts as a client
+    to the SDK's AgentHandler service (task execution).
+
+    Architecture:
+        SDK (any language) --gRPC--> Bindu Core (:3774)
+            RegisterAgent(config, skills, callback_address)
+
+        Bindu Core --gRPC--> SDK (callback_address)
+            HandleMessages(messages) when a task arrives
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="GRPC__",
+        extra="allow",
+    )
+
+    # Enable/disable gRPC adapter server
+    enabled: bool = Field(
+        default=False,
+        description="Enable gRPC server for language-agnostic SDK support",
+    )
+
+    # gRPC server bind address
+    host: str = Field(
+        default="0.0.0.0",
+        description="Host to bind the gRPC server to",
+    )
+
+    # gRPC server port (separate from HTTP port 3773)
+    port: int = Field(
+        default=3774,
+        description="Port for the gRPC server (default: 3774)",
+    )
+
+    # Thread pool size for gRPC server
+    max_workers: int = Field(
+        default=10,
+        description="Maximum number of gRPC server worker threads",
+    )
+
+    # Maximum message size (4MB default)
+    max_message_length: int = Field(
+        default=4 * 1024 * 1024,
+        description="Maximum gRPC message size in bytes (default: 4MB)",
+    )
+
+    # Timeout for HandleMessages calls to SDK (seconds)
+    handler_timeout: float = Field(
+        default=30.0,
+        description="Timeout in seconds for calling SDK's HandleMessages",
+    )
+
+    # Health check interval for registered agents (seconds)
+    health_check_interval: int = Field(
+        default=30,
+        description="Interval in seconds for health checking registered agents",
+    )
+
+
 class Settings(BaseSettings):
     """Main settings class that aggregates all configuration components."""
 
@@ -961,6 +1043,7 @@ class Settings(BaseSettings):
     retry: RetrySettings = RetrySettings()
     negotiation: NegotiationSettings = NegotiationSettings()
     sentry: SentrySettings = SentrySettings()
+    grpc: GrpcSettings = GrpcSettings()
 
 
 app_settings = Settings()

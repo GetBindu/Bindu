@@ -1,0 +1,131 @@
+# Research Skill
+# Research and information retrieval powered by LangChain.js + GPT-4o
+
+# Basic Metadata
+id: research-v1
+name: research
+version: 1.0.0
+author: dev@example.com
+
+# Description
+description: |
+  Research and information retrieval capability powered by LangChain.js.
+  Uses GPT-4o to answer questions, summarize information, provide detailed
+  analysis, and generate structured research outputs. Supports multi-turn
+  conversations with context awareness.
+
+# Tags and Modes
+tags:
+  - research
+  - question-answering
+  - analysis
+  - summarization
+  - langchain
+
+input_modes:
+  - text/plain
+  - application/json
+
+output_modes:
+  - text/plain
+  - application/json
+
+# Example Queries
+examples:
+  - "What is the current state of quantum computing?"
+  - "Summarize the key points of machine learning"
+  - "Explain the A2A protocol in simple terms"
+  - "Compare React vs Vue for a new project"
+  - "What are the best practices for API design?"
+  - "Analyze the pros and cons of microservices architecture"
+
+# Detailed Capabilities
+capabilities_detail:
+  question_answering:
+    supported: true
+    description: "Direct question answering with contextual understanding"
+    features:
+      - multi_turn_conversation
+      - context_awareness
+      - follow_up_handling
+
+  summarization:
+    supported: true
+    description: "Summarize complex topics into clear, structured outputs"
+    output_formats:
+      - bullet_points
+      - paragraphs
+      - structured_json
+
+  analysis:
+    supported: true
+    description: "Comparative analysis, pros/cons, trade-off evaluation"
+
+  code_explanation:
+    supported: true
+    description: "Explain code concepts and architectural patterns"
+    languages:
+      - typescript
+      - python
+      - rust
+      - go
+      - java
+
+# Requirements
+requirements:
+  packages:
+    - "@langchain/openai>=0.4.0"
+  system:
+    - internet_connection
+  api_keys:
+    - OPENAI_API_KEY
+
+# Performance Metrics
+performance:
+  avg_processing_time_ms: 2000
+  max_concurrent_requests: 10
+  context_window_tokens: 128000
+  scalability: horizontal
+
+# Assessment fields for skill negotiation
+assessment:
+  keywords:
+    - research
+    - explain
+    - summarize
+    - analyze
+    - compare
+    - question
+    - answer
+    - what
+    - how
+    - why
+
+  specializations:
+    - domain: research
+      confidence_boost: 0.3
+    - domain: analysis
+      confidence_boost: 0.2
+    - domain: summarization
+      confidence_boost: 0.2
+
+  anti_patterns:
+    - "real-time data"
+    - "image generation"
+    - "pdf processing"
+    - "database query"
+    - "file upload"
+
+  complexity_indicators:
+    simple:
+      - "what is"
+      - "explain"
+      - "define"
+    medium:
+      - "compare"
+      - "summarize"
+      - "analyze"
+    complex:
+      - "research paper"
+      - "comprehensive analysis"
+      - "multi-domain synthesis"

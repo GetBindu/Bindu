@@ -26,12 +26,13 @@ class X402AgentExtension:
 
     def __init__(
         self,
-        amount: str,
+        amount: Optional[str] = None,
         token: str = "USDC",
         network: str = "base-sepolia",
         pay_to_address: str = "",
         required: bool = True,
         description: Optional[str] = None,
+        payment_options: Optional[list[dict[str, str]]] = None,
     ):
         """Initialize the X402 extension with payment configuration.
 
@@ -47,13 +48,54 @@ class X402AgentExtension:
         Raises:
             ValueError: If pay_to_address is empty when required=True
         """
-        if required and not pay_to_address:
-            raise ValueError("pay_to_address is required when payment is enabled")
+        # When multiple payment options are provided, derive primary fields from the
+        # first option for backward compatibility, but keep the full list on the
+        # instance for middleware/payment requirement construction.
+        self.payment_options: Optional[list[dict[str, str]]] = None
 
-        self.amount = amount
-        self.token = token
-        self.network = network
-        self.pay_to_address = pay_to_address
+        if payment_options:
+            if not isinstance(payment_options, list) or not payment_options:
+                raise ValueError("payment_options must be a non-empty list of dicts")
+
+            # Basic type check – detailed validation happens earlier in config flow
+            for entry in payment_options:
+                if not isinstance(entry, dict):
+                    raise ValueError(
+                        "payment_options must contain only dictionary entries"
+                    )
+
+            self.payment_options = payment_options
+
+            primary = payment_options[0]
+            primary_amount = primary.get("amount")
+            primary_token = primary.get("token", token)
+            primary_network = primary.get("network", network)
+            primary_pay_to = primary.get("pay_to_address", pay_to_address)
+
+            if required and not primary_pay_to:
+                raise ValueError(
+                    "pay_to_address is required for at least one execution_cost entry "
+                    "when payment is enabled"
+                )
+
+            self.amount = primary_amount
+            self.token = primary_token
+            self.network = primary_network
+            self.pay_to_address = primary_pay_to
+        else:
+            if amount is None:
+                raise ValueError(
+                    "amount is required when payment is enabled and no payment_options "
+                    "are provided"
+                )
+            if required and not pay_to_address:
+                raise ValueError("pay_to_address is required when payment is enabled")
+
+            self.amount = amount
+            self.token = token
+            self.network = network
+            self.pay_to_address = pay_to_address
+
         self.required = required
         self._description = description
 

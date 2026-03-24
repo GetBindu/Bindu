@@ -106,6 +106,60 @@ class DIDAgentExtension:
             f"author={self.author}, agent_name={self.agent_name})"
         )
 
+    @staticmethod
+    def _sanitize_identifier(value: str) -> str:
+        """Sanitize identifier for DID format.
+
+        Converts to lowercase and replaces special characters with underscores.
+
+        Args:
+            value: Identifier to sanitize (e.g., author name, agent name)
+
+        Returns:
+            Sanitized identifier safe for DID format
+        """
+        return value.lower().replace(" ", "_").replace("@", "_at_").replace(".", "_")
+
+    def validate_keys(self) -> None:
+        """Validate that the private and public keys form a valid pair.
+
+        Raises:
+            ValueError: If keys do not match or are invalid.
+        """
+        # Trigger loading of keys
+        priv = self.private_key
+        pub = self.public_key
+
+        # Sign a test message
+        message = b"bindu-key-validation"
+        signature = priv.sign(message)
+
+        try:
+            pub.verify(signature, message)
+        except Exception as e:
+            raise ValueError("Private key does not match public key") from e
+
+    def check_integrity(self) -> None:
+        """Perform full integrity check on DID configuration and keys.
+
+        This validates:
+        1. Key pair matching (private/public key consistency)
+        2. DID Document structure and syntax
+        3. Service endpoint consistency with configured URL
+
+        Raises:
+             ValueError: If any validation checks fail
+        """
+        self.validate_keys()
+
+        from bindu.extensions.did.validation import DIDValidation
+
+        doc = self.get_did_document()
+        is_valid, errors = DIDValidation.validate_did_document(doc)
+
+        if not is_valid:
+            raise ValueError(f"DID Document validation failed: {'; '.join(errors)}")
+
     def _generate_key_pair_data(self) -> tuple[bytes, bytes]:
         """Generate key pair and return PEM data.
 
@@ -287,18 +341,8 @@ class DIDAgentExtension:
         """
         # Use custom bindu format if author, agent_name, and agent_id provided
         if self.author and self.agent_name and self.agent_id:
-            sanitized_author = (
-                self.author.lower()
-                .replace(" ", "_")
-                .replace("@", "_at_")
-                .replace(".", "_")
-            )
-            sanitized_agent_name = (
-                self.agent_name.lower()
-                .replace(" ", "_")
-                .replace("@", "_at_")
-                .replace(".", "_")
-            )
+            sanitized_author = self._sanitize_identifier(self.author)
+            sanitized_agent_name = self._sanitize_identifier(self.agent_name)
             return f"did:{app_settings.did.method_bindu}:{sanitized_author}:{sanitized_agent_name}:{self.agent_id}"
 
         # Fallback to did:key format with multibase encoding

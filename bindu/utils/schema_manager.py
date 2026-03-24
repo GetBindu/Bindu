@@ -10,15 +10,11 @@ providing complete logical separation between different agents.
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncConnection
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from bindu.utils.logging import get_logger
-
-if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncEngine
 
 logger = get_logger("bindu.utils.schema_manager")
 
@@ -106,48 +102,6 @@ async def create_schema_if_not_exists(
     return True
 
 
-async def drop_schema_if_exists(
-    connection: AsyncConnection, schema_name: str, cascade: bool = False
-) -> bool:
-    """Drop a PostgreSQL schema if it exists.
-
-    Args:
-        connection: SQLAlchemy async connection
-        schema_name: Name of the schema to drop
-        cascade: If True, drop all objects in the schema as well
-
-    Returns:
-        True if schema was dropped, False if it didn't exist
-
-    Raises:
-        Exception: If schema drop fails
-
-    Warning:
-        This is a destructive operation. Use with caution!
-    """
-    # Check if schema exists
-    result = await connection.execute(
-        text(
-            "SELECT schema_name FROM information_schema.schemata "
-            "WHERE schema_name = :schema_name"
-        ),
-        {"schema_name": schema_name},
-    )
-    exists = result.first() is not None
-
-    if not exists:
-        logger.debug(f"Schema '{schema_name}' does not exist")
-        return False
-
-    # Drop schema
-    cascade_clause = "CASCADE" if cascade else "RESTRICT"
-    await connection.execute(text(f'DROP SCHEMA "{schema_name}" {cascade_clause}'))
-    await connection.commit()
-
-    logger.warning(f"Dropped schema '{schema_name}' ({cascade_clause})")
-    return True
-
-
 async def set_search_path(
     connection: AsyncConnection, schema_name: str, include_public: bool = False
 ) -> None:
@@ -173,50 +127,6 @@ async def set_search_path(
 
     await connection.execute(text(f"SET search_path TO {search_path}"))
     logger.debug(f"Set search_path to: {search_path}")
-
-
-async def list_schemas(connection: AsyncConnection) -> list[str]:
-    """List all non-system schemas in the database.
-
-    Args:
-        connection: SQLAlchemy async connection
-
-    Returns:
-        List of schema names (excluding pg_* and information_schema)
-    """
-    result = await connection.execute(
-        text(
-            "SELECT schema_name FROM information_schema.schemata "
-            "WHERE schema_name NOT LIKE 'pg_%' "
-            "AND schema_name != 'information_schema' "
-            "ORDER BY schema_name"
-        )
-    )
-    return [row[0] for row in result.fetchall()]
-
-
-async def get_tables_in_schema(
-    connection: AsyncConnection, schema_name: str
-) -> list[str]:
-    """Get all table names in a specific schema.
-
-    Args:
-        connection: SQLAlchemy async connection
-        schema_name: Schema to query
-
-    Returns:
-        List of table names in the schema
-    """
-    result = await connection.execute(
-        text(
-            "SELECT table_name FROM information_schema.tables "
-            "WHERE table_schema = :schema_name "
-            "AND table_type = 'BASE TABLE' "
-            "ORDER BY table_name"
-        ),
-        {"schema_name": schema_name},
-    )
-    return [row[0] for row in result.fetchall()]
 
 
 async def initialize_did_schema(

@@ -43,7 +43,9 @@ sequenceDiagram
 
 ## Configuration
 
-Add the `execution_cost` configuration to your agent config to enable payment gating:
+Add the `execution_cost` configuration to your agent config to enable payment gating.
+
+### Single payment option (existing behavior)
 
 ```python
 config = {
@@ -62,6 +64,37 @@ config = {
     }
 }
 ```
+
+### Multiple payment options (new behavior)
+
+You can now provide **multiple** payment options. The agent will advertise all options
+to the client, and any one of them can satisfy the requirement. For example:
+
+```python
+config = {
+    "author": "your.email@example.com",
+    "name": "paid_agent",
+    "description": "An agent that requires payment",
+    "deployment": {"url": "http://localhost:3773", "expose": True},
+    "execution_cost": [
+        {
+            "amount": "0.1",              # 0.1 USDC on Base
+            "token": "USDC",
+            "network": "base",
+            "pay_to_address": "0xYourWalletAddressHere",
+        },
+        {
+            "amount": "0.0001",           # 0.0001 ETH on Ethereum mainnet
+            "token": "ETH",
+            "network": "ethereum",
+            "pay_to_address": "0xYourWalletAddressHere",
+        },
+    ],
+}
+```
+
+In this configuration, callers can pay **either** 0.1 USDC on Base **or** 0.0001 ETH
+on Ethereum to access the protected methods.
 
 ## Setup for Testing
 

@@ -3,22 +3,72 @@
 from __future__ import annotations
 
 from time import time
+from typing import Any, cast
 from uuid import UUID
 
 from starlette.requests import Request
 from starlette.responses import Response
 
-from bindu.common.protocol.types import AgentCard, agent_card_ta
-from bindu.extensions.x402.extension import (
-    is_activation_requested as x402_is_requested,
-    add_activation_header as x402_add_header,
-)
+from bindu.common.protocol.types import AgentCard, AgentCapabilities, agent_card_ta
 from bindu.server.applications import BinduApplication
-from bindu.utils.request_utils import handle_endpoint_errors
 from bindu.utils.logging import get_logger
-from bindu.utils.request_utils import get_client_ip
+from .utils import create_response_with_x402, handle_endpoint_errors, get_client_ip
 
 logger = get_logger("bindu.server.endpoints.agent_card")
+
+# Constants
+A2A_PROTOCOL_VERSION = "1.0.0"
+DEFAULT_AGENT_DESCRIPTION = "An AI agent exposed as an A2A agent."
+DEFAULT_INPUT_MODES = ["text/plain", "application/json"]
+DEFAULT_OUTPUT_MODES = ["text/plain", "application/json"]
+
+
+def _serialize_extension(ext: Any) -> dict | None:
+    """Serialize an extension to AgentExtension dict format.
+
+    Args:
+        ext: Extension instance or dict
+
+    Returns:
+        Serialized extension dict or None if unknown type
+    """
+    # Check if it's a DIDAgentExtension instance
+    if hasattr(ext, "did") and hasattr(ext, "author"):
+        return {
+            "uri": f"did:{ext.did}" if not ext.did.startswith("did:") else ext.did,
+            "description": f"DID-based identity for {ext.agent_name or 'agent'}",
+            "required": False,
+            "params": {
+                "author": ext.author,
+                "agent_name": ext.agent_name,
+                "agent_id": ext.agent_id,
+            },
+        }
+    elif isinstance(ext, dict):
+        # Already in correct format
+        return ext
+    else:
+        # Unknown extension type
+        logger.warning(f"Unknown extension type: {type(ext)}, skipping")
+        return None
+
+
+def _serialize_extensions(capabilities: dict) -> None:
+    """Serialize extensions in capabilities dict in-place.
+
+    Args:
+        capabilities: Capabilities dict to modify
+    """
+    if "extensions" not in capabilities:
+        return
+
+    serializable_extensions = []
+    for ext in capabilities["extensions"]:
+        serialized = _serialize_extension(ext)
+        if serialized is not None:
+            serializable_extensions.append(serialized)
+
+    capabilities["extensions"] = serializable_extensions
 
 
 def create_agent_card(app: BinduApplication) -> AgentCard:
@@ -56,44 +106,18 @@ def create_agent_card(app: BinduApplication) -> AgentCard:
     agent_id = manifest.id if isinstance(manifest.id, UUID) else UUID(manifest.id)
 
     # Convert capabilities to serializable format
-    # Extensions need to be converted from class instances to AgentExtension dicts
     capabilities = dict(manifest.capabilities)
-    if "extensions" in capabilities:
-        serializable_extensions = []
-        for ext in capabilities["extensions"]:
-            # Check if it's a DIDAgentExtension instance
-            if hasattr(ext, "did") and hasattr(ext, "author"):
-                serializable_extensions.append(
-                    {
-                        "uri": f"did:{ext.did}"
-                        if not ext.did.startswith("did:")
-                        else ext.did,
-                        "description": f"DID-based identity for {ext.agent_name or 'agent'}",
-                        "required": False,
-                        "params": {
-                            "author": ext.author,
-                            "agent_name": ext.agent_name,
-                            "agent_id": ext.agent_id,
-                        },
-                    }
-                )
-            elif isinstance(ext, dict):
-                # Already in correct format
-                serializable_extensions.append(ext)
-            else:
-                # Try to convert other extension types
-                logger.warning(f"Unknown extension type: {type(ext)}, skipping")
-        capabilities["extensions"] = serializable_extensions
+    _serialize_extensions(capabilities)
 
     return AgentCard(
         id=agent_id,
         name=manifest.name,
-        description=manifest.description or "An AI agent exposed as an A2A agent.",
+        description=manifest.description or DEFAULT_AGENT_DESCRIPTION,
         url=app.url,
         version=app.version,
-        protocol_version="1.0.0",  # A2A protocol version
+        protocol_version=A2A_PROTOCOL_VERSION,
         skills=minimal_skills,
-        capabilities=capabilities,
+        capabilities=cast(AgentCapabilities, capabilities),
         kind=manifest.kind,
         num_history_sessions=manifest.num_history_sessions,
         extra_data=manifest.extra_data
@@ -103,8 +127,8 @@ def create_agent_card(app: BinduApplication) -> AgentCard:
         monitoring=manifest.monitoring,
         telemetry=manifest.telemetry,
         agent_trust=manifest.agent_trust,
-        default_input_modes=["text/plain", "application/json"],
-        default_output_modes=["text/plain", "application/json"],
+        default_input_modes=DEFAULT_INPUT_MODES,
+        default_output_modes=DEFAULT_OUTPUT_MODES,
     )
 
 
@@ -123,7 +147,9 @@ async def agent_card_endpoint(app: BinduApplication, request: Request) -> Respon
         app._agent_card_json_schema = agent_card_ta.dump_json(agent_card, by_alias=True)
 
     logger.debug(f"Serving agent card to {client_ip}")
-    resp = Response(content=app._agent_card_json_schema, media_type="application/json")
-    if x402_is_requested(request):
-        resp = x402_add_header(resp)
-    return resp
+    return create_response_with_x402(
+        request,
+        app._agent_card_json_schema,
+        response_type=Response,
+        media_type="application/json",
+    )

@@ -221,14 +221,15 @@ class AgentManifest:
         The agent card is the agent's public face - a standardized representation
         that other agents and clients can understand and interact with.
         """
-        return AgentCard(
+        # Build AgentCard with required fields using direct keyword arguments
+        # so type checker can verify all required fields are present
+        card: AgentCard = AgentCard(
             id=self.id,
             name=self.name,
             description=self.description,
             url=self.url,
             version=self.version,
             protocol_version=self.protocol_version,
-            documentation_url=self.documentation_url,
             agent_trust=self.agent_trust,
             capabilities=self.capabilities,
             skills=self.skills,
@@ -241,8 +242,13 @@ class AgentManifest:
             telemetry=self.telemetry,
             default_input_modes=["text/plain", "application/json"],
             default_output_modes=["text/plain", "application/json"],
-            negotiation=self.negotiation,
         )
+
+        # Add optional fields if they have values
+        if self.documentation_url is not None:
+            card["documentation_url"] = self.documentation_url
+
+        return card
 
     def __repr__(self) -> str:
         """Human-readable representation of the agent."""

@@ -47,7 +47,7 @@ agent = Agent(
 # Note: Infrastructure configs (storage, scheduler, sentry, API keys) are now
 # automatically loaded from environment variables. See .env.example for details.
 config = {
-    "author": "your.email@example.com",
+    "author": "raahul.dutta@example.com",
     "name": "joke_agent",
     "description": "A research assistant agent",
     "deployment": {

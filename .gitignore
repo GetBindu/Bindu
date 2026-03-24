@@ -187,6 +187,8 @@ examples/.bindu/public.pem
 examples/agent_swarm/.bindu/private.pem
 examples/agent_swarm/.bindu/public.pem
 
+examples/typescript-openai-agent/logs/
+
 # Pebbling keys (DID private/public keys)
 examples/.pebbling/*
 **/.pebbling/private.pem
@@ -203,3 +205,14 @@ bindu/penguin/.bindu/public.pem
 .bindu/
 
 postman/*
+node_modules/
+**/node_modules/
+
+# TypeScript SDK
+sdks/typescript/dist/
+sdks/typescript/node_modules/
+
+# Kotlin SDK
+sdks/kotlin/build/
+sdks/kotlin/.gradle/
+sdks/kotlin/bin/
