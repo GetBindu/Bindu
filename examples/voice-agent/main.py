@@ -12,6 +12,16 @@ Run:
 
 from __future__ import annotations
 
+
+
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+# Debug: print environment variables to verify .env loading
+print("VOICE__STT_PROVIDER:", os.environ.get("VOICE__STT_PROVIDER"))
+print("VOICE__STT_API_KEY:", os.environ.get("VOICE__STT_API_KEY"))
+
 from bindu.penguin.bindufy import bindufy
 
 
@@ -49,7 +59,7 @@ config = {
         "stt_language": "en",
         "tts_provider": "elevenlabs",
         "tts_voice_id": "21m00Tcm4TlvDq8ikWAM",
-        "tts_model": "eleven_turbo_v2_5",
+        "tts_model": "eleven_flash_v2_5",
         "sample_rate": 16000,
         "allow_interruptions": True,
         "vad_enabled": True,
