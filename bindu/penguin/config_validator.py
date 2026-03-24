@@ -9,7 +9,7 @@ import os
 from typing import Any, Dict
 
 from bindu import __version__
-from bindu.common.protocol.types import AgentCapabilities, Skill
+from bindu.common.protocol.types import AgentCapabilities, AgentTrustConfig, Skill, TrustLevel
 
 
 class ConfigValidator:
@@ -95,11 +95,17 @@ class ConfigValidator:
         if isinstance(config.get("capabilities"), dict):
             config["capabilities"] = AgentCapabilities(**config["capabilities"])
 
-        # TODO: Process agent_trust - IN DEVELOPMENT PHASE
-        # Agent trust validation is currently in development
-        # Keep as dict for now - TypedDict validation will be added in future
+        # Process agent_trust configuration - VALIDATED AND TYPE-CHECKED
         if isinstance(config.get("agent_trust"), dict):
-            pass  # Keep as dict, validation to be implemented
+            agent_trust_data = config["agent_trust"]
+            try:
+                # Validate against AgentTrustConfig schema
+                config["agent_trust"] = AgentTrustConfig(**agent_trust_data)
+            except TypeError as e:
+                raise ValueError(
+                    f"Invalid agent_trust configuration: {str(e)}. "
+                    f"Required fields: required_verification_level, max_agent_hierarchy_depth"
+                )
 
         # Process key password - support environment variable and prompt
         if config.get("key_password"):
@@ -160,6 +166,10 @@ class ConfigValidator:
         # Validate kind
         if config.get("kind") not in ["agent", "team", "workflow"]:
             raise ValueError("Field 'kind' must be one of: agent, team, workflow")
+
+        # Validate agent_trust configuration
+        if config.get("agent_trust") is not None:
+            cls._validate_agent_trust_config(config["agent_trust"])
 
     @classmethod
     def _validate_auth_config(cls, auth_config: Dict[str, Any]) -> None:
@@ -282,6 +292,101 @@ class ConfigValidator:
                     f"Invalid Hydra agent_client_prefix: '{prefix}'. "
                     f"Expected non-empty string"
                 )
+
+    @classmethod
+    def _validate_agent_trust_config(cls, trust_config: AgentTrustConfig) -> None:
+        """Validate agent trust configuration.
+
+        Args:
+            trust_config: Agent trust configuration (AgentTrustConfig TypedDict)
+
+        Raises:
+            ValueError: If trust configuration is invalid
+        """
+        if not isinstance(trust_config, dict):
+            raise ValueError("Field 'agent_trust' must be a dictionary")
+
+        # Validate required_verification_level
+        if "required_verification_level" in trust_config:
+            level = trust_config["required_verification_level"]
+            valid_levels = [
+                "admin",
+                "analyst",
+                "auditor",
+                "editor",
+                "guest",
+                "manager",
+                "operator",
+                "super_admin",
+                "support",
+                "viewer",
+            ]
+            if level not in valid_levels:
+                raise ValueError(
+                    f"Invalid required_verification_level: '{level}'. "
+                    f"Must be one of: {', '.join(valid_levels)}"
+                )
+
+        # Validate max_agent_hierarchy_depth
+        if "max_agent_hierarchy_depth" in trust_config:
+            depth = trust_config["max_agent_hierarchy_depth"]
+            if not isinstance(depth, int) or depth < 1:
+                raise ValueError(
+                    f"Invalid max_agent_hierarchy_depth: '{depth}'. "
+                    f"Must be a positive integer (>= 1)"
+                )
+
+        # Validate identity_provider if provided
+        if "identity_provider" in trust_config:
+            provider = trust_config["identity_provider"]
+            if provider not in ["hydra"]:
+                raise ValueError(
+                    f"Invalid identity_provider: '{provider}'. "
+                    f"Supported providers: hydra"
+                )
+
+        # Validate allowed_origins if provided
+        if "allowed_origins" in trust_config:
+            origins = trust_config["allowed_origins"]
+            if not isinstance(origins, list):
+                raise ValueError(
+                    "Field 'allowed_origins' must be a list of strings"
+                )
+            for origin in origins:
+                if not isinstance(origin, str):
+                    raise ValueError(
+                        f"Invalid origin in allowed_origins: {origin}. "
+                        f"All origins must be strings"
+                    )
+                # Validate URL format
+                if not (
+                    origin.startswith("http://")
+                    or origin.startswith("https://")
+                    or "*" in origin
+                ):
+                    raise ValueError(
+                        f"Invalid origin format: '{origin}'. "
+                        f"Expected http:// or https:// URL or wildcard pattern"
+                    )
+
+        # Validate trust_verification_required if provided
+        if "trust_verification_required" in trust_config:
+            if not isinstance(trust_config["trust_verification_required"], bool):
+                raise ValueError(
+                    "Field 'trust_verification_required' must be a boolean"
+                )
+
+        # Validate certificate_required if provided
+        if "certificate_required" in trust_config:
+            if not isinstance(trust_config["certificate_required"], bool):
+                raise ValueError(
+                    "Field 'certificate_required' must be a boolean"
+                )
+
+        # Validate metadata if provided
+        if "metadata" in trust_config:
+            if not isinstance(trust_config["metadata"], dict):
+                raise ValueError("Field 'metadata' must be a dictionary")
 
     @classmethod
     def _process_oltp_config(cls, config: Dict[str, Any]) -> None:
