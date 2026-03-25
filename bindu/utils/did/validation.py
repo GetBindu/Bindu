@@ -5,9 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 
-def validate_did_extension(
-    did_extension: Any | None, required_attr: str
-) -> tuple[bool, str | None]:
+def validate_did_extension(did_extension: Any | None, required_attr: str) -> tuple[bool, str | None]:
     """Validate DID extension has required attribute.
 
     Args:

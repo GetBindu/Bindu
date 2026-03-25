@@ -1395,9 +1395,7 @@ ContentTypeNotSupportedError = JSONRPCError[
 ]
 InvalidAgentResponseError = JSONRPCError[
     Literal[-32006],
-    Literal[
-        "The agent returned an invalid or malformed response. This may indicate an agent implementation issue."
-    ],
+    Literal["The agent returned an invalid or malformed response. This may indicate an agent implementation issue."],
 ]
 AuthenticatedExtendedCardNotConfiguredError = JSONRPCError[
     Literal[-32007],
@@ -1427,15 +1425,11 @@ AuthenticationRequiredError = JSONRPCError[
 ]
 InvalidTokenError = JSONRPCError[
     Literal[-32010],
-    Literal[
-        "The provided authentication token is invalid or malformed. Verify token format and signature."
-    ],
+    Literal["The provided authentication token is invalid or malformed. Verify token format and signature."],
 ]
 TokenExpiredError = JSONRPCError[
     Literal[-32011],
-    Literal[
-        "The authentication token has expired. Request a new token from your authentication provider."
-    ],
+    Literal["The authentication token has expired. Request a new token from your authentication provider."],
 ]
 InvalidTokenSignatureError = JSONRPCError[
     Literal[-32012],
@@ -1472,10 +1466,7 @@ ContextNotCancelableError = JSONRPCError[
 # Bindu-specific skill management extensions
 SkillNotFoundError = JSONRPCError[
     Literal[-32030],
-    Literal[
-        "The specified skill ID was not found. "
-        "Check available skills: GET /agent/skills"
-    ],
+    Literal["The specified skill ID was not found. Check available skills: GET /agent/skills"],
 ]
 
 # -----------------------------------------------------------------------------
@@ -1483,9 +1474,7 @@ SkillNotFoundError = JSONRPCError[
 # -----------------------------------------------------------------------------
 
 SendMessageRequest = JSONRPCRequest[Literal["message/send"], MessageSendParams]
-SendMessageResponse = JSONRPCResponse[
-    Union[Task, Message], Union[TaskImmutableError, JSONRPCError[Any, Any]]
-]
+SendMessageResponse = JSONRPCResponse[Union[Task, Message], Union[TaskImmutableError, JSONRPCError[Any, Any]]]
 
 StreamMessageRequest = JSONRPCRequest[Literal["message/stream"], MessageSendParams]
 StreamMessageResponse = JSONRPCResponse[Union[Task, Message], JSONRPCError[Any, Any]]
@@ -1494,53 +1483,33 @@ GetTaskRequest = JSONRPCRequest[Literal["tasks/get"], TaskQueryParams]
 GetTaskResponse = JSONRPCResponse[Task, TaskNotFoundError]
 
 CancelTaskRequest = JSONRPCRequest[Literal["tasks/cancel"], TaskIdParams]
-CancelTaskResponse = JSONRPCResponse[
-    Task, Union[TaskNotCancelableError, TaskNotFoundError]
-]
+CancelTaskResponse = JSONRPCResponse[Task, Union[TaskNotCancelableError, TaskNotFoundError]]
 
 ListTasksRequest = JSONRPCRequest[Literal["tasks/list"], ListTasksParams]
-ListTasksResponse = JSONRPCResponse[
-    List[Task], Union[TaskNotFoundError, TaskNotCancelableError]
-]
+ListTasksResponse = JSONRPCResponse[List[Task], Union[TaskNotFoundError, TaskNotCancelableError]]
 
 TaskFeedbackRequest = JSONRPCRequest[Literal["tasks/feedback"], TaskFeedbackParams]
 TaskFeedbackResponse = JSONRPCResponse[Dict[str, str], TaskNotFoundError]
 
 ListContextsRequest = JSONRPCRequest[Literal["contexts/list"], ListContextsParams]
-ListContextsResponse = JSONRPCResponse[
-    List[Context], Union[ContextNotFoundError, ContextNotCancelableError]
-]
+ListContextsResponse = JSONRPCResponse[List[Context], Union[ContextNotFoundError, ContextNotCancelableError]]
 
 ClearContextsRequest = JSONRPCRequest[Literal["contexts/clear"], ContextIdParams]
-ClearContextsResponse = JSONRPCResponse[
-    Context, Union[ContextNotFoundError, ContextNotCancelableError]
-]
+ClearContextsResponse = JSONRPCResponse[Context, Union[ContextNotFoundError, ContextNotCancelableError]]
 
-SetTaskPushNotificationRequest = JSONRPCRequest[
-    Literal["tasks/pushNotification/set"], TaskPushNotificationConfig
-]
-SetTaskPushNotificationResponse = JSONRPCResponse[
-    TaskPushNotificationConfig, PushNotificationNotSupportedError
-]
+SetTaskPushNotificationRequest = JSONRPCRequest[Literal["tasks/pushNotification/set"], TaskPushNotificationConfig]
+SetTaskPushNotificationResponse = JSONRPCResponse[TaskPushNotificationConfig, PushNotificationNotSupportedError]
 
-GetTaskPushNotificationRequest = JSONRPCRequest[
-    Literal["tasks/pushNotification/get"], TaskIdParams
-]
-GetTaskPushNotificationResponse = JSONRPCResponse[
-    TaskPushNotificationConfig, PushNotificationNotSupportedError
-]
+GetTaskPushNotificationRequest = JSONRPCRequest[Literal["tasks/pushNotification/get"], TaskIdParams]
+GetTaskPushNotificationResponse = JSONRPCResponse[TaskPushNotificationConfig, PushNotificationNotSupportedError]
 
 ResubscribeTaskRequest = JSONRPCRequest[Literal["tasks/resubscribe"], TaskIdParams]
-ResubscribeTaskResponse = JSONRPCResponse[
-    Task, Union[TaskNotCancelableError, TaskNotFoundError]
-]
+ResubscribeTaskResponse = JSONRPCResponse[Task, Union[TaskNotCancelableError, TaskNotFoundError]]
 
 ListTaskPushNotificationConfigRequest = JSONRPCRequest[
     Literal["tasks/pushNotificationConfig/list"], ListTaskPushNotificationConfigParams
 ]
-ListTaskPushNotificationConfigResponse = JSONRPCResponse[
-    TaskPushNotificationConfig, PushNotificationNotSupportedError
-]
+ListTaskPushNotificationConfigResponse = JSONRPCResponse[TaskPushNotificationConfig, PushNotificationNotSupportedError]
 
 DeleteTaskPushNotificationConfigRequest = JSONRPCRequest[
     Literal["tasks/pushNotificationConfig/delete"],
@@ -1587,18 +1556,10 @@ A2AResponse: TypeAlias = Union[
 
 a2a_request_ta: TypeAdapter[A2ARequest] = TypeAdapter(A2ARequest)
 a2a_response_ta: TypeAdapter[A2AResponse] = TypeAdapter(A2AResponse)
-send_message_request_ta: TypeAdapter[SendMessageRequest] = TypeAdapter(
-    SendMessageRequest
-)
-send_message_response_ta: TypeAdapter[SendMessageResponse] = TypeAdapter(
-    SendMessageResponse
-)
-stream_message_request_ta: TypeAdapter[StreamMessageRequest] = TypeAdapter(
-    StreamMessageRequest
-)
-stream_message_response_ta: TypeAdapter[StreamMessageResponse] = TypeAdapter(
-    StreamMessageResponse
-)
+send_message_request_ta: TypeAdapter[SendMessageRequest] = TypeAdapter(SendMessageRequest)
+send_message_response_ta: TypeAdapter[SendMessageResponse] = TypeAdapter(SendMessageResponse)
+stream_message_request_ta: TypeAdapter[StreamMessageRequest] = TypeAdapter(StreamMessageRequest)
+stream_message_response_ta: TypeAdapter[StreamMessageResponse] = TypeAdapter(StreamMessageResponse)
 
 
 # -----------------------------------------------------------------------------

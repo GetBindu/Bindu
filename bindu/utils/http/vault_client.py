@@ -94,8 +94,7 @@ class VaultClient:
             if response.status >= 400:
                 error_text = await response.text()
                 logger.error(
-                    f"Vault request failed: {method} {path} - "
-                    f"Status: {response.status} - Response: {error_text}"
+                    f"Vault request failed: {method} {path} - Status: {response.status} - Response: {error_text}"
                 )
                 return None
 
@@ -201,14 +200,10 @@ class VaultClient:
 
         result = await self._make_request("POST", path, data)
         if result:
-            logger.info(
-                f"✅ Hydra credentials stored in Vault for DID: {credentials.client_id}"
-            )
+            logger.info(f"✅ Hydra credentials stored in Vault for DID: {credentials.client_id}")
             return True
         else:
-            logger.error(
-                f"Failed to store Hydra credentials in Vault for DID: {credentials.client_id}"
-            )
+            logger.error(f"Failed to store Hydra credentials in Vault for DID: {credentials.client_id}")
             return False
 
     async def get_hydra_credentials(
@@ -281,9 +276,7 @@ class VaultClient:
             logger.info(f"✅ Hydra credentials deleted from Vault for DID: {did}")
             return True
         else:
-            logger.error(
-                f"Failed to delete Hydra credentials from Vault for DID: {did}"
-            )
+            logger.error(f"Failed to delete Hydra credentials from Vault for DID: {did}")
             return False
 
 

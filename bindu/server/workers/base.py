@@ -138,9 +138,7 @@ class Worker(ABC):
                     if handler:
                         await handler(task_operation["params"])
                     else:
-                        logger.warning(
-                            f"Unknown operation: {task_operation['operation']}"
-                        )
+                        logger.warning(f"Unknown operation: {task_operation['operation']}")
         except Exception as e:  # noqa: BLE001 - intentionally broad: any unhandled worker failure must mark the task as failed
             # Update task status to failed on any exception
             task_id = self._normalize_uuid(task_operation["params"]["task_id"])

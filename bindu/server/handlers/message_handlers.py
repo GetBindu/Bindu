@@ -112,9 +112,7 @@ class MessageHandlers:
             "error": str(error),
         }
 
-    async def _submit_and_schedule_task(
-        self, request_params: dict[str, Any]
-    ) -> tuple[Task, UUID]:
+    async def _submit_and_schedule_task(self, request_params: dict[str, Any]) -> tuple[Task, UUID]:
         """Submit task to storage and schedule it with shared send/stream logic."""
         message = request_params["message"]
         context_id = self.context_id_parser(message.get("context_id"))
@@ -134,15 +132,10 @@ class MessageHandlers:
         push_config = config.get("push_notification_config")
         if push_config and self.push_manager:
             is_long_running = config.get("long_running", False)
-            await self.push_manager.register_push_config(
-                task["id"], push_config, persist=is_long_running
-            )
+            await self.push_manager.register_push_config(task["id"], push_config, persist=is_long_running)
 
         message_metadata = message.get("metadata", {})
-        if (
-            isinstance(message_metadata, dict)
-            and "_payment_context" in message_metadata
-        ):
+        if isinstance(message_metadata, dict) and "_payment_context" in message_metadata:
             # Move payment context to scheduler params and strip it from the
             # message metadata so it is not persisted or forwarded to the agent
             scheduler_params["payment_context"] = message_metadata["_payment_context"]
@@ -294,12 +287,8 @@ class MessageHandlers:
                 logger.debug(f"Streaming client disconnected for task {task['id']}")
                 return
             except Exception as e:
-                logger.error(
-                    f"Unhandled stream error for task {task['id']}: {e}", exc_info=True
-                )
-                error_event = await self._handle_stream_error(
-                    task, context_id, e, terminal_states
-                )
+                logger.error(f"Unhandled stream error for task {task['id']}: {e}", exc_info=True)
+                error_event = await self._handle_stream_error(task, context_id, e, terminal_states)
                 yield self._sse_event(error_event)
 
         return StreamingResponse(

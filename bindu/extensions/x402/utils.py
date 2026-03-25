@@ -17,9 +17,7 @@ def build_payment_completed_metadata(receipt: dict) -> dict[str, Any]:
     }
 
 
-def build_payment_failed_metadata(
-    error: str, receipt: Optional[dict] = None
-) -> dict[str, Any]:
+def build_payment_failed_metadata(error: str, receipt: Optional[dict] = None) -> dict[str, Any]:
     """Build metadata dict for payment-failed state."""
     md: dict[str, Any] = {
         app_settings.x402.meta_status_key: app_settings.x402.status_failed,

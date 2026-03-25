@@ -63,9 +63,7 @@ def sanitize_did_for_schema(did: str) -> str:
     return final_schema_name
 
 
-async def create_schema_if_not_exists(
-    connection: AsyncConnection, schema_name: str
-) -> bool:
+async def create_schema_if_not_exists(connection: AsyncConnection, schema_name: str) -> bool:
     """Create a PostgreSQL schema if it doesn't already exist.
 
     Args:
@@ -80,10 +78,7 @@ async def create_schema_if_not_exists(
     """
     # Check if schema exists
     result = await connection.execute(
-        text(
-            "SELECT schema_name FROM information_schema.schemata "
-            "WHERE schema_name = :schema_name"
-        ),
+        text("SELECT schema_name FROM information_schema.schemata WHERE schema_name = :schema_name"),
         {"schema_name": schema_name},
     )
     exists = result.first() is not None
@@ -102,9 +97,7 @@ async def create_schema_if_not_exists(
     return True
 
 
-async def set_search_path(
-    connection: AsyncConnection, schema_name: str, include_public: bool = False
-) -> None:
+async def set_search_path(connection: AsyncConnection, schema_name: str, include_public: bool = False) -> None:
     """Set the search_path for the current connection to use a specific schema.
 
     This makes all queries use the specified schema by default without
@@ -129,9 +122,7 @@ async def set_search_path(
     logger.debug(f"Set search_path to: {search_path}")
 
 
-async def initialize_did_schema(
-    engine: AsyncEngine, schema_name: str, create_tables: bool = True
-) -> str:
+async def initialize_did_schema(engine: AsyncEngine, schema_name: str, create_tables: bool = True) -> str:
     """Initialize a complete schema for a DID with all necessary tables.
 
     This is the main entry point for setting up a new DID's database schema.
@@ -171,9 +162,7 @@ async def initialize_did_schema(
         if created:
             logger.info(f"Initialized schema '{schema_name}' with all tables")
         else:
-            logger.info(
-                f"Schema '{schema_name}' already exists, ensured tables are created"
-            )
+            logger.info(f"Schema '{schema_name}' already exists, ensured tables are created")
     elif created:
         logger.info(f"Created empty schema '{schema_name}'")
     return schema_name

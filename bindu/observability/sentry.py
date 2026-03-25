@@ -185,9 +185,7 @@ def _before_send(event: dict[str, Any], hint: dict[str, Any]) -> dict[str, Any] 
     return event
 
 
-def _before_send_transaction(
-    event: dict[str, Any], hint: dict[str, Any]
-) -> dict[str, Any] | None:
+def _before_send_transaction(event: dict[str, Any], hint: dict[str, Any]) -> dict[str, Any] | None:
     """Filter transactions before sending to Sentry.
 
     This hook is called before every performance transaction is sent to Sentry.

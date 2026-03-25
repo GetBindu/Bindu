@@ -48,9 +48,7 @@ from bindu.utils.logging import get_logger
 logger = get_logger("bindu.server.applications")
 
 # Constants
-UNKNOWN_AUTH_PROVIDER_ERROR = (
-    "Unknown authentication provider: '{provider}'. Supported providers: {supported}"
-)
+UNKNOWN_AUTH_PROVIDER_ERROR = "Unknown authentication provider: '{provider}'. Supported providers: {supported}"
 TASKMANAGER_NOT_INITIALIZED_ERROR = "TaskManager was not properly initialized."
 
 
@@ -153,9 +151,7 @@ class BinduApplication(Starlette):
 
         # Initialize payment session manager and payment config if x402 enabled
         if x402_ext and payment_requirements_for_middleware:
-            self._setup_payment_session_manager(
-                manifest, payment_requirements_for_middleware
-            )
+            self._setup_payment_session_manager(manifest, payment_requirements_for_middleware)
 
         # In-memory not a good practice, but for development purposes
         # in production, use a database or redis
@@ -199,9 +195,7 @@ class BinduApplication(Starlette):
         self._add_route("/", agent_run_endpoint, ["POST"], with_app=True)
 
         # DID endpoints
-        self._add_route(
-            "/did/resolve", did_resolve_endpoint, ["GET", "POST"], with_app=True
-        )
+        self._add_route("/did/resolve", did_resolve_endpoint, ["GET", "POST"], with_app=True)
 
         # Skills endpoints
         self._add_route(
@@ -306,14 +300,9 @@ class BinduApplication(Starlette):
 
             # Override settings if storage_config is provided
             if self._storage_config:
-                if (
-                    self._storage_config.type == "postgres"
-                    and self._storage_config.database_url
-                ):
+                if self._storage_config.type == "postgres" and self._storage_config.database_url:
                     app_settings.storage.backend = "postgres"
-                    app_settings.storage.postgres_url = (
-                        self._storage_config.database_url
-                    )
+                    app_settings.storage.postgres_url = self._storage_config.database_url
                     app_settings.storage.run_migrations_on_startup = getattr(
                         self._storage_config, "run_migrations_on_startup", False
                     )
@@ -371,9 +360,7 @@ class BinduApplication(Starlette):
             # Start TaskManager
             if manifest:
                 logger.info("🔧 Starting TaskManager...")
-                task_manager = TaskManager(
-                    scheduler=scheduler, storage=storage, manifest=manifest
-                )
+                task_manager = TaskManager(scheduler=scheduler, storage=storage, manifest=manifest)
                 async with task_manager:
                     app.task_manager = task_manager
                     logger.info("✅ TaskManager started")
@@ -506,9 +493,7 @@ class BinduApplication(Starlette):
 
             # Type narrowing: amount should be present in payment options
             assert amount is not None, "Payment amount is required"
-            max_amount_required, asset_address, eip712_domain = (
-                process_price_to_atomic_amount(amount, network)
-            )
+            max_amount_required, asset_address, eip712_domain = process_price_to_atomic_amount(amount, network)
 
             payment_requirements.append(
                 PaymentRequirements(
@@ -580,10 +565,7 @@ class BinduApplication(Starlette):
         if x402_ext and payment_requirements:
             from .middleware import X402Middleware
 
-            logger.info(
-                f"X402 payment middleware enabled: "
-                f"{x402_ext.amount} {x402_ext.token} on {x402_ext.network})"
-            )
+            logger.info(f"X402 payment middleware enabled: {x402_ext.amount} {x402_ext.token} on {x402_ext.network})")
 
             facilitator_config = {"url": app_settings.x402.facilitator_url}
             x402_middleware = Middleware(
@@ -633,9 +615,7 @@ class BinduApplication(Starlette):
             return Middleware(HydraMiddleware, auth_config=app_settings.hydra)  # type: ignore[arg-type]
         else:
             logger.error(f"Unknown authentication provider: {provider}")
-            raise ValueError(
-                UNKNOWN_AUTH_PROVIDER_ERROR.format(provider=provider, supported="hydra")
-            )
+            raise ValueError(UNKNOWN_AUTH_PROVIDER_ERROR.format(provider=provider, supported="hydra"))
 
     def _setup_payment_session_manager(
         self,
@@ -675,9 +655,7 @@ class BinduApplication(Starlette):
         gate so that Kubernetes (and other orchestrators) can probe the pod
         while storage/scheduler initialisation is still in progress.
         """
-        if scope["type"] == "http" and (
-            self.task_manager is None or not self.task_manager.is_running
-        ):
+        if scope["type"] == "http" and (self.task_manager is None or not self.task_manager.is_running):
             path = scope.get("path", "")
             # Allow observability and probe endpoints through before full startup
             if path not in ("/health", "/healthz", "/metrics"):

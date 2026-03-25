@@ -159,15 +159,11 @@ class BinduServiceImpl(agent_handler_pb2_grpc.BinduServiceServicer):
         except json.JSONDecodeError as e:
             error_msg = f"Invalid config_json: {e}"
             logger.error(error_msg)
-            return agent_handler_pb2.RegisterAgentResponse(
-                success=False, error=error_msg
-            )
+            return agent_handler_pb2.RegisterAgentResponse(success=False, error=error_msg)
         except Exception as e:
             error_msg = f"Registration failed: {e}"
             logger.error(error_msg, exc_info=True)
-            return agent_handler_pb2.RegisterAgentResponse(
-                success=False, error=error_msg
-            )
+            return agent_handler_pb2.RegisterAgentResponse(success=False, error=error_msg)
 
     def Heartbeat(
         self,

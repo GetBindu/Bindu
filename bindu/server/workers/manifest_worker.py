@@ -57,9 +57,7 @@ logger = get_logger("bindu.server.workers.manifest_worker")
 
 # Constants
 TASK_NOT_FOUND_ERROR = "Task {task_id} not found"
-INVALID_TERMINAL_STATE_ERROR = (
-    "Invalid terminal state '{state}'. Must be one of: {terminal_states}"
-)
+INVALID_TERMINAL_STATE_ERROR = "Invalid terminal state '{state}'. Must be one of: {terminal_states}"
 
 
 @dataclass
@@ -88,9 +86,7 @@ class ManifestWorker(Worker):
     manifest: AgentManifest
     """The agent manifest containing execution logic and DID identity."""
 
-    lifecycle_notifier: Optional[Callable[[UUID, UUID, str, bool], Any]] = field(
-        default=None
-    )
+    lifecycle_notifier: Optional[Callable[[UUID, UUID, str, bool], Any]] = field(default=None)
     """Optional callback for task lifecycle notifications (task_id, context_id, state, final)."""
 
     @retry_worker_operation()
@@ -138,17 +134,12 @@ class ManifestWorker(Worker):
 
         try:
             # Step 3: Execute manifest with system prompt (if enabled)
-            if (
-                self.manifest.enable_system_message
-                and app_settings.agent.enable_structured_responses
-            ):
+            if self.manifest.enable_system_message and app_settings.agent.enable_structured_responses:
                 # Inject structured response system prompt as first message
                 system_prompt = app_settings.agent.structured_response_system_prompt
                 if system_prompt:
                     # Create new list to avoid mutating original message_history
-                    message_history = [{"role": "system", "content": system_prompt}] + (
-                        message_history or []
-                    )
+                    message_history = [{"role": "system", "content": system_prompt}] + (message_history or [])
 
             # Step 3.1: Execute agent with tracing
             with tracer.start_as_current_span("agent.execute") as agent_span:
@@ -171,18 +162,14 @@ class ManifestWorker(Worker):
                     raw_results = self.manifest.run(message_history or [])
 
                     # Handle generator/async generator responses
-                    collected_results = await ResultProcessor.collect_results(
-                        raw_results
-                    )
+                    collected_results = await ResultProcessor.collect_results(raw_results)
 
                     # Normalize result to extract final response (intelligent extraction)
                     results = ResultProcessor.normalize_result(collected_results)
 
                     # Record successful execution
                     execution_time = time.time() - start_time
-                    agent_span.set_attribute(
-                        "bindu.agent.execution_time", execution_time
-                    )
+                    agent_span.set_attribute("bindu.agent.execution_time", execution_time)
                     agent_span.set_status(Status(StatusCode.OK))
 
                 except Exception as agent_error:
@@ -202,9 +189,7 @@ class ManifestWorker(Worker):
             structured_response = ResponseDetector.parse_structured_response(results)
 
             # Determine task state based on response
-            state, message_content = ResponseDetector.determine_task_state(
-                results, structured_response
-            )
+            state, message_content = ResponseDetector.determine_task_state(results, structured_response)
 
             if state in ("input-required", "auth-required"):
                 # Hybrid Pattern: Return Message only, keep task open
@@ -215,16 +200,12 @@ class ManifestWorker(Worker):
                 # Hybrid Pattern: Task complete - generate Message + Artifacts
                 # Add span event for state transition
                 self._add_state_change_event(from_state="working", to_state=state)
-                await self._handle_terminal_state(
-                    task, results, state, payment_context=payment_context
-                )
+                await self._handle_terminal_state(task, results, state, payment_context=payment_context)
 
         except Exception as e:
             # Handle task failure with error message
             # Add span event for failure
-            self._add_state_change_event(
-                from_state="working", to_state="failed", error=str(e)
-            )
+            self._add_state_change_event(from_state="working", to_state="failed", error=str(e))
             await self._handle_task_failure(task, str(e))
             raise
         return
@@ -239,13 +220,9 @@ class ManifestWorker(Worker):
         task = await self.storage.load_task(params["task_id"])
         if task:
             # Add span event for cancellation
-            self._add_state_change_event(
-                from_state=task["status"]["state"], to_state="canceled"
-            )
+            self._add_state_change_event(from_state=task["status"]["state"], to_state="canceled")
             await self.storage.update_task(params["task_id"], state="canceled")
-            await self._notify_lifecycle(
-                params["task_id"], task["context_id"], "canceled", True
-            )
+            await self._notify_lifecycle(params["task_id"], task["context_id"], "canceled", True)
 
     def build_message_history(self, history: list[Message]) -> list[dict[str, str]]:
         """Convert A2A protocol messages to chat format for manifest execution.
@@ -314,9 +291,7 @@ class ManifestWorker(Worker):
         elif self.manifest.enable_context_based_history:
             # Strategy 2: Context-based history (implicit continuation)
             # Only enabled if configured in manifest
-            tasks_by_context = await self.storage.list_tasks_by_context(
-                task["context_id"]
-            )
+            tasks_by_context = await self.storage.list_tasks_by_context(task["context_id"])
             previous_tasks = [t for t in tasks_by_context if t["id"] != task["id"]]
 
             all_previous_messages: list[Message] = []
@@ -388,9 +363,7 @@ class ManifestWorker(Worker):
     # Message Normalization
     # -------------------------------------------------------------------------
 
-    async def _handle_intermediate_state(
-        self, task: Task, state: TaskState, message_content: Any
-    ) -> None:
+    async def _handle_intermediate_state(self, task: Task, state: TaskState, message_content: Any) -> None:
         """Handle intermediate task states (input-required, auth-required).
 
         A2A Protocol Compliance:
@@ -409,16 +382,12 @@ class ManifestWorker(Worker):
             if isinstance(message_content, dict) and message_content.get("prompt")
             else message_content
         )
-        agent_messages = MessageConverter.to_protocol_messages(
-            content, task["id"], task["context_id"]
-        )
+        agent_messages = MessageConverter.to_protocol_messages(content, task["id"], task["context_id"])
 
         metadata: dict[str, Any] | None = None
 
         # Update task with state and append agent messages to history
-        await self.storage.update_task(
-            task["id"], state=state, new_messages=agent_messages, metadata=metadata
-        )
+        await self.storage.update_task(task["id"], state=state, new_messages=agent_messages, metadata=metadata)
         await self._notify_lifecycle(task["id"], task["context_id"], state, False)
 
     async def _handle_terminal_state(
@@ -458,17 +427,13 @@ class ManifestWorker(Worker):
         # Validate that state is terminal
         if state not in app_settings.agent.terminal_states:
             raise ValueError(
-                INVALID_TERMINAL_STATE_ERROR.format(
-                    state=state, terminal_states=app_settings.agent.terminal_states
-                )
+                INVALID_TERMINAL_STATE_ERROR.format(state=state, terminal_states=app_settings.agent.terminal_states)
             )
 
         # Handle different terminal states
         if state == "completed":
             # Success: Add both Message and Artifacts
-            agent_messages = MessageConverter.to_protocol_messages(
-                results, task["id"], task["context_id"]
-            )
+            agent_messages = MessageConverter.to_protocol_messages(results, task["id"], task["context_id"])
             artifacts = self.build_artifacts(results)
 
             # Handle payment settlement if payment context is available
@@ -499,9 +464,7 @@ class ManifestWorker(Worker):
 
         elif state in ("failed", "rejected"):
             # Failure/Rejection: Message only (explanation), NO artifacts
-            error_message = MessageConverter.to_protocol_messages(
-                results, task["id"], task["context_id"]
-            )
+            error_message = MessageConverter.to_protocol_messages(results, task["id"], task["context_id"])
             await self.storage.update_task(
                 task["id"],
                 state=state,
@@ -531,9 +494,7 @@ class ManifestWorker(Worker):
         error_message = MessageConverter.to_protocol_messages(
             f"Task execution failed: {error}", task["id"], task["context_id"]
         )
-        await self.storage.update_task(
-            task["id"], state="failed", new_messages=error_message
-        )
+        await self.storage.update_task(task["id"], state="failed", new_messages=error_message)
         await self._notify_lifecycle(task["id"], task["context_id"], "failed", True)
 
     async def _settle_payment(self, payment_context: dict[str, Any]) -> dict[str, Any]:
@@ -559,20 +520,14 @@ class ManifestWorker(Worker):
 
             # Convert dicts back to Pydantic models (they were serialized in a2a_protocol)
             payment_payload = PaymentPayload.model_validate(payment_payload_dict)
-            payment_requirements = PaymentRequirements.model_validate(
-                payment_requirements_dict
-            )
+            payment_requirements = PaymentRequirements.model_validate(payment_requirements_dict)
 
             # Initialize facilitator client
-            facilitator = FacilitatorClient(
-                config=FacilitatorConfig(url=app_settings.x402.facilitator_url)
-            )
+            facilitator = FacilitatorClient(config=FacilitatorConfig(url=app_settings.x402.facilitator_url))
 
             # Settle payment
             logger.info("Settling payment for completed task")
-            settle_response = await facilitator.settle(
-                payment_payload, payment_requirements
-            )
+            settle_response = await facilitator.settle(payment_payload, payment_requirements)
 
             if settle_response.success:
                 logger.info("Payment settled successfully")
@@ -595,9 +550,7 @@ class ManifestWorker(Worker):
                 app_settings.x402.meta_error_key: str(e),
             }
 
-    async def _notify_artifact(
-        self, task_id: UUID, context_id: UUID, artifact: Artifact
-    ) -> None:
+    async def _notify_artifact(self, task_id: UUID, context_id: UUID, artifact: Artifact) -> None:
         """Notify about artifact generation if push manager is available.
 
         Args:
@@ -617,9 +570,7 @@ class ManifestWorker(Worker):
                 # Log but don't disrupt task execution on notification errors
                 self._log_notification_error("Artifact", task_id, context_id, e)
 
-    async def _notify_lifecycle(
-        self, task_id: UUID, context_id: UUID, state: str, final: bool
-    ) -> None:
+    async def _notify_lifecycle(self, task_id: UUID, context_id: UUID, state: str, final: bool) -> None:
         """Notify lifecycle changes if notifier is configured.
 
         Args:
@@ -636,6 +587,4 @@ class ManifestWorker(Worker):
                     await result
             except Exception as e:
                 # Log but don't disrupt task execution on notification errors
-                self._log_notification_error(
-                    "Lifecycle", task_id, context_id, e, state=state
-                )
+                self._log_notification_error("Lifecycle", task_id, context_id, e, state=state)

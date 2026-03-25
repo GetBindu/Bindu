@@ -57,9 +57,7 @@ async def get_client_credentials_token(
                 return result
             else:
                 error_text = await response.text()
-                logger.error(
-                    f"Failed to get token for {client_id}: {response.status} - {error_text}"
-                )
+                logger.error(f"Failed to get token for {client_id}: {response.status} - {error_text}")
                 return None
 
     except Exception as e:

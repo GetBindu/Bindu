@@ -50,9 +50,7 @@ def prepare_auth_settings(auth_config: Dict[str, Any]) -> Optional[Dict[str, Any
             "agent_client_prefix": auth_config.get("agent_client_prefix"),
         }
         # Remove None values
-        settings_to_apply["hydra"] = {
-            k: v for k, v in settings_to_apply["hydra"].items() if v is not None
-        }
+        settings_to_apply["hydra"] = {k: v for k, v in settings_to_apply["hydra"].items() if v is not None}
     else:
         logger.warning(f"Unknown authentication provider: {provider}")
 
@@ -83,14 +81,10 @@ def prepare_vault_settings(vault_config: Dict[str, Any]) -> Optional[Dict[str, A
     }
 
     # Remove None values
-    settings_to_apply["vault"] = {
-        k: v for k, v in settings_to_apply["vault"].items() if v is not None
-    }
+    settings_to_apply["vault"] = {k: v for k, v in settings_to_apply["vault"].items() if v is not None}
 
     if settings_to_apply["vault"].get("enabled"):
-        logger.info(
-            f"Vault integration enabled: {settings_to_apply['vault'].get('url')}"
-        )
+        logger.info(f"Vault integration enabled: {settings_to_apply['vault'].get('url')}")
     else:
         logger.debug("Vault integration disabled")
 

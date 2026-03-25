@@ -48,9 +48,7 @@ class HeartbeatRequest(_message.Message):
     TIMESTAMP_FIELD_NUMBER: _ClassVar[int]
     agent_id: str
     timestamp: int
-    def __init__(
-        self, agent_id: _Optional[str] = ..., timestamp: _Optional[int] = ...
-    ) -> None: ...
+    def __init__(self, agent_id: _Optional[str] = ..., timestamp: _Optional[int] = ...) -> None: ...
 
 class HeartbeatResponse(_message.Message):
     __slots__ = ("acknowledged", "server_timestamp")
@@ -58,9 +56,7 @@ class HeartbeatResponse(_message.Message):
     SERVER_TIMESTAMP_FIELD_NUMBER: _ClassVar[int]
     acknowledged: bool
     server_timestamp: int
-    def __init__(
-        self, acknowledged: bool = ..., server_timestamp: _Optional[int] = ...
-    ) -> None: ...
+    def __init__(self, acknowledged: bool = ..., server_timestamp: _Optional[int] = ...) -> None: ...
 
 class UnregisterAgentRequest(_message.Message):
     __slots__ = ("agent_id",)
@@ -82,9 +78,7 @@ class ChatMessage(_message.Message):
     CONTENT_FIELD_NUMBER: _ClassVar[int]
     role: str
     content: str
-    def __init__(
-        self, role: _Optional[str] = ..., content: _Optional[str] = ...
-    ) -> None: ...
+    def __init__(self, role: _Optional[str] = ..., content: _Optional[str] = ...) -> None: ...
 
 class HandleRequest(_message.Message):
     __slots__ = ("messages", "task_id", "context_id")
@@ -109,9 +103,7 @@ class HandleResponse(_message.Message):
         VALUE_FIELD_NUMBER: _ClassVar[int]
         key: str
         value: str
-        def __init__(
-            self, key: _Optional[str] = ..., value: _Optional[str] = ...
-        ) -> None: ...
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
 
     CONTENT_FIELD_NUMBER: _ClassVar[int]
     STATE_FIELD_NUMBER: _ClassVar[int]

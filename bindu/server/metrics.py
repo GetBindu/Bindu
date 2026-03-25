@@ -39,15 +39,9 @@ class PrometheusMetrics:
         # Task duration histogram: {bucket_le: count}
         # Buckets: 1s, 5s, 10s, 30s, 60s, +Inf
         self._task_duration_buckets = [1.0, 5.0, 10.0, 30.0, 60.0, float("inf")]
-        self._task_duration_counts: dict[tuple[str, str, float], int] = defaultdict(
-            int
-        )  # (agent_id, status, bucket)
-        self._task_duration_sum: dict[tuple[str, str], float] = defaultdict(
-            float
-        )  # (agent_id, status)
-        self._task_duration_total_count: dict[tuple[str, str], int] = defaultdict(
-            int
-        )  # (agent_id, status)
+        self._task_duration_counts: dict[tuple[str, str, float], int] = defaultdict(int)  # (agent_id, status, bucket)
+        self._task_duration_sum: dict[tuple[str, str], float] = defaultdict(float)  # (agent_id, status)
+        self._task_duration_total_count: dict[tuple[str, str], int] = defaultdict(int)  # (agent_id, status)
 
         # Error tracking: {(agent_id, error_type): count}
         self._agent_errors: dict[tuple[str, str], int] = defaultdict(int)
@@ -164,9 +158,7 @@ class PrometheusMetrics:
         return "+Inf" if bucket == float("inf") else str(bucket)
 
     @staticmethod
-    def _add_metric_header(
-        lines: list[str], metric_name: str, help_text: str, metric_type: str
-    ) -> None:
+    def _add_metric_header(lines: list[str], metric_name: str, help_text: str, metric_type: str) -> None:
         """Add Prometheus metric header lines.
 
         Args:
@@ -198,12 +190,8 @@ class PrometheusMetrics:
 
         with self._lock:
             # HTTP requests total
-            self._add_metric_header(
-                lines, "http_requests_total", "Total number of HTTP requests", "counter"
-            )
-            for (method, endpoint, status), count in sorted(
-                self._http_requests.items()
-            ):
+            self._add_metric_header(lines, "http_requests_total", "Total number of HTTP requests", "counter")
+            for (method, endpoint, status), count in sorted(self._http_requests.items()):
                 lines.append(
                     f'http_requests_total{{method="{method}",endpoint="{endpoint}",status="{status}"}} {count}'
                 )
@@ -219,20 +207,14 @@ class PrometheusMetrics:
             for bucket in self._duration_buckets:
                 count = self._duration_counts[bucket]
                 bucket_str = self._format_bucket(bucket)
-                lines.append(
-                    f'http_request_duration_seconds_bucket{{le="{bucket_str}"}} {count}'
-                )
+                lines.append(f'http_request_duration_seconds_bucket{{le="{bucket_str}"}} {count}')
             lines.append(f"http_request_duration_seconds_sum {self._duration_sum:.1f}")
-            lines.append(
-                f"http_request_duration_seconds_count {self._duration_total_count}"
-            )
+            lines.append(f"http_request_duration_seconds_count {self._duration_total_count}")
 
             # Agent tasks active
             if self._agent_tasks_active:
                 lines.append("")
-                self._add_metric_header(
-                    lines, "agent_tasks_active", "Currently active tasks", "gauge"
-                )
+                self._add_metric_header(lines, "agent_tasks_active", "Currently active tasks", "gauge")
                 for agent_id, count in sorted(self._agent_tasks_active.items()):
                     lines.append(f'agent_tasks_active{{agent_id="{agent_id}"}} {count}')
 
@@ -245,12 +227,8 @@ class PrometheusMetrics:
                     "Total completed tasks",
                     "counter",
                 )
-                for (agent_id, status), count in sorted(
-                    self._agent_tasks_completed.items()
-                ):
-                    lines.append(
-                        f'agent_tasks_completed_total{{agent_id="{agent_id}",status="{status}"}} {count}'
-                    )
+                for (agent_id, status), count in sorted(self._agent_tasks_completed.items()):
+                    lines.append(f'agent_tasks_completed_total{{agent_id="{agent_id}",status="{status}"}} {count}')
 
             # Task duration histogram
             if self._task_duration_total_count:
@@ -264,8 +242,7 @@ class PrometheusMetrics:
 
                 # Group by agent_id and status for histogram output
                 agent_status_pairs = set(
-                    (agent_id, status)
-                    for (agent_id, status, _) in self._task_duration_counts.keys()
+                    (agent_id, status) for (agent_id, status, _) in self._task_duration_counts.keys()
                 )
 
                 for agent_id, status in sorted(agent_status_pairs):
@@ -290,13 +267,9 @@ class PrometheusMetrics:
             # Agent errors
             if self._agent_errors:
                 lines.append("")
-                self._add_metric_header(
-                    lines, "agent_errors_total", "Total errors by type", "counter"
-                )
+                self._add_metric_header(lines, "agent_errors_total", "Total errors by type", "counter")
                 for (agent_id, error_type), count in sorted(self._agent_errors.items()):
-                    lines.append(
-                        f'agent_errors_total{{agent_id="{agent_id}",error_type="{error_type}"}} {count}'
-                    )
+                    lines.append(f'agent_errors_total{{agent_id="{agent_id}",error_type="{error_type}"}} {count}')
 
             # Request size metrics
             if self._http_request_size_count > 0:
@@ -307,12 +280,8 @@ class PrometheusMetrics:
                     "HTTP request body size",
                     "summary",
                 )
-                lines.append(
-                    f"http_request_size_bytes_sum {self._http_request_size_sum:.0f}"
-                )
-                lines.append(
-                    f"http_request_size_bytes_count {self._http_request_size_count}"
-                )
+                lines.append(f"http_request_size_bytes_sum {self._http_request_size_sum:.0f}")
+                lines.append(f"http_request_size_bytes_count {self._http_request_size_count}")
 
             # Response size metrics
             if self._http_response_size_count > 0:
@@ -323,12 +292,8 @@ class PrometheusMetrics:
                     "HTTP response body size",
                     "summary",
                 )
-                lines.append(
-                    f"http_response_size_bytes_sum {self._http_response_size_sum:.0f}"
-                )
-                lines.append(
-                    f"http_response_size_bytes_count {self._http_response_size_count}"
-                )
+                lines.append(f"http_response_size_bytes_sum {self._http_response_size_sum:.0f}")
+                lines.append(f"http_response_size_bytes_count {self._http_response_size_count}")
 
             # Requests in flight
             lines.append("")

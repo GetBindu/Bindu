@@ -23,9 +23,7 @@ def normalize_uuid(value: UUID | str | None, param_name: str = "uuid") -> UUID:
     return validate_uuid_type(value, param_name)
 
 
-def normalize_message_uuids(
-    message: Message, task_id: UUID | None = None, context_id: UUID | None = None
-) -> Message:
+def normalize_message_uuids(message: Message, task_id: UUID | None = None, context_id: UUID | None = None) -> Message:
     """Normalize all UUID fields in a message to UUID type.
 
     Converts string UUIDs to UUID objects for task_id, context_id,
@@ -57,8 +55,7 @@ def normalize_message_uuids(
 
     if "reference_task_ids" in message and message["reference_task_ids"] is not None:
         message["reference_task_ids"] = [
-            normalize_uuid(ref_id, "reference_task_id")
-            for ref_id in message["reference_task_ids"]
+            normalize_uuid(ref_id, "reference_task_id") for ref_id in message["reference_task_ids"]
         ]
 
     return message

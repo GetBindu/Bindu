@@ -25,9 +25,7 @@ _BLOCKED_NETWORKS: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = [
     ipaddress.ip_network("10.0.0.0/8"),  # RFC-1918
     ipaddress.ip_network("172.16.0.0/12"),  # RFC-1918
     ipaddress.ip_network("192.168.0.0/16"),  # RFC-1918
-    ipaddress.ip_network(
-        "169.254.0.0/16"
-    ),  # link-local / cloud metadata (AWS, GCP, Azure)
+    ipaddress.ip_network("169.254.0.0/16"),  # link-local / cloud metadata (AWS, GCP, Azure)
     ipaddress.ip_network("100.64.0.0/10"),  # Carrier-grade NAT
     ipaddress.ip_network("::1/128"),  # IPv6 loopback
     ipaddress.ip_network("fc00::/7"),  # IPv6 unique local
@@ -64,9 +62,7 @@ class NotificationService:
     total_success: int = 0
     total_failures: int = 0
 
-    async def send_event(
-        self, config: PushNotificationConfig, event: dict[str, Any]
-    ) -> None:
+    async def send_event(self, config: PushNotificationConfig, event: dict[str, Any]) -> None:
         """Send an event to the configured HTTP webhook."""
         self.validate_config(config)
 
@@ -97,9 +93,7 @@ class NotificationService:
             resolved_ip = socket.getaddrinfo(hostname, None)[0][4][0]
             addr = ipaddress.ip_address(resolved_ip)
         except (socket.gaierror, ValueError) as exc:
-            raise ValueError(
-                f"Push notification URL hostname could not be resolved: {exc}"
-            ) from exc
+            raise ValueError(f"Push notification URL hostname could not be resolved: {exc}") from exc
 
         for blocked in _BLOCKED_NETWORKS:
             if addr in blocked:
@@ -109,9 +103,7 @@ class NotificationService:
                 )
 
     @create_retry_decorator("api", max_attempts=3, min_wait=0.5, max_wait=5.0)
-    async def _post_with_retry(
-        self, url: str, headers: dict[str, str], payload: bytes, event: dict[str, Any]
-    ) -> None:
+    async def _post_with_retry(self, url: str, headers: dict[str, str], payload: bytes, event: dict[str, Any]) -> None:
         """Send POST request with automatic retry via unified retry decorator."""
         # --- Metrics: count total attempts to send ---
         self.total_sent += 1
@@ -160,9 +152,7 @@ class NotificationService:
                 status = response.getcode()
                 if 200 <= status < 300:
                     return status
-                raise NotificationDeliveryError(
-                    status, f"Unexpected status code: {status}"
-                )
+                raise NotificationDeliveryError(status, f"Unexpected status code: {status}")
         except error.HTTPError as exc:
             status = exc.code
             body = b""
@@ -171,13 +161,9 @@ class NotificationService:
             except OSError:
                 body = b""
             message = body.decode("utf-8", errors="ignore").strip()
-            raise NotificationDeliveryError(
-                status, message or f"HTTP error {status}"
-            ) from exc
+            raise NotificationDeliveryError(status, message or f"HTTP error {status}") from exc
         except error.URLError as exc:
-            raise NotificationDeliveryError(
-                None, f"Connection error: {exc.reason}"
-            ) from exc
+            raise NotificationDeliveryError(None, f"Connection error: {exc.reason}") from exc
 
     def _build_headers(self, config: PushNotificationConfig) -> dict[str, str]:
         headers = {"Content-Type": "application/json"}

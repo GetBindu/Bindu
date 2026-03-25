@@ -64,9 +64,7 @@ from .schema import (
 logger = get_logger("bindu.server.storage.postgres_storage")
 
 # Constants
-ENGINE_NOT_INITIALIZED_ERROR = (
-    "PostgreSQL engine not initialized. Call connect() first."
-)
+ENGINE_NOT_INITIALIZED_ERROR = "PostgreSQL engine not initialized. Call connect() first."
 TERMINAL_STATE_ERROR_TEMPLATE = (
     "Cannot continue task {task_id}: Task is in terminal state '{state}' and is immutable. "
     "Create a new task with referenceTaskIds to continue the conversation."
@@ -124,9 +122,7 @@ class PostgresStorage(Storage[dict[str, Any]]):
         self.pool_min = pool_min or app_settings.storage.postgres_pool_min
         self.pool_max = pool_max or app_settings.storage.postgres_pool_max
         self.timeout = timeout or app_settings.storage.postgres_timeout
-        self.command_timeout = (
-            command_timeout or app_settings.storage.postgres_command_timeout
-        )
+        self.command_timeout = command_timeout or app_settings.storage.postgres_command_timeout
 
         self._engine = None
         self._session_factory = None
@@ -138,9 +134,7 @@ class PostgresStorage(Storage[dict[str, Any]]):
             from bindu.utils.schema_manager import sanitize_did_for_schema
 
             self.schema_name = sanitize_did_for_schema(did)
-            logger.info(
-                f"PostgresStorage configured for DID '{did}' using schema '{self.schema_name}'"
-            )
+            logger.info(f"PostgresStorage configured for DID '{did}' using schema '{self.schema_name}'")
 
     async def connect(self) -> None:
         """Initialize SQLAlchemy engine and session factory.
@@ -188,12 +182,8 @@ class PostgresStorage(Storage[dict[str, Any]]):
             if self.did and self.schema_name:
                 from bindu.utils.schema_manager import initialize_did_schema
 
-                logger.info(
-                    f"Initializing schema '{self.schema_name}' for DID '{self.did}'..."
-                )
-                await initialize_did_schema(
-                    self._engine, self.schema_name, create_tables=True
-                )
+                logger.info(f"Initializing schema '{self.schema_name}' for DID '{self.did}'...")
+                await initialize_did_schema(self._engine, self.schema_name, create_tables=True)
                 logger.info(f"Schema '{self.schema_name}' initialized successfully")
             else:
                 # Test connection if no DID schema initialization
@@ -282,9 +272,7 @@ class PostgresStorage(Storage[dict[str, Any]]):
             id=row.id,
             context_id=row.context_id,
             kind=row.kind,
-            status=TaskStatus(
-                state=row.state, timestamp=row.state_timestamp.isoformat()
-            ),
+            status=TaskStatus(state=row.state, timestamp=row.state_timestamp.isoformat()),
             history=row.history or [],
             artifacts=row.artifacts or [],
             metadata=row.metadata or {},
@@ -294,9 +282,7 @@ class PostgresStorage(Storage[dict[str, Any]]):
     # Task Operations
     # -------------------------------------------------------------------------
 
-    async def load_task(
-        self, task_id: UUID, history_length: int | None = None
-    ) -> Task | None:
+    async def load_task(self, task_id: UUID, history_length: int | None = None) -> Task | None:
         """Load a task from PostgreSQL using SQLAlchemy.
 
         Args:
@@ -353,9 +339,7 @@ class PostgresStorage(Storage[dict[str, Any]]):
         """
         context_id = validate_uuid_type(context_id, "context_id")
         task_id = normalize_uuid(message.get("task_id"), "task_id")
-        message = normalize_message_uuids(
-            message, task_id=task_id, context_id=context_id
-        )
+        message = normalize_message_uuids(message, task_id=task_id, context_id=context_id)
 
         self._ensure_connected()
 
@@ -372,15 +356,9 @@ class PostgresStorage(Storage[dict[str, Any]]):
                         current_state = existing.state
 
                         if current_state in app_settings.agent.terminal_states:
-                            raise ValueError(
-                                TERMINAL_STATE_ERROR_TEMPLATE.format(
-                                    task_id=task_id, state=current_state
-                                )
-                            )
+                            raise ValueError(TERMINAL_STATE_ERROR_TEMPLATE.format(task_id=task_id, state=current_state))
 
-                        logger.info(
-                            f"Continuing existing task {task_id} from state '{current_state}'"
-                        )
+                        logger.info(f"Continuing existing task {task_id} from state '{current_state}'")
 
                         stmt = (
                             update(tasks_table)
@@ -491,12 +469,8 @@ class PostgresStorage(Storage[dict[str, Any]]):
                     if new_messages:
                         for message in new_messages:
                             if not isinstance(message, dict):
-                                raise TypeError(
-                                    f"Message must be dict, got {type(message).__name__}"
-                                )
-                            normalize_message_uuids(
-                                message, task_id=task_id, context_id=task_row.context_id
-                            )
+                                raise TypeError(f"Message must be dict, got {type(message).__name__}")
+                            normalize_message_uuids(message, task_id=task_id, context_id=task_row.context_id)
 
                         update_values["history"] = func.jsonb_concat(
                             tasks_table.c.history, prepare_jsonb_value(new_messages)
@@ -516,9 +490,7 @@ class PostgresStorage(Storage[dict[str, Any]]):
 
         return await self._retry_on_connection_error(_update)
 
-    async def list_tasks(
-        self, length: int | None = None, offset: int = 0
-    ) -> list[Task]:
+    async def list_tasks(self, length: int | None = None, offset: int = 0) -> list[Task]:
         """List all tasks using SQLAlchemy.
 
         Args:
@@ -569,9 +541,7 @@ class PostgresStorage(Storage[dict[str, Any]]):
 
         return await self._retry_on_connection_error(_count)
 
-    async def list_tasks_by_context(
-        self, context_id: UUID, length: int | None = None, offset: int = 0
-    ) -> list[Task]:
+    async def list_tasks_by_context(self, context_id: UUID, length: int | None = None, offset: int = 0) -> list[Task]:
         """List tasks belonging to a specific context.
 
         Args:
@@ -673,9 +643,7 @@ class PostgresStorage(Storage[dict[str, Any]]):
 
         await self._retry_on_connection_error(_update)
 
-    async def append_to_contexts(
-        self, context_id: UUID, messages: list[Message]
-    ) -> None:
+    async def append_to_contexts(self, context_id: UUID, messages: list[Message]) -> None:
         """Append messages to context history using SQLAlchemy.
 
         Args:
@@ -719,9 +687,7 @@ class PostgresStorage(Storage[dict[str, Any]]):
 
         await self._retry_on_connection_error(_append)
 
-    async def list_contexts(
-        self, length: int | None = None, offset: int = 0
-    ) -> list[dict[str, Any]]:
+    async def list_contexts(self, length: int | None = None, offset: int = 0) -> list[dict[str, Any]]:
         """List all contexts using SQLAlchemy.
 
         Args:
@@ -741,15 +707,11 @@ class PostgresStorage(Storage[dict[str, Any]]):
                         contexts_table.c.id.label("context_id"),
                         func.count(tasks_table.c.id).label("task_count"),
                         func.coalesce(
-                            func.json_agg(tasks_table.c.id).filter(
-                                tasks_table.c.id.isnot(None)
-                            ),
+                            func.json_agg(tasks_table.c.id).filter(tasks_table.c.id.isnot(None)),
                             cast("[]", JSON),
                         ).label("task_ids"),
                     )
-                    .outerjoin(
-                        tasks_table, contexts_table.c.id == tasks_table.c.context_id
-                    )
+                    .outerjoin(tasks_table, contexts_table.c.id == tasks_table.c.context_id)
                     .group_by(contexts_table.c.id)
                     .order_by(contexts_table.c.created_at.desc())
                 )
@@ -797,9 +759,7 @@ class PostgresStorage(Storage[dict[str, Any]]):
             async with self._get_session_with_schema() as session:
                 async with session.begin():
                     # Check if context exists
-                    stmt = select(contexts_table).where(
-                        contexts_table.c.id == context_id
-                    )
+                    stmt = select(contexts_table).where(contexts_table.c.id == context_id)
                     result = await session.execute(stmt)
                     context = result.first()
 
@@ -807,21 +767,15 @@ class PostgresStorage(Storage[dict[str, Any]]):
                         raise ValueError(f"Context {context_id} not found")
 
                     # Delete tasks (cascade will delete feedback)
-                    stmt = delete(tasks_table).where(
-                        tasks_table.c.context_id == context_id
-                    )
+                    stmt = delete(tasks_table).where(tasks_table.c.context_id == context_id)
                     result = await session.execute(stmt)
                     deleted_count = result.rowcount
 
                     # Delete context
-                    stmt = delete(contexts_table).where(
-                        contexts_table.c.id == context_id
-                    )
+                    stmt = delete(contexts_table).where(contexts_table.c.id == context_id)
                     await session.execute(stmt)
 
-                    logger.info(
-                        f"Cleared context {context_id}: removed {deleted_count} tasks"
-                    )
+                    logger.info(f"Cleared context {context_id}: removed {deleted_count} tasks")
 
         await self._retry_on_connection_error(_clear)
 
@@ -839,9 +793,7 @@ class PostgresStorage(Storage[dict[str, Any]]):
                     await session.execute(delete(task_feedback_table))
                     await session.execute(delete(tasks_table))
                     await session.execute(delete(contexts_table))
-                    logger.info(
-                        "Cleared all tasks, contexts, feedback, and webhook configs"
-                    )
+                    logger.info("Cleared all tasks, contexts, feedback, and webhook configs")
 
         await self._retry_on_connection_error(_clear)
 
@@ -849,9 +801,7 @@ class PostgresStorage(Storage[dict[str, Any]]):
     # Feedback Operations
     # -------------------------------------------------------------------------
 
-    async def store_task_feedback(
-        self, task_id: UUID, feedback_data: dict[str, Any]
-    ) -> None:
+    async def store_task_feedback(self, task_id: UUID, feedback_data: dict[str, Any]) -> None:
         """Store user feedback for a task using SQLAlchemy.
 
         Args:
@@ -864,9 +814,7 @@ class PostgresStorage(Storage[dict[str, Any]]):
         task_id = validate_uuid_type(task_id, "task_id")
 
         if not isinstance(feedback_data, dict):
-            raise TypeError(
-                f"feedback_data must be dict, got {type(feedback_data).__name__}"
-            )
+            raise TypeError(f"feedback_data must be dict, got {type(feedback_data).__name__}")
 
         self._ensure_connected()
 
@@ -918,9 +866,7 @@ class PostgresStorage(Storage[dict[str, Any]]):
     # Webhook Persistence Operations (for long-running tasks)
     # -------------------------------------------------------------------------
 
-    async def save_webhook_config(
-        self, task_id: UUID, config: PushNotificationConfig
-    ) -> None:
+    async def save_webhook_config(self, task_id: UUID, config: PushNotificationConfig) -> None:
         """Save a webhook configuration for a task using SQLAlchemy.
 
         Uses upsert to handle both insert and update scenarios.
@@ -974,9 +920,7 @@ class PostgresStorage(Storage[dict[str, Any]]):
 
         async def _load():
             async with self._get_session_with_schema() as session:
-                stmt = select(webhook_configs_table).where(
-                    webhook_configs_table.c.task_id == task_id
-                )
+                stmt = select(webhook_configs_table).where(webhook_configs_table.c.task_id == task_id)
                 result = await session.execute(stmt)
                 row = result.first()
 
@@ -1005,9 +949,7 @@ class PostgresStorage(Storage[dict[str, Any]]):
         async def _delete():
             async with self._get_session_with_schema() as session:
                 async with session.begin():
-                    stmt = delete(webhook_configs_table).where(
-                        webhook_configs_table.c.task_id == task_id
-                    )
+                    stmt = delete(webhook_configs_table).where(webhook_configs_table.c.task_id == task_id)
                     result = await session.execute(stmt)
                     if result.rowcount > 0:
                         logger.debug(f"Deleted webhook config for task {task_id}")

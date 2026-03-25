@@ -58,9 +58,7 @@ class SkillEmbedder:
         the event loop while the `/agent/negotiation` endpoint awaits the response.
         """
         if self._client is None:
-            self._client = AsyncHTTPClient(
-                base_url=OPENROUTER_API_URL, timeout=EMBEDDING_REQUEST_TIMEOUT_SECONDS
-            )
+            self._client = AsyncHTTPClient(base_url=OPENROUTER_API_URL, timeout=EMBEDDING_REQUEST_TIMEOUT_SECONDS)
         return self._client
 
     async def _embed_with_openrouter(self, texts: list[str]) -> np.ndarray:
@@ -74,8 +72,7 @@ class SkillEmbedder:
         """
         if not self._api_key:
             raise ValueError(
-                "OpenRouter API key not configured. "
-                "Set NEGOTIATION__EMBEDDING_API_KEY or pass api_key to constructor."
+                "OpenRouter API key not configured. Set NEGOTIATION__EMBEDDING_API_KEY or pass api_key to constructor."
             )
 
         client = self._get_client()
@@ -132,14 +129,10 @@ class SkillEmbedder:
         else:
             # Fallback to OpenRouter for unknown providers
             if self._provider != "openrouter":
-                logger.warning(
-                    f"Unknown embedding provider: {self._provider}, falling back to OpenRouter"
-                )
+                logger.warning(f"Unknown embedding provider: {self._provider}, falling back to OpenRouter")
             return await self._embed_with_openrouter(texts)
 
-    async def compute_skill_embeddings(
-        self, skills: list[Skill]
-    ) -> dict[str, dict[str, Any]]:
+    async def compute_skill_embeddings(self, skills: list[Skill]) -> dict[str, dict[str, Any]]:
         """Compute embeddings for all skills.
 
         For each skill, creates a composite text from:
@@ -211,9 +204,7 @@ class SkillEmbedder:
 
         # Build result dict
         result = {}
-        for skill_id, embedding, text, keywords in zip(
-            skill_ids, embeddings, skill_texts, skill_keywords
-        ):
+        for skill_id, embedding, text, keywords in zip(skill_ids, embeddings, skill_texts, skill_keywords):
             result[skill_id] = {
                 "embedding": embedding,
                 "text": text,
@@ -223,9 +214,7 @@ class SkillEmbedder:
         logger.info(f"Computed embeddings for {len(result)} skills")
         return result
 
-    async def embed_task_cached(
-        self, task_summary: str, task_details: str = ""
-    ) -> np.ndarray:
+    async def embed_task_cached(self, task_summary: str, task_details: str = "") -> np.ndarray:
         """Embed task text, using an in-instance dict cache for deduplication.
 
         ``lru_cache`` cannot be applied to async methods, so we maintain a

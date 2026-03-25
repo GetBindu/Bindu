@@ -72,14 +72,10 @@ def validate_agent_function(agent_function: Callable) -> None:
         )
 
     if len(params) > 1:
-        raise ValueError(
-            f"Agent function must have only '{REQUIRED_PARAM_NAME}' parameter"
-        )
+        raise ValueError(f"Agent function must have only '{REQUIRED_PARAM_NAME}' parameter")
 
     if params[0].name != REQUIRED_PARAM_NAME:
-        raise ValueError(
-            f"First parameter must be named '{REQUIRED_PARAM_NAME}', got '{params[0].name}'"
-        )
+        raise ValueError(f"First parameter must be named '{REQUIRED_PARAM_NAME}', got '{params[0].name}'")
 
     logger.debug(f"Agent function '{func_name}' validated successfully")
 
@@ -263,20 +259,12 @@ def create_manifest(
     logger.debug(f"Function parameters: {param_names}, has_context={has_context_param}")
 
     # Prepare manifest metadata
-    manifest_name = name or getattr(agent_function, "__name__", "agent").replace(
-        "_", "-"
-    )
-    manifest_description = (
-        description or inspect.getdoc(agent_function) or f"Agent: {manifest_name}"
-    )
+    manifest_name = name or getattr(agent_function, "__name__", "agent").replace("_", "-")
+    manifest_description = description or inspect.getdoc(agent_function) or f"Agent: {manifest_name}"
 
-    logger.info(
-        f"Creating agent manifest: name='{manifest_name}', version={version}, kind={kind}"
-    )
+    logger.info(f"Creating agent manifest: name='{manifest_name}', version={version}, kind={kind}")
 
-    _agent_trust = (
-        agent_trust if agent_trust is not None else _create_default_agent_trust()
-    )
+    _agent_trust = agent_trust if agent_trust is not None else _create_default_agent_trust()
     _capabilities = capabilities if capabilities is not None else AgentCapabilities()
     _skills = skills if skills is not None else []
 
@@ -315,9 +303,7 @@ def create_manifest(
 
     # Attach extra metadata attributes if provided
     if extra_metadata:
-        logger.debug(
-            f"Attaching extra metadata to manifest '{manifest_name}': {list(extra_metadata.keys())}"
-        )
+        logger.debug(f"Attaching extra metadata to manifest '{manifest_name}': {list(extra_metadata.keys())}")
         for key, value in extra_metadata.items():
             setattr(manifest, key, value)
 
