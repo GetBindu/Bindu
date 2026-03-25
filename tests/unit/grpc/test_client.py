@@ -107,9 +107,7 @@ class TestGrpcAgentClient:
         """Test that input messages are correctly converted to proto format."""
         mock_stub = MagicMock()
         mock_stub_class.return_value = mock_stub
-        mock_stub.HandleMessages.return_value = agent_handler_pb2.HandleResponse(
-            content="ok", state=""
-        )
+        mock_stub.HandleMessages.return_value = agent_handler_pb2.HandleResponse(content="ok", state="")
 
         client = GrpcAgentClient("localhost:50052")
         messages = [
@@ -137,9 +135,7 @@ class TestGrpcAgentClient:
 
         mock_stub = MagicMock()
         mock_stub_class.return_value = mock_stub
-        mock_stub.HandleMessages.return_value = agent_handler_pb2.HandleResponse(
-            content="ok", state=""
-        )
+        mock_stub.HandleMessages.return_value = agent_handler_pb2.HandleResponse(content="ok", state="")
 
         client([{"role": "user", "content": "test"}])
         mock_channel.assert_called_once()
@@ -150,9 +146,7 @@ class TestGrpcAgentClient:
         """Test health check returns True for healthy agent."""
         mock_stub = MagicMock()
         mock_stub_class.return_value = mock_stub
-        mock_stub.HealthCheck.return_value = agent_handler_pb2.HealthCheckResponse(
-            healthy=True, message="OK"
-        )
+        mock_stub.HealthCheck.return_value = agent_handler_pb2.HealthCheckResponse(healthy=True, message="OK")
 
         client = GrpcAgentClient("localhost:50052")
         assert client.health_check() is True
@@ -210,15 +204,9 @@ class TestGrpcAgentClient:
         # Simulate a streaming response (iterable of HandleResponse)
         mock_stub.HandleMessagesStream.return_value = iter(
             [
-                agent_handler_pb2.HandleResponse(
-                    content="chunk 1", state="", is_final=False
-                ),
-                agent_handler_pb2.HandleResponse(
-                    content="chunk 2", state="", is_final=False
-                ),
-                agent_handler_pb2.HandleResponse(
-                    content="final answer", state="", is_final=True
-                ),
+                agent_handler_pb2.HandleResponse(content="chunk 1", state="", is_final=False),
+                agent_handler_pb2.HandleResponse(content="chunk 2", state="", is_final=False),
+                agent_handler_pb2.HandleResponse(content="final answer", state="", is_final=True),
             ]
         )
 
@@ -237,18 +225,14 @@ class TestGrpcAgentClient:
 
     @patch("bindu.grpc.client.grpc.insecure_channel")
     @patch("bindu.grpc.client.agent_handler_pb2_grpc.AgentHandlerStub")
-    def test_streaming_response_with_state_transition(
-        self, mock_stub_class, mock_channel
-    ):
+    def test_streaming_response_with_state_transition(self, mock_stub_class, mock_channel):
         """Test streaming where final chunk has a state transition."""
         mock_stub = MagicMock()
         mock_stub_class.return_value = mock_stub
 
         mock_stub.HandleMessagesStream.return_value = iter(
             [
-                agent_handler_pb2.HandleResponse(
-                    content="thinking...", state="", is_final=False
-                ),
+                agent_handler_pb2.HandleResponse(content="thinking...", state="", is_final=False),
                 agent_handler_pb2.HandleResponse(
                     content="",
                     state="input-required",
@@ -290,9 +274,7 @@ class TestGrpcAgentClient:
         """Test unary mode calls HandleMessages, not HandleMessagesStream."""
         mock_stub = MagicMock()
         mock_stub_class.return_value = mock_stub
-        mock_stub.HandleMessages.return_value = agent_handler_pb2.HandleResponse(
-            content="ok", state=""
-        )
+        mock_stub.HandleMessages.return_value = agent_handler_pb2.HandleResponse(content="ok", state="")
 
         client = GrpcAgentClient("localhost:50052", use_streaming=False)
         client([{"role": "user", "content": "Hi"}])

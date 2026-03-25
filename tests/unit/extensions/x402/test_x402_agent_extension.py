@@ -87,9 +87,7 @@ class TestX402AgentExtensionWithPaymentOptions:
         """Test that payment_options can use default values."""
         payment_options = [{"amount": "1000000", "pay_to_address": "0x1234"}]
 
-        ext = X402AgentExtension(
-            payment_options=payment_options, token="DAI", network="polygon"
-        )
+        ext = X402AgentExtension(payment_options=payment_options, token="DAI", network="polygon")
 
         # Should use defaults for missing fields
         assert ext.token == "DAI"
@@ -174,9 +172,7 @@ class TestX402AgentExtensionEdgeCases:
         tokens = ["USDC", "USDT", "DAI", "ETH", "MATIC"]
 
         for token in tokens:
-            ext = X402AgentExtension(
-                amount="1000000", token=token, pay_to_address="0x1234"
-            )
+            ext = X402AgentExtension(amount="1000000", token=token, pay_to_address="0x1234")
             assert ext.token == token
 
     def test_init_with_different_networks(self):
@@ -190,9 +186,7 @@ class TestX402AgentExtensionEdgeCases:
         ]
 
         for network in networks:
-            ext = X402AgentExtension(
-                amount="1000000", network=network, pay_to_address="0x1234"
-            )
+            ext = X402AgentExtension(amount="1000000", network=network, pay_to_address="0x1234")
             assert ext.network == network
 
     def test_init_with_long_pay_to_address(self):
@@ -220,9 +214,7 @@ class TestX402AgentExtensionEdgeCases:
     def test_init_with_description(self):
         """Test initialization with description."""
         description = "Payment for AI service execution"
-        ext = X402AgentExtension(
-            amount="1000000", pay_to_address="0x1234", description=description
-        )
+        ext = X402AgentExtension(amount="1000000", pay_to_address="0x1234", description=description)
 
         assert ext._description == description
 

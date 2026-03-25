@@ -11,11 +11,7 @@ class TestMessageConverter:
 
     def test_to_chat_format_with_user_message(self):
         """Test converting user message to chat format."""
-        messages = [
-            cast(
-                Message, {"role": "user", "parts": [{"kind": "text", "text": "Hello"}]}
-            )
-        ]
+        messages = [cast(Message, {"role": "user", "parts": [{"kind": "text", "text": "Hello"}]})]
 
         result = MessageConverter.to_chat_format(messages)
 

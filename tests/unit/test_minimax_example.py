@@ -59,7 +59,7 @@ class TestMiniMaxExampleFile:
     def test_example_reads_api_key_from_env(self):
         """Verify the example reads MINIMAX_API_KEY from env."""
         source = EXAMPLE_PATH.read_text()
-        assert 'MINIMAX_API_KEY' in source
+        assert "MINIMAX_API_KEY" in source
         assert 'os.getenv("MINIMAX_API_KEY")' in source
 
     def test_example_has_config_dict(self):
@@ -184,6 +184,7 @@ class TestMiniMaxIntegration:
     def test_minimax_api_connection(self, api_key):
         """Test that MiniMax API is reachable with valid key."""
         import httpx
+
         resp = httpx.post(
             "https://api.minimax.io/v1/chat/completions",
             headers={
@@ -202,6 +203,7 @@ class TestMiniMaxIntegration:
     def test_minimax_chat_completion(self, api_key):
         """Test a simple chat completion via MiniMax API."""
         import httpx
+
         resp = httpx.post(
             "https://api.minimax.io/v1/chat/completions",
             headers={
@@ -223,6 +225,7 @@ class TestMiniMaxIntegration:
     def test_minimax_m27_highspeed_model(self, api_key):
         """Test that M2.7-highspeed model is also accessible."""
         import httpx
+
         resp = httpx.post(
             "https://api.minimax.io/v1/chat/completions",
             headers={

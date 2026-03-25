@@ -286,9 +286,7 @@ class TestRegisterAgentInHydra:
                 mock_settings.vault.enabled = False
                 mock_settings.did.verification_key_type = "Ed25519VerificationKey2020"
 
-                with patch(
-                    "bindu.auth.hydra.registration.HydraClient", return_value=mock_hydra
-                ):
+                with patch("bindu.auth.hydra.registration.HydraClient", return_value=mock_hydra):
                     result = await register_agent_in_hydra(
                         agent_id="agent-123",
                         agent_name="Test Agent",
@@ -319,9 +317,7 @@ class TestRegisterAgentInHydra:
             save_agent_credentials(existing_creds, creds_dir)
 
             mock_hydra = AsyncMock()
-            mock_hydra.get_oauth_client = AsyncMock(
-                return_value={"client_id": "did:bindu:test"}
-            )
+            mock_hydra.get_oauth_client = AsyncMock(return_value={"client_id": "did:bindu:test"})
             mock_hydra.__aenter__ = AsyncMock(return_value=mock_hydra)
             mock_hydra.__aexit__ = AsyncMock()
 
@@ -334,9 +330,7 @@ class TestRegisterAgentInHydra:
                 mock_settings.hydra.max_retries = 3
                 mock_settings.vault.enabled = False
 
-                with patch(
-                    "bindu.auth.hydra.registration.HydraClient", return_value=mock_hydra
-                ):
+                with patch("bindu.auth.hydra.registration.HydraClient", return_value=mock_hydra):
                     result = await register_agent_in_hydra(
                         agent_id="agent-123",
                         agent_name="Test Agent",
@@ -355,9 +349,7 @@ class TestRegisterAgentInHydra:
             creds_dir = Path(tmpdir)
 
             mock_did_extension = MagicMock()
-            mock_did_extension.public_key_base58 = (
-                "5D5sRMv58uwU5zWRv7zEeXJC3DRPkkNeqFC8ZbTHkTDeA"
-            )
+            mock_did_extension.public_key_base58 = "5D5sRMv58uwU5zWRv7zEeXJC3DRPkkNeqFC8ZbTHkTDeA"
 
             mock_hydra = AsyncMock()
             mock_hydra.get_oauth_client = AsyncMock(return_value=None)
@@ -377,9 +369,7 @@ class TestRegisterAgentInHydra:
                 mock_settings.vault.enabled = False
                 mock_settings.did.verification_key_type = "Ed25519VerificationKey2020"
 
-                with patch(
-                    "bindu.auth.hydra.registration.HydraClient", return_value=mock_hydra
-                ):
+                with patch("bindu.auth.hydra.registration.HydraClient", return_value=mock_hydra):
                     result = await register_agent_in_hydra(
                         agent_id="agent-123",
                         agent_name="Test Agent",
@@ -392,10 +382,7 @@ class TestRegisterAgentInHydra:
             assert result is not None
             # Verify create_oauth_client was called with public key in metadata
             call_args = mock_hydra.create_oauth_client.call_args[0][0]
-            assert (
-                call_args["metadata"]["public_key"]
-                == "5D5sRMv58uwU5zWRv7zEeXJC3DRPkkNeqFC8ZbTHkTDeA"
-            )
+            assert call_args["metadata"]["public_key"] == "5D5sRMv58uwU5zWRv7zEeXJC3DRPkkNeqFC8ZbTHkTDeA"
             assert call_args["metadata"]["key_type"] == "Ed25519"
 
     @pytest.mark.asyncio
@@ -407,9 +394,7 @@ class TestRegisterAgentInHydra:
             creds_dir = Path(tmpdir)
 
             mock_hydra = AsyncMock()
-            mock_hydra.get_oauth_client = AsyncMock(
-                return_value={"client_id": "did:bindu:test"}
-            )
+            mock_hydra.get_oauth_client = AsyncMock(return_value={"client_id": "did:bindu:test"})
             mock_hydra.delete_oauth_client = AsyncMock()
             mock_hydra.create_oauth_client = AsyncMock()
             mock_hydra.__aenter__ = AsyncMock(return_value=mock_hydra)
@@ -427,9 +412,7 @@ class TestRegisterAgentInHydra:
                 mock_settings.vault.enabled = False
                 mock_settings.did.verification_key_type = "Ed25519VerificationKey2020"
 
-                with patch(
-                    "bindu.auth.hydra.registration.HydraClient", return_value=mock_hydra
-                ):
+                with patch("bindu.auth.hydra.registration.HydraClient", return_value=mock_hydra):
                     await register_agent_in_hydra(
                         agent_id="agent-123",
                         agent_name="Test Agent",
@@ -449,9 +432,7 @@ class TestRegisterAgentInHydra:
             creds_dir = Path(tmpdir)
 
             mock_hydra = AsyncMock()
-            mock_hydra.get_oauth_client = AsyncMock(
-                side_effect=Exception("Connection error")
-            )
+            mock_hydra.get_oauth_client = AsyncMock(side_effect=Exception("Connection error"))
             mock_hydra.__aenter__ = AsyncMock(return_value=mock_hydra)
             mock_hydra.__aexit__ = AsyncMock()
 
@@ -464,9 +445,7 @@ class TestRegisterAgentInHydra:
                 mock_settings.hydra.max_retries = 3
                 mock_settings.vault.enabled = False
 
-                with patch(
-                    "bindu.auth.hydra.registration.HydraClient", return_value=mock_hydra
-                ):
+                with patch("bindu.auth.hydra.registration.HydraClient", return_value=mock_hydra):
                     result = await register_agent_in_hydra(
                         agent_id="agent-123",
                         agent_name="Test Agent",
@@ -514,9 +493,7 @@ class TestRegistrationEdgeCases:
             )
 
             save_agent_credentials(credentials, creds_dir)
-            loaded = load_agent_credentials(
-                "did:bindu:agent:test-123_special", creds_dir
-            )
+            loaded = load_agent_credentials("did:bindu:agent:test-123_special", creds_dir)
 
             assert loaded is not None
             assert loaded.client_id == "did:bindu:agent:test-123_special"

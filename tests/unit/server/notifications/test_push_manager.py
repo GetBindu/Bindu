@@ -124,9 +124,7 @@ class TestPushNotificationManager:
         """Test initialize loads persisted configs from storage."""
         mock_storage = AsyncMock()
         task_id = uuid4()
-        persisted_configs = {
-            task_id: {"id": task_id, "url": "https://example.com/webhook"}
-        }
+        persisted_configs = {task_id: {"id": task_id, "url": "https://example.com/webhook"}}
         mock_storage.load_all_webhook_configs.return_value = persisted_configs
 
         manager = PushNotificationManager(storage=mock_storage)
@@ -336,9 +334,7 @@ class TestPushNotificationManager:
         result = manager.build_task_push_config(task_id)
 
         assert result["id"] == task_id
-        assert (
-            result["push_notification_config"]["url"] == "https://example.com/webhook"
-        )
+        assert result["push_notification_config"]["url"] == "https://example.com/webhook"
 
     def test_build_task_push_config_not_found(self):
         """Test building task push config when not found."""

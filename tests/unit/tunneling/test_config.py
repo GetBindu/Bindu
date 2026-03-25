@@ -20,9 +20,7 @@ class TestTunnelConfig:
 
     def test_config_with_custom_values(self):
         """Test creating config with custom values."""
-        config = TunnelConfig(
-            enabled=True, subdomain="my-app", local_port=8080, use_tls=True
-        )
+        config = TunnelConfig(enabled=True, subdomain="my-app", local_port=8080, use_tls=True)
 
         assert config.enabled is True
         assert config.subdomain == "my-app"

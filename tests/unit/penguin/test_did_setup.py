@@ -56,9 +56,7 @@ class TestInitializeDIDExtension:
 
     @patch("bindu.penguin.did_setup.app_settings")
     @patch("bindu.penguin.did_setup.DIDAgentExtension")
-    def test_initialize_integrity_check_failure_raises(
-        self, mock_did_class, mock_settings
-    ):
+    def test_initialize_integrity_check_failure_raises(self, mock_did_class, mock_settings):
         """Test that integrity check failure raises error."""
         mock_settings.vault.enabled = False
         mock_settings.did.pki_dir = "pki"

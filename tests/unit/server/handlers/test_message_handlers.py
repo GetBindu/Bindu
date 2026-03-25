@@ -71,9 +71,7 @@ class TestMessageHandlers:
         error = Exception("Test error")
         terminal_states = frozenset(["completed", "failed", "canceled"])
 
-        result = await handler._handle_stream_error(
-            task, "ctx1", error, terminal_states
-        )
+        result = await handler._handle_stream_error(task, "ctx1", error, terminal_states)
 
         assert result["status"]["state"] == "failed"
         assert result["final"] is True
@@ -91,9 +89,7 @@ class TestMessageHandlers:
         error = Exception("Test error")
         terminal_states = frozenset(["completed", "failed", "canceled"])
 
-        result = await handler._handle_stream_error(
-            task, "ctx1", error, terminal_states
-        )
+        result = await handler._handle_stream_error(task, "ctx1", error, terminal_states)
 
         assert "kind" in result
         assert result["status"]["state"] == "failed"
@@ -124,9 +120,7 @@ class TestMessageHandlers:
 
         request_params = {"message": {"content": "test", "context_id": str(context_id)}}
 
-        result_task, result_ctx = await handler._submit_and_schedule_task(
-            request_params
-        )
+        result_task, result_ctx = await handler._submit_and_schedule_task(request_params)
 
         assert result_task["id"] == task_id
         assert result_ctx == context_id
@@ -204,9 +198,7 @@ class TestMessageHandlers:
 
         await handler._submit_and_schedule_task(request_params)
 
-        mock_push_manager.register_push_config.assert_called_once_with(
-            task_id, push_config, persist=True
-        )
+        mock_push_manager.register_push_config.assert_called_once_with(task_id, push_config, persist=True)
 
     @pytest.mark.asyncio
     async def test_submit_and_schedule_task_with_payment_context(self):
