@@ -40,15 +40,9 @@ async def _update_agent_metrics(app: BinduApplication) -> None:
             from typing import cast
             from bindu.common.protocol.types import TaskState
 
-            submitted = await app._storage.count_tasks(
-                status=cast(TaskState, ACTIVE_TASK_STATUSES[0])
-            )
-            working = await app._storage.count_tasks(
-                status=cast(TaskState, ACTIVE_TASK_STATUSES[1])
-            )
-            input_required = await app._storage.count_tasks(
-                status=cast(TaskState, ACTIVE_TASK_STATUSES[2])
-            )
+            submitted = await app._storage.count_tasks(status=cast(TaskState, ACTIVE_TASK_STATUSES[0]))
+            working = await app._storage.count_tasks(status=cast(TaskState, ACTIVE_TASK_STATUSES[1]))
+            input_required = await app._storage.count_tasks(status=cast(TaskState, ACTIVE_TASK_STATUSES[2]))
 
             active_count = submitted + working + input_required
             metrics.set_agent_tasks_active(agent_id, active_count)

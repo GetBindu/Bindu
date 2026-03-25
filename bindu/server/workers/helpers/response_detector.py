@@ -82,9 +82,7 @@ class ResponseDetector:
         return None
 
     @staticmethod
-    def determine_task_state(
-        result: Any, structured: Optional[dict[str, Any]]
-    ) -> tuple[TaskState, Any]:
+    def determine_task_state(result: Any, structured: Optional[dict[str, Any]]) -> tuple[TaskState, Any]:
         """Determine task state from agent response.
 
         Handles multiple response types:

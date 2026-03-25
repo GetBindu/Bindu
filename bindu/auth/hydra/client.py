@@ -60,9 +60,7 @@ class HydraClient:
             },
         )
 
-        logger.debug(
-            f"Hydra client initialized: admin={admin_url}, public={self.public_url}"
-        )
+        logger.debug(f"Hydra client initialized: admin={admin_url}, public={self.public_url}")
 
     async def __aenter__(self) -> "HydraClient":
         """Async context manager entry."""
@@ -95,21 +93,15 @@ class HydraClient:
         }
 
         try:
-            response = await self._http_client.post(
-                "/admin/oauth2/introspect", data=data
-            )
+            response = await self._http_client.post("/admin/oauth2/introspect", data=data)
 
             if response.status != 200:
                 error_text = await response.text()
-                logger.error(
-                    f"Token introspection failed: {response.status} - {error_text}"
-                )
+                logger.error(f"Token introspection failed: {response.status} - {error_text}")
                 raise ValueError(f"Hydra introspection failed: {error_text}")
 
             result_data = await response.json()
-            logger.debug(
-                f"Token introspection successful: active={result_data.get('active')}"
-            )
+            logger.debug(f"Token introspection successful: active={result_data.get('active')}")
 
             return result_data
 
@@ -153,9 +145,7 @@ class HydraClient:
         try:
             # URL-encode client_id to handle DIDs with colons and special characters
             encoded_client_id = quote(client_id, safe="")
-            response = await self._http_client.get(
-                f"/admin/clients/{encoded_client_id}"
-            )
+            response = await self._http_client.get(f"/admin/clients/{encoded_client_id}")
 
             if response.status == 200:
                 return await response.json()
@@ -178,9 +168,7 @@ class HydraClient:
             logger.error(f"Failed to get OAuth client: {error}")
             raise
 
-    async def list_oauth_clients(
-        self, limit: int = 100, offset: int = 0
-    ) -> List[Dict[str, Any]]:
+    async def list_oauth_clients(self, limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
         """List OAuth2 clients.
 
         Args:
@@ -191,9 +179,7 @@ class HydraClient:
             List of OAuth2 clients
         """
         try:
-            response = await self._http_client.get(
-                f"/admin/clients?limit={limit}&offset={offset}"
-            )
+            response = await self._http_client.get(f"/admin/clients?limit={limit}&offset={offset}")
 
             if response.status != 200:
                 error_text = await response.text()
@@ -217,9 +203,7 @@ class HydraClient:
         try:
             # URL-encode client_id to handle DIDs with colons and special characters
             encoded_client_id = quote(client_id, safe="")
-            response = await self._http_client.delete(
-                f"/admin/clients/{encoded_client_id}"
-            )
+            response = await self._http_client.delete(f"/admin/clients/{encoded_client_id}")
 
             if response.status in (200, 204):
                 return True

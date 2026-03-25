@@ -102,9 +102,7 @@ class ConfigValidator:
                     break
                 value = value[key]
 
-            if field not in missing and (
-                value is None or (isinstance(value, str) and not value.strip())
-            ):
+            if field not in missing and (value is None or (isinstance(value, str) and not value.strip())):
                 missing.append(field)
 
         if missing:
@@ -192,19 +190,12 @@ class ConfigValidator:
             cls._validate_field_type(config, field, bool)
 
         if "debug_level" in config:
-            if not isinstance(config["debug_level"], int) or config[
-                "debug_level"
-            ] not in [1, 2]:
+            if not isinstance(config["debug_level"], int) or config["debug_level"] not in [1, 2]:
                 raise ValueError("Field 'debug_level' must be 1 or 2")
 
         if "num_history_sessions" in config:
-            if (
-                not isinstance(config["num_history_sessions"], int)
-                or config["num_history_sessions"] < 0
-            ):
-                raise ValueError(
-                    "Field 'num_history_sessions' must be a non-negative integer"
-                )
+            if not isinstance(config["num_history_sessions"], int) or config["num_history_sessions"] < 0:
+                raise ValueError("Field 'num_history_sessions' must be a non-negative integer")
 
         if config.get("kind") not in ["agent", "team", "workflow"]:
             raise ValueError("Field 'kind' must be one of: agent, team, workflow")
@@ -223,14 +214,10 @@ class ConfigValidator:
 
                 for item in execution_cost:
                     if not isinstance(item, dict):
-                        raise ValueError(
-                            "Field 'execution_cost' must be a dict or a list of dicts"
-                        )
+                        raise ValueError("Field 'execution_cost' must be a dict or a list of dicts")
             else:
                 # Any other type is invalid
-                raise ValueError(
-                    "Field 'execution_cost' must be a dict or a list of dicts"
-                )
+                raise ValueError("Field 'execution_cost' must be a dict or a list of dicts")
 
     # ------------------------------------------------------------------
     # Auth validation
@@ -249,9 +236,7 @@ class ConfigValidator:
         if provider == "hydra":
             cls._validate_hydra_config(auth_config)
         else:
-            raise ValueError(
-                f"Unknown auth provider: '{provider}'. Supported providers: hydra"
-            )
+            raise ValueError(f"Unknown auth provider: '{provider}'. Supported providers: hydra")
 
     @classmethod
     def _validate_hydra_config(cls, auth_config: Dict[str, Any]) -> None:
@@ -259,8 +244,7 @@ class ConfigValidator:
             admin_url = auth_config["admin_url"]
             if not admin_url.startswith(("http://", "https://")):
                 raise ValueError(
-                    f"Invalid Hydra admin_url: '{admin_url}'. "
-                    f"Expected format: 'https://hydra-admin.getbindu.com'"
+                    f"Invalid Hydra admin_url: '{admin_url}'. Expected format: 'https://hydra-admin.getbindu.com'"
                 )
 
     # ------------------------------------------------------------------

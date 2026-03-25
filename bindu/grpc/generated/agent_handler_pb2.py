@@ -11,9 +11,7 @@ from google.protobuf import runtime_version as _runtime_version
 from google.protobuf import symbol_database as _symbol_database
 from google.protobuf.internal import builder as _builder
 
-_runtime_version.ValidateProtobufRuntimeVersion(
-    _runtime_version.Domain.PUBLIC, 6, 31, 1, "", "agent_handler.proto"
-)
+_runtime_version.ValidateProtobufRuntimeVersion(_runtime_version.Domain.PUBLIC, 6, 31, 1, "", "agent_handler.proto")
 # @@protoc_insertion_point(imports)
 
 _sym_db = _symbol_database.Default()
@@ -28,11 +26,7 @@ _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, "agent_handler_pb2", _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
     _globals["DESCRIPTOR"]._loaded_options = None
-    _globals[
-        "DESCRIPTOR"
-    ]._serialized_options = (
-        b"\n\021com.getbindu.grpcP\001Z\037github.com/getbindu/bindu/proto"
-    )
+    _globals["DESCRIPTOR"]._serialized_options = b"\n\021com.getbindu.grpcP\001Z\037github.com/getbindu/bindu/proto"
     _globals["_HANDLERESPONSE_METADATAENTRY"]._loaded_options = None
     _globals["_HANDLERESPONSE_METADATAENTRY"]._serialized_options = b"8\001"
     _globals["_REGISTERAGENTREQUEST"]._serialized_start = 35

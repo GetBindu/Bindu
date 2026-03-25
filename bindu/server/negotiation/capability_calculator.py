@@ -67,13 +67,7 @@ class ScoringWeights:
     @cached_property
     def normalized(self) -> dict[str, float]:
         """Return weights normalized to sum to 1.0 (cached)."""
-        total = (
-            self.skill_match
-            + self.io_compatibility
-            + self.performance
-            + self.load
-            + self.cost
-        )
+        total = self.skill_match + self.io_compatibility + self.performance + self.load + self.cost
         if total == 0:
             return {
                 "skill_match": DEFAULT_EQUAL_WEIGHT,
@@ -313,18 +307,12 @@ class CapabilityCalculator:
         """Check hard constraints that cause immediate rejection."""
         # Check if input mime types are supported
         if input_mime_types:
-            if not any(
-                any(im in skill.get("input_modes", []) for im in input_mime_types)
-                for skill in self._skills
-            ):
+            if not any(any(im in skill.get("input_modes", []) for im in input_mime_types) for skill in self._skills):
                 return "input_mime_unsupported"
 
         # Check if output mime types are supported
         if output_mime_types:
-            if not any(
-                any(om in skill.get("output_modes", []) for om in output_mime_types)
-                for skill in self._skills
-            ):
+            if not any(any(om in skill.get("output_modes", []) for om in output_mime_types) for skill in self._skills):
                 return "output_mime_unsupported"
 
         # Check required tools
@@ -371,25 +359,19 @@ class CapabilityCalculator:
             # Tags
             for tag in tags:
                 keywords.update(
-                    t
-                    for t in _TOKEN_SPLIT_PATTERN.split(tag.lower())
-                    if 2 <= len(t) <= self.MAX_KEYWORD_LENGTH
+                    t for t in _TOKEN_SPLIT_PATTERN.split(tag.lower()) if 2 <= len(t) <= self.MAX_KEYWORD_LENGTH
                 )
 
             # Skill name
             keywords.update(
-                t
-                for t in _TOKEN_SPLIT_PATTERN.split(skill_name.lower())
-                if 2 <= len(t) <= self.MAX_KEYWORD_LENGTH
+                t for t in _TOKEN_SPLIT_PATTERN.split(skill_name.lower()) if 2 <= len(t) <= self.MAX_KEYWORD_LENGTH
             )
 
             # Capability names
             if isinstance(caps_detail, dict):
                 for cap_key in caps_detail.keys():
                     keywords.update(
-                        t
-                        for t in _TOKEN_SPLIT_PATTERN.split(cap_key.lower())
-                        if 2 <= len(t) <= self.MAX_KEYWORD_LENGTH
+                        t for t in _TOKEN_SPLIT_PATTERN.split(cap_key.lower()) if 2 <= len(t) <= self.MAX_KEYWORD_LENGTH
                     )
 
             # Extract assessment fields
@@ -426,20 +408,14 @@ class CapabilityCalculator:
             from bindu.server.negotiation.embedder import SkillEmbedder
 
             self._embedder = SkillEmbedder(api_key=self._embedding_api_key)
-            self._skill_embeddings = await self._embedder.compute_skill_embeddings(
-                self._skills
-            )
+            self._skill_embeddings = await self._embedder.compute_skill_embeddings(self._skills)
         except ImportError:
             logger = get_logger("bindu.server.negotiation.capability_calculator")
-            logger.warning(
-                "Required dependencies not available. Falling back to keyword matching."
-            )
+            logger.warning("Required dependencies not available. Falling back to keyword matching.")
             self._use_embeddings = False
         except Exception as e:
             logger = get_logger("bindu.server.negotiation.capability_calculator")
-            logger.warning(
-                f"Failed to initialize embeddings: {e}. Using keyword matching."
-            )
+            logger.warning(f"Failed to initialize embeddings: {e}. Using keyword matching.")
             self._use_embeddings = False
 
     async def _calculate_skill_match(
@@ -467,13 +443,9 @@ class CapabilityCalculator:
             if self._embedder and self._skill_embeddings:
                 try:
                     task_text = task_details or ""
-                    task_embedding = await self._embedder.embed_task_cached(
-                        task_summary, task_text
-                    )
+                    task_embedding = await self._embedder.embed_task_cached(task_summary, task_text)
                 except Exception as e:
-                    logger = get_logger(
-                        "bindu.server.negotiation.capability_calculator"
-                    )
+                    logger = get_logger("bindu.server.negotiation.capability_calculator")
                     logger.warning(f"Failed to embed task: {e}")
 
         for skill_meta in self._skill_metadata:
@@ -496,11 +468,7 @@ class CapabilityCalculator:
 
             # Calculate embedding similarity if available
             embedding_score = 0.0
-            if (
-                task_embedding is not None
-                and self._skill_embeddings
-                and skill_id in self._skill_embeddings
-            ):
+            if task_embedding is not None and self._skill_embeddings and skill_id in self._skill_embeddings:
                 from bindu.server.negotiation.embedder import cosine_similarity
 
                 skill_emb = self._skill_embeddings[skill_id]["embedding"]
@@ -515,9 +483,7 @@ class CapabilityCalculator:
             if task_embedding is not None and embedding_score > 0:
                 emb_weight = app_settings.negotiation.embedding_weight
                 kw_weight = app_settings.negotiation.keyword_weight
-                base_score = (emb_weight * embedding_score) + (
-                    kw_weight * keyword_score
-                )
+                base_score = (emb_weight * embedding_score) + (kw_weight * keyword_score)
             else:
                 base_score = keyword_score
 
@@ -528,11 +494,7 @@ class CapabilityCalculator:
                     if isinstance(spec, dict):
                         domain = spec.get("domain", "")
                         boost = spec.get("confidence_boost", 0.0)
-                        if (
-                            domain
-                            and task_summary
-                            and domain.lower() in task_summary.lower()
-                        ):
+                        if domain and task_summary and domain.lower() in task_summary.lower():
                             base_score = min(1.0, base_score + boost)
 
             match_score = base_score
@@ -543,9 +505,7 @@ class CapabilityCalculator:
                 reasons.append(f"semantic similarity: {embedding_score:.2f}")
 
             matched_tags_for_skill = [
-                tag
-                for tag in tags
-                if any(t.lower() in intersection for t in tag.lower().split())
+                tag for tag in tags if any(t.lower() in intersection for t in tag.lower().split())
             ]
             if matched_tags_for_skill:
                 reasons.append(f"tags: {', '.join(matched_tags_for_skill)}")
@@ -591,14 +551,12 @@ class CapabilityCalculator:
 
         if input_mime_types:
             input_match = any(
-                any(im in skill.get("input_modes", []) for im in input_mime_types)
-                for skill in self._skills
+                any(im in skill.get("input_modes", []) for im in input_mime_types) for skill in self._skills
             )
 
         if output_mime_types:
             output_match = any(
-                any(om in skill.get("output_modes", []) for om in output_mime_types)
-                for skill in self._skills
+                any(om in skill.get("output_modes", []) for om in output_mime_types) for skill in self._skills
             )
 
         if input_mime_types and output_mime_types:

@@ -88,9 +88,7 @@ async def did_resolve_endpoint(app: BinduApplication, request: Request) -> Respo
 
     # Validate DID extension has required method
     if not hasattr(did_extension, "get_did_document"):
-        return _did_not_found_error(
-            did, "DID extension missing 'get_did_document' method", client_ip
-        )
+        return _did_not_found_error(did, "DID extension missing 'get_did_document' method", client_ip)
 
     logger.debug(f"Resolving DID {did} for {client_ip}")
     did_document = did_extension.get_did_document()

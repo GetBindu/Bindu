@@ -68,9 +68,7 @@ class InMemoryStorage(Storage[dict[str, Any]]):
         min_wait=DEFAULT_STORAGE_MIN_WAIT,
         max_wait=DEFAULT_STORAGE_MAX_WAIT,
     )
-    async def load_task(
-        self, task_id: UUID, history_length: int | None = None
-    ) -> Task | None:
+    async def load_task(self, task_id: UUID, history_length: int | None = None) -> Task | None:
         """Load a task from memory.
 
         Args:
@@ -130,9 +128,7 @@ class InMemoryStorage(Storage[dict[str, Any]]):
         elif isinstance(task_id_raw, UUID):
             task_id = task_id_raw
         else:
-            raise TypeError(
-                f"task_id must be UUID or str, got {type(task_id_raw).__name__}"
-            )
+            raise TypeError(f"task_id must be UUID or str, got {type(task_id_raw).__name__}")
 
         # Ensure all UUID fields are proper UUID objects (normalize to snake_case)
         message["task_id"] = task_id
@@ -142,9 +138,7 @@ class InMemoryStorage(Storage[dict[str, Any]]):
         if isinstance(message_id_raw, str):
             message["message_id"] = UUID(message_id_raw)
         elif message_id_raw is not None and not isinstance(message_id_raw, UUID):
-            raise TypeError(
-                f"message_id must be UUID or str, got {type(message_id_raw).__name__}"
-            )
+            raise TypeError(f"message_id must be UUID or str, got {type(message_id_raw).__name__}")
 
         # Validate and normalize reference_task_ids if present (handle both formats)
         ref_ids_key = "reference_task_ids"
@@ -158,9 +152,7 @@ class InMemoryStorage(Storage[dict[str, Any]]):
                     elif isinstance(ref_id, UUID):
                         normalized_refs.append(ref_id)
                     else:
-                        raise TypeError(
-                            f"reference_task_id must be UUID or str, got {type(ref_id).__name__}"
-                        )
+                        raise TypeError(f"reference_task_id must be UUID or str, got {type(ref_id).__name__}")
                 message["reference_task_ids"] = normalized_refs
 
         # Check if task already exists
@@ -178,25 +170,19 @@ class InMemoryStorage(Storage[dict[str, Any]]):
                 )
 
             # Non-terminal states (mutable) - append message and continue
-            logger.info(
-                f"Continuing existing task {task_id} from state '{current_state}'"
-            )
+            logger.info(f"Continuing existing task {task_id} from state '{current_state}'")
 
             if "history" not in existing_task:
                 existing_task["history"] = []
             existing_task["history"].append(message)
 
             # Reset to submitted state for re-execution
-            existing_task["status"] = TaskStatus(
-                state="submitted", timestamp=datetime.now(timezone.utc).isoformat()
-            )
+            existing_task["status"] = TaskStatus(state="submitted", timestamp=datetime.now(timezone.utc).isoformat())
 
             return existing_task
 
         # Task doesn't exist - create new task
-        task_status = TaskStatus(
-            state="submitted", timestamp=datetime.now(timezone.utc).isoformat()
-        )
+        task_status = TaskStatus(state="submitted", timestamp=datetime.now(timezone.utc).isoformat())
         task = Task(
             id=task_id,
             context_id=context_id,
@@ -252,9 +238,7 @@ class InMemoryStorage(Storage[dict[str, Any]]):
             raise KeyError(f"Task {task_id} not found")
 
         task = self.tasks[task_id]
-        task["status"] = TaskStatus(
-            state=state, timestamp=datetime.now(timezone.utc).isoformat()
-        )
+        task["status"] = TaskStatus(state=state, timestamp=datetime.now(timezone.utc).isoformat())
 
         if metadata:
             if "metadata" not in task:
@@ -272,9 +256,7 @@ class InMemoryStorage(Storage[dict[str, Any]]):
             # Add IDs to messages for consistency
             for message in new_messages:
                 if not isinstance(message, dict):
-                    raise TypeError(
-                        f"Message must be dict, got {type(message).__name__}"
-                    )
+                    raise TypeError(f"Message must be dict, got {type(message).__name__}")
                 message["task_id"] = task_id
                 message["context_id"] = task["context_id"]
                 task["history"].append(message)
@@ -319,9 +301,7 @@ class InMemoryStorage(Storage[dict[str, Any]]):
         # Wrap task list in dict to match expected return type
         return {"task_ids": task_list}
 
-    async def append_to_contexts(
-        self, context_id: UUID, messages: list[Message]
-    ) -> None:
+    async def append_to_contexts(self, context_id: UUID, messages: list[Message]) -> None:
         """Append messages to context history.
 
         Note: This method is deprecated as contexts now store task lists.
@@ -343,9 +323,7 @@ class InMemoryStorage(Storage[dict[str, Any]]):
         # to ensure context-task mapping associations are safely preserved.
         pass
 
-    async def list_tasks(
-        self, length: int | None = None, offset: int = 0
-    ) -> list[Task]:
+    async def list_tasks(self, length: int | None = None, offset: int = 0) -> list[Task]:
         """List all tasks in storage.
 
         Args:
@@ -379,9 +357,7 @@ class InMemoryStorage(Storage[dict[str, Any]]):
 
         return sum(1 for t in self.tasks.values() if t["status"]["state"] == status)
 
-    async def list_tasks_by_context(
-        self, context_id: UUID, length: int | None = None, offset: int = 0
-    ) -> list[Task]:
+    async def list_tasks_by_context(self, context_id: UUID, length: int | None = None, offset: int = 0) -> list[Task]:
         """List tasks belonging to a specific context.
 
         Used for building conversation history and supporting task refinements.
@@ -401,9 +377,7 @@ class InMemoryStorage(Storage[dict[str, Any]]):
 
         # Get task IDs from context
         task_ids = self.contexts.get(context_id, [])
-        tasks: list[Task] = [
-            self.tasks[task_id] for task_id in task_ids if task_id in self.tasks
-        ]
+        tasks: list[Task] = [self.tasks[task_id] for task_id in task_ids if task_id in self.tasks]
 
         if offset > 0:
             tasks = tasks[offset:]
@@ -413,9 +387,7 @@ class InMemoryStorage(Storage[dict[str, Any]]):
 
         return tasks
 
-    async def list_contexts(
-        self, length: int | None = None, offset: int = 0
-    ) -> list[dict[str, Any]]:
+    async def list_contexts(self, length: int | None = None, offset: int = 0) -> list[dict[str, Any]]:
         """List all contexts in storage.
 
         Args:
@@ -490,9 +462,7 @@ class InMemoryStorage(Storage[dict[str, Any]]):
         """Safely close and cleanup resources."""
         await self.clear_all()
 
-    async def store_task_feedback(
-        self, task_id: UUID, feedback_data: dict[str, Any]
-    ) -> None:
+    async def store_task_feedback(self, task_id: UUID, feedback_data: dict[str, Any]) -> None:
         """Store user feedback for a task.
 
         Args:
@@ -505,9 +475,7 @@ class InMemoryStorage(Storage[dict[str, Any]]):
         task_id = validate_uuid_type(task_id, "task_id")
 
         if not isinstance(feedback_data, dict):
-            raise TypeError(
-                f"feedback_data must be dict, got {type(feedback_data).__name__}"
-            )
+            raise TypeError(f"feedback_data must be dict, got {type(feedback_data).__name__}")
 
         if task_id not in self.task_feedback:
             self.task_feedback[task_id] = []
@@ -533,9 +501,7 @@ class InMemoryStorage(Storage[dict[str, Any]]):
     # Webhook Persistence Operations (for long-running tasks)
     # -------------------------------------------------------------------------
 
-    async def save_webhook_config(
-        self, task_id: UUID, config: PushNotificationConfig
-    ) -> None:
+    async def save_webhook_config(self, task_id: UUID, config: PushNotificationConfig) -> None:
         """Save a webhook configuration for a task.
 
         Args:

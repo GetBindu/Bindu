@@ -60,9 +60,7 @@ class X402AgentExtension:
             # Basic type check – detailed validation happens earlier in config flow
             for entry in payment_options:
                 if not isinstance(entry, dict):
-                    raise ValueError(
-                        "payment_options must contain only dictionary entries"
-                    )
+                    raise ValueError("payment_options must contain only dictionary entries")
 
             self.payment_options = payment_options
 
@@ -74,8 +72,7 @@ class X402AgentExtension:
 
             if required and not primary_pay_to:
                 raise ValueError(
-                    "pay_to_address is required for at least one execution_cost entry "
-                    "when payment is enabled"
+                    "pay_to_address is required for at least one execution_cost entry when payment is enabled"
                 )
 
             self.amount = primary_amount
@@ -84,10 +81,7 @@ class X402AgentExtension:
             self.pay_to_address = primary_pay_to
         else:
             if amount is None:
-                raise ValueError(
-                    "amount is required when payment is enabled and no payment_options "
-                    "are provided"
-                )
+                raise ValueError("amount is required when payment is enabled and no payment_options are provided")
             if required and not pay_to_address:
                 raise ValueError("pay_to_address is required when payment is enabled")
 

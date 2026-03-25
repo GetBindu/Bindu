@@ -20,9 +20,7 @@ from bindu.utils.logging import get_logger
 logger = get_logger("bindu.auth.hydra_registration")
 
 
-def save_agent_credentials(
-    credentials: AgentCredentials, credentials_dir: Path
-) -> None:
+def save_agent_credentials(credentials: AgentCredentials, credentials_dir: Path) -> None:
     """Save agent OAuth credentials to .GetBindu.com.
 
     Credentials are keyed by DID (client_id) instead of agent_id because
@@ -58,9 +56,7 @@ def save_agent_credentials(
     logger.warning(f"⚠️  Keep {creds_file} secure and add to .gitignore!")
 
 
-def load_agent_credentials(
-    did: str, credentials_dir: Path
-) -> Optional[AgentCredentials]:
+def load_agent_credentials(did: str, credentials_dir: Path) -> Optional[AgentCredentials]:
     """Load agent OAuth credentials from .GetBindu.com.
 
     Credentials are looked up by DID (client_id) instead of agent_id because
@@ -146,18 +142,12 @@ async def register_agent_in_hydra(
                     vault_creds = await vault_client.get_hydra_credentials(did)
 
                     if vault_creds:
-                        logger.info(
-                            f"✅ Found Hydra credentials in Vault for DID: {did}"
-                        )
+                        logger.info(f"✅ Found Hydra credentials in Vault for DID: {did}")
 
                         # Verify the client still exists in Hydra
-                        existing_client = await hydra.get_oauth_client(
-                            vault_creds.client_id
-                        )
+                        existing_client = await hydra.get_oauth_client(vault_creds.client_id)
                         if existing_client:
-                            logger.info(
-                                f"✅ Hydra client verified in server: {vault_creds.client_id}"
-                            )
+                            logger.info(f"✅ Hydra client verified in server: {vault_creds.client_id}")
                             # Save to local file as backup
                             save_agent_credentials(vault_creds, credentials_dir)
                             return vault_creds
@@ -185,40 +175,32 @@ async def register_agent_in_hydra(
                         try:
                             await vault_client.store_hydra_credentials(existing_creds)
                         except Exception as e:
-                            logger.warning(
-                                f"Failed to backup credentials to Vault: {e}"
-                            )
+                            logger.warning(f"Failed to backup credentials to Vault: {e}")
 
                     return existing_creds
                 elif vault_creds:
                     # We have vault creds and client exists, use vault creds
-                    logger.info(
-                        f"Using Vault credentials for existing Hydra client: {did}"
-                    )
+                    logger.info(f"Using Vault credentials for existing Hydra client: {did}")
                     save_agent_credentials(vault_creds, credentials_dir)
                     return vault_creds
                 else:
                     # Client exists in Hydra but no credentials anywhere - delete and recreate
                     logger.warning(
-                        f"Client {client_id} exists in Hydra but no credentials found. "
-                        "Deleting and recreating..."
+                        f"Client {client_id} exists in Hydra but no credentials found. Deleting and recreating..."
                     )
                     await hydra.delete_oauth_client(client_id)
             else:
                 # Client doesn't exist in Hydra
                 if vault_creds:
                     # Use vault credentials to recreate client
-                    logger.info(
-                        f"Recreating Hydra client with Vault credentials for DID: {did}"
-                    )
+                    logger.info(f"Recreating Hydra client with Vault credentials for DID: {did}")
                     client_secret = vault_creds.client_secret
                 else:
                     # Check if we have stale local credentials
                     existing_creds = load_agent_credentials(did, credentials_dir)
                     if existing_creds:
                         logger.warning(
-                            f"Local credentials exist for {did} but client not found in Hydra. "
-                            "Creating new client..."
+                            f"Local credentials exist for {did} but client not found in Hydra. Creating new client..."
                         )
 
             # Extract public key from DID extension if available
@@ -228,13 +210,9 @@ async def register_agent_in_hydra(
                 try:
                     public_key = did_extension.public_key_base58
                     key_type = "Ed25519"
-                    logger.info(
-                        f"Extracted public key (base58) from DID extension for {did}"
-                    )
+                    logger.info(f"Extracted public key (base58) from DID extension for {did}")
                 except Exception as e:
-                    logger.warning(
-                        f"Failed to extract public key from DID extension: {e}"
-                    )
+                    logger.warning(f"Failed to extract public key from DID extension: {e}")
 
             # Create new OAuth client with DID metadata
             client_data = {
@@ -251,9 +229,7 @@ async def register_agent_in_hydra(
                     "did": did,
                     "public_key": public_key,
                     "key_type": key_type,
-                    "verification_method": app_settings.did.verification_key_type
-                    if key_type
-                    else None,
+                    "verification_method": app_settings.did.verification_key_type if key_type else None,
                     "registered_at": datetime.now(timezone.utc).isoformat(),
                     "hybrid_auth": True,  # Flag for hybrid OAuth2 + DID authentication
                 },
@@ -277,9 +253,7 @@ async def register_agent_in_hydra(
             # Backup to Vault if enabled
             if vault_client:
                 try:
-                    vault_stored = await vault_client.store_hydra_credentials(
-                        credentials
-                    )
+                    vault_stored = await vault_client.store_hydra_credentials(credentials)
                     if vault_stored:
                         logger.info("✅ Hydra credentials backed up to Vault")
                     else:
@@ -291,10 +265,7 @@ async def register_agent_in_hydra(
 
     except Exception as e:
         logger.error(f"Failed to register agent in Hydra: {e}")
-        logger.warning(
-            "Agent will start without OAuth credentials. "
-            "Authentication may not work correctly."
-        )
+        logger.warning("Agent will start without OAuth credentials. Authentication may not work correctly.")
         return None
     finally:
         # Clean up VaultClient

@@ -105,9 +105,7 @@ def handle_endpoint_errors(endpoint_name: str) -> Callable:
             try:
                 return await func(*args, **kwargs)
             except Exception as e:
-                logger.error(
-                    f"Error serving {endpoint_name} to {client_ip}: {e}", exc_info=True
-                )
+                logger.error(f"Error serving {endpoint_name} to {client_ip}: {e}", exc_info=True)
                 code, message = extract_error_fields(InternalError)
                 return jsonrpc_error(code, message, str(e), status=500)
 
@@ -141,9 +139,7 @@ def validate_manifest(
         code, message = extract_error_fields(error_type)
         return jsonrpc_error(code, message, "Agent manifest not configured", status=500)
     else:
-        return JSONResponse(
-            content={"error": "Agent manifest not configured"}, status_code=500
-        )
+        return JSONResponse(content={"error": "Agent manifest not configured"}, status_code=500)
 
 
 def get_agent_did(app: Any) -> str | None:
@@ -155,11 +151,7 @@ def get_agent_did(app: Any) -> str | None:
     Returns:
         Agent DID if available, None otherwise
     """
-    if (
-        app.manifest
-        and hasattr(app.manifest, "did_extension")
-        and app.manifest.did_extension
-    ):
+    if app.manifest and hasattr(app.manifest, "did_extension") and app.manifest.did_extension:
         return app.manifest.did_extension.did
     return None
 
@@ -282,9 +274,7 @@ def get_skill_or_error(app: Any, skill_id: str) -> tuple[Any, JSONResponse | Non
     return skill, None
 
 
-def validate_payment_manager(
-    app: Any, use_html: bool = False, error_html_generator: Any = None
-) -> Response | None:
+def validate_payment_manager(app: Any, use_html: bool = False, error_html_generator: Any = None) -> Response | None:
     """Validate payment session manager exists.
 
     Args:
@@ -308,6 +298,4 @@ def validate_payment_manager(
         )
         return HTMLResponse(content=error_content, status_code=503)
     else:
-        return JSONResponse(
-            content={"error": "Payment sessions not enabled"}, status_code=503
-        )
+        return JSONResponse(content={"error": "Payment sessions not enabled"}, status_code=503)

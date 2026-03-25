@@ -78,9 +78,7 @@ class AgentRegistry:
         )
         with self._lock:
             self._agents[agent_id] = entry
-        logger.info(
-            f"Registered agent {agent_id} with callback at {grpc_callback_address}"
-        )
+        logger.info(f"Registered agent {agent_id} with callback at {grpc_callback_address}")
         return entry
 
     def get(self, agent_id: str) -> RegisteredAgent | None:

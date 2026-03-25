@@ -103,9 +103,7 @@ class AuthMiddleware(ABC):
 
     # Main ASGI Dispatch
 
-    async def __call__(
-        self, scope: dict[str, Any], receive: Callable, send: Callable
-    ) -> None:
+    async def __call__(self, scope: dict[str, Any], receive: Callable, send: Callable) -> None:
         """Pure ASGI implementation bypassing BaseHTTPMiddleware limitations."""
         # We only care about HTTP and WebSocket connections
         if scope["type"] not in ("http", "websocket"):
@@ -126,9 +124,7 @@ class AuthMiddleware(ABC):
         token = self._extract_token(conn)
         if not token:
             logger.warning(f"No token provided for {path}")
-            await self._send_error(
-                scope, receive, send, AuthenticationRequiredError, 401
-            )
+            await self._send_error(scope, receive, send, AuthenticationRequiredError, 401)
             return
 
         # Validate token
@@ -158,9 +154,7 @@ class AuthMiddleware(ABC):
         # Attach context to ASGI state
         self._attach_user_context(scope, user_info, token_payload)
 
-        logger.debug(
-            f"Authenticated {path} - sub={user_info.get('sub')}, m2m={user_info.get('is_m2m', False)}"
-        )
+        logger.debug(f"Authenticated {path} - sub={user_info.get('sub')}, m2m={user_info.get('is_m2m', False)}")
 
         # Pass the unconsumed stream to the next application
         await self.app(scope, receive, send)
@@ -181,9 +175,7 @@ class AuthMiddleware(ABC):
 
         # JSON-RPC 2.0 states ID must be null on parse/auth errors
         # This prevents the DoS vector of parsing massive unauthenticated bodies
-        response = jsonrpc_error(
-            code=code, message=message, request_id=None, data=data, status=status
-        )
+        response = jsonrpc_error(code=code, message=message, request_id=None, data=data, status=status)
 
         if scope["type"] == "websocket":
             # Safely reject unauthenticated websockets

@@ -293,9 +293,7 @@ class OAuthClient:
     client_name: str | None = None
     client_secret: str | None = None
     redirect_uris: list[str] = field(default_factory=list)
-    grant_types: list[str] = field(
-        default_factory=lambda: ["authorization_code", "refresh_token"]
-    )
+    grant_types: list[str] = field(default_factory=lambda: ["authorization_code", "refresh_token"])
     response_types: list[str] = field(default_factory=lambda: ["code"])
     scope: str = "openid offline"
     token_endpoint_auth_method: str = "client_secret_basic"

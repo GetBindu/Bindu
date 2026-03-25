@@ -72,8 +72,7 @@ async def create_storage(did: str | None = None) -> Storage:
     elif backend == "postgres":
         if not POSTGRES_AVAILABLE or PostgresStorage is None:
             raise ValueError(
-                "PostgreSQL storage requires SQLAlchemy. "
-                "Install with: pip install sqlalchemy[asyncio] asyncpg"
+                "PostgreSQL storage requires SQLAlchemy. Install with: pip install sqlalchemy[asyncio] asyncpg"
             )
 
         # Validate postgres_url is provided
@@ -99,9 +98,7 @@ async def create_storage(did: str | None = None) -> Storage:
         return storage
 
     else:
-        raise ValueError(
-            f"Unknown storage backend: {backend}. Supported backends: memory, postgres"
-        )
+        raise ValueError(f"Unknown storage backend: {backend}. Supported backends: memory, postgres")
 
 
 async def close_storage(storage: Storage) -> None:

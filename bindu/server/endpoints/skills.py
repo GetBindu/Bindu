@@ -86,9 +86,7 @@ async def skill_detail_endpoint(app: BinduApplication, request: Request) -> Resp
     logger.debug(f"Serving skill detail for '{skill_id}' to {client_ip}")
 
     # Ensure manifest exists
-    error_resp = validate_manifest(
-        app, client_ip, use_jsonrpc=True, error_type=SkillNotFoundError
-    )
+    error_resp = validate_manifest(app, client_ip, use_jsonrpc=True, error_type=SkillNotFoundError)
     if error_resp:
         return error_resp
 
@@ -112,9 +110,7 @@ async def skill_detail_endpoint(app: BinduApplication, request: Request) -> Resp
 
 
 @handle_endpoint_errors("skill documentation")
-async def skill_documentation_endpoint(
-    app: BinduApplication, request: Request
-) -> Response:
+async def skill_documentation_endpoint(app: BinduApplication, request: Request) -> Response:
     """Get the full skill.yaml documentation for a specific skill.
 
     Returns the complete YAML documentation that orchestrators can use
@@ -130,9 +126,7 @@ async def skill_documentation_endpoint(
     logger.debug(f"Serving skill documentation for '{skill_id}' to {client_ip}")
 
     # Ensure manifest exists
-    error_resp = validate_manifest(
-        app, client_ip, use_jsonrpc=True, error_type=SkillNotFoundError
-    )
+    error_resp = validate_manifest(app, client_ip, use_jsonrpc=True, error_type=SkillNotFoundError)
     if error_resp:
         return error_resp
 
@@ -147,11 +141,7 @@ async def skill_documentation_endpoint(
     if not documentation:
         logger.warning(f"No documentation available for skill: {skill_id}")
         code, message = extract_error_fields(SkillNotFoundError)
-        return jsonrpc_error(
-            code, f"No documentation available for skill: {skill_id}", status=404
-        )
+        return jsonrpc_error(code, f"No documentation available for skill: {skill_id}", status=404)
 
     # Return as YAML
-    return create_response_with_x402(
-        request, documentation, response_type=Response, media_type="application/yaml"
-    )
+    return create_response_with_x402(request, documentation, response_type=Response, media_type="application/yaml")

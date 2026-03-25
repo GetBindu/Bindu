@@ -106,9 +106,7 @@ def prepare_server_display(
 
     # Print ASCII art panel
     console.print()
-    console.print(
-        Panel(panel_content, title=title, border_style="bright_cyan", padding=(1, 2))
-    )
+    console.print(Panel(panel_content, title=title, border_style="bright_cyan", padding=(1, 2)))
     console.print()
 
     # Print version
@@ -118,9 +116,7 @@ def prepare_server_display(
     # Print server information
     if host and port:
         console.print(Text("🚀 Bindu Server 🚀", style="bold magenta"), highlight=False)
-        console.print(
-            Text(f"Local Server: http://{host}:{port}", style="green"), highlight=False
-        )
+        console.print(Text(f"Local Server: http://{host}:{port}", style="green"), highlight=False)
 
         # Display tunnel URL prominently if available
         if tunnel_url:
@@ -146,9 +142,7 @@ def prepare_server_display(
         base_url = tunnel_url if tunnel_url else f"http://{host}:{port}"
 
         console.print(Text("Protocol Endpoints:", style="bold white"), highlight=False)
-        console.print(
-            Text(f"  - Agent Endpoint: {base_url}/", style="white"), highlight=False
-        )
+        console.print(Text(f"  - Agent Endpoint: {base_url}/", style="white"), highlight=False)
         console.print(
             Text(f"  - Agent Card: {base_url}/.well-known/agent.json", style="white"),
             highlight=False,
@@ -164,9 +158,7 @@ def prepare_server_display(
         Text("⭐️⭐️⭐️ Support Open Source ⭐️⭐️⭐️", style="bold yellow"),
         highlight=False,
     )
-    console.print(
-        Text("⭐️⭐️⭐️ Star on GitHub! ⭐️⭐️⭐️", style="bold yellow"), highlight=False
-    )
+    console.print(Text("⭐️⭐️⭐️ Star on GitHub! ⭐️⭐️⭐️", style="bold yellow"), highlight=False)
     console.print(
         Text("https://github.com/getbindu/Bindu", style="cyan underline"),
         highlight=False,
@@ -174,22 +166,16 @@ def prepare_server_display(
     console.print()
 
     console.print(Text("Join our Community 🤝", style="bold green"), highlight=False)
-    console.print(
-        Text("https://discord.gg/3w5zuYUuwt", style="cyan underline"), highlight=False
-    )
+    console.print(Text("https://discord.gg/3w5zuYUuwt", style="cyan underline"), highlight=False)
     console.print()
 
     console.print(Text("Documentation 🌻", style="bold blue"), highlight=False)
-    console.print(
-        Text("https://docs.getbindu.com", style="cyan underline"), highlight=False
-    )
+    console.print(Text("https://docs.getbindu.com", style="cyan underline"), highlight=False)
     console.print()
 
     # Print token retrieval command if credentials are available
     if client_id and client_secret:
-        console.print(
-            Text("🔑 Get Access Token:", style="bold yellow"), highlight=False
-        )
+        console.print(Text("🔑 Get Access Token:", style="bold yellow"), highlight=False)
         curl_cmd = (
             f"curl -X POST https://hydra.getbindu.com/oauth2/token \\\n"
             f'  -H "Content-Type: application/x-www-form-urlencoded" \\\n'

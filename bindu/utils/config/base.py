@@ -49,9 +49,7 @@ class ConfigLoader:
         valid_types: Optional[List[str]] = None,
         default_type: Optional[str] = None,
         env_prefix: str = "",
-        type_specific_loaders: Optional[
-            Dict[str, Callable[[str], Dict[str, Any]]]
-        ] = None,
+        type_specific_loaders: Optional[Dict[str, Callable[[str], Dict[str, Any]]]] = None,
     ) -> Optional[T]:
         """Load typed configuration (storage, scheduler, etc.) with validation.
 
@@ -82,9 +80,7 @@ class ConfigLoader:
 
             # Validate type
             if valid_types and config_type not in valid_types:
-                logger.warning(
-                    f"Invalid {config_key} type: {config_type}, using {default_type}"
-                )
+                logger.warning(f"Invalid {config_key} type: {config_type}, using {default_type}")
                 config_type = default_type
 
             return config_class(**config_dict)
@@ -98,9 +94,7 @@ class ConfigLoader:
 
         # Validate type
         if valid_types and config_type not in valid_types:
-            logger.warning(
-                f"Invalid {config_key} type: {config_type}, using {default_type}"
-            )
+            logger.warning(f"Invalid {config_key} type: {config_type}, using {default_type}")
             config_type = default_type
 
         logger.debug(f"Loaded {env_type_key} from environment: {config_type}")
@@ -116,9 +110,7 @@ class ConfigLoader:
         return config_class(**config_data)
 
     @staticmethod
-    def load_boolean_from_env(
-        env_key: str, default: bool = False, true_values: tuple = ("true", "1", "yes")
-    ) -> bool:
+    def load_boolean_from_env(env_key: str, default: bool = False, true_values: tuple = ("true", "1", "yes")) -> bool:
         """Load boolean value from environment variable.
 
         Args:
@@ -166,8 +158,6 @@ class ConfigLoader:
         if required_when_enabled and config_dict.get("enabled"):
             for field in required_when_enabled:
                 if field not in config_dict or config_dict[field] is None:
-                    raise ValueError(
-                        f"{field} is required when {config_key} is enabled"
-                    )
+                    raise ValueError(f"{field} is required when {config_key} is enabled")
 
         return config_dict if config_dict else None

@@ -19,9 +19,7 @@ logger = get_logger("bindu.server.middleware.metrics")
 METRICS_ENDPOINT_PATH = "/metrics"
 
 # Pre-compiled regex patterns for endpoint sanitization
-UUID_PATTERN = re.compile(
-    r"/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
-)
+UUID_PATTERN = re.compile(r"/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 NUMERIC_ID_PATTERN = re.compile(r"/\d+")
 
 

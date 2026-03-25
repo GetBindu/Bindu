@@ -15,9 +15,7 @@ from bindu.utils.logging import get_logger
 logger = get_logger("bindu.utils.did_signature")
 
 
-def create_signature_payload(
-    body: str | bytes | dict, did: str, timestamp: Optional[int] = None
-) -> Dict[str, Any]:
+def create_signature_payload(body: str | bytes | dict, did: str, timestamp: Optional[int] = None) -> Dict[str, Any]:
     """Create signature payload for request signing.
 
     Args:
@@ -42,9 +40,7 @@ def create_signature_payload(
     return {"body": body_str, "timestamp": timestamp, "did": did}
 
 
-def sign_request(
-    body: str | bytes | dict, did: str, did_extension, timestamp: Optional[int] = None
-) -> Dict[str, str]:
+def sign_request(body: str | bytes | dict, did: str, did_extension, timestamp: Optional[int] = None) -> Dict[str, str]:
     """Sign a request with DID private key.
 
     Args:
@@ -95,10 +91,7 @@ def verify_signature(
         # Check timestamp to prevent replay attacks
         current_time = int(time.time())
         if abs(current_time - timestamp) > max_age_seconds:
-            logger.warning(
-                f"Request timestamp too old: {timestamp} vs {current_time} "
-                f"(max age: {max_age_seconds}s)"
-            )
+            logger.warning(f"Request timestamp too old: {timestamp} vs {current_time} (max age: {max_age_seconds}s)")
             return False
 
         # Reconstruct signature payload

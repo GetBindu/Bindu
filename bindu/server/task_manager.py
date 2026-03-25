@@ -182,9 +182,7 @@ class TaskManager:
         await self._aexit_stack.__aexit__(exc_type, exc_value, traceback)
         self._aexit_stack = None
 
-    def _create_error_response(
-        self, response_class: type, request_id: str, error_class: type, message: str
-    ) -> Any:
+    def _create_error_response(self, response_class: type, request_id: str, error_class: type, message: str) -> Any:
         """Create a standardized error response."""
         return response_class(
             jsonrpc=JSONRPC_VERSION,
@@ -208,9 +206,7 @@ class TaskManager:
                 return uuid.UUID(context_id)
             except ValueError:
                 # Log the issue so we know bad data is coming in, but don't crash
-                logger.warning(
-                    f"Received malformed context_id: '{context_id}'. Generating new UUID fallback."
-                )
+                logger.warning(f"Received malformed context_id: '{context_id}'. Generating new UUID fallback.")
                 pass
 
         return uuid.uuid4()
@@ -246,9 +242,7 @@ class TaskManager:
         """List all contexts in storage."""
         return await self._context_handlers.list_contexts(request)
 
-    async def clear_context(
-        self, request: ClearContextsRequest
-    ) -> ClearContextsResponse:
+    async def clear_context(self, request: ClearContextsRequest) -> ClearContextsResponse:
         """Clear a context from storage."""
         return await self._context_handlers.clear_context(request)
 
@@ -257,9 +251,7 @@ class TaskManager:
         self, request: SetTaskPushNotificationRequest
     ) -> SetTaskPushNotificationResponse:
         """Set push notification settings for a task."""
-        return await self._push_manager.set_task_push_notification(
-            request, self.storage.load_task
-        )
+        return await self._push_manager.set_task_push_notification(request, self.storage.load_task)
 
     async def get_task_push_notification(
         self, request: GetTaskPushNotificationRequest

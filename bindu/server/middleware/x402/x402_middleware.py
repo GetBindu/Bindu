@@ -122,9 +122,7 @@ class X402Middleware(BaseHTTPMiddleware):
                 logger.debug(f"Using cached Web3 connection for {network}")
                 return self._web3_connections[network], None
             except Exception as e:
-                logger.warning(
-                    f"Cached connection for {network} failed: {e}. Reconnecting..."
-                )
+                logger.warning(f"Cached connection for {network} failed: {e}. Reconnecting...")
                 del self._web3_connections[network]
 
         # Get RPC URLs for this network
@@ -139,17 +137,11 @@ class X402Middleware(BaseHTTPMiddleware):
         for rpc_url in rpc_urls:
             try:
                 logger.debug(f"Creating new Web3 connection to {rpc_url}")
-                w3 = Web3(
-                    Web3.HTTPProvider(
-                        rpc_url, request_kwargs={"timeout": WEB3_RPC_TIMEOUT_SECONDS}
-                    )
-                )
+                w3 = Web3(Web3.HTTPProvider(rpc_url, request_kwargs={"timeout": WEB3_RPC_TIMEOUT_SECONDS}))
 
                 # Test connection
                 chain_id = w3.eth.chain_id
-                logger.info(
-                    f"Successfully connected to {network} (chain_id={chain_id}) via {rpc_url}"
-                )
+                logger.info(f"Successfully connected to {network} (chain_id={chain_id}) via {rpc_url}")
 
                 # Cache the connection
                 self._web3_connections[network] = w3
@@ -161,9 +153,7 @@ class X402Middleware(BaseHTTPMiddleware):
                 continue
 
         # All connections failed
-        error_msg = (
-            f"Failed to connect to any {network} RPC provider. Last error: {last_error}"
-        )
+        error_msg = f"Failed to connect to any {network} RPC provider. Last error: {last_error}"
         logger.error(error_msg)
         return None, error_msg
 
@@ -177,11 +167,7 @@ class X402Middleware(BaseHTTPMiddleware):
         Returns:
             Response with payment enforcement or agent execution result
         """
-        if (
-            not self.x402_ext
-            or request.url.path != self.protected_path
-            or request.method != PROTECTED_METHOD
-        ):
+        if not self.x402_ext or request.url.path != self.protected_path or request.method != PROTECTED_METHOD:
             return await call_next(request)
 
         # Check if the JSON-RPC method requires payment
@@ -201,14 +187,10 @@ class X402Middleware(BaseHTTPMiddleware):
 
             # Check if method requires payment (configured in settings)
             if method not in app_settings.x402.protected_methods:
-                logger.debug(
-                    f"Method '{method}' does not require payment, allowing request"
-                )
+                logger.debug(f"Method '{method}' does not require payment, allowing request")
                 return await call_next(request)
 
-            logger.debug(
-                f"Method '{method}' requires payment, checking X-PAYMENT header"
-            )
+            logger.debug(f"Method '{method}' requires payment, checking X-PAYMENT header")
 
         except Exception as e:
             logger.warning(f"Error parsing request body: {e}")
@@ -229,16 +211,10 @@ class X402Middleware(BaseHTTPMiddleware):
             payment_dict = json.loads(safe_base64_decode(payment_header))
             payment_payload = PaymentPayload.model_validate(payment_dict)
         except Exception as e:
-            logger.warning(
-                f"Invalid X-PAYMENT header from {request.client.host if request.client else 'unknown'}: {e}"
-            )
-            return self._create_402_response(
-                f"Invalid X-PAYMENT header format: {str(e)}"
-            )
+            logger.warning(f"Invalid X-PAYMENT header from {request.client.host if request.client else 'unknown'}: {e}")
+            return self._create_402_response(f"Invalid X-PAYMENT header format: {str(e)}")
 
-        selected_payment_requirements = find_matching_payment_requirements(
-            self._payment_requirements, payment_payload
-        )
+        selected_payment_requirements = find_matching_payment_requirements(self._payment_requirements, payment_payload)
 
         if not selected_payment_requirements:
             return self._create_402_response("No matching payment requirements found")
@@ -247,9 +223,7 @@ class X402Middleware(BaseHTTPMiddleware):
             is_valid, error_reason = await self._validate_payment_manually(
                 payment_payload, selected_payment_requirements
             )
-            logger.info(
-                f"Manual payment validation: is_valid={is_valid}, error_reason={error_reason}"
-            )
+            logger.info(f"Manual payment validation: is_valid={is_valid}, error_reason={error_reason}")
         except Exception as e:
             logger.error(f"Payment verification error: {e}", exc_info=True)
             return self._create_402_response(f"Payment verification error: {str(e)}")
@@ -269,9 +243,7 @@ class X402Middleware(BaseHTTPMiddleware):
         # Attach payment details to request for later use by the worker
         request.state.payment_payload = payment_payload
         request.state.payment_requirements = selected_payment_requirements
-        request.state.verify_response = VerifyResponse(
-            is_valid=True, invalid_reason=None
-        )
+        request.state.verify_response = VerifyResponse(is_valid=True, invalid_reason=None)
 
         # Process the request (execute agent)
         # Payment settlement will be handled by ManifestWorker when task completes
@@ -339,9 +311,7 @@ class X402Middleware(BaseHTTPMiddleware):
             try:
                 # Get token contract address
                 token_address = Web3.to_checksum_address(payment_requirements.asset)
-                logger.info(
-                    f"Checking token contract: {token_address} on {payment_payload.network}"
-                )
+                logger.info(f"Checking token contract: {token_address} on {payment_payload.network}")
 
                 # Check if contract is deployed at this address
                 code = w3.eth.get_code(token_address)
@@ -351,13 +321,9 @@ class X402Middleware(BaseHTTPMiddleware):
                         f"This may be an incorrect token address. Skipping balance check."
                     )
                 else:
-                    logger.info(
-                        f"Contract found at {token_address}, bytecode length: {len(code)} bytes"
-                    )
+                    logger.info(f"Contract found at {token_address}, bytecode length: {len(code)} bytes")
 
-                    token_contract = w3.eth.contract(
-                        address=token_address, abi=ERC20_BALANCE_OF_ABI
-                    )
+                    token_contract = w3.eth.contract(address=token_address, abi=ERC20_BALANCE_OF_ABI)
 
                     # Check payer balance
                     payer_address = Web3.to_checksum_address(auth.from_)

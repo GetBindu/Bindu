@@ -37,9 +37,7 @@ PAYMENT_WAIT_TIMEOUT_SECONDS = 300  # 5 minutes
 
 
 @handle_endpoint_errors("start payment session")
-async def start_payment_session_endpoint(
-    app: BinduApplication, request: Request
-) -> Response:
+async def start_payment_session_endpoint(app: BinduApplication, request: Request) -> Response:
     """Start a new payment session.
 
     Returns:
@@ -76,9 +74,7 @@ async def payment_capture_endpoint(app: BinduApplication, request: Request) -> R
 
     Shows paywall UI and captures payment token when completed.
     """
-    error_resp = validate_payment_manager(
-        app, use_html=True, error_html_generator=_get_error_html
-    )
+    error_resp = validate_payment_manager(app, use_html=True, error_html_generator=_get_error_html)
     if error_resp:
         return error_resp
 
@@ -86,25 +82,19 @@ async def payment_capture_endpoint(app: BinduApplication, request: Request) -> R
 
     session_id = request.query_params.get("session_id")
     if not session_id:
-        return HTMLResponse(
-            content=_get_error_html("Session ID required"), status_code=400
-        )
+        return HTMLResponse(content=_get_error_html("Session ID required"), status_code=400)
 
     # Verify session exists
     session = app._payment_session_manager.get_session(session_id)
     if session is None:
-        return HTMLResponse(
-            content=_get_error_html("Session not found or expired"), status_code=404
-        )
+        return HTMLResponse(content=_get_error_html("Session not found or expired"), status_code=404)
 
     # Check if payment already completed
     if session.is_completed():
         return HTMLResponse(content=_get_success_html(session_id), status_code=200)
 
     # Check for payment token (from header or query param)
-    payment_token = request.headers.get("X-PAYMENT", "") or request.query_params.get(
-        "payment", ""
-    )
+    payment_token = request.headers.get("X-PAYMENT", "") or request.query_params.get("payment", "")
 
     if payment_token:
         # Payment completed - capture token
@@ -121,9 +111,7 @@ async def payment_capture_endpoint(app: BinduApplication, request: Request) -> R
 
         except Exception as e:
             error_msg = f"Invalid payment: {str(e)}"
-            logger.error(
-                f"Payment capture error for session {session_id}: {e}", exc_info=True
-            )
+            logger.error(f"Payment capture error for session {session_id}: {e}", exc_info=True)
             app._payment_session_manager.fail_session(session_id, error_msg)
 
             return HTMLResponse(content=_get_error_html(error_msg), status_code=400)
@@ -140,9 +128,7 @@ async def payment_capture_endpoint(app: BinduApplication, request: Request) -> R
     payment_reqs_with_session = []
     for req in app._payment_requirements:
         # Append session_id to resource URL using model_copy
-        updated_req = req.model_copy(
-            update={"resource": f"{req.resource}?session_id={session_id}"}
-        )
+        updated_req = req.model_copy(update={"resource": f"{req.resource}?session_id={session_id}"})
         payment_reqs_with_session.append(updated_req)
 
     html_content = get_paywall_html(
@@ -183,9 +169,7 @@ async def payment_status_endpoint(app: BinduApplication, request: Request) -> Re
         session = app._payment_session_manager.get_session(session_id)
 
     if session is None:
-        return JSONResponse(
-            content={"error": "Session not found or expired"}, status_code=404
-        )
+        return JSONResponse(content={"error": "Session not found or expired"}, status_code=404)
 
     # Prepare response
     response_data = {
@@ -250,9 +234,7 @@ def _get_common_styles() -> str:
     """
 
 
-def _get_base_html(
-    title: str, background_gradient: str, body_content: str, additional_styles: str = ""
-) -> str:
+def _get_base_html(title: str, background_gradient: str, body_content: str, additional_styles: str = "") -> str:
     """Generate base HTML structure for payment pages.
 
     Args:

@@ -120,8 +120,7 @@ def create_agent_card(app: BinduApplication) -> AgentCard:
         capabilities=cast(AgentCapabilities, capabilities),
         kind=manifest.kind,
         num_history_sessions=manifest.num_history_sessions,
-        extra_data=manifest.extra_data
-        or {"created": int(time()), "server_info": "bindu Agent Server"},
+        extra_data=manifest.extra_data or {"created": int(time()), "server_info": "bindu Agent Server"},
         debug_mode=manifest.debug_mode,
         debug_level=manifest.debug_level,
         monitoring=manifest.monitoring,

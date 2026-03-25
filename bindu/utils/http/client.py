@@ -124,11 +124,7 @@ class AsyncHTTPClient:
         assert self._session is not None
 
         # Build full URL
-        url = (
-            f"{self.base_url}{endpoint}"
-            if endpoint.startswith("/")
-            else f"{self.base_url}/{endpoint}"
-        )
+        url = f"{self.base_url}{endpoint}" if endpoint.startswith("/") else f"{self.base_url}/{endpoint}"
 
         # Merge headers
         request_headers = {**self.default_headers, **(headers or {})}
@@ -200,9 +196,7 @@ class AsyncHTTPClient:
         Returns:
             HTTP response
         """
-        return await self.request(
-            "GET", endpoint, params=params, headers=headers, **kwargs
-        )
+        return await self.request("GET", endpoint, params=params, headers=headers, **kwargs)
 
     @create_retry_decorator("api")
     async def post(
@@ -226,9 +220,7 @@ class AsyncHTTPClient:
         Returns:
             HTTP response
         """
-        return await self.request(
-            "POST", endpoint, data=data, json=json, headers=headers, **kwargs
-        )
+        return await self.request("POST", endpoint, data=data, json=json, headers=headers, **kwargs)
 
     @create_retry_decorator("api")
     async def put(
@@ -252,9 +244,7 @@ class AsyncHTTPClient:
         Returns:
             HTTP response
         """
-        return await self.request(
-            "PUT", endpoint, data=data, json=json, headers=headers, **kwargs
-        )
+        return await self.request("PUT", endpoint, data=data, json=json, headers=headers, **kwargs)
 
     @create_retry_decorator("api")
     async def delete(
@@ -298,9 +288,7 @@ class AsyncHTTPClient:
         Returns:
             HTTP response
         """
-        return await self.request(
-            "PATCH", endpoint, data=data, json=json, headers=headers, **kwargs
-        )
+        return await self.request("PATCH", endpoint, data=data, json=json, headers=headers, **kwargs)
 
 
 @asynccontextmanager

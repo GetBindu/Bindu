@@ -64,16 +64,12 @@ class Tunnel:
     def stop(self) -> None:
         """Stop the tunnel and cleanup the process."""
         if self.proc is not None:
-            logger.info(
-                f"Stopping tunnel {self.config.local_host}:{self.config.local_port} <> {self.public_url}"
-            )
+            logger.info(f"Stopping tunnel {self.config.local_host}:{self.config.local_port} <> {self.public_url}")
             try:
                 self.proc.terminate()
                 self.proc.wait(timeout=5)
             except subprocess.TimeoutExpired:
-                logger.warning(
-                    "Tunnel process did not terminate gracefully, killing..."
-                )
+                logger.warning("Tunnel process did not terminate gracefully, killing...")
                 self.proc.kill()
             except Exception as e:
                 logger.error(f"Error stopping tunnel: {e}")
@@ -207,9 +203,7 @@ class Tunnel:
                     else:
                         # URL not in output, construct it from config
                         url = self.config.get_public_url()
-                        logger.info(
-                            f"Tunnel started successfully, constructed URL: {url}"
-                        )
+                        logger.info(f"Tunnel started successfully, constructed URL: {url}")
 
                 # Check for login failure
                 elif "login to server failed" in line or "error" in line.lower():

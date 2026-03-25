@@ -113,9 +113,7 @@ def _get_or_create_calculator(app: BinduApplication) -> CapabilityCalculator:
 
     # Create new calculator
     skills = app.manifest.skills or [] if app.manifest else []
-    x402_extension = (
-        get_x402_extension_from_capabilities(app.manifest) if app.manifest else None
-    )
+    x402_extension = get_x402_extension_from_capabilities(app.manifest) if app.manifest else None
 
     # Get embedding API key from manifest negotiation config if available
     embedding_api_key = None
@@ -166,16 +164,12 @@ async def negotiation_endpoint(app: BinduApplication, request: Request) -> Respo
     # Early validation: required field
     task_summary = body.get("task_summary")
     if not task_summary:
-        return JSONResponse(
-            content={"error": "'task_summary' is required"}, status_code=400
-        )
+        return JSONResponse(content={"error": "'task_summary' is required"}, status_code=400)
 
     # Early validation: task_summary length
     if len(task_summary) > MAX_TASK_SUMMARY_LENGTH:
         return JSONResponse(
-            content={
-                "error": f"task_summary exceeds maximum length of {MAX_TASK_SUMMARY_LENGTH} characters"
-            },
+            content={"error": f"task_summary exceeds maximum length of {MAX_TASK_SUMMARY_LENGTH} characters"},
             status_code=400,
         )
 
@@ -196,22 +190,14 @@ async def negotiation_endpoint(app: BinduApplication, request: Request) -> Respo
         w = body["weights"]
         try:
             weights = ScoringWeights(
-                skill_match=w.get(
-                    "skill_match", DEFAULT_SCORING_WEIGHTS["skill_match"]
-                ),
-                io_compatibility=w.get(
-                    "io_compatibility", DEFAULT_SCORING_WEIGHTS["io_compatibility"]
-                ),
-                performance=w.get(
-                    "performance", DEFAULT_SCORING_WEIGHTS["performance"]
-                ),
+                skill_match=w.get("skill_match", DEFAULT_SCORING_WEIGHTS["skill_match"]),
+                io_compatibility=w.get("io_compatibility", DEFAULT_SCORING_WEIGHTS["io_compatibility"]),
+                performance=w.get("performance", DEFAULT_SCORING_WEIGHTS["performance"]),
                 load=w.get("load", DEFAULT_SCORING_WEIGHTS["load"]),
                 cost=w.get("cost", DEFAULT_SCORING_WEIGHTS["cost"]),
             )
         except ValueError as e:
-            return JSONResponse(
-                content={"error": f"Invalid weights: {e}"}, status_code=400
-            )
+            return JSONResponse(content={"error": f"Invalid weights: {e}"}, status_code=400)
 
     # Get queue depth by counting non-terminal tasks from storage
     queue_depth = None
@@ -224,10 +210,7 @@ async def negotiation_endpoint(app: BinduApplication, request: Request) -> Respo
             # the wrong key made queue_depth always 0, so load score was
             # permanently pegged at 1.0 regardless of actual queue depth.
             queue_depth = sum(
-                1
-                for task in tasks
-                if task.get("status", {}).get("state")
-                in app_settings.agent.non_terminal_states
+                1 for task in tasks if task.get("status", {}).get("state") in app_settings.agent.non_terminal_states
             )
         except Exception as e:
             logger.warning(f"Failed to get queue depth from storage: {e}")

@@ -100,9 +100,7 @@ def create_scheduler_config_from_env(user_config: Dict[str, Any]):
         if redis_url:
             logger.debug("Loaded REDIS_URL from environment")
 
-    return SchedulerConfig(
-        type=cast(Literal["redis", "memory"], scheduler_type), redis_url=redis_url
-    )
+    return SchedulerConfig(type=cast(Literal["redis", "memory"], scheduler_type), redis_url=redis_url)
 
 
 def create_tunnel_config_from_env(user_config: Dict[str, Any]):
@@ -192,9 +190,7 @@ def create_sentry_config_from_env(user_config: Dict[str, Any]):
     from bindu.settings import app_settings
 
     sentry_dsn = os.getenv("SENTRY_DSN")
-    logger.debug(
-        f"Loaded Sentry configuration: enabled={sentry_enabled}, dsn={'***' if sentry_dsn else 'None'}"
-    )
+    logger.debug(f"Loaded Sentry configuration: enabled={sentry_enabled}, dsn={'***' if sentry_dsn else 'None'}")
 
     return SentryConfig(
         enabled=True,

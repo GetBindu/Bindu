@@ -59,9 +59,7 @@ class HydraMiddleware(AuthMiddleware):
                 timeout=getattr(self.config, "timeout", 10),
                 verify_ssl=getattr(self.config, "verify_ssl", True),
             )
-            logger.info(
-                f"Hydra middleware initialized. Admin URL: {self.config.admin_url}"
-            )
+            logger.info(f"Hydra middleware initialized. Admin URL: {self.config.admin_url}")
         except Exception as e:
             logger.error(f"Failed to initialize Hydra client: {e}")
             raise
@@ -89,9 +87,7 @@ class HydraMiddleware(AuthMiddleware):
             if introspection_result["exp"] < current_time:
                 raise ValueError(f"Token expired at {introspection_result['exp']}")
 
-            expires_at = min(
-                introspection_result["exp"], current_time + self._cache_ttl
-            )
+            expires_at = min(introspection_result["exp"], current_time + self._cache_ttl)
             self._introspection_cache[cache_key] = {
                 "data": introspection_result,
                 "expires_at": expires_at,
@@ -114,9 +110,7 @@ class HydraMiddleware(AuthMiddleware):
             "sub": token_payload["sub"],
             "is_m2m": is_m2m,
             "client_id": token_payload.get("client_id", ""),
-            "scope": token_payload.get("scope", "").split()
-            if token_payload.get("scope")
-            else [],
+            "scope": token_payload.get("scope", "").split() if token_payload.get("scope") else [],
             "exp": token_payload.get("exp", 0),
             "iat": token_payload.get("iat", 0),
             "aud": token_payload.get("aud", []),
@@ -178,9 +172,7 @@ class HydraMiddleware(AuthMiddleware):
         # Memory Safety Guard
         content_length = int(headers.get("content-length", 0))
         if content_length > MAX_BODY_SIZE_BYTES:
-            logger.warning(
-                f"Payload too large for signature verification: {content_length} bytes"
-            )
+            logger.warning(f"Payload too large for signature verification: {content_length} bytes")
             return (
                 False,
                 {"did_verified": False, "reason": "payload_too_large"},
@@ -222,9 +214,7 @@ class HydraMiddleware(AuthMiddleware):
         }
         return is_valid, verification_result, cached_receive
 
-    async def __call__(
-        self, scope: dict[str, Any], receive: Callable, send: Callable
-    ) -> None:
+    async def __call__(self, scope: dict[str, Any], receive: Callable, send: Callable) -> None:
         """Hydra-specific Pure ASGI pipeline overriding the base class."""
         if scope["type"] not in ("http", "websocket"):
             await self.app(scope, receive, send)
@@ -242,9 +232,7 @@ class HydraMiddleware(AuthMiddleware):
         if not token:
             from bindu.common.protocol.types import AuthenticationRequiredError
 
-            await self._send_error(
-                scope, receive, send, AuthenticationRequiredError, 401
-            )
+            await self._send_error(scope, receive, send, AuthenticationRequiredError, 401)
             return
 
         try:
@@ -267,9 +255,7 @@ class HydraMiddleware(AuthMiddleware):
         # --- LAYER 2: ASGI Safe DID Verification ---
         client_did = user_info.get("client_id")
         if scope["type"] == "http" and client_did and client_did.startswith("did:"):
-            is_valid, signature_info, receive = await self._verify_did_signature_asgi(
-                receive, client_did, conn.headers
-            )
+            is_valid, signature_info, receive = await self._verify_did_signature_asgi(receive, client_did, conn.headers)
 
             if not is_valid:
                 logger.warning(f"DID signature verification failed for {client_did}")

@@ -39,9 +39,7 @@ class TunnelManager:
             ValueError: If tunnel creation fails
         """
         if self.active_tunnel is not None:
-            raise RuntimeError(
-                "A tunnel is already active. Stop it before creating a new one."
-            )
+            raise RuntimeError("A tunnel is already active. Stop it before creating a new one.")
 
         # Create config if not provided
         if config is None:
@@ -56,9 +54,7 @@ class TunnelManager:
         elif not config.subdomain:
             config.subdomain = self._generate_subdomain()
 
-        logger.info(
-            f"Creating tunnel for localhost:{local_port} with subdomain '{config.subdomain}'"
-        )
+        logger.info(f"Creating tunnel for localhost:{local_port} with subdomain '{config.subdomain}'")
 
         # Create and start tunnel
         tunnel = Tunnel(config)
