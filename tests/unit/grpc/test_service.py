@@ -150,9 +150,7 @@ class TestBinduServiceImpl:
         service = BinduServiceImpl(registry)
         context = MagicMock()
 
-        request = agent_handler_pb2.HeartbeatRequest(
-            agent_id="agent-1", timestamp=1234567890
-        )
+        request = agent_handler_pb2.HeartbeatRequest(agent_id="agent-1", timestamp=1234567890)
         response = service.Heartbeat(request, context)
 
         assert response.acknowledged is True
@@ -164,9 +162,7 @@ class TestBinduServiceImpl:
         service = BinduServiceImpl(registry)
         context = MagicMock()
 
-        request = agent_handler_pb2.HeartbeatRequest(
-            agent_id="unknown", timestamp=1234567890
-        )
+        request = agent_handler_pb2.HeartbeatRequest(agent_id="unknown", timestamp=1234567890)
         response = service.Heartbeat(request, context)
 
         assert response.acknowledged is False

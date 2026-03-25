@@ -46,7 +46,9 @@ class TestIsActivationRequested:
     def test_activation_requested_with_multiple_extensions(self):
         """Test activation is detected when x402 is among multiple extensions."""
         request = MagicMock(spec=Request)
-        request.headers.get.return_value = "https://example.com/ext1,https://github.com/google-a2a/a2a-x402/v0.1,https://example.com/ext2"
+        request.headers.get.return_value = (
+            "https://example.com/ext1,https://github.com/google-a2a/a2a-x402/v0.1,https://example.com/ext2"
+        )
 
         result = is_activation_requested(request)
 
@@ -132,9 +134,7 @@ class TestX402ExtensionEdgeCases:
     def test_activation_with_whitespace_in_header(self):
         """Test activation detection with whitespace in header."""
         request = MagicMock(spec=Request)
-        request.headers.get.return_value = (
-            " https://github.com/google-a2a/a2a-x402/v0.1 "
-        )
+        request.headers.get.return_value = " https://github.com/google-a2a/a2a-x402/v0.1 "
 
         result = is_activation_requested(request)
 
@@ -192,9 +192,7 @@ class TestX402ExtensionEdgeCases:
     def test_activation_with_uri_as_substring(self):
         """Test activation when URI appears as substring."""
         request = MagicMock(spec=Request)
-        request.headers.get.return_value = (
-            "prefix-https://github.com/google-a2a/a2a-x402/v0.1-suffix"
-        )
+        request.headers.get.return_value = "prefix-https://github.com/google-a2a/a2a-x402/v0.1-suffix"
 
         result = is_activation_requested(request)
 

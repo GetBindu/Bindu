@@ -206,9 +206,7 @@ class TestInitializeDIDSchema:
         mock_engine.begin.return_value.__aenter__.return_value = mock_conn
         mock_engine.begin.return_value.__aexit__.return_value = None
 
-        schema_name = await initialize_did_schema(
-            mock_engine, "test_schema", create_tables=True
-        )
+        schema_name = await initialize_did_schema(mock_engine, "test_schema", create_tables=True)
 
         assert schema_name == "test_schema"
         # Should be called twice: once for schema creation, once for table creation
@@ -231,9 +229,7 @@ class TestInitializeDIDSchema:
         mock_engine.begin.return_value.__aenter__.return_value = mock_conn
         mock_engine.begin.return_value.__aexit__.return_value = None
 
-        schema_name = await initialize_did_schema(
-            mock_engine, "existing_schema", create_tables=True
-        )
+        schema_name = await initialize_did_schema(mock_engine, "existing_schema", create_tables=True)
 
         assert schema_name == "existing_schema"
         # Should still create tables even if schema exists
@@ -254,9 +250,7 @@ class TestInitializeDIDSchema:
         mock_engine.begin.return_value.__aenter__.return_value = mock_conn
         mock_engine.begin.return_value.__aexit__.return_value = None
 
-        schema_name = await initialize_did_schema(
-            mock_engine, "test_schema", create_tables=False
-        )
+        schema_name = await initialize_did_schema(mock_engine, "test_schema", create_tables=False)
 
         assert schema_name == "test_schema"
         # Should only call begin once for schema creation
@@ -285,9 +279,7 @@ class TestInitializeDIDSchema:
         mock_engine.begin.return_value.__aenter__.return_value = mock_conn
         mock_engine.begin.return_value.__aexit__.return_value = None
 
-        result = await initialize_did_schema(
-            mock_engine, schema_name, create_tables=True
-        )
+        result = await initialize_did_schema(mock_engine, schema_name, create_tables=True)
 
         assert result == "did_bindu_alice_agent1_abc123"
         assert mock_engine.begin.call_count == 2

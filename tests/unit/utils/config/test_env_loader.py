@@ -93,9 +93,7 @@ class TestSchedulerConfigFromEnv:
 
     def test_scheduler_from_user_config_redis(self):
         """Test creating redis scheduler from user config."""
-        user_config = {
-            "scheduler": {"type": "redis", "redis_url": "redis://localhost:6379"}
-        }
+        user_config = {"scheduler": {"type": "redis", "redis_url": "redis://localhost:6379"}}
 
         result = create_scheduler_config_from_env(user_config)
 
@@ -287,9 +285,7 @@ class TestSentryConfigFromEnv:
         """Test creating Sentry from environment."""
         user_config = {}
 
-        with patch.dict(
-            os.environ, {"SENTRY_ENABLED": "true", "SENTRY_DSN": "https://example.com"}
-        ):
+        with patch.dict(os.environ, {"SENTRY_ENABLED": "true", "SENTRY_DSN": "https://example.com"}):
             result = create_sentry_config_from_env(user_config)
 
         assert result.enabled is True

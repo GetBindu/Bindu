@@ -81,9 +81,7 @@ class TestHTTPError:
 
     def test_http_error_with_all_params(self):
         """Test creating HTTPError with all parameters."""
-        error = HTTPError(
-            "Server error", status=500, url="https://example.com/api/endpoint"
-        )
+        error = HTTPError("Server error", status=500, url="https://example.com/api/endpoint")
 
         error_str = str(error)
         assert "Server error" in error_str
@@ -164,9 +162,7 @@ class TestHTTPClientError:
 
     def test_client_error_404(self):
         """Test HTTPClientError for 404."""
-        error = HTTPClientError(
-            "Not found", status=404, url="https://api.example.com/missing"
-        )
+        error = HTTPClientError("Not found", status=404, url="https://api.example.com/missing")
 
         assert "Not found" in str(error)
         assert "Status: 404" in str(error)
@@ -191,9 +187,7 @@ class TestHTTPServerError:
 
     def test_server_error_503(self):
         """Test HTTPServerError for 503."""
-        error = HTTPServerError(
-            "Service unavailable", status=503, url="https://api.example.com/service"
-        )
+        error = HTTPServerError("Service unavailable", status=503, url="https://api.example.com/service")
 
         assert "Service unavailable" in str(error)
         assert "Status: 503" in str(error)

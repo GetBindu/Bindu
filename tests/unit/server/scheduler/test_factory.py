@@ -40,9 +40,7 @@ class TestSchedulerFactory:
     @pytest.mark.asyncio
     async def test_create_redis_scheduler_constructs_url_from_components(self):
         """Test that Redis scheduler can construct URL from components."""
-        config = SchedulerConfig(
-            type="redis", redis_host="localhost", redis_port=6379, redis_db=0
-        )
+        config = SchedulerConfig(type="redis", redis_host="localhost", redis_port=6379, redis_db=0)
 
         with patch("bindu.server.scheduler.factory.REDIS_AVAILABLE", True):
             with patch("bindu.server.scheduler.factory.RedisScheduler") as mock_redis:

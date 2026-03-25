@@ -53,9 +53,7 @@ class TestPrepareServerDisplay:
         mock_console = MagicMock()
         mock_console_class.return_value = mock_console
 
-        prepare_server_display(
-            host="localhost", port=3773, tunnel_url="https://test.tunnel.getbindu.com"
-        )
+        prepare_server_display(host="localhost", port=3773, tunnel_url="https://test.tunnel.getbindu.com")
 
         # Verify tunnel URL is displayed
         calls = [str(call) for call in mock_console.print.call_args_list]
@@ -104,9 +102,7 @@ class TestPrepareServerDisplay:
         prepare_server_display()
 
         # Should attempt to reconfigure stdout
-        mock_stdout.reconfigure.assert_called_once_with(
-            encoding="utf-8", errors="replace"
-        )
+        mock_stdout.reconfigure.assert_called_once_with(encoding="utf-8", errors="replace")
 
     @patch("bindu.utils.display.Console")
     @patch("sys.stdout")
@@ -128,16 +124,11 @@ class TestPrepareServerDisplay:
         mock_console = MagicMock()
         mock_console_class.return_value = mock_console
 
-        prepare_server_display(
-            host="localhost", port=3773, tunnel_url="https://tunnel.example.com"
-        )
+        prepare_server_display(host="localhost", port=3773, tunnel_url="https://tunnel.example.com")
 
         # Verify endpoints use tunnel URL
         calls = [str(call) for call in mock_console.print.call_args_list]
-        assert any(
-            "tunnel.example.com" in str(call) and "agent.json" in str(call)
-            for call in calls
-        )
+        assert any("tunnel.example.com" in str(call) and "agent.json" in str(call) for call in calls)
 
     @patch("bindu.utils.display.Console")
     def test_display_endpoints_without_tunnel(self, mock_console_class):
@@ -149,7 +140,4 @@ class TestPrepareServerDisplay:
 
         # Verify endpoints use local URL
         calls = [str(call) for call in mock_console.print.call_args_list]
-        assert any(
-            "localhost:3773" in str(call) and "agent.json" in str(call)
-            for call in calls
-        )
+        assert any("localhost:3773" in str(call) and "agent.json" in str(call) for call in calls)

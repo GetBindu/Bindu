@@ -18,9 +18,7 @@ class TestManifestWorker:
         mock_scheduler = Mock()
         mock_storage = AsyncMock()
 
-        worker = ManifestWorker(
-            manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage
-        )
+        worker = ManifestWorker(manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage)
 
         messages = [
             {"role": "user", "content": "Hello"},
@@ -41,9 +39,7 @@ class TestManifestWorker:
         mock_scheduler = Mock()
         mock_storage = AsyncMock()
 
-        worker = ManifestWorker(
-            manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage
-        )
+        worker = ManifestWorker(manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage)
 
         result = "Task completed successfully"
 
@@ -59,9 +55,7 @@ class TestManifestWorker:
         mock_scheduler = Mock()
         mock_storage = AsyncMock()
 
-        worker = ManifestWorker(
-            manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage
-        )
+        worker = ManifestWorker(manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage)
 
         task = cast(
             Task,
@@ -108,9 +102,7 @@ class TestManifestWorker:
         mock_scheduler = Mock()
         mock_storage = AsyncMock()
 
-        worker = ManifestWorker(
-            manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage
-        )
+        worker = ManifestWorker(manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage)
 
         task_id = uuid4()
         context_id = uuid4()
@@ -125,9 +117,7 @@ class TestManifestWorker:
         mock_scheduler = Mock()
         mock_storage = AsyncMock()
 
-        worker = ManifestWorker(
-            manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage
-        )
+        worker = ManifestWorker(manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage)
 
         # Empty payment context should return error
         payment_context = {}
@@ -143,9 +133,7 @@ class TestManifestWorker:
         mock_scheduler = Mock()
         mock_storage = AsyncMock()
 
-        worker = ManifestWorker(
-            manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage
-        )
+        worker = ManifestWorker(manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage)
 
         # Should not raise error
         worker._add_state_change_event("working", "pending")
@@ -156,9 +144,7 @@ class TestManifestWorker:
         mock_scheduler = Mock()
         mock_storage = AsyncMock()
 
-        worker = ManifestWorker(
-            manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage
-        )
+        worker = ManifestWorker(manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage)
 
         task_id = uuid4()
         context_id = uuid4()
@@ -183,9 +169,7 @@ class TestManifestWorker:
         }
         mock_storage.load_task.return_value = mock_task
 
-        worker = ManifestWorker(
-            manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage
-        )
+        worker = ManifestWorker(manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage)
 
         await worker.cancel_task({"task_id": task_id})
 
@@ -199,9 +183,7 @@ class TestManifestWorker:
         mock_storage = AsyncMock()
         mock_storage.load_task.return_value = None
 
-        worker = ManifestWorker(
-            manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage
-        )
+        worker = ManifestWorker(manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage)
 
         task_id = uuid4()
         await worker.cancel_task({"task_id": task_id})
@@ -243,9 +225,7 @@ class TestManifestWorker:
 
         mock_storage.load_task.return_value = ref_task
 
-        worker = ManifestWorker(
-            manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage
-        )
+        worker = ManifestWorker(manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage)
 
         history = await worker._build_complete_message_history(task)
 
@@ -274,9 +254,7 @@ class TestManifestWorker:
 
         mock_storage.load_context_tasks.return_value = [task]
 
-        worker = ManifestWorker(
-            manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage
-        )
+        worker = ManifestWorker(manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage)
 
         history = await worker._build_complete_message_history(task)
 
@@ -292,9 +270,7 @@ class TestManifestWorker:
         mock_scheduler = Mock()
         mock_storage = AsyncMock()
 
-        worker = ManifestWorker(
-            manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage
-        )
+        worker = ManifestWorker(manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage)
 
         payment_context = {"session_id": "sess123", "amount": "100", "token": "USDC"}
 
@@ -320,13 +296,9 @@ class TestManifestWorker:
             },
         )
 
-        worker = ManifestWorker(
-            manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage
-        )
+        worker = ManifestWorker(manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage)
 
-        await worker._handle_intermediate_state(
-            task, "input-required", "Please provide input"
-        )
+        await worker._handle_intermediate_state(task, "input-required", "Please provide input")
 
         mock_storage.update_task.assert_called()
 
@@ -350,9 +322,7 @@ class TestManifestWorker:
             },
         )
 
-        worker = ManifestWorker(
-            manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage
-        )
+        worker = ManifestWorker(manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage)
 
         await worker._handle_terminal_state(task, "Task completed", "completed")
 
@@ -381,13 +351,9 @@ class TestManifestWorker:
 
         payment_context = {"session_id": "sess123"}
 
-        worker = ManifestWorker(
-            manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage
-        )
+        worker = ManifestWorker(manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage)
 
-        await worker._handle_terminal_state(
-            task, "Task completed", "completed", payment_context=payment_context
-        )
+        await worker._handle_terminal_state(task, "Task completed", "completed", payment_context=payment_context)
 
         mock_storage.update_task.assert_called()
 
@@ -397,9 +363,7 @@ class TestManifestWorker:
         mock_scheduler = Mock()
         mock_storage = AsyncMock()
 
-        worker = ManifestWorker(
-            manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage
-        )
+        worker = ManifestWorker(manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage)
 
         worker._add_state_change_event("failed", "working", error="Test error")
 
@@ -409,9 +373,7 @@ class TestManifestWorker:
         mock_scheduler = Mock()
         mock_storage = AsyncMock()
 
-        worker = ManifestWorker(
-            manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage
-        )
+        worker = ManifestWorker(manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage)
 
         worker._add_state_change_event("completed")
 
@@ -441,9 +403,7 @@ class TestManifestWorker:
 
         mock_storage.load_task.return_value = mock_task
 
-        worker = ManifestWorker(
-            manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage
-        )
+        worker = ManifestWorker(manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage)
 
         params = cast(TaskSendParams, {"task_id": task_id, "context_id": context_id})
 
@@ -456,9 +416,7 @@ class TestManifestWorker:
     async def test_run_task_with_input_required_response(self):
         """Test task execution with input-required response."""
         mock_manifest = Mock()
-        mock_manifest.run = Mock(
-            return_value='{"state": "input-required", "prompt": "Need more info"}'
-        )
+        mock_manifest.run = Mock(return_value='{"state": "input-required", "prompt": "Need more info"}')
         mock_manifest.name = "test-agent"
         mock_manifest.did_extension = Mock()
         mock_manifest.did_extension.did = "did:example:123"
@@ -480,9 +438,7 @@ class TestManifestWorker:
 
         mock_storage.load_task.return_value = mock_task
 
-        worker = ManifestWorker(
-            manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage
-        )
+        worker = ManifestWorker(manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage)
 
         params = cast(TaskSendParams, {"task_id": task_id, "context_id": context_id})
 
@@ -494,9 +450,7 @@ class TestManifestWorker:
     async def test_run_task_with_auth_required_response(self):
         """Test task execution with auth-required response."""
         mock_manifest = Mock()
-        mock_manifest.run = Mock(
-            return_value='{"state": "auth-required", "prompt": "Login needed"}'
-        )
+        mock_manifest.run = Mock(return_value='{"state": "auth-required", "prompt": "Login needed"}')
         mock_manifest.name = "test-agent"
         mock_manifest.did_extension = Mock()
         mock_manifest.did_extension.did = "did:example:123"
@@ -518,9 +472,7 @@ class TestManifestWorker:
 
         mock_storage.load_task.return_value = mock_task
 
-        worker = ManifestWorker(
-            manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage
-        )
+        worker = ManifestWorker(manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage)
 
         params = cast(TaskSendParams, {"task_id": task_id, "context_id": context_id})
 
@@ -555,9 +507,7 @@ class TestManifestWorker:
 
         mock_storage.load_task.return_value = mock_task
 
-        worker = ManifestWorker(
-            manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage
-        )
+        worker = ManifestWorker(manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage)
 
         params = cast(
             TaskSendParams,
@@ -580,9 +530,7 @@ class TestManifestWorker:
         mock_storage = AsyncMock()
         mock_storage.load_task.return_value = None
 
-        worker = ManifestWorker(
-            manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage
-        )
+        worker = ManifestWorker(manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage)
 
         params = cast(TaskSendParams, {"task_id": uuid4(), "context_id": uuid4()})
 
@@ -615,9 +563,7 @@ class TestManifestWorker:
 
         mock_storage.load_task.return_value = mock_task
 
-        worker = ManifestWorker(
-            manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage
-        )
+        worker = ManifestWorker(manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage)
 
         params = cast(TaskSendParams, {"task_id": task_id, "context_id": context_id})
 
@@ -625,10 +571,7 @@ class TestManifestWorker:
             await worker.run_task(params)
 
         # Should have updated task to failed state
-        assert any(
-            call[1].get("state") == "failed"
-            for call in mock_storage.update_task.call_args_list
-        )
+        assert any(call[1].get("state") == "failed" for call in mock_storage.update_task.call_args_list)
 
     @pytest.mark.asyncio
     async def test_run_task_with_system_message(self):
@@ -658,20 +601,14 @@ class TestManifestWorker:
 
         mock_storage.load_task.return_value = mock_task
 
-        worker = ManifestWorker(
-            manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage
-        )
+        worker = ManifestWorker(manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage)
 
         params = cast(TaskSendParams, {"task_id": task_id, "context_id": context_id})
 
-        with patch(
-            "bindu.server.workers.manifest_worker.app_settings"
-        ) as mock_settings:
+        with patch("bindu.server.workers.manifest_worker.app_settings") as mock_settings:
             mock_settings.agent.enable_structured_responses = True
             mock_settings.agent.structured_response_system_prompt = "System prompt"
-            mock_settings.agent.terminal_states = frozenset(
-                ["completed", "failed", "canceled"]
-            )
+            mock_settings.agent.terminal_states = frozenset(["completed", "failed", "canceled"])
 
             await worker.run_task(params)
 
@@ -711,9 +648,7 @@ class TestManifestWorker:
         mock_storage.load_task.return_value = mock_task
         mock_storage.list_tasks_by_context.return_value = [prev_task, mock_task]
 
-        worker = ManifestWorker(
-            manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage
-        )
+        worker = ManifestWorker(manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage)
 
         params = cast(TaskSendParams, {"task_id": task_id, "context_id": context_id})
 
@@ -733,15 +668,11 @@ class TestManifestWorker:
         mock_scheduler = Mock()
         mock_storage = AsyncMock()
 
-        worker = ManifestWorker(
-            manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage
-        )
+        worker = ManifestWorker(manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage)
 
         payment_context = {"session_id": "sess123", "amount": "100", "token": "USDC"}
 
-        with patch(
-            "bindu.server.workers.manifest_worker.FacilitatorClient"
-        ) as mock_client_class:
+        with patch("bindu.server.workers.manifest_worker.FacilitatorClient") as mock_client_class:
             mock_client = AsyncMock()
             mock_client.settle_payment = AsyncMock(return_value={"status": "success"})
             mock_client_class.return_value = mock_client
@@ -771,9 +702,7 @@ class TestManifestWorker:
             },
         )
 
-        worker = ManifestWorker(
-            manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage
-        )
+        worker = ManifestWorker(manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage)
 
         history = await worker._build_complete_message_history(task)
 
