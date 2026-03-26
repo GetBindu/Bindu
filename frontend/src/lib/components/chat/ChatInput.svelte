@@ -16,6 +16,7 @@
 
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
 	import { requireAuthUser } from "$lib/utils/auth";
+	import { validateFiles } from "$lib/utils/fileValidation";
 	import { page } from "$app/state";
 
 	interface Props {
@@ -33,6 +34,7 @@
 		onPaste?: (e: ClipboardEvent) => void;
 		focused?: boolean;
 		onsubmit?: () => void;
+		onFileError?: (error: string) => void;
 	}
 
 	let {
@@ -49,6 +51,7 @@
 		onPaste,
 		focused = $bindable(false),
 		onsubmit,
+		onFileError,
 	}: Props = $props();
 
 	const onFileChange = async (e: Event) => {
@@ -56,7 +59,19 @@
 		const target = e.target as HTMLInputElement;
 		const selected = Array.from(target.files ?? []);
 		if (selected.length === 0) return;
-		files = [...files, ...selected];
+
+		// Validate files before adding
+		const { valid, errors } = validateFiles(selected, mimeTypes);
+
+		if (errors.length > 0) {
+			const errorMsg = errors.join("\n");
+			onFileError?.(errorMsg);
+		}
+
+		if (valid.length > 0) {
+			files = [...files, ...valid];
+		}
+
 		await tick();
 		void focusTextarea();
 	};

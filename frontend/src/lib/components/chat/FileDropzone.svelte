@@ -1,13 +1,15 @@
 <script lang="ts">
 	import { requireAuthUser } from "$lib/utils/auth";
+	import { validateFiles, getFileUploadConstraints } from "$lib/utils/fileValidation";
 	import CarbonImage from "~icons/carbon/image";
+	import CarbonWarningAltFilled from "~icons/carbon/warning-alt-filled";
 
 	interface Props {
-		// import EosIconsLoading from "~icons/eos-icons/loading";
 		files: File[];
 		mimeTypes?: string[];
 		onDrag?: boolean;
 		onDragInner?: boolean;
+		onError?: (error: string) => void;
 	}
 
 	let {
@@ -15,78 +17,95 @@
 		mimeTypes = [],
 		onDrag = $bindable(false),
 		onDragInner = $bindable(false),
+		onError,
 	}: Props = $props();
+
+	let errorMessage = $state<string | null>(null);
+	let errorTimeout: ReturnType<typeof setTimeout> | undefined;
 
 	async function dropHandle(event: DragEvent) {
 		event.preventDefault();
-		if (!requireAuthUser() && event.dataTransfer && event.dataTransfer.items) {
-			// Use DataTransferItemList interface to access the file(s)
-			if (files.length > 0) {
-				files = [];
-			}
-			if (event.dataTransfer.items[0].kind === "file") {
-				for (let i = 0; i < event.dataTransfer.items.length; i++) {
-					const file = event.dataTransfer.items[i].getAsFile();
+		errorMessage = null;
 
-					if (file) {
-						// check if the file matches the mimeTypes
-						// else abort
-						if (
-							!mimeTypes.some((mimeType: string) => {
-								const [type, subtype] = mimeType.split("/");
-								const [fileType, fileSubtype] = file.type.split("/");
-								return (
-									(type === "*" || type === fileType) &&
-									(subtype === "*" || subtype === fileSubtype)
-								);
-							})
-						) {
-							setErrorMsg(
-								`Some file type not supported. Only allowed: ${mimeTypes.join(
-									", "
-								)}. Uploaded document is of type ${file.type}`
-							);
-							files = [];
-							return;
-						}
+		if (requireAuthUser()) {
+			showError("Please authenticate to upload files");
+			return;
+		}
 
-						// if file is bigger than 10MB abort
-						if (file.size > 10 * 1024 * 1024) {
-							setErrorMsg("Some file is too big. (10MB max)");
-							files = [];
-							return;
-						}
+		if (!event.dataTransfer?.items) return;
 
-						// add the file to the files array
-						files = [...files, file];
-
-						// Tools removed: no settings update for document parser
-					}
-				}
-				onDrag = false;
+		// Extract files from drag event
+		const droppedFiles: File[] = [];
+		for (let i = 0; i < event.dataTransfer.items.length; i++) {
+			const file = event.dataTransfer.items[i].getAsFile();
+			if (file) {
+				droppedFiles.push(file);
 			}
 		}
+
+		// Validate files
+		if (droppedFiles.length > 0) {
+			const { valid, errors } = validateFiles(droppedFiles, mimeTypes);
+
+			if (errors.length > 0) {
+				const errorMsg = errors.join("\n");
+				showError(errorMsg);
+				onError?.(errorMsg);
+			}
+
+			if (valid.length > 0) {
+				files = [...files, ...valid];
+			}
+		}
+
+		onDrag = false;
+		onDragInner = false;
 	}
 
-	function setErrorMsg(errorMsg: string) {
-		onDrag = false;
-		alert(errorMsg);
+	function showError(message: string) {
+		errorMessage = message;
+		if (errorTimeout) clearTimeout(errorTimeout);
+		errorTimeout = setTimeout(() => {
+			errorMessage = null;
+		}, 6000);
 	}
 </script>
 
-<div
-	id="dropzone"
-	role="form"
-	ondrop={dropHandle}
-	ondragenter={() => (onDragInner = true)}
-	ondragleave={() => (onDragInner = false)}
-	ondragover={(e) => {
-		e.preventDefault();
-	}}
-	class="relative flex h-28 w-full max-w-4xl flex-col items-center justify-center gap-1 rounded-xl border-2 border-dotted {onDragInner
-		? 'border-blue-200 !bg-blue-600/10 text-blue-600 *:pointer-events-none dark:border-blue-600 dark:bg-blue-600/20 dark:text-blue-600'
-		: 'bg-gray-100 text-gray-500 dark:border-gray-500 dark:bg-gray-700 dark:text-gray-400'}"
->
-	<CarbonImage class="text-xl" />
-	<p>Drop File to add to chat</p>
+<div class="w-full max-w-4xl space-y-2">
+	{#if errorMessage}
+		<div
+			class="flex gap-2 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800 dark:bg-red-900/30 dark:text-red-200"
+			role="alert"
+		>
+			<CarbonWarningAltFilled class="h-5 w-5 flex-shrink-0 pt-0.5" />
+			<div>
+				<p class="font-medium">Upload error</p>
+				<p class="mt-1 whitespace-pre-wrap text-xs">{errorMessage}</p>
+			</div>
+		</div>
+	{/if}
+
+	<div
+		id="dropzone"
+		role="form"
+		ondrop={dropHandle}
+		ondragenter={() => (onDragInner = true)}
+		ondragleave={() => (onDragInner = false)}
+		ondragover={(e) => {
+			e.preventDefault();
+		}}
+		class="relative flex h-28 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dotted transition-colors {onDragInner
+			? 'border-blue-200 !bg-blue-600/10 text-blue-600 *:pointer-events-none dark:border-blue-600 dark:bg-blue-600/20 dark:text-blue-600'
+			: 'border-gray-300 bg-gray-50 text-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400'}"
+	>
+		<CarbonImage class="text-xl" />
+		<p class="font-medium">Drop files here to upload</p>
+		<p class="text-xs opacity-75">or use the attachment button below</p>
+	</div>
+
+	{#if mimeTypes.length > 0}
+		<p class="text-xs text-gray-600 dark:text-gray-400">
+			{getFileUploadConstraints(mimeTypes)}
+		</p>
+	{/if}
 </div>

@@ -27,16 +27,12 @@ def upgrade() -> None:
     op.drop_index(op.f("idx_contexts_updated_at"), table_name="contexts")
     op.create_index("idx_contexts_updated_at", "contexts", ["updated_at"], unique=False)
     op.drop_index(op.f("idx_task_feedback_created_at"), table_name="task_feedback")
-    op.create_index(
-        "idx_task_feedback_created_at", "task_feedback", ["created_at"], unique=False
-    )
+    op.create_index("idx_task_feedback_created_at", "task_feedback", ["created_at"], unique=False)
     op.drop_index(op.f("idx_tasks_created_at"), table_name="tasks")
     op.create_index("idx_tasks_created_at", "tasks", ["created_at"], unique=False)
     op.drop_index(op.f("idx_tasks_updated_at"), table_name="tasks")
     op.create_index("idx_tasks_updated_at", "tasks", ["updated_at"], unique=False)
-    op.create_foreign_key(
-        None, "tasks", "contexts", ["context_id"], ["id"], ondelete="CASCADE"
-    )
+    op.create_foreign_key(None, "tasks", "contexts", ["context_id"], ["id"], ondelete="CASCADE")
     # ### end Alembic commands ###
 
 
