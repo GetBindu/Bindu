@@ -4,10 +4,10 @@ from __future__ import annotations as _annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
-from typing import Annotated, Any, Generic, Literal, TypeVar
+from typing import Annotated, Any, Generic, Literal, Self, TypeVar
 
 from pydantic import Discriminator
-from typing_extensions import Self, TypedDict
+from typing_extensions import TypedDict
 
 from bindu.common.protocol.types import TaskIdParams, TaskSendParams
 from bindu.utils.logging import get_logger
@@ -79,6 +79,4 @@ _CancelTask = _TaskOperation[Literal["cancel"], TaskIdParams]
 _PauseTask = _TaskOperation[Literal["pause"], TaskIdParams]
 _ResumeTask = _TaskOperation[Literal["resume"], TaskIdParams]
 
-TaskOperation = Annotated[
-    "_RunTask | _CancelTask | _PauseTask | _ResumeTask", Discriminator("operation")
-]
+TaskOperation = Annotated["_RunTask | _CancelTask | _PauseTask | _ResumeTask", Discriminator("operation")]

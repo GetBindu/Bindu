@@ -15,18 +15,21 @@ from bindu.common.protocol.types import (
     a2a_request_ta,
     a2a_response_ta,
 )
+from bindu.extensions.x402.extension import (
+    add_activation_header as x402_add_header,
+)
+from bindu.extensions.x402.extension import (
+    is_activation_requested as x402_is_requested,
+)
 from bindu.server.applications import BinduApplication
 from bindu.settings import app_settings
 from bindu.utils.logging import get_logger
+
 from .utils import (
     extract_error_fields,
     get_client_ip,
     jsonrpc_error,
     validate_authentication,
-)
-from bindu.extensions.x402.extension import (
-    is_activation_requested as x402_is_requested,
-    add_activation_header as x402_add_header,
 )
 
 logger = get_logger("bindu.server.endpoints.a2a_protocol")
@@ -81,8 +84,7 @@ def _attach_payment_context(request: Request, a2a_request: Any, method: str) -> 
         # Serialization failure must not abort the request;
         # log and continue without attaching the payment context.
         logger.warning(
-            f"Failed to serialize payment context into message metadata "
-            f"– payment context will be omitted: {ser_err}"
+            f"Failed to serialize payment context into message metadata – payment context will be omitted: {ser_err}"
         )
 
 
@@ -138,9 +140,7 @@ async def agent_run_endpoint(app: BinduApplication, request: Request) -> Respons
         logger.debug(f"A2A request from {client_ip}: method={method}, id={request_id}")
 
         # Authentication / Authorization guard
-        auth_error = validate_authentication(
-            request, client_ip, "agent execution", request_id
-        )
+        auth_error = validate_authentication(request, client_ip, "agent execution", request_id)
         if auth_error:
             return auth_error
 
@@ -155,16 +155,12 @@ async def agent_run_endpoint(app: BinduApplication, request: Request) -> Respons
                 if required_scopes and user_info:
                     token_scopes = user_info.get("scope", []) or []
                     if not any(scope in token_scopes for scope in required_scopes):
-                        logger.warning(
-                            f"Insufficient permissions for method {method} from {client_ip}"
-                        )
+                        logger.warning(f"Insufficient permissions for method {method} from {client_ip}")
                         from bindu.common.protocol.types import (
                             InsufficientPermissionsError,
                         )
 
-                        code, message = extract_error_fields(
-                            InsufficientPermissionsError
-                        )
+                        code, message = extract_error_fields(InsufficientPermissionsError)
                         return jsonrpc_error(
                             code,
                             message,
@@ -177,9 +173,7 @@ async def agent_run_endpoint(app: BinduApplication, request: Request) -> Respons
         if handler_name is None:
             logger.warning(f"Unsupported A2A method '{method}' from {client_ip}")
             code, message = extract_error_fields(MethodNotFoundError)
-            return jsonrpc_error(
-                code, message, f"Method '{method}' is not implemented", request_id, 404
-            )
+            return jsonrpc_error(code, message, f"Method '{method}' is not implemented", request_id, 404)
 
         handler = getattr(app.task_manager, handler_name)
 
@@ -197,9 +191,7 @@ async def agent_run_endpoint(app: BinduApplication, request: Request) -> Respons
             return jsonrpc_response
 
         resp = Response(
-            content=a2a_response_ta.dump_json(
-                jsonrpc_response, by_alias=True, serialize_as_any=True
-            ),
+            content=a2a_response_ta.dump_json(jsonrpc_response, by_alias=True, serialize_as_any=True),
             media_type="application/json",
         )
 

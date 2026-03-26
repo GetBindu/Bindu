@@ -5,15 +5,15 @@ variables with a unified approach.
 """
 
 from .base import ConfigLoader
+from .enricher import load_config_from_env
 from .env_loader import (
-    create_storage_config_from_env,
-    create_scheduler_config_from_env,
-    create_tunnel_config_from_env,
-    create_sentry_config_from_env,
     create_auth_config_from_env,
+    create_scheduler_config_from_env,
+    create_sentry_config_from_env,
+    create_storage_config_from_env,
+    create_tunnel_config_from_env,
     create_vault_config_from_env,
 )
-from .enricher import load_config_from_env
 from .path_resolver import resolve_key_directory
 from .settings import (
     prepare_auth_settings,

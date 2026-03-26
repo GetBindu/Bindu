@@ -15,8 +15,9 @@ configuration, and runtime behavior.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Literal
+from typing import Any, Literal
 from uuid import UUID
 
 from bindu.extensions.did import DIDAgentExtension
@@ -293,9 +294,7 @@ class OAuthClient:
     client_name: str | None = None
     client_secret: str | None = None
     redirect_uris: list[str] = field(default_factory=list)
-    grant_types: list[str] = field(
-        default_factory=lambda: ["authorization_code", "refresh_token"]
-    )
+    grant_types: list[str] = field(default_factory=lambda: ["authorization_code", "refresh_token"])
     response_types: list[str] = field(default_factory=lambda: ["code"])
     scope: str = "openid offline"
     token_endpoint_auth_method: str = "client_secret_basic"
@@ -326,7 +325,7 @@ class AgentCredentials:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "AgentCredentials":
+    def from_dict(cls, data: dict[str, Any]) -> AgentCredentials:
         """Create from dictionary."""
         return cls(
             agent_id=data["agent_id"],

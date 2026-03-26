@@ -1,10 +1,10 @@
 """Tests for database operations helpers."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from bindu.server.storage.helpers.db_operations import (
-    get_current_utc_timestamp,
     create_update_values,
+    get_current_utc_timestamp,
 )
 
 
@@ -16,7 +16,7 @@ class TestDatabaseOperations:
         result = get_current_utc_timestamp()
 
         assert isinstance(result, datetime)
-        assert result.tzinfo == timezone.utc
+        assert result.tzinfo == UTC
 
     def test_create_update_values_with_state(self):
         """Test creating update values with state."""

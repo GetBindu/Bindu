@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 import time
-from typing import Callable
+from collections.abc import Callable
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -19,9 +19,7 @@ logger = get_logger("bindu.server.middleware.metrics")
 METRICS_ENDPOINT_PATH = "/metrics"
 
 # Pre-compiled regex patterns for endpoint sanitization
-UUID_PATTERN = re.compile(
-    r"/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
-)
+UUID_PATTERN = re.compile(r"/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 NUMERIC_ID_PATTERN = re.compile(r"/\d+")
 
 

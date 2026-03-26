@@ -1,7 +1,7 @@
 """Test utilities for creating test data and assertions."""
 
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, cast
+from datetime import UTC, datetime
+from typing import Any, cast
 from uuid import UUID, uuid4
 
 from bindu.common.protocol.types import (
@@ -16,13 +16,13 @@ from bindu.common.protocol.types import (
 
 
 def create_test_message(
-    message_id: Optional[UUID] = None,
-    context_id: Optional[UUID] = None,
-    task_id: Optional[UUID] = None,
+    message_id: UUID | None = None,
+    context_id: UUID | None = None,
+    task_id: UUID | None = None,
     role: str = "user",
     text: str = "Test message",
-    reference_task_ids: Optional[List[UUID]] = None,
-    metadata: Optional[Dict[str, Any]] = None,
+    reference_task_ids: list[UUID] | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> Message:
     """Create a test Message object with sensible defaults."""
     text_part = cast(
@@ -55,13 +55,13 @@ def create_test_message(
 
 
 def create_test_task(
-    task_id: Optional[UUID] = None,
-    context_id: Optional[UUID] = None,
+    task_id: UUID | None = None,
+    context_id: UUID | None = None,
     state: TaskState = "submitted",
-    message: Optional[Message] = None,
-    artifacts: Optional[List[Artifact]] = None,
-    history: Optional[List[Message]] = None,
-    metadata: Optional[Dict[str, Any]] = None,
+    message: Message | None = None,
+    artifacts: list[Artifact] | None = None,
+    history: list[Message] | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> Task:
     """Create a test Task object with sensible defaults."""
     tid = task_id or uuid4()
@@ -71,7 +71,7 @@ def create_test_task(
         TaskStatus,
         {
             "state": state,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         },
     )
 
@@ -101,10 +101,10 @@ def create_test_task(
 
 
 def create_test_artifact(
-    artifact_id: Optional[UUID] = None,
+    artifact_id: UUID | None = None,
     name: str = "test_artifact",
     text: str = "Test artifact content",
-    metadata: Optional[Dict[str, Any]] = None,
+    metadata: dict[str, Any] | None = None,
 ) -> Artifact:
     """Create a test Artifact object."""
     text_part = cast(
@@ -131,15 +131,15 @@ def create_test_artifact(
 
 
 def create_test_context(
-    context_id: Optional[UUID] = None,
-    tasks: Optional[List[UUID]] = None,
+    context_id: UUID | None = None,
+    tasks: list[UUID] | None = None,
     name: str = "Test Context",
     role: str = "user",
     status: str = "active",
-    metadata: Optional[Dict[str, Any]] = None,
+    metadata: dict[str, Any] | None = None,
 ) -> Context:
     """Create a test Context object."""
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     context = cast(
         Context,
@@ -170,27 +170,21 @@ def create_test_context(
 def assert_task_state(task: Task, expected_state: TaskState) -> None:
     """Assert that a task is in the expected state."""
     actual_state = task["status"]["state"]
-    assert actual_state == expected_state, (
-        f"Expected task state '{expected_state}', got '{actual_state}'"
-    )
+    assert actual_state == expected_state, f"Expected task state '{expected_state}', got '{actual_state}'"
 
 
-def assert_jsonrpc_error(response: Dict[str, Any], expected_code: int) -> None:
+def assert_jsonrpc_error(response: dict[str, Any], expected_code: int) -> None:
     """Assert that a JSON-RPC response contains an error with the expected code."""
     assert "error" in response, "Response does not contain an error"
     assert "code" in response["error"], "Error does not contain a code"
     actual_code = response["error"]["code"]
-    assert actual_code == expected_code, (
-        f"Expected error code {expected_code}, got {actual_code}"
-    )
+    assert actual_code == expected_code, f"Expected error code {expected_code}, got {actual_code}"
 
 
-def assert_jsonrpc_success(response: Dict[str, Any]) -> None:
+def assert_jsonrpc_success(response: dict[str, Any]) -> None:
     """Assert that a JSON-RPC response is successful."""
     assert "result" in response, "Response does not contain a result"
-    assert "error" not in response, (
-        f"Response contains an error: {response.get('error')}"
-    )
+    assert "error" not in response, f"Response contains an error: {response.get('error')}"
 
 
 def get_deterministic_uuid(seed: int) -> UUID:

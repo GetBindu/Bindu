@@ -1,7 +1,7 @@
 """Configuration enrichment from environment variables."""
 
 import os
-from typing import Any, Dict
+from typing import Any
 from urllib.parse import urlparse, urlunparse
 
 from bindu.utils.logging import get_logger
@@ -9,7 +9,7 @@ from bindu.utils.logging import get_logger
 logger = get_logger("bindu.utils.config.enricher")
 
 
-def load_config_from_env(config: Dict[str, Any]) -> Dict[str, Any]:
+def load_config_from_env(config: dict[str, Any]) -> dict[str, Any]:
     """Load capability-specific configurations from environment variables.
 
     This function loads all infrastructure and capability configs from environment:
@@ -55,8 +55,7 @@ def load_config_from_env(config: Dict[str, Any]) -> Dict[str, Any]:
                     port = int(deployment_port_override)
                 except ValueError as exc:
                     raise ValueError(
-                        f"Invalid deployment port '{deployment_port_override}'. "
-                        "BINDU_PORT/PORT must be an integer"
+                        f"Invalid deployment port '{deployment_port_override}'. BINDU_PORT/PORT must be an integer"
                     ) from exc
             else:
                 port = parsed_url.port or 3773
@@ -72,9 +71,7 @@ def load_config_from_env(config: Dict[str, Any]) -> Dict[str, Any]:
                     parsed_url.fragment,
                 )
             )
-            logger.debug(
-                f"Applied deployment override from environment: {deployment_dict['url']}"
-            )
+            logger.debug(f"Applied deployment override from environment: {deployment_dict['url']}")
 
     # Storage configuration - load from env if not in user config
     if "storage" not in enriched_config:
@@ -84,9 +81,7 @@ def load_config_from_env(config: Dict[str, Any]) -> Dict[str, Any]:
             if storage_type == "postgres":
                 database_url = os.getenv("DATABASE_URL")
                 if not database_url:
-                    raise ValueError(
-                        "DATABASE_URL environment variable is required when STORAGE_TYPE=postgres"
-                    )
+                    raise ValueError("DATABASE_URL environment variable is required when STORAGE_TYPE=postgres")
                 enriched_config["storage"]["postgres_url"] = database_url
                 logger.debug("Loaded DATABASE_URL from environment")
             logger.debug(f"Loaded STORAGE_TYPE from environment: {storage_type}")
@@ -99,9 +94,7 @@ def load_config_from_env(config: Dict[str, Any]) -> Dict[str, Any]:
             if scheduler_type == "redis":
                 redis_url = os.getenv("REDIS_URL")
                 if not redis_url:
-                    raise ValueError(
-                        "REDIS_URL environment variable is required when SCHEDULER_TYPE=redis"
-                    )
+                    raise ValueError("REDIS_URL environment variable is required when SCHEDULER_TYPE=redis")
                 enriched_config["scheduler"]["redis_url"] = redis_url
                 logger.debug("Loaded REDIS_URL from environment")
             logger.debug(f"Loaded SCHEDULER_TYPE from environment: {scheduler_type}")
@@ -116,16 +109,12 @@ def load_config_from_env(config: Dict[str, Any]) -> Dict[str, Any]:
         if sentry_enabled:
             sentry_dsn = os.getenv("SENTRY_DSN")
             if not sentry_dsn:
-                raise ValueError(
-                    "SENTRY_DSN environment variable is required when SENTRY_ENABLED=true"
-                )
+                raise ValueError("SENTRY_DSN environment variable is required when SENTRY_ENABLED=true")
             enriched_config["sentry"] = {
                 "enabled": True,
                 "dsn": sentry_dsn,
             }
-            logger.debug(
-                f"Loaded Sentry configuration from environment: enabled={sentry_enabled}"
-            )
+            logger.debug(f"Loaded Sentry configuration from environment: enabled={sentry_enabled}")
 
     # Telemetry configuration - load from env if not in user config
     if "telemetry" not in enriched_config:
@@ -149,9 +138,7 @@ def load_config_from_env(config: Dict[str, Any]) -> Dict[str, Any]:
             oltp_service_name = os.getenv("OLTP_SERVICE_NAME")
             if oltp_service_name:
                 enriched_config["oltp_service_name"] = oltp_service_name
-                logger.debug(
-                    f"Loaded OLTP_SERVICE_NAME from environment: {oltp_service_name}"
-                )
+                logger.debug(f"Loaded OLTP_SERVICE_NAME from environment: {oltp_service_name}")
 
         if "oltp_headers" not in enriched_config:
             oltp_headers_str = os.getenv("OLTP_HEADERS")
@@ -186,9 +173,7 @@ def load_config_from_env(config: Dict[str, Any]) -> Dict[str, Any]:
                 if "negotiation" not in enriched_config:
                     enriched_config["negotiation"] = {}
                 if not enriched_config["negotiation"].get("embedding_api_key"):
-                    enriched_config["negotiation"]["embedding_api_key"] = (
-                        env_openrouter_api_key
-                    )
+                    enriched_config["negotiation"]["embedding_api_key"] = env_openrouter_api_key
                     logger.debug("Loaded OPENROUTER_API_KEY from environment")
 
     # Authentication configuration - load from env if not in user config
@@ -197,14 +182,12 @@ def load_config_from_env(config: Dict[str, Any]) -> Dict[str, Any]:
         auth_provider = os.getenv("AUTH__PROVIDER", "").lower()
 
         if auth_enabled and auth_provider:
-            auth_config: Dict[str, Any] = {
+            auth_config: dict[str, Any] = {
                 "enabled": auth_enabled,
                 "provider": auth_provider,
             }
             enriched_config["auth"] = auth_config
-            logger.debug(
-                f"Loaded AUTH__ENABLED={auth_enabled} and AUTH__PROVIDER={auth_provider} from environment"
-            )
+            logger.debug(f"Loaded AUTH__ENABLED={auth_enabled} and AUTH__PROVIDER={auth_provider} from environment")
 
             # Load provider-specific configuration
             if auth_provider == "hydra":
@@ -249,9 +232,7 @@ def load_config_from_env(config: Dict[str, Any]) -> Dict[str, Any]:
                     logger.debug("Loaded HYDRA__MAX_CACHE_SIZE from environment")
 
                 # Auto-registration settings
-                hydra_auto_register = os.getenv(
-                    "HYDRA__AUTO_REGISTER_AGENTS", "true"
-                ).lower() in ("true", "1", "yes")
+                hydra_auto_register = os.getenv("HYDRA__AUTO_REGISTER_AGENTS", "true").lower() in ("true", "1", "yes")
                 auth_config["auto_register_agents"] = hydra_auto_register
                 logger.debug("Loaded HYDRA__AUTO_REGISTER_AGENTS from environment")
 
@@ -267,7 +248,7 @@ def load_config_from_env(config: Dict[str, Any]) -> Dict[str, Any]:
         vault_token = os.getenv("VAULT__TOKEN") or os.getenv("VAULT_TOKEN")
 
         if vault_enabled or vault_url or vault_token:
-            vault_config: Dict[str, Any] = {
+            vault_config: dict[str, Any] = {
                 "enabled": vault_enabled,
             }
             if vault_url:

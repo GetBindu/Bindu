@@ -12,6 +12,7 @@
 from .a2a_protocol import agent_run_endpoint
 from .agent_card import agent_card_endpoint
 from .did_endpoints import did_resolve_endpoint
+from .metrics import metrics_endpoint
 from .negotiation import negotiation_endpoint
 from .payment_sessions import (
     payment_capture_endpoint,
@@ -23,7 +24,6 @@ from .skills import (
     skill_documentation_endpoint,
     skills_list_endpoint,
 )
-from .metrics import metrics_endpoint
 
 __all__ = [
     # A2A Protocol

@@ -1,12 +1,13 @@
 """Minimal tests for metrics middleware."""
 
 from unittest.mock import AsyncMock, Mock, patch
+
 import pytest
 
 from bindu.server.middleware.metrics import (
-    MetricsMiddleware,
-    UUID_PATTERN,
     NUMERIC_ID_PATTERN,
+    UUID_PATTERN,
+    MetricsMiddleware,
 )
 
 
@@ -63,9 +64,7 @@ class TestMetricsMiddleware:
 
         middleware = MetricsMiddleware(app=Mock())
 
-        with patch(
-            "bindu.server.middleware.metrics.get_metrics", return_value=mock_metrics
-        ):
+        with patch("bindu.server.middleware.metrics.get_metrics", return_value=mock_metrics):
             result = await middleware.dispatch(mock_request, mock_call_next)
 
         assert result == mock_response
@@ -88,9 +87,7 @@ class TestMetricsMiddleware:
 
         middleware = MetricsMiddleware(app=Mock())
 
-        with patch(
-            "bindu.server.middleware.metrics.get_metrics", return_value=mock_metrics
-        ):
+        with patch("bindu.server.middleware.metrics.get_metrics", return_value=mock_metrics):
             with pytest.raises(Exception, match="Test error"):
                 await middleware.dispatch(mock_request, mock_call_next)
 

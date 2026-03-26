@@ -52,9 +52,7 @@ class TestArtifactBuilder:
 
         result = "Signed result"
 
-        artifacts = ArtifactBuilder.from_result(
-            result, did_extension=mock_did_extension
-        )
+        artifacts = ArtifactBuilder.from_result(result, did_extension=mock_did_extension)
 
         assert len(artifacts) == 1
         # DID extension should be used for signing text

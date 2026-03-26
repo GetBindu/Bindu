@@ -12,8 +12,9 @@
 
 import inspect
 import os
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Dict
+from typing import Any
 from urllib.parse import urlparse
 from uuid import UUID
 
@@ -29,9 +30,9 @@ from bindu.settings import app_settings
 from bindu.utils import add_extension_to_capabilities
 from bindu.utils.config import (
     create_auth_config_from_env,
-    create_storage_config_from_env,
     create_scheduler_config_from_env,
     create_sentry_config_from_env,
+    create_storage_config_from_env,
     create_vault_config_from_env,
     load_config_from_env,
     resolve_key_directory,
@@ -54,7 +55,7 @@ DEFAULT_NETWORK = "base-sepolia"
 DEFAULT_PROTOCOL_VERSION = "1.0.0"
 
 
-def _generate_agent_id(validated_config: Dict[str, Any]) -> UUID:
+def _generate_agent_id(validated_config: dict[str, Any]) -> UUID:
     """Generate deterministic agent ID from author + name.
 
     Args:
@@ -111,9 +112,7 @@ def _normalize_execution_costs(execution_cost: Any) -> list[dict[str, Any]]:
         pay_to_address = cost.get("pay_to_address")
 
         if not amount:
-            raise ValueError(
-                "execution_cost.amount is required when execution_cost is configured"
-            )
+            raise ValueError("execution_cost.amount is required when execution_cost is configured")
 
         logger.info(f"Execution cost option {idx + 1}: {amount} {token} on {network}")
 
@@ -154,7 +153,7 @@ def _setup_x402_extension(normalized_costs: list[dict[str, Any]]) -> X402AgentEx
 
 def _register_in_hydra(
     agent_id_str: str,
-    validated_config: Dict[str, Any],
+    validated_config: dict[str, Any],
     agent_url: str,
     did_extension: Any,
     caller_dir: Path,
@@ -174,10 +173,9 @@ def _register_in_hydra(
     if not (app_settings.auth.enabled and app_settings.auth.provider == "hydra"):
         return None
 
-    logger.info(
-        "Registering agent in Hydra OAuth2 server with DID-based authentication..."
-    )
+    logger.info("Registering agent in Hydra OAuth2 server with DID-based authentication...")
     import asyncio
+
     from bindu.auth.hydra.registration import register_agent_in_hydra
 
     credentials = asyncio.run(
@@ -192,14 +190,9 @@ def _register_in_hydra(
     )
 
     if credentials:
-        logger.info(
-            f"✅ Agent registered with OAuth client ID: {credentials.client_id}"
-        )
+        logger.info(f"✅ Agent registered with OAuth client ID: {credentials.client_id}")
     else:
-        logger.warning(
-            "⚠️  Agent registration in Hydra failed or was skipped. "
-            "Authentication may not work correctly."
-        )
+        logger.warning("⚠️  Agent registration in Hydra failed or was skipped. Authentication may not work correctly.")
 
     return credentials
 
@@ -255,7 +248,7 @@ def _setup_tunnel(
         return None
 
 
-def _create_telemetry_config(validated_config: Dict[str, Any]) -> TelemetryConfig:
+def _create_telemetry_config(validated_config: dict[str, Any]) -> TelemetryConfig:
     """Create telemetry configuration from validated config.
 
     Args:
@@ -271,19 +264,11 @@ def _create_telemetry_config(validated_config: Dict[str, Any]) -> TelemetryConfi
         headers=validated_config.get("oltp_headers"),
         verbose_logging=validated_config.get("oltp_verbose_logging", False),
         service_version=validated_config.get("oltp_service_version", "1.0.0"),
-        deployment_environment=validated_config.get(
-            "oltp_deployment_environment", "production"
-        ),
+        deployment_environment=validated_config.get("oltp_deployment_environment", "production"),
         batch_max_queue_size=validated_config.get("oltp_batch_max_queue_size", 2048),
-        batch_schedule_delay_millis=validated_config.get(
-            "oltp_batch_schedule_delay_millis", 5000
-        ),
-        batch_max_export_batch_size=validated_config.get(
-            "oltp_batch_max_export_batch_size", 512
-        ),
-        batch_export_timeout_millis=validated_config.get(
-            "oltp_batch_export_timeout_millis", 30000
-        ),
+        batch_schedule_delay_millis=validated_config.get("oltp_batch_schedule_delay_millis", 5000),
+        batch_max_export_batch_size=validated_config.get("oltp_batch_max_export_batch_size", 512),
+        batch_export_timeout_millis=validated_config.get("oltp_batch_export_timeout_millis", 30000),
     )
 
 
@@ -309,7 +294,7 @@ def _parse_deployment_url(
 
 
 def _create_deployment_config(
-    validated_config: Dict[str, Any],
+    validated_config: dict[str, Any],
 ) -> DeploymentConfig | None:
     """Create deployment config from validated config dict.
 
@@ -345,7 +330,7 @@ def _create_deployment_config(
 
 
 def _bindufy_core(
-    config: Dict[str, Any],
+    config: dict[str, Any],
     handler_callable: Callable,
     run_server: bool = True,
     key_dir: str | Path | None = None,
@@ -393,10 +378,7 @@ def _bindufy_core(
     validated_config = ConfigValidator.validate_and_process(config)
 
     # Early validation for required author field
-    if (
-        not validated_config.get("author")
-        or not str(validated_config["author"]).strip()
-    ):
+    if not validated_config.get("author") or not str(validated_config["author"]).strip():
         raise ValueError("'author' is required in config and cannot be empty.")
 
     # Generate agent_id if not provided
@@ -470,17 +452,13 @@ def _bindufy_core(
         )
 
     # Set agent metadata for DID document
-    agent_url = (
-        deployment_config.url if deployment_config else app_settings.network.default_url
-    )
+    agent_url = deployment_config.url if deployment_config else app_settings.network.default_url
 
     logger.info(f"DID Extension setup complete: {did_extension.did}")
     logger.info("Creating agent manifest...")
 
     # Update capabilities to include DID extension
-    capabilities = add_extension_to_capabilities(
-        validated_config.get("capabilities", {}), did_extension
-    )
+    capabilities = add_extension_to_capabilities(validated_config.get("capabilities", {}), did_extension)
 
     # Only add x402 extension if execution_cost is configured
     execution_cost = validated_config.get("execution_cost")
@@ -505,9 +483,7 @@ def _bindufy_core(
         agent_trust=validated_config["agent_trust"],
         version=validated_config["version"],
         url=agent_url,
-        protocol_version=deployment_config.protocol_version
-        if deployment_config
-        else DEFAULT_PROTOCOL_VERSION,
+        protocol_version=deployment_config.protocol_version if deployment_config else DEFAULT_PROTOCOL_VERSION,
         kind=validated_config["kind"],
         debug_mode=validated_config["debug_mode"],
         debug_level=validated_config["debug_level"],
@@ -517,9 +493,7 @@ def _bindufy_core(
         oltp_service_name=validated_config.get("oltp_service_name"),
         num_history_sessions=validated_config["num_history_sessions"],
         enable_system_message=validated_config.get("enable_system_message", True),
-        enable_context_based_history=validated_config.get(
-            "enable_context_based_history", False
-        ),
+        enable_context_based_history=validated_config.get("enable_context_based_history", False),
         negotiation=validated_config.get("negotiation"),
         documentation_url=validated_config["documentation_url"],
         extra_metadata=validated_config["extra_metadata"],
@@ -600,15 +574,13 @@ def _bindufy_core(
             # Run server blocking (normal Python bindufy path)
             start_uvicorn_server(bindu_app, host=host, port=port, display_info=True)
     else:
-        logger.info(
-            "Server not started (run_server=False). Manifest returned for programmatic use."
-        )
+        logger.info("Server not started (run_server=False). Manifest returned for programmatic use.")
 
     return _manifest
 
 
 def bindufy(
-    config: Dict[str, Any],
+    config: dict[str, Any],
     handler: Callable[[list[dict[str, str]]], Any],
     run_server: bool = True,
     key_dir: str | Path | None = None,

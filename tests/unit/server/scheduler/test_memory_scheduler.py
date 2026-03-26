@@ -1,7 +1,8 @@
 """Minimal tests for in-memory scheduler."""
 
-import pytest
 from uuid import uuid4
+
+import pytest
 
 from bindu.server.scheduler.memory_scheduler import InMemoryScheduler
 

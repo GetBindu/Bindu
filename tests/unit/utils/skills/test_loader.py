@@ -7,11 +7,11 @@ import pytest
 import yaml
 
 from bindu.utils.skills.loader import (
+    _build_skill_from_data,
+    _parse_markdown_frontmatter,
+    find_skill_by_id,
     load_skill_from_directory,
     load_skills,
-    find_skill_by_id,
-    _parse_markdown_frontmatter,
-    _build_skill_from_data,
 )
 
 
@@ -272,9 +272,7 @@ Rich documentation here.
         skill_dir = tmp_path / "no_name"
         skill_dir.mkdir()
 
-        (skill_dir / "SKILL.md").write_text(
-            "---\ndescription: No name field\n---\n# Body"
-        )
+        (skill_dir / "SKILL.md").write_text("---\ndescription: No name field\n---\n# Body")
 
         with pytest.raises(KeyError, match="name"):
             load_skill_from_directory(skill_dir, tmp_path)
@@ -294,9 +292,7 @@ Rich documentation here.
         skill_dir = tmp_path / "empty_body"
         skill_dir.mkdir()
 
-        (skill_dir / "SKILL.md").write_text(
-            "---\nname: Empty Body\ndescription: No markdown body\n---\n"
-        )
+        (skill_dir / "SKILL.md").write_text("---\nname: Empty Body\ndescription: No markdown body\n---\n")
 
         skill = load_skill_from_directory(skill_dir, tmp_path)
 
@@ -443,9 +439,7 @@ class TestLoadSkills:
         """Test loading skills from SKILL.md files via load_skills."""
         skill_dir = tmp_path / "md_skill"
         skill_dir.mkdir()
-        (skill_dir / "SKILL.md").write_text(
-            "---\nname: MD Skill\ndescription: From markdown\n---\n# Docs\n"
-        )
+        (skill_dir / "SKILL.md").write_text("---\nname: MD Skill\ndescription: From markdown\n---\n# Docs\n")
 
         skills = load_skills(["md_skill"], tmp_path)
 

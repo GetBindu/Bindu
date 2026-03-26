@@ -5,14 +5,14 @@ across different configuration types.
 """
 
 import os
-from typing import Any, Dict, Literal, Optional, cast
+from typing import Any, Literal, cast
 
 from bindu.utils.logging import get_logger
 
 logger = get_logger("bindu.utils.config.env_loader")
 
 
-def create_storage_config_from_env(user_config: Dict[str, Any]):
+def create_storage_config_from_env(user_config: dict[str, Any]):
     """Create StorageConfig from environment variables and user config.
 
     Args:
@@ -59,7 +59,7 @@ def create_storage_config_from_env(user_config: Dict[str, Any]):
     )
 
 
-def create_scheduler_config_from_env(user_config: Dict[str, Any]):
+def create_scheduler_config_from_env(user_config: dict[str, Any]):
     """Create SchedulerConfig from environment variables and user config.
 
     Args:
@@ -100,12 +100,10 @@ def create_scheduler_config_from_env(user_config: Dict[str, Any]):
         if redis_url:
             logger.debug("Loaded REDIS_URL from environment")
 
-    return SchedulerConfig(
-        type=cast(Literal["redis", "memory"], scheduler_type), redis_url=redis_url
-    )
+    return SchedulerConfig(type=cast(Literal["redis", "memory"], scheduler_type), redis_url=redis_url)
 
 
-def create_tunnel_config_from_env(user_config: Dict[str, Any]):
+def create_tunnel_config_from_env(user_config: dict[str, Any]):
     """Create TunnelConfig from environment variables and user config.
 
     Args:
@@ -152,7 +150,7 @@ def create_tunnel_config_from_env(user_config: Dict[str, Any]):
     )
 
 
-def create_sentry_config_from_env(user_config: Dict[str, Any]):
+def create_sentry_config_from_env(user_config: dict[str, Any]):
     """Create SentryConfig from environment variables and user config.
 
     Args:
@@ -192,9 +190,7 @@ def create_sentry_config_from_env(user_config: Dict[str, Any]):
     from bindu.settings import app_settings
 
     sentry_dsn = os.getenv("SENTRY_DSN")
-    logger.debug(
-        f"Loaded Sentry configuration: enabled={sentry_enabled}, dsn={'***' if sentry_dsn else 'None'}"
-    )
+    logger.debug(f"Loaded Sentry configuration: enabled={sentry_enabled}, dsn={'***' if sentry_dsn else 'None'}")
 
     return SentryConfig(
         enabled=True,
@@ -209,8 +205,8 @@ def create_sentry_config_from_env(user_config: Dict[str, Any]):
 
 
 def create_auth_config_from_env(
-    user_config: Dict[str, Any],
-) -> Optional[Dict[str, Any]]:
+    user_config: dict[str, Any],
+) -> dict[str, Any] | None:
     """Create auth configuration from validated config.
 
     Auth config is already enriched by load_config_from_env() and validated.
@@ -226,8 +222,8 @@ def create_auth_config_from_env(
 
 
 def create_vault_config_from_env(
-    user_config: Dict[str, Any],
-) -> Optional[Dict[str, Any]]:
+    user_config: dict[str, Any],
+) -> dict[str, Any] | None:
     """Create vault configuration from validated config.
 
     Vault config is already enriched by load_config_from_env() and validated.

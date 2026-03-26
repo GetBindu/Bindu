@@ -6,7 +6,7 @@ ensuring they meet the required schema and have proper defaults.
 """
 
 import os
-from typing import Any, Dict
+from typing import Any
 
 from bindu import __version__
 from bindu.common.protocol.types import AgentCapabilities, Skill
@@ -64,7 +64,7 @@ class ConfigValidator:
     ]
 
     @classmethod
-    def validate_and_process(cls, config: Dict[str, Any]) -> Dict[str, Any]:
+    def validate_and_process(cls, config: dict[str, Any]) -> dict[str, Any]:
         """Validate and process agent configuration."""
         # Validate required fields first (fail-fast)
         cls._validate_required_fields(config)
@@ -88,7 +88,7 @@ class ConfigValidator:
     # ------------------------------------------------------------------
 
     @classmethod
-    def _validate_required_fields(cls, config: Dict[str, Any]) -> None:
+    def _validate_required_fields(cls, config: dict[str, Any]) -> None:
         """Validate required fields including nested fields."""
         missing = []
 
@@ -102,9 +102,7 @@ class ConfigValidator:
                     break
                 value = value[key]
 
-            if field not in missing and (
-                value is None or (isinstance(value, str) and not value.strip())
-            ):
+            if field not in missing and (value is None or (isinstance(value, str) and not value.strip())):
                 missing.append(field)
 
         if missing:
@@ -122,7 +120,7 @@ class ConfigValidator:
     # ------------------------------------------------------------------
 
     @classmethod
-    def _process_complex_fields(cls, config: Dict[str, Any]) -> Dict[str, Any]:
+    def _process_complex_fields(cls, config: dict[str, Any]) -> dict[str, Any]:
         if isinstance(config.get("skills"), list) and config["skills"]:
             if isinstance(config["skills"][0], dict):
                 config["skills"] = [Skill(**skill) for skill in config["skills"]]
@@ -145,7 +143,7 @@ class ConfigValidator:
     @classmethod
     def _validate_field_type(
         cls,
-        config: Dict[str, Any],
+        config: dict[str, Any],
         field: str,
         expected_type: type,
         allow_none: bool = False,
@@ -173,7 +171,7 @@ class ConfigValidator:
             raise ValueError(f"Field '{field}' must be a {type_name}")
 
     @classmethod
-    def _validate_field_types(cls, config: Dict[str, Any]) -> None:
+    def _validate_field_types(cls, config: dict[str, Any]) -> None:
         # Validate string fields
         string_fields = [
             "author",
@@ -192,19 +190,12 @@ class ConfigValidator:
             cls._validate_field_type(config, field, bool)
 
         if "debug_level" in config:
-            if not isinstance(config["debug_level"], int) or config[
-                "debug_level"
-            ] not in [1, 2]:
+            if not isinstance(config["debug_level"], int) or config["debug_level"] not in [1, 2]:
                 raise ValueError("Field 'debug_level' must be 1 or 2")
 
         if "num_history_sessions" in config:
-            if (
-                not isinstance(config["num_history_sessions"], int)
-                or config["num_history_sessions"] < 0
-            ):
-                raise ValueError(
-                    "Field 'num_history_sessions' must be a non-negative integer"
-                )
+            if not isinstance(config["num_history_sessions"], int) or config["num_history_sessions"] < 0:
+                raise ValueError("Field 'num_history_sessions' must be a non-negative integer")
 
         if config.get("kind") not in ["agent", "team", "workflow"]:
             raise ValueError("Field 'kind' must be one of: agent, team, workflow")
@@ -223,21 +214,17 @@ class ConfigValidator:
 
                 for item in execution_cost:
                     if not isinstance(item, dict):
-                        raise ValueError(
-                            "Field 'execution_cost' must be a dict or a list of dicts"
-                        )
+                        raise ValueError("Field 'execution_cost' must be a dict or a list of dicts")
             else:
                 # Any other type is invalid
-                raise ValueError(
-                    "Field 'execution_cost' must be a dict or a list of dicts"
-                )
+                raise ValueError("Field 'execution_cost' must be a dict or a list of dicts")
 
     # ------------------------------------------------------------------
     # Auth validation
     # ------------------------------------------------------------------
 
     @classmethod
-    def _validate_auth_config(cls, auth_config: Dict[str, Any]) -> None:
+    def _validate_auth_config(cls, auth_config: dict[str, Any]) -> None:
         if not isinstance(auth_config, dict):
             raise ValueError("Field 'auth' must be a dictionary")
 
@@ -249,18 +236,15 @@ class ConfigValidator:
         if provider == "hydra":
             cls._validate_hydra_config(auth_config)
         else:
-            raise ValueError(
-                f"Unknown auth provider: '{provider}'. Supported providers: hydra"
-            )
+            raise ValueError(f"Unknown auth provider: '{provider}'. Supported providers: hydra")
 
     @classmethod
-    def _validate_hydra_config(cls, auth_config: Dict[str, Any]) -> None:
+    def _validate_hydra_config(cls, auth_config: dict[str, Any]) -> None:
         if "admin_url" in auth_config:
             admin_url = auth_config["admin_url"]
             if not admin_url.startswith(("http://", "https://")):
                 raise ValueError(
-                    f"Invalid Hydra admin_url: '{admin_url}'. "
-                    f"Expected format: 'https://hydra-admin.getbindu.com'"
+                    f"Invalid Hydra admin_url: '{admin_url}'. Expected format: 'https://hydra-admin.getbindu.com'"
                 )
 
     # ------------------------------------------------------------------
@@ -268,7 +252,7 @@ class ConfigValidator:
     # ------------------------------------------------------------------
 
     @classmethod
-    def _process_oltp_config(cls, config: Dict[str, Any]) -> None:
+    def _process_oltp_config(cls, config: dict[str, Any]) -> None:
         oltp_endpoint = config.get("oltp_endpoint")
         if oltp_endpoint and isinstance(oltp_endpoint, str):
             if oltp_endpoint.startswith("env:"):
@@ -279,12 +263,12 @@ class ConfigValidator:
     # ------------------------------------------------------------------
 
     @classmethod
-    def create_bindufy_config(cls, raw_config: Dict[str, Any]) -> Dict[str, Any]:
+    def create_bindufy_config(cls, raw_config: dict[str, Any]) -> dict[str, Any]:
         """Create bindufy configuration from raw config."""
         return cls.validate_and_process(raw_config)
 
 
-def load_and_validate_config(config_path: str) -> Dict[str, Any]:
+def load_and_validate_config(config_path: str) -> dict[str, Any]:
     """Load and validate configuration from file path."""
     import json
 
@@ -292,7 +276,7 @@ def load_and_validate_config(config_path: str) -> Dict[str, Any]:
         caller_dir = os.path.dirname(os.path.abspath(__file__))
         config_path = os.path.join(caller_dir, config_path)
 
-    with open(config_path, "r") as f:
+    with open(config_path) as f:
         raw_config = json.load(f)
 
     return ConfigValidator.create_bindufy_config(raw_config)

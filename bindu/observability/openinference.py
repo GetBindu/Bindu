@@ -40,23 +40,13 @@ SUPPORTED_FRAMEWORKS = [
     AgentFrameworkSpec("agno", "openinference-instrumentation-agno", "1.5.2"),
     AgentFrameworkSpec("crewai", "openinference-instrumentation-crewai", "0.41.1"),
     AgentFrameworkSpec("langchain", "openinference-instrumentation-langchain", "0.1.0"),
-    AgentFrameworkSpec(
-        "llama-index", "openinference-instrumentation-llama-index", "0.1.0"
-    ),
+    AgentFrameworkSpec("llama-index", "openinference-instrumentation-llama-index", "0.1.0"),
     AgentFrameworkSpec("dspy", "openinference-instrumentation-dspy", "2.0.0"),
     AgentFrameworkSpec("haystack", "openinference-instrumentation-haystack", "2.0.0"),
-    AgentFrameworkSpec(
-        "instructor", "openinference-instrumentation-instructor", "1.0.0"
-    ),
-    AgentFrameworkSpec(
-        "pydantic-ai", "openinference-instrumentation-pydantic-ai", "0.1.0"
-    ),
-    AgentFrameworkSpec(
-        "autogen", "openinference-instrumentation-autogen-agentchat", "0.4.0"
-    ),
-    AgentFrameworkSpec(
-        "smolagents", "openinference-instrumentation-smolagents", "1.0.0"
-    ),
+    AgentFrameworkSpec("instructor", "openinference-instrumentation-instructor", "1.0.0"),
+    AgentFrameworkSpec("pydantic-ai", "openinference-instrumentation-pydantic-ai", "0.1.0"),
+    AgentFrameworkSpec("autogen", "openinference-instrumentation-autogen-agentchat", "0.4.0"),
+    AgentFrameworkSpec("smolagents", "openinference-instrumentation-smolagents", "1.0.0"),
     # LLM Providers (Lower Priority)
     AgentFrameworkSpec("litellm", "openinference-instrumentation-litellm", "1.43.0"),
     AgentFrameworkSpec("openai", "openinference-instrumentation-openai", "1.69.0"),
@@ -65,9 +55,7 @@ SUPPORTED_FRAMEWORKS = [
     AgentFrameworkSpec("groq", "openinference-instrumentation-groq", "0.1.0"),
     AgentFrameworkSpec("bedrock", "openinference-instrumentation-bedrock", "0.1.0"),
     AgentFrameworkSpec("vertexai", "openinference-instrumentation-vertexai", "1.0.0"),
-    AgentFrameworkSpec(
-        "google-genai", "openinference-instrumentation-google-genai", "0.1.0"
-    ),
+    AgentFrameworkSpec("google-genai", "openinference-instrumentation-google-genai", "0.1.0"),
 ]
 
 
@@ -99,9 +87,7 @@ def _validate_framework_version(
         Tuple of (is_valid, installed_version)
     """
     installed_version = installed_dists[framework_spec.framework].version
-    is_valid = version.parse(installed_version) >= version.parse(
-        framework_spec.min_version
-    )
+    is_valid = version.parse(installed_version) >= version.parse(framework_spec.min_version)
     return is_valid, installed_version
 
 
@@ -112,9 +98,7 @@ def _get_package_manager() -> list[str]:
         Command prefix for package installation
     """
     current_directory = Path.cwd()
-    has_uv = (current_directory / "uv.lock").exists() or (
-        current_directory / "pyproject.toml"
-    ).exists()
+    has_uv = (current_directory / "uv.lock").exists() or (current_directory / "pyproject.toml").exists()
     return ["uv", "add"] if has_uv else [sys.executable, "-m", "pip", "install"]
 
 
@@ -157,9 +141,7 @@ def _instrument_framework(framework: str, tracer_provider: Any) -> None:
         )
 
 
-def _check_missing_packages(
-    framework_spec: AgentFrameworkSpec, installed_dists: dict[str, Any]
-) -> list[str]:
+def _check_missing_packages(framework_spec: AgentFrameworkSpec, installed_dists: dict[str, Any]) -> list[str]:
     """Check for missing OpenTelemetry packages.
 
     Args:
@@ -169,9 +151,7 @@ def _check_missing_packages(
     Returns:
         List of missing package names
     """
-    required_packages = app_settings.observability.base_packages + [
-        framework_spec.instrumentation_package
-    ]
+    required_packages = app_settings.observability.base_packages + [framework_spec.instrumentation_package]
     return [pkg for pkg in required_packages if pkg not in installed_dists]
 
 
@@ -312,9 +292,7 @@ def _setup_tracer_provider(
         for endpoint in endpoints:
             # Create OTLP exporter with logging wrapper
             otlp_exporter = OTLPSpanExporter(endpoint=endpoint, headers=oltp_headers)
-            logging_exporter = _LoggingSpanExporter(
-                otlp_exporter, endpoint, verbose_logging
-            )
+            logging_exporter = _LoggingSpanExporter(otlp_exporter, endpoint, verbose_logging)
 
             # Type ignore: _LoggingSpanExporter implements SpanExporter protocol
             processor = BatchSpanProcessor(logging_exporter, **batch_config)  # type: ignore[arg-type]
@@ -331,9 +309,7 @@ def _setup_tracer_provider(
             )
     else:
         tracer_provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
-        _log_if_verbose(
-            verbose_logging, "Using console exporter - no OTLP endpoint configured"
-        )
+        _log_if_verbose(verbose_logging, "Using console exporter - no OTLP endpoint configured")
 
     # Set as global tracer provider so all tracers use it
     trace.set_tracer_provider(tracer_provider)
@@ -406,9 +382,7 @@ def setup(
         return
 
     # Step 2: Validate framework version
-    is_valid, installed_version = _validate_framework_version(
-        framework_spec, installed_dists
-    )
+    is_valid, installed_version = _validate_framework_version(framework_spec, installed_dists)
 
     if not is_valid:
         _log_if_verbose(

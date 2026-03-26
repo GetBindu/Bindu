@@ -1,6 +1,7 @@
 """Minimal tests for TunnelManager."""
 
 from unittest.mock import Mock, patch
+
 import pytest
 
 from bindu.tunneling.manager import TunnelManager

@@ -1,6 +1,7 @@
 """Minimal tests for task handlers."""
 
 from unittest.mock import AsyncMock, Mock
+
 import pytest
 
 from bindu.server.handlers.task_handlers import TaskHandlers

@@ -5,7 +5,8 @@ environment variables, eliminating code duplication across config loaders.
 """
 
 import os
-from typing import Any, Callable, Dict, List, Optional, Type, TypeVar
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 from bindu.utils.logging import get_logger
 
@@ -20,9 +21,9 @@ class ConfigLoader:
     @staticmethod
     def load_from_env_or_user(
         config_key: str,
-        user_config: Dict[str, Any],
-        env_loader: Callable[[Dict[str, Any]], Optional[T]],
-    ) -> Optional[T]:
+        user_config: dict[str, Any],
+        env_loader: Callable[[dict[str, Any]], T | None],
+    ) -> T | None:
         """Load config from user config or environment variables.
 
         Args:
@@ -43,16 +44,14 @@ class ConfigLoader:
     @staticmethod
     def load_typed_config(
         config_key: str,
-        user_config: Dict[str, Any],
-        config_class: Type[T],
+        user_config: dict[str, Any],
+        config_class: type[T],
         type_field: str = "type",
-        valid_types: Optional[List[str]] = None,
-        default_type: Optional[str] = None,
+        valid_types: list[str] | None = None,
+        default_type: str | None = None,
         env_prefix: str = "",
-        type_specific_loaders: Optional[
-            Dict[str, Callable[[str], Dict[str, Any]]]
-        ] = None,
-    ) -> Optional[T]:
+        type_specific_loaders: dict[str, Callable[[str], dict[str, Any]]] | None = None,
+    ) -> T | None:
         """Load typed configuration (storage, scheduler, etc.) with validation.
 
         This is a DRY factory method that handles the common pattern of:
@@ -82,9 +81,7 @@ class ConfigLoader:
 
             # Validate type
             if valid_types and config_type not in valid_types:
-                logger.warning(
-                    f"Invalid {config_key} type: {config_type}, using {default_type}"
-                )
+                logger.warning(f"Invalid {config_key} type: {config_type}, using {default_type}")
                 config_type = default_type
 
             return config_class(**config_dict)
@@ -98,9 +95,7 @@ class ConfigLoader:
 
         # Validate type
         if valid_types and config_type not in valid_types:
-            logger.warning(
-                f"Invalid {config_key} type: {config_type}, using {default_type}"
-            )
+            logger.warning(f"Invalid {config_key} type: {config_type}, using {default_type}")
             config_type = default_type
 
         logger.debug(f"Loaded {env_type_key} from environment: {config_type}")
@@ -116,9 +111,7 @@ class ConfigLoader:
         return config_class(**config_data)
 
     @staticmethod
-    def load_boolean_from_env(
-        env_key: str, default: bool = False, true_values: tuple = ("true", "1", "yes")
-    ) -> bool:
+    def load_boolean_from_env(env_key: str, default: bool = False, true_values: tuple = ("true", "1", "yes")) -> bool:
         """Load boolean value from environment variable.
 
         Args:
@@ -135,10 +128,10 @@ class ConfigLoader:
     @staticmethod
     def load_dict_from_user_or_env(
         config_key: str,
-        user_config: Dict[str, Any],
-        env_loaders: Dict[str, Callable[[], Any]],
-        required_when_enabled: Optional[List[str]] = None,
-    ) -> Optional[Dict[str, Any]]:
+        user_config: dict[str, Any],
+        env_loaders: dict[str, Callable[[], Any]],
+        required_when_enabled: list[str] | None = None,
+    ) -> dict[str, Any] | None:
         """Load dictionary config from user config or environment variables.
 
         Args:
@@ -155,7 +148,7 @@ class ConfigLoader:
             return user_config[config_key]
 
         # Load from environment
-        config_dict: Dict[str, Any] = {}
+        config_dict: dict[str, Any] = {}
 
         for field, loader in env_loaders.items():
             value = loader()
@@ -166,8 +159,6 @@ class ConfigLoader:
         if required_when_enabled and config_dict.get("enabled"):
             for field in required_when_enabled:
                 if field not in config_dict or config_dict[field] is None:
-                    raise ValueError(
-                        f"{field} is required when {config_key} is enabled"
-                    )
+                    raise ValueError(f"{field} is required when {config_key} is enabled")
 
         return config_dict if config_dict else None

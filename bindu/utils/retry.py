@@ -17,26 +17,27 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, Callable, TypeVar
+from typing import Any, TypeVar
 
 from tenacity import (
     AsyncRetrying,
+    after_log,
+    before_sleep_log,
     retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    before_sleep_log,
-    after_log,
 )
 from tenacity.wait import wait_random_exponential
 
+from bindu.settings import app_settings
 from bindu.utils.exceptions import (
     HTTPConnectionError,
-    HTTPTimeoutError,
     HTTPServerError,
+    HTTPTimeoutError,
 )
 from bindu.utils.logging import get_logger
-from bindu.settings import app_settings
 
 logger = get_logger("bindu.utils.retry")
 
@@ -108,10 +109,7 @@ def create_retry_decorator(
     }
 
     if operation_type not in settings_map:
-        raise ValueError(
-            f"Invalid operation_type: {operation_type}. "
-            f"Must be one of: {', '.join(settings_map.keys())}"
-        )
+        raise ValueError(f"Invalid operation_type: {operation_type}. Must be one of: {', '.join(settings_map.keys())}")
 
     max_key, min_key, max_wait_key = settings_map[operation_type]
 
@@ -168,9 +166,7 @@ def retry_worker_operation(
     Returns:
         Decorated function with retry logic
     """
-    return create_retry_decorator(
-        "worker", max_attempts, min_wait, max_wait, use_jitter=True
-    )
+    return create_retry_decorator("worker", max_attempts, min_wait, max_wait, use_jitter=True)
 
 
 def retry_storage_operation(
@@ -190,9 +186,7 @@ def retry_storage_operation(
     Returns:
         Decorated function with retry logic
     """
-    return create_retry_decorator(
-        "storage", max_attempts, min_wait, max_wait, use_jitter=False
-    )
+    return create_retry_decorator("storage", max_attempts, min_wait, max_wait, use_jitter=False)
 
 
 def retry_scheduler_operation(
@@ -212,9 +206,7 @@ def retry_scheduler_operation(
     Returns:
         Decorated function with retry logic
     """
-    return create_retry_decorator(
-        "scheduler", max_attempts, min_wait, max_wait, use_jitter=True
-    )
+    return create_retry_decorator("scheduler", max_attempts, min_wait, max_wait, use_jitter=True)
 
 
 def retry_api_call(
@@ -234,9 +226,7 @@ def retry_api_call(
     Returns:
         Decorated function with retry logic
     """
-    return create_retry_decorator(
-        "api", max_attempts, min_wait, max_wait, use_jitter=True
-    )
+    return create_retry_decorator("api", max_attempts, min_wait, max_wait, use_jitter=True)
 
 
 async def execute_with_retry(

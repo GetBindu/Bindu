@@ -41,9 +41,7 @@ class InMemoryScheduler(Scheduler):
         # FIX: Added math.inf to create a buffered stream.
         # Without this, the stream defaults to 0 (unbuffered), which causes
         # the API server to deadlock/hang waiting for a worker to receive the task.
-        self._write_stream, self._read_stream = anyio.create_memory_object_stream[
-            TaskOperation
-        ](math.inf)
+        self._write_stream, self._read_stream = anyio.create_memory_object_stream[TaskOperation](math.inf)
         await self.aexit_stack.enter_async_context(self._read_stream)
         await self.aexit_stack.enter_async_context(self._write_stream)
 
@@ -67,9 +65,7 @@ class InMemoryScheduler(Scheduler):
             params: Task parameters
         """
         trace_id, span_id = get_trace_context()
-        task_op = operation_class(
-            operation=operation, params=params, trace_id=trace_id, span_id=span_id
-        )
+        task_op = operation_class(operation=operation, params=params, trace_id=trace_id, span_id=span_id)
         await self._write_stream.send(task_op)
 
     @retry_scheduler_operation(

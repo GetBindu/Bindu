@@ -19,18 +19,14 @@ class TestHydraClientInitialization:
 
     def test_init_with_both_urls(self):
         """Test initialization with both admin and public URLs."""
-        client = HydraClient(
-            admin_url="http://hydra-admin:4445", public_url="http://hydra-public:4444"
-        )
+        client = HydraClient(admin_url="http://hydra-admin:4445", public_url="http://hydra-public:4444")
 
         assert client.admin_url == "http://hydra-admin:4445"
         assert client.public_url == "http://hydra-public:4444"
 
     def test_init_strips_trailing_slashes(self):
         """Test that trailing slashes are removed from URLs."""
-        client = HydraClient(
-            admin_url="http://localhost:4445/", public_url="http://localhost:4444/"
-        )
+        client = HydraClient(admin_url="http://localhost:4445/", public_url="http://localhost:4444/")
 
         assert client.admin_url == "http://localhost:4445"
         assert client.public_url == "http://localhost:4444"
@@ -59,9 +55,7 @@ class TestHydraClientContextManager:
         """Test async context manager enters and exits properly."""
         client = HydraClient(admin_url="http://localhost:4445")
 
-        with patch.object(
-            client._http_client, "_ensure_session", new_callable=AsyncMock
-        ):
+        with patch.object(client._http_client, "_ensure_session", new_callable=AsyncMock):
             with patch.object(client, "close", new_callable=AsyncMock) as mock_close:
                 async with client as ctx_client:
                     assert ctx_client is client
@@ -73,9 +67,7 @@ class TestHydraClientContextManager:
         """Test close method closes HTTP client."""
         client = HydraClient(admin_url="http://localhost:4445")
 
-        with patch.object(
-            client._http_client, "close", new_callable=AsyncMock
-        ) as mock_close:
+        with patch.object(client._http_client, "close", new_callable=AsyncMock) as mock_close:
             await client.close()
             mock_close.assert_called_once()
 
@@ -239,9 +231,7 @@ class TestHydraClientOAuthManagement:
         # Create HTTPClientError with proper initialization
         error = HTTPClientError(status=404, message="Not found")
 
-        with patch.object(
-            client._http_client, "get", new_callable=AsyncMock, side_effect=error
-        ):
+        with patch.object(client._http_client, "get", new_callable=AsyncMock, side_effect=error):
             result = await client.get_oauth_client("nonexistent")
 
             assert result is None
@@ -274,9 +264,7 @@ class TestHydraClientOAuthManagement:
 
         mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.json = AsyncMock(
-            return_value=[{"client_id": "client-1"}, {"client_id": "client-2"}]
-        )
+        mock_response.json = AsyncMock(return_value=[{"client_id": "client-1"}, {"client_id": "client-2"}])
 
         with patch.object(
             client._http_client,
@@ -426,9 +414,7 @@ class TestHydraClientHealthAndUtilities:
 
         mock_client_data = {
             "client_id": "did:bindu:test",
-            "metadata": {
-                "public_key": "z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH"
-            },
+            "metadata": {"public_key": "z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH"},
         }
 
         with patch.object(
@@ -446,9 +432,7 @@ class TestHydraClientHealthAndUtilities:
         """Test getting public key when client doesn't exist."""
         client = HydraClient(admin_url="http://localhost:4445")
 
-        with patch.object(
-            client, "get_oauth_client", new_callable=AsyncMock, return_value=None
-        ):
+        with patch.object(client, "get_oauth_client", new_callable=AsyncMock, return_value=None):
             result = await client.get_public_key_from_client("nonexistent")
 
             assert result is None

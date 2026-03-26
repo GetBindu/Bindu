@@ -29,11 +29,11 @@ from __future__ import annotations as _annotations
 # Export authentication implementations from auth/ subdirectory
 from .auth import HydraMiddleware
 
-# Export payment middleware from x402/ subdirectory
-from .x402 import X402Middleware
-
 # Export metrics middleware
 from .metrics import MetricsMiddleware
+
+# Export payment middleware from x402/ subdirectory
+from .x402 import X402Middleware
 
 __all__ = [
     # Authentication implementations

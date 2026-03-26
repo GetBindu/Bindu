@@ -1,12 +1,12 @@
 """Minimal tests for storage normalization helpers."""
 
-from uuid import UUID, uuid4
 from typing import cast
+from uuid import UUID, uuid4
 
 from bindu.common.protocol.types import Message
 from bindu.server.storage.helpers.normalization import (
-    normalize_uuid,
     normalize_message_uuids,
+    normalize_uuid,
 )
 
 

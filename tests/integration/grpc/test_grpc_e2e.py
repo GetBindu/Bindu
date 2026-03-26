@@ -28,7 +28,6 @@ from bindu.grpc.generated import agent_handler_pb2, agent_handler_pb2_grpc
 from bindu.grpc.registry import AgentRegistry
 from bindu.grpc.server import start_grpc_server
 
-
 # ---------------------------------------------------------------------------
 # Mock AgentHandler — simulates what a TypeScript/Kotlin SDK would run
 # ---------------------------------------------------------------------------
@@ -175,9 +174,7 @@ class TestGrpcE2ERegistration:
         assert response.server_timestamp > 0
         channel.close()
 
-    def test_register_agent(
-        self, grpc_server: Any, mock_agent: MockAgentHandler
-    ) -> None:
+    def test_register_agent(self, grpc_server: Any, mock_agent: MockAgentHandler) -> None:
         """Test full RegisterAgent flow — DID, manifest, HTTP server."""
         channel = grpc.insecure_channel(f"localhost:{GRPC_PORT}")
         stub = agent_handler_pb2_grpc.BinduServiceStub(channel)
@@ -257,9 +254,7 @@ class TestGrpcE2EMessageFlow:
         assert len(extensions) > 0
         assert extensions[0]["uri"].startswith("did:bindu:")
 
-    def test_send_message_and_get_response(
-        self, grpc_server: Any, mock_agent: MockAgentHandler
-    ) -> None:
+    def test_send_message_and_get_response(self, grpc_server: Any, mock_agent: MockAgentHandler) -> None:
         """Test full round-trip: send A2A message → handler executes → task completes.
 
         This is the critical E2E test. It proves:

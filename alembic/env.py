@@ -6,16 +6,17 @@ the Bindu settings system and asyncpg.
 
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-# Import Bindu settings to get database URL
-from bindu.settings import app_settings
+from alembic import context
 
 # Import metadata for autogenerate support
 from bindu.server.storage.schema import metadata
+
+# Import Bindu settings to get database URL
+from bindu.settings import app_settings
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

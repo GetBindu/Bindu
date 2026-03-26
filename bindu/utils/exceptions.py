@@ -36,22 +36,14 @@ class HTTPError(Exception):
 class HTTPConnectionError(HTTPError):
     """Raised when connection to server fails."""
 
-    pass
-
 
 class HTTPTimeoutError(HTTPError):
     """Raised when request times out."""
-
-    pass
 
 
 class HTTPClientError(HTTPError):
     """Raised for 4xx client errors."""
 
-    pass
-
 
 class HTTPServerError(HTTPError):
     """Raised for 5xx server errors."""
-
-    pass

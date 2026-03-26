@@ -1,9 +1,9 @@
 """Minimal tests for binary management."""
 
 from pathlib import Path
-from unittest.mock import patch, Mock
+from unittest.mock import Mock, patch
 
-from bindu.tunneling.binary import get_binary_path, BINARY_PATH
+from bindu.tunneling.binary import BINARY_PATH, get_binary_path
 
 
 class TestBinaryManagement:

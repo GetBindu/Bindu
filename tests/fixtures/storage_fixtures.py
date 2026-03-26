@@ -1,10 +1,11 @@
 """Storage-related test fixtures."""
 
-import pytest_asyncio
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
-from bindu.server.storage.memory_storage import InMemoryStorage
+import pytest_asyncio
+
 from bindu.server.scheduler.memory_scheduler import InMemoryScheduler
+from bindu.server.storage.memory_storage import InMemoryStorage
 
 
 @pytest_asyncio.fixture

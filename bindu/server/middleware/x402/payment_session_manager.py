@@ -19,9 +19,8 @@ from __future__ import annotations
 
 import asyncio
 import secrets
-from datetime import datetime, timedelta, timezone
-from typing import Optional
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 
 from x402.types import PaymentPayload
 
@@ -35,17 +34,15 @@ class PaymentSession:
     """Represents a payment session."""
 
     session_id: str
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    expires_at: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc) + timedelta(minutes=15)
-    )
-    payment_payload: Optional[PaymentPayload] = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    expires_at: datetime = field(default_factory=lambda: datetime.now(UTC) + timedelta(minutes=15))
+    payment_payload: PaymentPayload | None = None
     status: str = "pending"  # pending, completed, expired, failed
-    error: Optional[str] = None
+    error: str | None = None
 
     def is_expired(self) -> bool:
         """Check if session has expired."""
-        return datetime.now(timezone.utc) > self.expires_at
+        return datetime.now(UTC) > self.expires_at
 
     def is_completed(self) -> bool:
         """Check if payment is completed."""
@@ -63,7 +60,7 @@ class PaymentSessionManager:
         """
         self._sessions: dict[str, PaymentSession] = {}
         self._session_timeout = timedelta(minutes=session_timeout_minutes)
-        self._cleanup_task: Optional[asyncio.Task] = None
+        self._cleanup_task: asyncio.Task | None = None
 
     async def start_cleanup_task(self) -> None:
         """Start background task to cleanup expired sessions."""
@@ -87,9 +84,7 @@ class PaymentSessionManager:
             try:
                 await asyncio.sleep(60)  # Run every minute
                 expired_sessions = [
-                    session_id
-                    for session_id, session in self._sessions.items()
-                    if session.is_expired()
+                    session_id for session_id, session in self._sessions.items() if session.is_expired()
                 ]
 
                 for session_id in expired_sessions:
@@ -115,7 +110,7 @@ class PaymentSessionManager:
         logger.info(f"Created payment session: {session_id}")
         return session
 
-    def get_session(self, session_id: str) -> Optional[PaymentSession]:
+    def get_session(self, session_id: str) -> PaymentSession | None:
         """Get payment session by ID.
 
         Args:
@@ -138,9 +133,7 @@ class PaymentSessionManager:
 
         return session
 
-    def complete_session(
-        self, session_id: str, payment_payload: PaymentPayload
-    ) -> bool:
+    def complete_session(self, session_id: str, payment_payload: PaymentPayload) -> bool:
         """Mark session as completed with payment payload.
 
         Args:
@@ -153,9 +146,7 @@ class PaymentSessionManager:
         session = self.get_session(session_id)
 
         if session is None:
-            logger.warning(
-                f"Cannot complete session: not found or expired: {session_id}"
-            )
+            logger.warning(f"Cannot complete session: not found or expired: {session_id}")
             return False
 
         session.payment_payload = payment_payload
@@ -186,9 +177,7 @@ class PaymentSessionManager:
         logger.warning(f"Payment session failed: {session_id} - {error}")
         return True
 
-    async def wait_for_completion(
-        self, session_id: str, timeout_seconds: int = 300
-    ) -> Optional[PaymentSession]:
+    async def wait_for_completion(self, session_id: str, timeout_seconds: int = 300) -> PaymentSession | None:
         """Wait for session to complete (polling).
 
         Args:
@@ -198,16 +187,14 @@ class PaymentSessionManager:
         Returns:
             PaymentSession if completed, None if timeout or error
         """
-        start_time = datetime.now(timezone.utc)
+        start_time = datetime.now(UTC)
         timeout = timedelta(seconds=timeout_seconds)
 
-        while datetime.now(timezone.utc) - start_time < timeout:
+        while datetime.now(UTC) - start_time < timeout:
             session = self.get_session(session_id)
 
             if session is None:
-                logger.warning(
-                    f"Session not found or expired during wait: {session_id}"
-                )
+                logger.warning(f"Session not found or expired during wait: {session_id}")
                 return None
 
             if session.is_completed():

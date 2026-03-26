@@ -10,17 +10,18 @@ This migration creates the core tables for A2A protocol task and context managem
 - task_feedback: Stores optional user feedback for tasks
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
+from alembic import op
+
 # revision identifiers, used by Alembic.
 revision: str = "20251207_0001"
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -28,9 +29,7 @@ def upgrade() -> None:
     # Create tasks table
     op.create_table(
         "tasks",
-        sa.Column(
-            "id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False
-        ),
+        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
         sa.Column("context_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("kind", sa.String(50), nullable=False, server_default="task"),
         sa.Column("state", sa.String(50), nullable=False),
@@ -71,9 +70,7 @@ def upgrade() -> None:
     # Create contexts table
     op.create_table(
         "contexts",
-        sa.Column(
-            "id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False
-        ),
+        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
         sa.Column(
             "context_data",
             postgresql.JSONB(astext_type=sa.Text()),
@@ -104,13 +101,9 @@ def upgrade() -> None:
     # Create task_feedback table
     op.create_table(
         "task_feedback",
-        sa.Column(
-            "id", sa.Integer(), primary_key=True, autoincrement=True, nullable=False
-        ),
+        sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True, nullable=False),
         sa.Column("task_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column(
-            "feedback_data", postgresql.JSONB(astext_type=sa.Text()), nullable=False
-        ),
+        sa.Column("feedback_data", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
         sa.Column(
             "created_at",
             sa.TIMESTAMP(timezone=True),
@@ -140,15 +133,9 @@ def upgrade() -> None:
     )
 
     # GIN indexes for JSONB columns (for efficient querying inside JSON)
-    op.create_index(
-        "idx_tasks_history_gin", "tasks", ["history"], postgresql_using="gin"
-    )
-    op.create_index(
-        "idx_tasks_metadata_gin", "tasks", ["metadata"], postgresql_using="gin"
-    )
-    op.create_index(
-        "idx_tasks_artifacts_gin", "tasks", ["artifacts"], postgresql_using="gin"
-    )
+    op.create_index("idx_tasks_history_gin", "tasks", ["history"], postgresql_using="gin")
+    op.create_index("idx_tasks_metadata_gin", "tasks", ["metadata"], postgresql_using="gin")
+    op.create_index("idx_tasks_artifacts_gin", "tasks", ["artifacts"], postgresql_using="gin")
 
     # Contexts indexes
     op.create_index(
@@ -163,9 +150,7 @@ def upgrade() -> None:
         ["updated_at"],
         postgresql_ops={"updated_at": "DESC"},
     )
-    op.create_index(
-        "idx_contexts_data_gin", "contexts", ["context_data"], postgresql_using="gin"
-    )
+    op.create_index("idx_contexts_data_gin", "contexts", ["context_data"], postgresql_using="gin")
     op.create_index(
         "idx_contexts_history_gin",
         "contexts",

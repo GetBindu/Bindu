@@ -22,9 +22,7 @@ class TestDIDFormatValidation:
 
     def test_validate_valid_bindu_did_with_agent_id(self):
         """Test validation of valid bindu DID with agent ID."""
-        valid, error = DIDValidation.validate_did_format(
-            "did:bindu:author:agent_name:agent123"
-        )
+        valid, error = DIDValidation.validate_did_format("did:bindu:author:agent_name:agent123")
 
         assert valid is True
         assert error is None
@@ -75,9 +73,7 @@ class TestDIDFormatValidation:
 
     def test_validate_did_with_special_characters(self):
         """Test validation of DID with special characters in components."""
-        valid, error = DIDValidation.validate_did_format(
-            "did:bindu:user_at_example:my_agent"
-        )
+        valid, error = DIDValidation.validate_did_format("did:bindu:user_at_example:my_agent")
 
         assert valid is True
         assert error is None
@@ -284,9 +280,7 @@ class TestDIDValidationEdgeCases:
     def test_validate_very_long_did(self):
         """Test validation of very long DID."""
         long_component = "a" * 200
-        valid, error = DIDValidation.validate_did_format(
-            f"did:bindu:{long_component}:agent"
-        )
+        valid, error = DIDValidation.validate_did_format(f"did:bindu:{long_component}:agent")
 
         assert valid is True
         assert error is None

@@ -621,7 +621,7 @@ Bindu என்பது [Apache License 2.0](https://choosealicense.com/license
 
 நாங்கள் 💛 பங்களிப்புகளை! நீங்கள் பிழைகளை சரிசெய்யுகிறீர்களா, ஆவணங்களை மேம்படுத்துகிறீர்களா, அல்லது டெமோக்களை உருவாக்குகிறீர்களா—உங்கள் பங்களிப்புகள் Bindu ஐ மேம்படுத்துகின்றன.
 
-- 💬 விவாதங்கள் மற்றும் ஆதரவு க்காக [Join Discord](https://discord.gg/3w5zuYUuwt) 
+- 💬 விவாதங்கள் மற்றும் ஆதரவு க்காக [Join Discord](https://discord.gg/3w5zuYUuwt)
 - ⭐ நீங்கள் இதைப் பயனுள்ளதாகக் கண்டால் [Star the repository](https://github.com/getbindu/Bindu)!
 
 ---

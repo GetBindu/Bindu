@@ -9,9 +9,7 @@ class TaskStateManager:
     """Optimized manager for task state transitions and validation."""
 
     @staticmethod
-    async def validate_task_state(
-        task: Task, expected_state: str = "submitted"
-    ) -> None:
+    async def validate_task_state(task: Task, expected_state: str = "submitted") -> None:
         """Validate task is in expected state.
 
         Args:

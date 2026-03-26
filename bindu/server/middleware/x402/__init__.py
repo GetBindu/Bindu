@@ -26,8 +26,8 @@ Payment session endpoints are available in bindu.server.endpoints.payment_sessio
 
 from __future__ import annotations as _annotations
 
+from .payment_session_manager import PaymentSession, PaymentSessionManager
 from .x402_middleware import X402Middleware
-from .payment_session_manager import PaymentSessionManager, PaymentSession
 
 __all__ = [
     "X402Middleware",

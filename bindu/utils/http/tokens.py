@@ -6,18 +6,15 @@ including getting tokens for agents and validating tokens.
 
 from __future__ import annotations as _annotations
 
-from typing import Optional
-
 from bindu.settings import app_settings
-from .client import http_client
 from bindu.utils.logging import get_logger
+
+from .client import http_client
 
 logger = get_logger("bindu.utils.token_utils")
 
 
-async def get_client_credentials_token(
-    client_id: str, client_secret: str, scope: Optional[str] = None
-) -> Optional[dict]:
+async def get_client_credentials_token(client_id: str, client_secret: str, scope: str | None = None) -> dict | None:
     """Get access token using client credentials grant.
 
     Args:
@@ -57,9 +54,7 @@ async def get_client_credentials_token(
                 return result
             else:
                 error_text = await response.text()
-                logger.error(
-                    f"Failed to get token for {client_id}: {response.status} - {error_text}"
-                )
+                logger.error(f"Failed to get token for {client_id}: {response.status} - {error_text}")
                 return None
 
     except Exception as e:
@@ -67,7 +62,7 @@ async def get_client_credentials_token(
         return None
 
 
-async def introspect_token(token: str) -> Optional[dict]:
+async def introspect_token(token: str) -> dict | None:
     """Introspect a token to check if it's valid.
 
     Args:

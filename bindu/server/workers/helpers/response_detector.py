@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any, Optional
+from typing import Any
 
 from bindu.common.protocol.types import TaskState
 from bindu.settings import app_settings
@@ -26,7 +26,7 @@ class ResponseDetector:
     """
 
     @staticmethod
-    def parse_structured_response(result: Any) -> Optional[dict[str, Any]]:
+    def parse_structured_response(result: Any) -> dict[str, Any] | None:
         """Parse agent response for structured state transitions.
 
         Handles multiple response types:
@@ -82,9 +82,7 @@ class ResponseDetector:
         return None
 
     @staticmethod
-    def determine_task_state(
-        result: Any, structured: Optional[dict[str, Any]]
-    ) -> tuple[TaskState, Any]:
+    def determine_task_state(result: Any, structured: dict[str, Any] | None) -> tuple[TaskState, Any]:
         """Determine task state from agent response.
 
         Handles multiple response types:

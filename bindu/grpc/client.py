@@ -91,9 +91,7 @@ class GrpcAgentClient:
             self._stub = agent_handler_pb2_grpc.AgentHandlerStub(self._channel)
             logger.debug(f"Connected to agent handler at {self._address}")
 
-    def _build_request(
-        self, messages: list[dict[str, str]]
-    ) -> agent_handler_pb2.HandleRequest:
+    def _build_request(self, messages: list[dict[str, str]]) -> agent_handler_pb2.HandleRequest:
         """Convert chat-format messages to a proto HandleRequest.
 
         Args:
@@ -146,21 +144,13 @@ class GrpcAgentClient:
         request = self._build_request(messages)
 
         if self._use_streaming:
-            logger.debug(
-                f"Calling HandleMessagesStream on {self._address} "
-                f"with {len(request.messages)} messages"
-            )
+            logger.debug(f"Calling HandleMessagesStream on {self._address} with {len(request.messages)} messages")
             return self._handle_streaming(request)
         else:
-            logger.debug(
-                f"Calling HandleMessages on {self._address} "
-                f"with {len(request.messages)} messages"
-            )
+            logger.debug(f"Calling HandleMessages on {self._address} with {len(request.messages)} messages")
             return self._handle_unary(request)
 
-    def _handle_unary(
-        self, request: agent_handler_pb2.HandleRequest
-    ) -> str | dict[str, Any]:
+    def _handle_unary(self, request: agent_handler_pb2.HandleRequest) -> str | dict[str, Any]:
         """Make a unary HandleMessages call.
 
         Args:
@@ -187,9 +177,7 @@ class GrpcAgentClient:
             str or dict from _response_to_result() for each stream chunk.
         """
         assert self._stub is not None
-        response_stream = self._stub.HandleMessagesStream(
-            request, timeout=self._timeout
-        )
+        response_stream = self._stub.HandleMessagesStream(request, timeout=self._timeout)
         for response in response_stream:
             yield self._response_to_result(response)
 
@@ -272,7 +260,4 @@ class GrpcAgentClient:
 
     def __repr__(self) -> str:  # noqa: D105
         mode = "streaming" if self._use_streaming else "unary"
-        return (
-            f"GrpcAgentClient(address={self._address!r}, "
-            f"timeout={self._timeout}, mode={mode})"
-        )
+        return f"GrpcAgentClient(address={self._address!r}, timeout={self._timeout}, mode={mode})"

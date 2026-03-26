@@ -5,7 +5,6 @@ configuration directories with intelligent fallback strategies.
 """
 
 from pathlib import Path
-from typing import Optional
 
 from bindu.utils.logging import get_logger
 
@@ -13,8 +12,8 @@ logger = get_logger("bindu.utils.config.path_resolver")
 
 
 def resolve_key_directory(
-    explicit_dir: Optional[str | Path] = None,
-    caller_dir: Optional[Path] = None,
+    explicit_dir: str | Path | None = None,
+    caller_dir: Path | None = None,
     subdir: str = ".bindu",
 ) -> Path:
     """Resolve the directory for storing DID keys with multiple fallback strategies.

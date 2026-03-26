@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import threading
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from bindu.utils.logging import get_logger
@@ -39,8 +39,8 @@ class RegisteredAgent:
     agent_id: str
     grpc_callback_address: str
     manifest: AgentManifest
-    registered_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    last_heartbeat: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    registered_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    last_heartbeat: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 class AgentRegistry:
@@ -78,9 +78,7 @@ class AgentRegistry:
         )
         with self._lock:
             self._agents[agent_id] = entry
-        logger.info(
-            f"Registered agent {agent_id} with callback at {grpc_callback_address}"
-        )
+        logger.info(f"Registered agent {agent_id} with callback at {grpc_callback_address}")
         return entry
 
     def get(self, agent_id: str) -> RegisteredAgent | None:
@@ -124,7 +122,7 @@ class AgentRegistry:
         with self._lock:
             entry = self._agents.get(agent_id)
             if entry:
-                entry.last_heartbeat = datetime.now(timezone.utc)
+                entry.last_heartbeat = datetime.now(UTC)
                 return True
         return False
 

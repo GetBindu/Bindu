@@ -1,8 +1,9 @@
 """Tests for worker task utilities."""
 
-import pytest
 from typing import cast
 from uuid import uuid4
+
+import pytest
 
 from bindu.common.protocol.types import Task
 from bindu.utils.worker.tasks import TaskStateManager

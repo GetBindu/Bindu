@@ -15,9 +15,10 @@ fully self-contained and can be transmitted over the network (e.g. via gRPC)
 without needing filesystem access.
 """
 
-import yaml
 from pathlib import Path
-from typing import Any, Dict, List, Union, cast
+from typing import Any, cast
+
+import yaml
 
 from bindu.common.protocol.types import Skill
 from bindu.utils.logging import get_logger
@@ -29,7 +30,7 @@ SKILL_YAML_FILENAME = "skill.yaml"
 SKILL_MD_FILENAME = "SKILL.md"
 
 
-def _parse_markdown_frontmatter(content: str) -> tuple[Dict[str, Any], str]:
+def _parse_markdown_frontmatter(content: str) -> tuple[dict[str, Any], str]:
     """Parse YAML frontmatter from a markdown file.
 
     Expects the format:
@@ -52,17 +53,13 @@ def _parse_markdown_frontmatter(content: str) -> tuple[Dict[str, Any], str]:
 
     if not content.startswith("---"):
         raise ValueError(
-            "SKILL.md must start with YAML frontmatter (---). "
-            "Expected format: ---\\nname: ...\\ndescription: ...\\n---"
+            "SKILL.md must start with YAML frontmatter (---). Expected format: ---\\nname: ...\\ndescription: ...\\n---"
         )
 
     # Find the closing ---
     end_idx = content.find("---", 3)
     if end_idx == -1:
-        raise ValueError(
-            "SKILL.md frontmatter is not closed. "
-            "Expected a closing --- after the YAML block."
-        )
+        raise ValueError("SKILL.md frontmatter is not closed. Expected a closing --- after the YAML block.")
 
     frontmatter_str = content[3:end_idx].strip()
     body = content[end_idx + 3 :].strip()
@@ -73,16 +70,14 @@ def _parse_markdown_frontmatter(content: str) -> tuple[Dict[str, Any], str]:
         raise ValueError(f"Invalid YAML in SKILL.md frontmatter: {e}")
 
     if not isinstance(frontmatter, dict):
-        raise ValueError(
-            "SKILL.md frontmatter must be a YAML mapping (key: value pairs)"
-        )
+        raise ValueError("SKILL.md frontmatter must be a YAML mapping (key: value pairs)")
 
     return frontmatter, body
 
 
 def _build_skill_from_data(
-    skill_data: Dict[str, Any],
-) -> Dict[str, Any]:
+    skill_data: dict[str, Any],
+) -> dict[str, Any]:
     """Build a Skill dict from parsed skill data.
 
     Extracts required fields with defaults and copies optional fields.
@@ -101,7 +96,7 @@ def _build_skill_from_data(
     if "description" not in skill_data:
         raise KeyError("Skill definition missing required field 'description'")
 
-    skill: Dict[str, Any] = {
+    skill: dict[str, Any] = {
         "id": skill_data.get("id", skill_data["name"]),
         "name": skill_data["name"],
         "description": skill_data["description"],
@@ -130,9 +125,7 @@ def _build_skill_from_data(
     return skill
 
 
-def _load_skill_from_yaml(
-    yaml_path: Path, skill_dir: Path, caller_dir: Path
-) -> Dict[str, Any]:
+def _load_skill_from_yaml(yaml_path: Path, skill_dir: Path, caller_dir: Path) -> dict[str, Any]:
     """Load skill metadata from a skill.yaml file.
 
     Args:
@@ -167,9 +160,7 @@ def _load_skill_from_yaml(
     return skill
 
 
-def _load_skill_from_markdown(
-    md_path: Path, skill_dir: Path, caller_dir: Path
-) -> Dict[str, Any]:
+def _load_skill_from_markdown(md_path: Path, skill_dir: Path, caller_dir: Path) -> dict[str, Any]:
     """Load skill metadata from a SKILL.md file with YAML frontmatter.
 
     The SKILL.md file must have YAML frontmatter with at least 'name' and
@@ -208,7 +199,7 @@ def _load_skill_from_markdown(
     return skill
 
 
-def load_skill_from_directory(skill_path: Union[str, Path], caller_dir: Path) -> Skill:
+def load_skill_from_directory(skill_path: str | Path, caller_dir: Path) -> Skill:
     """Load a skill from a directory containing skill.yaml and/or SKILL.md.
 
     Resolution order:
@@ -251,8 +242,7 @@ def load_skill_from_directory(skill_path: Union[str, Path], caller_dir: Path) ->
 
     if not has_yaml and not has_md:
         raise FileNotFoundError(
-            f"No skill definition found in {skill_path}. "
-            f"Expected {SKILL_YAML_FILENAME} or {SKILL_MD_FILENAME}"
+            f"No skill definition found in {skill_path}. Expected {SKILL_YAML_FILENAME} or {SKILL_MD_FILENAME}"
         )
 
     if has_yaml:
@@ -266,9 +256,7 @@ def load_skill_from_directory(skill_path: Union[str, Path], caller_dir: Path) ->
                 _, markdown_body = _parse_markdown_frontmatter(md_content)
                 if markdown_body:
                     skill["markdown_content"] = markdown_body
-                logger.debug(
-                    f"Merged SKILL.md documentation for skill '{skill['name']}'"
-                )
+                logger.debug(f"Merged SKILL.md documentation for skill '{skill['name']}'")
             except (ValueError, OSError) as e:
                 logger.warning(
                     f"Found SKILL.md alongside skill.yaml in {skill_path} "
@@ -286,9 +274,7 @@ def load_skill_from_directory(skill_path: Union[str, Path], caller_dir: Path) ->
     return cast(Skill, skill)
 
 
-def load_skills(
-    skills_config: List[Union[str, Dict[str, Any]]], caller_dir: Path
-) -> List[Skill]:
+def load_skills(skills_config: list[str | dict[str, Any]], caller_dir: Path) -> list[Skill]:
     """Load skills from configuration.
 
     Supports:
@@ -303,7 +289,7 @@ def load_skills(
     Returns:
         List of loaded Skill objects
     """
-    skills: List[Skill] = []
+    skills: list[Skill] = []
 
     for skill_item in skills_config:
         try:
@@ -314,14 +300,10 @@ def load_skills(
             elif isinstance(skill_item, dict):
                 # Inline skill: dict with at minimum "name" and "description" keys.
                 if "name" not in skill_item:
-                    raise ValueError(
-                        f"Inline skill definition missing required 'name': {skill_item}"
-                    )
+                    raise ValueError(f"Inline skill definition missing required 'name': {skill_item}")
                 if "description" not in skill_item:
-                    raise ValueError(
-                        f"Inline skill definition missing required 'description': {skill_item}"
-                    )
-                inline_skill: Dict[str, Any] = {
+                    raise ValueError(f"Inline skill definition missing required 'description': {skill_item}")
+                inline_skill: dict[str, Any] = {
                     "id": skill_item.get("id", skill_item["name"]),
                     "name": skill_item["name"],
                     "description": skill_item["description"],
@@ -345,9 +327,7 @@ def load_skills(
                 logger.info(f"Loaded inline skill: {inline_skill['name']}")
                 skills.append(cast(Skill, inline_skill))
             else:
-                logger.warning(
-                    f"Invalid skill configuration (expected str path or dict): {skill_item}"
-                )
+                logger.warning(f"Invalid skill configuration (expected str path or dict): {skill_item}")
         except (FileNotFoundError, ValueError, KeyError) as e:
             logger.error(f"Failed to load skill {skill_item}: {e}")
             raise
@@ -356,9 +336,7 @@ def load_skills(
     return skills
 
 
-def find_skill_by_id(
-    skills: list[Skill] | list[dict[str, Any]], skill_id: str
-) -> Skill | dict[str, Any] | None:
+def find_skill_by_id(skills: list[Skill] | list[dict[str, Any]], skill_id: str) -> Skill | dict[str, Any] | None:
     """Find skill by id or name.
 
     Args:

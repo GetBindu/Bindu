@@ -133,9 +133,7 @@ class ResultProcessor:
                     return result_dict["content"]
                 return result_dict
             except Exception as e:
-                logger.debug(
-                    "Failed to extract content from .to_dict() method", error=str(e)
-                )
+                logger.debug("Failed to extract content from .to_dict() method", error=str(e))
 
         # Strategy 6: Fallback to string conversion
         return str(result) if result is not None else ""

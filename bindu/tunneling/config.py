@@ -1,7 +1,6 @@
 """Tunnel configuration models."""
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 
 def _get_default_server_address() -> str:
@@ -35,12 +34,12 @@ class TunnelConfig:
 
     enabled: bool = False
     server_address: str = field(default_factory=_get_default_server_address)
-    subdomain: Optional[str] = None
+    subdomain: str | None = None
     tunnel_domain: str = field(default_factory=_get_default_tunnel_domain)
     protocol: str = "http"
     use_tls: bool = False
     local_host: str = "127.0.0.1"
-    local_port: Optional[int] = None
+    local_port: int | None = None
 
     def get_public_url(self) -> str:
         """Get the public URL for this tunnel.

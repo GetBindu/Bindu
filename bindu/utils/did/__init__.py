@@ -6,11 +6,11 @@ and validation.
 
 from .signature import (
     create_signature_payload,
+    extract_signature_headers,
     sign_request,
     verify_signature,
-    extract_signature_headers,
 )
-from .validation import validate_did_extension, check_did_match
+from .validation import check_did_match, validate_did_extension
 
 __all__ = [
     # Signature utilities

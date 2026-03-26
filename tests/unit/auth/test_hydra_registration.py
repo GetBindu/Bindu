@@ -2,16 +2,16 @@
 
 import json
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from bindu.auth.hydra.registration import (
-    save_agent_credentials,
     load_agent_credentials,
     register_agent_in_hydra,
+    save_agent_credentials,
 )
 from bindu.common.models import AgentCredentials
 
@@ -28,7 +28,7 @@ class TestSaveAgentCredentials:
                 agent_id="agent-123",
                 client_id="did:bindu:test",
                 client_secret="secret",
-                created_at=datetime.now(timezone.utc).isoformat(),
+                created_at=datetime.now(UTC).isoformat(),
                 scopes=["read", "write"],
             )
 
@@ -46,14 +46,14 @@ class TestSaveAgentCredentials:
                 agent_id="agent-123",
                 client_id="did:bindu:test",
                 client_secret="secret",
-                created_at=datetime.now(timezone.utc).isoformat(),
+                created_at=datetime.now(UTC).isoformat(),
                 scopes=["read", "write"],
             )
 
             save_agent_credentials(credentials, creds_dir)
 
             creds_file = creds_dir / "oauth_credentials.json"
-            with open(creds_file, "r") as f:
+            with open(creds_file) as f:
                 data = json.load(f)
 
             assert "did:bindu:test" in data
@@ -69,7 +69,7 @@ class TestSaveAgentCredentials:
                 agent_id="agent-123",
                 client_id="did:bindu:test",
                 client_secret="secret",
-                created_at=datetime.now(timezone.utc).isoformat(),
+                created_at=datetime.now(UTC).isoformat(),
                 scopes=["read"],
             )
 
@@ -89,7 +89,7 @@ class TestSaveAgentCredentials:
                 agent_id="agent-1",
                 client_id="did:bindu:agent1",
                 client_secret="secret1",
-                created_at=datetime.now(timezone.utc).isoformat(),
+                created_at=datetime.now(UTC).isoformat(),
                 scopes=["read"],
             )
             save_agent_credentials(creds1, creds_dir)
@@ -99,14 +99,14 @@ class TestSaveAgentCredentials:
                 agent_id="agent-2",
                 client_id="did:bindu:agent2",
                 client_secret="secret2",
-                created_at=datetime.now(timezone.utc).isoformat(),
+                created_at=datetime.now(UTC).isoformat(),
                 scopes=["write"],
             )
             save_agent_credentials(creds2, creds_dir)
 
             # Verify both exist
             creds_file = creds_dir / "oauth_credentials.json"
-            with open(creds_file, "r") as f:
+            with open(creds_file) as f:
                 data = json.load(f)
 
             assert "did:bindu:agent1" in data
@@ -122,7 +122,7 @@ class TestSaveAgentCredentials:
                 agent_id="agent-1",
                 client_id="did:bindu:test",
                 client_secret="old-secret",
-                created_at=datetime.now(timezone.utc).isoformat(),
+                created_at=datetime.now(UTC).isoformat(),
                 scopes=["read"],
             )
             save_agent_credentials(creds1, creds_dir)
@@ -132,14 +132,14 @@ class TestSaveAgentCredentials:
                 agent_id="agent-1",
                 client_id="did:bindu:test",
                 client_secret="new-secret",
-                created_at=datetime.now(timezone.utc).isoformat(),
+                created_at=datetime.now(UTC).isoformat(),
                 scopes=["read", "write"],
             )
             save_agent_credentials(creds2, creds_dir)
 
             # Verify updated
             creds_file = creds_dir / "oauth_credentials.json"
-            with open(creds_file, "r") as f:
+            with open(creds_file) as f:
                 data = json.load(f)
 
             assert data["did:bindu:test"]["client_secret"] == "new-secret"
@@ -161,13 +161,13 @@ class TestSaveAgentCredentials:
                 agent_id="agent-123",
                 client_id="did:bindu:test",
                 client_secret="secret",
-                created_at=datetime.now(timezone.utc).isoformat(),
+                created_at=datetime.now(UTC).isoformat(),
                 scopes=["read"],
             )
             save_agent_credentials(credentials, creds_dir)
 
             # Verify new data saved
-            with open(creds_file, "r") as f:
+            with open(creds_file) as f:
                 data = json.load(f)
             assert "did:bindu:test" in data
 
@@ -185,7 +185,7 @@ class TestLoadAgentCredentials:
                 agent_id="agent-123",
                 client_id="did:bindu:test",
                 client_secret="secret",
-                created_at=datetime.now(timezone.utc).isoformat(),
+                created_at=datetime.now(UTC).isoformat(),
                 scopes=["read", "write"],
             )
             save_agent_credentials(credentials, creds_dir)
@@ -217,7 +217,7 @@ class TestLoadAgentCredentials:
                 agent_id="agent-123",
                 client_id="did:bindu:other",
                 client_secret="secret",
-                created_at=datetime.now(timezone.utc).isoformat(),
+                created_at=datetime.now(UTC).isoformat(),
                 scopes=["read"],
             )
             save_agent_credentials(credentials, creds_dir)
@@ -286,9 +286,7 @@ class TestRegisterAgentInHydra:
                 mock_settings.vault.enabled = False
                 mock_settings.did.verification_key_type = "Ed25519VerificationKey2020"
 
-                with patch(
-                    "bindu.auth.hydra.registration.HydraClient", return_value=mock_hydra
-                ):
+                with patch("bindu.auth.hydra.registration.HydraClient", return_value=mock_hydra):
                     result = await register_agent_in_hydra(
                         agent_id="agent-123",
                         agent_name="Test Agent",
@@ -313,15 +311,13 @@ class TestRegisterAgentInHydra:
                 agent_id="agent-123",
                 client_id="did:bindu:test",
                 client_secret="existing-secret",
-                created_at=datetime.now(timezone.utc).isoformat(),
+                created_at=datetime.now(UTC).isoformat(),
                 scopes=["read", "write"],
             )
             save_agent_credentials(existing_creds, creds_dir)
 
             mock_hydra = AsyncMock()
-            mock_hydra.get_oauth_client = AsyncMock(
-                return_value={"client_id": "did:bindu:test"}
-            )
+            mock_hydra.get_oauth_client = AsyncMock(return_value={"client_id": "did:bindu:test"})
             mock_hydra.__aenter__ = AsyncMock(return_value=mock_hydra)
             mock_hydra.__aexit__ = AsyncMock()
 
@@ -334,9 +330,7 @@ class TestRegisterAgentInHydra:
                 mock_settings.hydra.max_retries = 3
                 mock_settings.vault.enabled = False
 
-                with patch(
-                    "bindu.auth.hydra.registration.HydraClient", return_value=mock_hydra
-                ):
+                with patch("bindu.auth.hydra.registration.HydraClient", return_value=mock_hydra):
                     result = await register_agent_in_hydra(
                         agent_id="agent-123",
                         agent_name="Test Agent",
@@ -355,9 +349,7 @@ class TestRegisterAgentInHydra:
             creds_dir = Path(tmpdir)
 
             mock_did_extension = MagicMock()
-            mock_did_extension.public_key_base58 = (
-                "5D5sRMv58uwU5zWRv7zEeXJC3DRPkkNeqFC8ZbTHkTDeA"
-            )
+            mock_did_extension.public_key_base58 = "5D5sRMv58uwU5zWRv7zEeXJC3DRPkkNeqFC8ZbTHkTDeA"
 
             mock_hydra = AsyncMock()
             mock_hydra.get_oauth_client = AsyncMock(return_value=None)
@@ -377,9 +369,7 @@ class TestRegisterAgentInHydra:
                 mock_settings.vault.enabled = False
                 mock_settings.did.verification_key_type = "Ed25519VerificationKey2020"
 
-                with patch(
-                    "bindu.auth.hydra.registration.HydraClient", return_value=mock_hydra
-                ):
+                with patch("bindu.auth.hydra.registration.HydraClient", return_value=mock_hydra):
                     result = await register_agent_in_hydra(
                         agent_id="agent-123",
                         agent_name="Test Agent",
@@ -392,10 +382,7 @@ class TestRegisterAgentInHydra:
             assert result is not None
             # Verify create_oauth_client was called with public key in metadata
             call_args = mock_hydra.create_oauth_client.call_args[0][0]
-            assert (
-                call_args["metadata"]["public_key"]
-                == "5D5sRMv58uwU5zWRv7zEeXJC3DRPkkNeqFC8ZbTHkTDeA"
-            )
+            assert call_args["metadata"]["public_key"] == "5D5sRMv58uwU5zWRv7zEeXJC3DRPkkNeqFC8ZbTHkTDeA"
             assert call_args["metadata"]["key_type"] == "Ed25519"
 
     @pytest.mark.asyncio
@@ -407,9 +394,7 @@ class TestRegisterAgentInHydra:
             creds_dir = Path(tmpdir)
 
             mock_hydra = AsyncMock()
-            mock_hydra.get_oauth_client = AsyncMock(
-                return_value={"client_id": "did:bindu:test"}
-            )
+            mock_hydra.get_oauth_client = AsyncMock(return_value={"client_id": "did:bindu:test"})
             mock_hydra.delete_oauth_client = AsyncMock()
             mock_hydra.create_oauth_client = AsyncMock()
             mock_hydra.__aenter__ = AsyncMock(return_value=mock_hydra)
@@ -427,9 +412,7 @@ class TestRegisterAgentInHydra:
                 mock_settings.vault.enabled = False
                 mock_settings.did.verification_key_type = "Ed25519VerificationKey2020"
 
-                with patch(
-                    "bindu.auth.hydra.registration.HydraClient", return_value=mock_hydra
-                ):
+                with patch("bindu.auth.hydra.registration.HydraClient", return_value=mock_hydra):
                     await register_agent_in_hydra(
                         agent_id="agent-123",
                         agent_name="Test Agent",
@@ -449,9 +432,7 @@ class TestRegisterAgentInHydra:
             creds_dir = Path(tmpdir)
 
             mock_hydra = AsyncMock()
-            mock_hydra.get_oauth_client = AsyncMock(
-                side_effect=Exception("Connection error")
-            )
+            mock_hydra.get_oauth_client = AsyncMock(side_effect=Exception("Connection error"))
             mock_hydra.__aenter__ = AsyncMock(return_value=mock_hydra)
             mock_hydra.__aexit__ = AsyncMock()
 
@@ -464,9 +445,7 @@ class TestRegisterAgentInHydra:
                 mock_settings.hydra.max_retries = 3
                 mock_settings.vault.enabled = False
 
-                with patch(
-                    "bindu.auth.hydra.registration.HydraClient", return_value=mock_hydra
-                ):
+                with patch("bindu.auth.hydra.registration.HydraClient", return_value=mock_hydra):
                     result = await register_agent_in_hydra(
                         agent_id="agent-123",
                         agent_name="Test Agent",
@@ -490,7 +469,7 @@ class TestRegistrationEdgeCases:
                 agent_id="agent-123",
                 client_id="did:bindu:test",
                 client_secret="secret",
-                created_at=datetime.now(timezone.utc).isoformat(),
+                created_at=datetime.now(UTC).isoformat(),
                 scopes=[],
             )
 
@@ -509,14 +488,12 @@ class TestRegistrationEdgeCases:
                 agent_id="agent-123",
                 client_id="did:bindu:agent:test-123_special",
                 client_secret="secret",
-                created_at=datetime.now(timezone.utc).isoformat(),
+                created_at=datetime.now(UTC).isoformat(),
                 scopes=["read"],
             )
 
             save_agent_credentials(credentials, creds_dir)
-            loaded = load_agent_credentials(
-                "did:bindu:agent:test-123_special", creds_dir
-            )
+            loaded = load_agent_credentials("did:bindu:agent:test-123_special", creds_dir)
 
             assert loaded is not None
             assert loaded.client_id == "did:bindu:agent:test-123_special"

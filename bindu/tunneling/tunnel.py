@@ -5,7 +5,6 @@ import re
 import subprocess
 import time
 from pathlib import Path
-from typing import Optional
 
 from bindu.settings import app_settings
 from bindu.tunneling.binary import download_binary
@@ -32,9 +31,9 @@ class Tunnel:
             config: Tunnel configuration
         """
         self.config = config
-        self.proc: Optional[subprocess.Popen] = None
-        self.public_url: Optional[str] = None
-        self._binary_path: Optional[Path] = None
+        self.proc: subprocess.Popen | None = None
+        self.public_url: str | None = None
+        self._binary_path: Path | None = None
 
     def start(self) -> str:
         """Start the tunnel and return the public URL.
@@ -64,16 +63,12 @@ class Tunnel:
     def stop(self) -> None:
         """Stop the tunnel and cleanup the process."""
         if self.proc is not None:
-            logger.info(
-                f"Stopping tunnel {self.config.local_host}:{self.config.local_port} <> {self.public_url}"
-            )
+            logger.info(f"Stopping tunnel {self.config.local_host}:{self.config.local_port} <> {self.public_url}")
             try:
                 self.proc.terminate()
                 self.proc.wait(timeout=5)
             except subprocess.TimeoutExpired:
-                logger.warning(
-                    "Tunnel process did not terminate gracefully, killing..."
-                )
+                logger.warning("Tunnel process did not terminate gracefully, killing...")
                 self.proc.kill()
             except Exception as e:
                 logger.error(f"Error stopping tunnel: {e}")
@@ -207,9 +202,7 @@ class Tunnel:
                     else:
                         # URL not in output, construct it from config
                         url = self.config.get_public_url()
-                        logger.info(
-                            f"Tunnel started successfully, constructed URL: {url}"
-                        )
+                        logger.info(f"Tunnel started successfully, constructed URL: {url}")
 
                 # Check for login failure
                 elif "login to server failed" in line or "error" in line.lower():

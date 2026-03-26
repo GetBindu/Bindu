@@ -2,8 +2,9 @@
 
 import json
 import os
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 from bindu.utils.config.enricher import load_config_from_env
 
@@ -15,9 +16,7 @@ class TestDeploymentConfiguration:
         """Test BINDU_DEPLOYMENT_URL override."""
         config = {"deployment": {"url": "http://localhost:3773"}}
 
-        with patch.dict(
-            os.environ, {"BINDU_DEPLOYMENT_URL": "https://example.com:8080"}
-        ):
+        with patch.dict(os.environ, {"BINDU_DEPLOYMENT_URL": "https://example.com:8080"}):
             result = load_config_from_env(config)
 
         assert result["deployment"]["url"] == "https://example.com:8080"
@@ -53,9 +52,7 @@ class TestDeploymentConfiguration:
         """Test both host and port override."""
         config = {"deployment": {"url": "http://localhost:3773"}}
 
-        with patch.dict(
-            os.environ, {"BINDU_HOST": "example.com", "BINDU_PORT": "9000"}
-        ):
+        with patch.dict(os.environ, {"BINDU_HOST": "example.com", "BINDU_PORT": "9000"}):
             result = load_config_from_env(config)
 
         assert result["deployment"]["url"] == "http://example.com:9000"
@@ -108,16 +105,12 @@ class TestStorageConfiguration:
         config = {}
 
         with patch.dict(os.environ, {"STORAGE_TYPE": "postgres"}):
-            with pytest.raises(
-                ValueError, match="DATABASE_URL environment variable is required"
-            ):
+            with pytest.raises(ValueError, match="DATABASE_URL environment variable is required"):
                 load_config_from_env(config)
 
     def test_storage_user_config_preserved(self):
         """Test that user-provided storage config is preserved."""
-        config = {
-            "storage": {"type": "postgres", "postgres_url": "postgresql://user/db"}
-        }
+        config = {"storage": {"type": "postgres", "postgres_url": "postgresql://user/db"}}
 
         with patch.dict(os.environ, {}, clear=True):
             result = load_config_from_env(config)
@@ -156,9 +149,7 @@ class TestSchedulerConfiguration:
         config = {}
 
         with patch.dict(os.environ, {"SCHEDULER_TYPE": "redis"}):
-            with pytest.raises(
-                ValueError, match="REDIS_URL environment variable is required"
-            ):
+            with pytest.raises(ValueError, match="REDIS_URL environment variable is required"):
                 load_config_from_env(config)
 
     def test_scheduler_user_config_preserved(self):
@@ -214,9 +205,7 @@ class TestSentryConfiguration:
         config = {}
 
         with patch.dict(os.environ, {"SENTRY_ENABLED": "true"}):
-            with pytest.raises(
-                ValueError, match="SENTRY_DSN environment variable is required"
-            ):
+            with pytest.raises(ValueError, match="SENTRY_DSN environment variable is required"):
                 load_config_from_env(config)
 
 

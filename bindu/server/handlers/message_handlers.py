@@ -15,12 +15,13 @@ sending messages and streaming responses.
 
 from __future__ import annotations
 
-import anyio
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
+
+import anyio
 
 from bindu.common.protocol.types import (
     SendMessageRequest,
@@ -29,13 +30,11 @@ from bindu.common.protocol.types import (
     Task,
     TaskSendParams,
 )
-from bindu.settings import app_settings
-
-from bindu.utils.logging import get_logger
-from bindu.utils.task_telemetry import trace_task_operation, track_active_task
-
 from bindu.server.scheduler import Scheduler
 from bindu.server.storage import Storage
+from bindu.settings import app_settings
+from bindu.utils.logging import get_logger
+from bindu.utils.task_telemetry import trace_task_operation, track_active_task
 
 logger = get_logger("bindu.server.handlers.message_handlers")
 
@@ -73,7 +72,7 @@ class MessageHandlers:
         Returns:
             Error event dict for SSE stream
         """
-        timestamp = datetime.now(timezone.utc).isoformat()
+        timestamp = datetime.now(UTC).isoformat()
         current_state = "failed"
 
         try:
@@ -112,9 +111,7 @@ class MessageHandlers:
             "error": str(error),
         }
 
-    async def _submit_and_schedule_task(
-        self, request_params: dict[str, Any]
-    ) -> tuple[Task, UUID]:
+    async def _submit_and_schedule_task(self, request_params: dict[str, Any]) -> tuple[Task, UUID]:
         """Submit task to storage and schedule it with shared send/stream logic."""
         message = request_params["message"]
         context_id = self.context_id_parser(message.get("context_id"))
@@ -134,15 +131,10 @@ class MessageHandlers:
         push_config = config.get("push_notification_config")
         if push_config and self.push_manager:
             is_long_running = config.get("long_running", False)
-            await self.push_manager.register_push_config(
-                task["id"], push_config, persist=is_long_running
-            )
+            await self.push_manager.register_push_config(task["id"], push_config, persist=is_long_running)
 
         message_metadata = message.get("metadata", {})
-        if (
-            isinstance(message_metadata, dict)
-            and "_payment_context" in message_metadata
-        ):
+        if isinstance(message_metadata, dict) and "_payment_context" in message_metadata:
             # Move payment context to scheduler params and strip it from the
             # message metadata so it is not persisted or forwarded to the agent
             scheduler_params["payment_context"] = message_metadata["_payment_context"]
@@ -229,7 +221,7 @@ class MessageHandlers:
                             "context_id": str(context_id),
                             "status": {
                                 "state": "failed",
-                                "timestamp": datetime.now(timezone.utc).isoformat(),
+                                "timestamp": datetime.now(UTC).isoformat(),
                             },
                             "final": True,
                             "error": f"Task {task['id']} not found while streaming",
@@ -294,12 +286,8 @@ class MessageHandlers:
                 logger.debug(f"Streaming client disconnected for task {task['id']}")
                 return
             except Exception as e:
-                logger.error(
-                    f"Unhandled stream error for task {task['id']}: {e}", exc_info=True
-                )
-                error_event = await self._handle_stream_error(
-                    task, context_id, e, terminal_states
-                )
+                logger.error(f"Unhandled stream error for task {task['id']}: {e}", exc_info=True)
+                error_event = await self._handle_stream_error(task, context_id, e, terminal_states)
                 yield self._sse_event(error_event)
 
         return StreamingResponse(
