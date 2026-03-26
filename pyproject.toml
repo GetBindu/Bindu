@@ -172,3 +172,24 @@ fallback-version = "0.3.14"
 
 [tool.hatch.build.hooks.vcs]
 version-file = "bindu/_version.py"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "C",      # flake8-comprehensions
+    "B",      # flake8-bugbear
+    "UP",     # pyupgrade
+    "A",      # flake8-builtins
+    "PIE",    # flake8-pie
+]
+ignore = [
+    "E501",   # line too long (handled by line-length)
+    "W293",   # blank line contains whitespace
+]
