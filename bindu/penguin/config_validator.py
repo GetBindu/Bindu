@@ -6,10 +6,10 @@ ensuring they meet the required schema and have proper defaults.
 """
 
 import os
-from typing import Any, Dict
+from typing import Any, Dict, get_args
 
 from bindu import __version__
-from bindu.common.protocol.types import AgentCapabilities, AgentTrustConfig, Skill, TrustLevel
+from bindu.common.protocol.types import AgentCapabilities, AgentTrustConfig, IdentityProvider, Skill, TrustLevel
 
 
 class ConfigValidator:
@@ -132,6 +132,15 @@ class ConfigValidator:
 
         if config.get("auth"):
             cls._validate_auth_config(config["auth"])
+
+        # Validate agent_trust configuration if provided
+        if config.get("agent_trust") is not None:
+            trust_config = config["agent_trust"]
+            
+            if not isinstance(trust_config, dict):
+                raise ValueError("Field 'agent_trust' must be a dictionary")
+            
+            cls._validate_agent_trust_config(trust_config)
 
         if config.get("telemetry"):
             cls._process_oltp_config(config)
@@ -280,21 +289,19 @@ class ConfigValidator:
         if not isinstance(trust_config, dict):
             raise ValueError("Field 'agent_trust' must be a dictionary")
 
+        # Validate required fields are present
+        required_fields = ["required_verification_level", "max_agent_hierarchy_depth"]
+        missing_fields = [field for field in required_fields if field not in trust_config]
+        if missing_fields:
+            raise ValueError(
+                f"Missing required agent_trust fields: {', '.join(missing_fields)}. "
+                f"Required fields: {', '.join(required_fields)}"
+            )
+
         # Validate required_verification_level
         if "required_verification_level" in trust_config:
             level = trust_config["required_verification_level"]
-            valid_levels = [
-                "admin",
-                "analyst",
-                "auditor",
-                "editor",
-                "guest",
-                "manager",
-                "operator",
-                "super_admin",
-                "support",
-                "viewer",
-            ]
+            valid_levels = get_args(TrustLevel)
             if level not in valid_levels:
                 raise ValueError(
                     f"Invalid required_verification_level: '{level}'. "
@@ -313,10 +320,11 @@ class ConfigValidator:
         # Validate identity_provider if provided
         if "identity_provider" in trust_config:
             provider = trust_config["identity_provider"]
-            if provider not in ["hydra"]:
+            valid_providers = get_args(IdentityProvider)
+            if provider not in valid_providers:
                 raise ValueError(
                     f"Invalid identity_provider: '{provider}'. "
-                    f"Supported providers: hydra"
+                    f"Supported providers: {', '.join(valid_providers)}"
                 )
 
         # Validate allowed_origins if provided
