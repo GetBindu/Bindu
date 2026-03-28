@@ -60,7 +60,7 @@ dependencies = [
     # Security
     "detect-secrets==1.5.0",
     "python-dotenv>=1.1.0",
-    "grpcio>=1.78.0",
+    "grpcio>=1.67.0,<1.78.0",
     "grpcio-tools>=1.67.0,<1.78.0",
     "protobuf>=5.29.6,<5.30.0",
 ]
@@ -87,9 +87,9 @@ agents = [
 
 # gRPC adapter for language-agnostic agent support (use: pip install bindu[grpc])
 grpc = [
-    "grpcio>=1.78.0",
+    "grpcio>=1.67.0,<1.78.0",
     "grpcio-tools>=1.67.0,<1.78.0",
-    "protobuf>=5.29.6",
+    "protobuf>=5.29.6,<5.30.0",
 ]
 
 # Voice agent support (use: pip install bindu[voice])

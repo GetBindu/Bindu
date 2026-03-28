@@ -1059,6 +1059,8 @@ class VoiceSettings(BaseSettings):
     max_concurrent_sessions: int = 10
 
     # Extension metadata
+    # Note: bindu:// is an internal routing scheme used by the voice agent extension.
+    # Consumers should handle this as a special case for internal routing.
     extension_uri: str = "bindu://voice"
     extension_description: str = "Real-time voice conversation for Bindu agents"
 
