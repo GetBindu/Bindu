@@ -156,35 +156,48 @@ const dispatch = createEventDispatcher();
 		adjustTextareaHeight();
 	});
 
-			       async function handleKeydown(event: KeyboardEvent) {
-				       if (
-					       event.key === "Enter" &&
-					       !event.shiftKey &&
-					       !isCompositionOn &&
-					       !isVirtualKeyboard() &&
-					       value.trim() !== ""
-				       ) {
-					       event.preventDefault();
-					       await tick();
-					       // Gather file parts and dispatch submit event
-					       const fileParts = await getFileParts();
-					       dispatch('submit', { message: value, fileParts });
-				       }
-			       }
+	async function handleKeydown(event: KeyboardEvent) {
+		if (
+			event.key === "Enter" &&
+			!event.shiftKey &&
+			!isCompositionOn &&
+			!isVirtualKeyboard() &&
+			value.trim() !== ""
+		) {
+			event.preventDefault();
+			await tick();
+			try {
+				const fileParts = await getFileParts();
+				if (typeof onsubmit === "function") {
+					onsubmit(value, fileParts);
+				}
+				// Clear files and input after successful submit
+				files = [];
+				value = "";
+			} catch (err) {
+				console.error("Error reading file parts:", err);
+				// Surface error to user via alert as fallback
+				alert(`Error reading file: ${err instanceof Error ? err.message : String(err)}`);
+				// Reset file input state
+				if (fileInputEl) fileInputEl.value = "";
+				files = [];
+			}
+		}
+	}
 
-	       // Helper to convert files to base64 parts for agentMessageHandler
-	       async function getFileParts() {
-		       if (!files || files.length === 0) return [];
-		       const file2base64 = (await import("$lib/utils/file2base64")).default;
-		       const fileParts = await Promise.all(
-			       files.map(async (file) => ({
-				       name: file.name,
-				       mime: file.type,
-				       value: await file2base64(file)
-			       }))
-		       );
-		       return fileParts;
-	       }
+	// Helper to convert files to base64 parts for agentMessageHandler
+	async function getFileParts() {
+		if (!files || files.length === 0) return [];
+		const file2base64 = (await import("$lib/utils/file2base64")).default;
+		const fileParts = await Promise.all(
+			files.map(async (file) => ({
+				name: file.name,
+				mime: file.type || "application/octet-stream",
+				value: await file2base64(file),
+			}))
+		);
+		return fileParts;
+	}
 
 	function handleFocus() {
 		if (requireAuthUser()) {

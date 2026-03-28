@@ -30,25 +30,51 @@ export async function startVoiceSession(contextId?: string): Promise<void> {
   currentUserTranscript.set('');
   currentAgentTranscript.set('');
 
+  // Clean up any existing client before creating a new one
+  const existingClient = client;
+  if (existingClient) {
+    try {
+      // Call cleanup method if available, otherwise just null out
+      if (typeof existingClient.stopSession === 'function') {
+        await existingClient.stopSession();
+      }
+    } catch (err) {
+      console.error("Error cleaning up existing client:", err);
+    }
+  }
+
   client = new VoiceClient();
-  client.onTranscript = appendTranscript;
-  client.onStateChange = (state) => {
-    voiceState.set(state);
-  };
-  client.onAgentAudio = (audioData) => {
-    latestAgentAudio.set(audioData);
-  };
-  client.onError = (message) => {
-    voiceError.set(message);
-    voiceState.set('error');
-  };
 
   voiceState.set('connecting');
-  const session = await client.startSession(contextId);
-  voiceSessionId.set(session.session_id);
-  voiceContextId.set(session.context_id);
+  try {
+    const session = await client.startSession(contextId);
+    voiceSessionId.set(session.session_id);
+    voiceContextId.set(session.context_id);
 
-  await client.connect(session.ws_url, session.session_id);
+    await client.connect(session.ws_url, session.session_id);
+
+    // Only attach handlers after successful start
+    client.onTranscript = appendTranscript;
+    client.onStateChange = (state) => {
+      voiceState.set(state);
+    };
+    client.onAgentAudio = (audioData) => {
+      latestAgentAudio.set(audioData);
+    };
+    client.onError = (message) => {
+      voiceError.set(message);
+      voiceState.set('error');
+    };
+  } catch (err) {
+    // On failure, clear the partially-initialized client
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    voiceError.set(errorMessage);
+    voiceState.set('error');
+    client = null;
+    voiceSessionId.set(null);
+    voiceContextId.set(null);
+    throw err;
+  }
 }
 
 export async function endVoiceSession(): Promise<void> {
@@ -56,10 +82,17 @@ export async function endVoiceSession(): Promise<void> {
   client = null;
 
   if (active) {
-    await active.stopSession();
+    try {
+      await active.stopSession();
+    } catch (err) {
+      console.error("Error stopping voice session:", err);
+      // Continue with cleanup even if stopSession throws
+    }
   }
 
+  // Reset all state variables
   voiceSessionId.set(null);
+  voiceContextId.set(null);
   isVoiceMuted.set(false);
   latestAgentAudio.set(null);
   voiceState.set('idle');

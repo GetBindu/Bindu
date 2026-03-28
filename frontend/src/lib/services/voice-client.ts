@@ -162,13 +162,15 @@ export class VoiceClient {
   }
 
   mute(): void {
-    this.sendControl({ type: 'mute' });
-    this.setState('muted');
+    if (this.sendControl({ type: 'mute' })) {
+      this.setState('muted');
+    }
   }
 
   unmute(): void {
-    this.sendControl({ type: 'unmute' });
-    this.setState('listening');
+    if (this.sendControl({ type: 'unmute' })) {
+      this.setState('listening');
+    }
   }
 
   async stopSession(): Promise<void> {
@@ -189,11 +191,12 @@ export class VoiceClient {
     }
   }
 
-  private sendControl(payload: Record<string, unknown>): void {
+  private sendControl(payload: Record<string, unknown>): boolean {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      return;
+      return false;
     }
     this.ws.send(JSON.stringify(payload));
+    return true;
   }
 
   private setState(state: VoiceState): void {

@@ -1,8 +1,3 @@
-// non‑image document types we permit as attachments (not previewed as text)
-export const DOCUMENT_MIME_ALLOWLIST = [
-	"application/pdf",
-	"application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
-] as const;
 // Centralized MIME allowlists used across client and server
 // Keep these lists minimal and consistent with server processing.
 
@@ -15,6 +10,8 @@ export const TEXT_MIME_ALLOWLIST = [
 
 export const IMAGE_MIME_ALLOWLIST_DEFAULT = ["image/jpeg", "image/png"] as const;
 
+// Document types permitted as attachments (non-image, non-previewable as text)
+// Includes PDF, Word, Excel, PowerPoint, plain text, and CSV
 export const DOCUMENT_MIME_ALLOWLIST = [
 	"application/pdf",
 	"application/msword",

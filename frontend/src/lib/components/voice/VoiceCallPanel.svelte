@@ -29,8 +29,26 @@
 		const blob = new Blob([$latestAgentAudio], { type: "audio/mpeg" });
 		const url = URL.createObjectURL(blob);
 		const audio = new Audio(url);
-		void audio.play().catch(() => undefined);
-		audio.onended = () => {
+
+		// Handle errors during playback
+		const handleError = () => {
+			URL.revokeObjectURL(url);
+		};
+
+		audio.onerror = handleError;
+
+		// Start playback and handle failure
+		audio.play().catch(() => {
+			handleError();
+		});
+
+		// Cleanup function for when effect re-runs or component unmounts
+		return () => {
+			if (!audio.paused) {
+				audio.pause();
+			}
+			audio.onended = null;
+			audio.onerror = null;
 			URL.revokeObjectURL(url);
 		};
 	});

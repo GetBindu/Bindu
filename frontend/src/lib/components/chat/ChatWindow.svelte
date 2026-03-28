@@ -146,31 +146,27 @@
 		!!(page.data as { transcriptionEnabled?: boolean }).transcriptionEnabled
 	);
 	let isTouchDevice = $derived(browser && navigator.maxTouchPoints > 0);
-	let agentContextId = $derived.by(() => {
-		const data = page.data as { conversation?: { id?: string } } | undefined;
-		const fromConversation = data?.conversation?.id;
-		const fromRoute = (page.params as { id?: string } | undefined)?.id;
-		// Only return string or undefined, never null
-		return fromConversation ?? fromRoute ?? undefined;
-	});
 
 
-	import { sendMessage } from "$lib/stores/chat";
+	async function submit(message: string, fileParts: MessageFile[]) {
+		if (!message || loading || isReadOnly) return;
+		if (requireAuthUser()) return;
 
-	const handleSubmit = async () => {
-		if (requireAuthUser() || loading || !draft) return;
-		// Await all file sources (file parts)
-		const fileParts = sources ? await Promise.all(sources) : [];
-		// Only include file parts that are not null/undefined
-		const validFileParts = fileParts.filter(Boolean);
-		// Build the parts array: text part first, then file parts
-		const parts = [
-			{ kind: 'text', text: draft },
-			...validFileParts
-		];
-		sendMessage(parts);
-		draft = "";
-	};
+		const contextId = agentContextId ?? undefined;
+		try {
+			for await (const _update of sendAgentMessage(message, contextId, undefined, undefined, undefined, undefined, fileParts)) {
+				// Process updates if needed
+			}
+		} catch (err) {
+			console.error("Error sending agent message:", err);
+			// Optionally surface error to user
+			alert(`Error: ${err instanceof Error ? err.message : String(err)}`);
+		} finally {
+			// Always clear draft and files
+			draft = "";
+			files = [];
+		}
+	}
 
 	let lastTarget: EventTarget | null = null;
 
@@ -428,9 +424,15 @@
 		}
 	}
 
+	let previousVoiceError: string | null = null;
 	$effect(() => {
 		if ($voiceError) {
 			$error = $voiceError;
+			previousVoiceError = $voiceError;
+		} else if ($error && $error === previousVoiceError) {
+			// Voice error was cleared, and the global error is that voice error, so clear it.
+			$error = null;
+			previousVoiceError = null;
 		}
 	});
 </script>
@@ -600,15 +602,18 @@
 			<!-- Right blue glow -->
 			<div class="composer-glow composer-glow-right"></div>
 
-			<form
-				tabindex="-1"
-				aria-label={isFileUploadEnabled ? "file dropzone" : undefined}
-				onsubmit={(e) => {
-					e.preventDefault();
-					handleSubmit();
-				}}
-				class="composer {isReadOnly ? 'opacity-30' : ''} {focused && isVirtualKeyboard() ? 'max-sm:mb-4' : ''} {pastedLongContent ? 'paste-glow' : ''}"
-			>
+			       <form
+				       tabindex="-1"
+				       aria-label={isFileUploadEnabled ? "file dropzone" : undefined}
+				       onsubmit={async (e) => {
+				       e.preventDefault();
+				       if (draft) {
+					       const fileParts = sources ? await Promise.all(sources) : [];
+					       await submit(draft, fileParts.filter(Boolean));
+				       }
+				       }}
+				       class="composer {isReadOnly ? 'opacity-30' : ''} {focused && isVirtualKeyboard() ? 'max-sm:mb-4' : ''} {pastedLongContent ? 'paste-glow' : ''}"
+			       >
 				{#if isRecording || isTranscribing}
 					<VoiceRecorder
 						{isTranscribing}
@@ -638,9 +643,7 @@
 										       mimeTypes={activeMimeTypes}
 											       on:submit={async (event) => {
 												       const { message, fileParts } = event.detail;
-												       // agentContextId may be null, but sendAgentMessage expects string | undefined
-												       const contextId = agentContextId ?? undefined;
-												       await sendAgentMessage(message, contextId, undefined, undefined, undefined, undefined, fileParts);
+												       await submit(message, fileParts);
 											       }}
 										       {onPaste}
 										       disabled={isReadOnly || lastIsError}

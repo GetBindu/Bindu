@@ -258,7 +258,10 @@ export async function sendMessage(parts: any[]) {
   try {
     // Add user message immediately (text part only for display)
     const textPart = parts.find((p) => p.kind === 'text');
-    addMessage(textPart?.text || '', 'user', taskId);
+    // Only add message if text part exists and has non-empty text
+    if (textPart?.text) {
+      addMessage(textPart.text, 'user', taskId);
+    }
     replyToTaskId.set(null);
     isThinking.set(true);
 
