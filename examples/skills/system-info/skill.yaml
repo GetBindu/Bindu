@@ -1,0 +1,42 @@
+skill_id: "system-info-v1"
+name: "System Monitor"
+version: "1.0.0"
+description: "Retrieves real-time system health metrics including CPU, Memory, and Disk usage."
+
+capabilities_detail:
+  cpu_monitoring: {supported: true}
+  memory_stats: {supported: true}
+  disk_usage: {supported: true}
+  platform_info: {supported: true}
+  battery_monitoring: {supported: true}
+
+
+tags:
+  - monitoring
+  - system
+  - health
+  - hardware
+  - battery
+
+input_structure: |
+  {
+    "metrics": ["cpu", "memory", "disk", "all"]
+  }
+
+output_format: |
+  {
+    "cpu_percent": 15.5,
+    "memory_used_gb": 4.2,
+    "memory_total_gb": 16.0,
+    "disk_percent": 45.2,
+    "platform": "Linux-5.15.0-generic-x86_64-with-glibc2.35"
+  }
+
+assessment:
+  keywords:
+    - system
+    - cpu
+    - ram
+    - hardware
+    - health
+    - monitoring
