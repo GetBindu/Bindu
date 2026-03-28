@@ -67,7 +67,14 @@ async def voice_session_start(app: BinduApplication, request: Request) -> Respon
 
     # Build WebSocket URL from request
     scheme = "wss" if request.url.scheme == "https" else "ws"
-    ws_url = f"{scheme}://{request.url.hostname}"
+    # Use hostname from request, fallback to client host, or raise error if unavailable
+    host = request.url.hostname or (request.client.host if request.client else None)
+    if not host:
+        return JSONResponse(
+            {"error": "Unable to determine host for WebSocket URL"},
+            status_code=400,
+        )
+    ws_url = f"{scheme}://{host}"
     if request.url.port:
         ws_url += f":{request.url.port}"
     ws_url += f"/ws/voice/{session.id}"
@@ -294,17 +301,34 @@ async def voice_websocket(websocket: WebSocket) -> None:
             )
     finally:
         # Flush any pending audio when the socket is closing.
-        if audio_buffer:
-            transcript = await _transcribe_pcm_buffer(bytes(audio_buffer))
-            if transcript and websocket.client_state == WebSocketState.CONNECTED:
-                delta = _trim_overlap_text(last_chunk_transcript, transcript)
-                if delta:
-                    await _process_user_turn(websocket, bridge, delta)
+        try:
+            if audio_buffer:
+                try:
+                    transcript = await _transcribe_pcm_buffer(bytes(audio_buffer))
+                    if transcript and websocket.client_state == WebSocketState.CONNECTED:
+                        delta = _trim_overlap_text(last_chunk_transcript, transcript)
+                        if delta:
+                            await _process_user_turn(websocket, bridge, delta)
+                except Exception as e:
+                    logger.exception(f"Error during final audio transcription for session {session_id}: {e}")
+        except Exception as e:
+            logger.exception(f"Error in audio buffer cleanup for session {session_id}: {e}")
 
-        await session_manager.update_state(session_id, "ending")
-        await session_manager.end_session(session_id)
-        if websocket.client_state == WebSocketState.CONNECTED:
-            await websocket.close()
+        try:
+            await session_manager.update_state(session_id, "ending")
+        except Exception as e:
+            logger.exception(f"Error updating session state to 'ending' for session {session_id}: {e}")
+
+        try:
+            await session_manager.end_session(session_id)
+        except Exception as e:
+            logger.exception(f"Error ending session {session_id}: {e}")
+
+        try:
+            if websocket.client_state == WebSocketState.CONNECTED:
+                await websocket.close()
+        except Exception as e:
+            logger.exception(f"Error closing websocket for session {session_id}: {e}")
 
 
 async def _process_user_turn(
