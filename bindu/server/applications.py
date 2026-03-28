@@ -411,11 +411,10 @@ class BinduApplication(Starlette):
 
             # Initialize voice session manager if voice extension is enabled
             if app._voice_ext:
-                from bindu.extensions.voice.session_manager import VoiceSessionManager
+                from bindu.extensions.voice.session_factory import create_session_manager
 
-                app._voice_session_manager = VoiceSessionManager(
-                    max_sessions=app_settings.voice.max_concurrent_sessions,
-                    session_timeout=app_settings.voice.session_timeout,
+                app._voice_session_manager = await create_session_manager(
+                    app_settings.voice
                 )
                 await app._voice_session_manager.start_cleanup_loop()
                 logger.info("✅ Voice session manager started")
@@ -438,9 +437,11 @@ class BinduApplication(Starlette):
             if app._payment_session_manager:
                 await app._payment_session_manager.stop_cleanup_task()
 
-            # Stop voice session manager cleanup loop
+            # Stop voice session manager
             if app._voice_session_manager:
-                await app._voice_session_manager.stop_cleanup_loop()
+                from bindu.extensions.voice.session_factory import close_session_manager
+
+                await close_session_manager(app._voice_session_manager)
                 logger.info("🛑 Voice session manager stopped")
 
             # Cleanup storage
