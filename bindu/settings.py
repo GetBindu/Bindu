@@ -1058,6 +1058,11 @@ class VoiceSettings(BaseSettings):
     session_timeout: int = 300  # seconds (5 min)
     max_concurrent_sessions: int = 10
 
+    # Session storage backend (for multi-worker compatibility)
+    session_backend: Literal["memory", "redis"] = "memory"
+    redis_url: str = ""  # e.g., "redis://localhost:6379/0"
+    redis_session_ttl: int = 300  # seconds, TTL for session keys in Redis
+
     # Extension metadata
     # Note: bindu:// is an internal routing scheme used by the voice agent extension.
     # Consumers should handle this as a special case for internal routing.
