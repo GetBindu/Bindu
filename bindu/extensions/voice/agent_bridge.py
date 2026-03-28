@@ -52,6 +52,7 @@ class AgentBridgeProcessor:
         self._on_agent_response = on_agent_response
         self._conversation_history: list[dict[str, str]] = []
         self._processing = False
+        self._lock = asyncio.Lock()
 
     async def process_transcription(self, text: str) -> str | None:
         """Process a completed user transcription and get agent response.
@@ -66,11 +67,12 @@ class AgentBridgeProcessor:
         if not text:
             return None
 
-        if self._processing:
-            logger.warning("Skipping overlapping transcription while agent is busy")
-            return None
+        async with self._lock:
+            if self._processing:
+                logger.warning("Skipping overlapping transcription while agent is busy")
+                return None
+            self._processing = True
 
-        self._processing = True
         try:
             # Notify caller about the user transcript
             if self._on_user_transcript:
@@ -102,12 +104,13 @@ class AgentBridgeProcessor:
             logger.exception(f"Error processing voice transcription in {self._context_id}")
             return None
         finally:
-            self._processing = False
+            async with self._lock:
+                self._processing = False
 
     async def _invoke_agent(self) -> str | None:
         """Call manifest.run with the conversation history and return response text."""
         try:
-            raw = self._manifest_run(self._conversation_history)
+            raw = self._manifest_run(list(self._conversation_history))
             result = await ResultProcessor.collect_results(raw)
 
             if result is None:

@@ -108,9 +108,10 @@ class VoiceSessionManager:
         state: Literal["connecting", "active", "ending", "ended"],
     ) -> None:
         """Update the state of a session."""
-        session = self._sessions.get(session_id)
-        if session:
-            session.state = state
+        async with self._lock:
+            session = self._sessions.get(session_id)
+            if session:
+                session.state = state
 
     @property
     def active_count(self) -> int:

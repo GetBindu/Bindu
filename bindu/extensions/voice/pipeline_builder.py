@@ -19,7 +19,7 @@ from .voice_agent_extension import VoiceAgentExtension
 logger = get_logger("bindu.voice.pipeline_builder")
 
 
-async def build_voice_pipeline(
+def build_voice_pipeline(
     voice_ext: VoiceAgentExtension,
     manifest_run: Callable[..., Any],
     context_id: str,
