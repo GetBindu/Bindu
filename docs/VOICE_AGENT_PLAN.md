@@ -148,7 +148,7 @@ Add to `pyproject.toml` under `[project.optional-dependencies]`:
 
 ```toml
 voice = [
-    "pipecat-ai[deepgram,elevenlabs,silero]>=0.0.105",
+    "pipecat-ai[deepgram,elevenlabs,silero]~=0.0.105",
     "websockets>=14.0",
 ]
 ```
@@ -191,10 +191,36 @@ class VoiceSettings(BaseSettings):
     vad_enabled: bool = True
     vad_threshold: float = 0.5
 
+    # Security & Authentication
+    session_auth_required: bool = True  # Require session authentication
+    session_token_ttl: int = 600        # Session token time-to-live (seconds)
+    session_auth_provider: str | None = None  # Optional: external auth provider id
+    per_agent_voice_access: dict | str | None = None  # Per-agent access control or policy id
+    rate_limit_per_user: int = 60       # Max requests per user per minute
+    rate_limit_per_ip: int = 120        # Max requests per IP per minute
+    secret_store: Literal["env", "vault"] = "env"  # Where API keys are stored
+    secret_rotation_policy: str = "manual"  # e.g., "manual", "auto-30d"
+    encrypt_api_keys_at_rest: bool = True
+
+    # Privacy & Compliance
+    store_transcripts: bool = False  # Default to False, require explicit opt-in
+    transcript_retention_days: int = 30
+    store_audio: bool = False
+    audio_retention_days: int = 7
+    require_user_consent: bool = True  # Must have user consent before enabling transcripts
+    compliance_guidelines: list[str] = ["gdpr", "ccpa"]
+    # Enforcement mechanisms:
+    # - Validation checks: when store_transcripts=True, enforce PII redaction on transcript content
+    # - Automated retention worker: scheduled job using transcript_retention_days and audio_retention_days
+    #   to purge expired data
+    # - Audit logging: log all consent grant/revoke events and data access events for compliance
+
     # Behavior
     allow_interruptions: bool = True
     session_timeout: int = 300          # seconds (5 min)
     max_concurrent_sessions: int = 10
+    autoscaling_policy: str | None = None  # Reference to autoscaling/capacity profile
+    rationale_note: str = "Defaults chosen for balance of UX, cost, and compliance. Infra may override."
 
     # Extension metadata
     extension_uri: str = "bindu://voice"
@@ -330,15 +356,19 @@ class VoiceSessionManager:
 class AgentBridgeProcessor(FrameProcessor):
     """Bridges pipecat STT output to Bindu agent handler, then feeds response to TTS.
 
-    Flow:
+    Production-grade flow:
         1. Receives TranscriptionFrame from STT (complete utterance)
         2. Creates A2A-compatible message: { role: "user", parts: [{ kind: "text", text }] }
-        3. Invokes the agent's handler function (same path as ManifestWorker)
-        4. Captures agent response text
-        5. Emits TextFrame for TTS
-        6. Stores both messages in A2A task history via storage backend
+        3. Invokes the agent's handler function (same path as ManifestWorker) in a cancellable asyncio.Task (self._current_task)
+        4. Enforces a short agent timeout (e.g., 10s); if exceeded, sends a "thinking..." prompt to TTS, plus a longer total utterance timeout
+        5. Catches and logs handler exceptions and invalid/empty responses, converting them to a safe TTS fallback message
+        6. Guards storage writes (self._storage) and TTS sends with try/except and retry/fallback paths
+        7. Implements cancellation: task.cancel() and await with short grace, then force-cancel if needed; documents non-cancellable handler behavior
+        8. Enforces conversation history limits by truncating self._conversation_history to N recent messages and persists metadata on truncation
+        9. Detects streaming responses (async iterator) from self._handler and forwards partial text to TTS incrementally, honoring interruptions and finalization
+       10. Adds a simple state machine (idle/listening/processing/speaking/interrupted) to coordinate transitions and error recovery
 
-    Handles interruptions: if user speaks while agent is responding, cancels current TTS.
+    Handles interruptions: if user speaks while agent is responding, cancels current TTS and agent task.
     """
 
     def __init__(self, agent_handler, storage, context_id):
@@ -348,9 +378,19 @@ class AgentBridgeProcessor(FrameProcessor):
         self._context_id = context_id
         self._conversation_history: list[dict] = []
         self._current_task_id: str | None = None
+        self._current_task: asyncio.Task | None = None
+        self._state: Literal["idle", "listening", "processing", "speaking", "interrupted"] = "idle"
 
     async def process_frame(self, frame, direction):
         # Handle TranscriptionFrame → invoke agent → emit TextFrame
+        # 1. Cancel any running agent task if interrupted
+        # 2. Start new agent handler in asyncio.Task, enforce timeout
+        # 3. On timeout, send "thinking..." to TTS, continue waiting for agent
+        # 4. On exception or invalid response, send fallback TTS message
+        # 5. On streaming response, forward partials to TTS incrementally
+        # 6. Guard storage and TTS sends with try/except
+        # 7. Truncate conversation history if needed
+        # 8. Update state machine for transitions and error recovery
         ...
 ```
 
@@ -371,14 +411,27 @@ FRAME_SIZE = DEFAULT_SAMPLE_RATE * FRAME_DURATION_MS // 1000 * BYTES_PER_SAMPLE
 Three REST endpoints + one WebSocket:
 
 ```
-POST   /voice/session/start             → { session_id, ws_url }
+POST   /voice/session/start             → { session_id, session_token, ws_url (wss://...) }
 DELETE /voice/session/{session_id}       → { status: "ended" }
 GET    /voice/session/{session_id}/status → { state, duration, ... }
-WS     /ws/voice/{session_id}            → bidirectional audio stream
+WS     /ws/voice/{session_id}            → bidirectional audio stream (wss:// required)
 ```
 
-**WebSocket protocol:**
+**WebSocket protocol and security:**
 
+- POST /voice/session/start requires Authorization: Bearer <user_token> and returns a short-lived session_token
+- ws_url is always wss:// (secure transport)
+- Client must present session_token in the WebSocket handshake using one of these methods:
+  1. Send session_token in the Sec-WebSocket-Protocol header
+  2. Send session_token in a custom header such as Authorization: Bearer <session_token>
+  3. Perform an application-level handshake by sending session_token as the first text frame after connection
+- Query parameter tokens are NOT allowed for security reasons
+- Server validates session_token for session ownership from header/handshake mechanisms only
+- Input validation: max binary frame size, max frames/sec, reject malformed JSON text frames
+- Error handling: explicit error frames ({"type": "error"}), state frames ({"type": "state"}), and clear messages for malformed audio, STT/TTS failures, and network interruptions
+- Endpoints referenced: POST /voice/session/start, DELETE /voice/session/{session_id}, GET /voice/session/{session_id}/status, WS /ws/voice/{session_id}
+
+**Frame types:**
 ```
 Direction    Frame Type    Content
 ─────────    ──────────    ───────────────────────────────────────
@@ -386,6 +439,7 @@ Client→Svr   text          { "type": "start", "config": { "sampleRate": 16000 
 Client→Svr   binary        Raw PCM 16-bit audio frames (20ms chunks)
 Client→Svr   text          { "type": "mute" } / { "type": "unmute" }
 Client→Svr   text          { "type": "stop" }
+Client→Svr   text          session_token (in handshake)
 
 Svr→Client   text          { "type": "transcript", "role": "user",
                              "text": "...", "is_final": true }
@@ -478,11 +532,19 @@ export class VoiceClient {
 ```
 
 **Audio capture pipeline:**
+
 ```
-getUserMedia({ audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true } })
-  → MediaStreamSource
-  → AudioWorkletNode (PCM conversion + downsampling)
-  → WebSocket.send(binaryFrame)
+getUserMedia({
+    audio: {
+        channelCount: 1,
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+    }
+})
+    → MediaStreamSource (captures at browser's native sample rate)
+    → AudioWorkletNode (resample nativeRate → 16kHz, stereo→mono, Float32→Int16 PCM, chunk into 20ms/320-sample frames)
+    → WebSocket.send(binaryFrame)
 ```
 
 **Audio playback pipeline:**
@@ -602,8 +664,8 @@ Create A2A Task (state: "working")
                │
                ▼
 Session End → Task state: "completed"
-             Transcripts in task.history[]
-             Queryable via GET /tasks/get
+              Transcripts in task.history[]
+              Queryable via GET /tasks/{task_id}
 ```
 
 ---
@@ -612,6 +674,8 @@ Session End → Task state: "completed"
 
 #### Step 4.1 — Unit Tests
 
+
+**Unit Tests**
 | Test File | Covers |
 |-----------|--------|
 | `test_voice_extension.py` | Extension instantiation, `agent_extension` property, config validation |
@@ -620,15 +684,48 @@ Session End → Task state: "completed"
 | `test_agent_bridge.py` | Frame processing, A2A message creation, history management |
 | `test_voice_endpoints.py` | REST endpoints (start/end/status) + WebSocket handshake |
 
+**Integration Tests**
+- WebSocket lifecycle with pipecat pipeline (connect, send audio, receive transcript, close)
+- STT/TTS integration using test audio files and output format validation
+- Agent bridge end-to-end handler integration
+- Session manager timeout and cleanup scenarios
+
+**End-to-End (E2E) Tests**
+- Full voice-call flows: start → speak → agent response → end
+- Interruption and reconnection scenarios
+- Concurrent session handling and resource cleanup
+
+**Performance Tests**
+- Measure STT, agent, and TTS latency
+- Load test for max concurrent sessions
+- Long-running memory-leak checks
+
+**Frontend/Browser Tests**
+- AudioWorklet pipeline and PCM conversion
+- Microphone permission flows and error handling
+- Playback queue behavior and UI state
+- Cross-browser and mobile compatibility (Chrome, Edge, Firefox, Safari)
+
 #### Step 4.2 — Example Voice Agent
 
 ```python
 # examples/voice-agent/main.py
 from bindu.penguin import bindufy
 
-def voice_handler(messages: str) -> str:
-    """Simple voice agent that echoes back with personality."""
-    return f"I heard you say: {messages}. That's interesting!"
+def voice_handler(messages: list[dict]) -> str:
+    """Simple voice agent that echoes back with personality.
+    
+    Args:
+        messages: List of message objects from the A2A protocol.
+                  Each dict has keys like 'role' and 'content'.
+    
+    Returns:
+        A string response to be spoken by the TTS engine.
+    """
+    # Extract text from messages - concatenate all user messages
+    user_texts = [m.get("content", "") for m in messages if m.get("role") == "user"]
+    combined = " ".join(user_texts)
+    return f"I heard you say: {combined}. That's interesting!"
 
 config = {
     "author": "demo@getbindu.com",
@@ -760,11 +857,34 @@ Phases 2 and 3 can proceed in parallel once Phase 1 is complete.
 - [ ] `uv run pre-commit run --all-files` — clean lint/formatting
 - [ ] WebSocket connectivity: connect to `/ws/voice/{session_id}`, send audio, receive transcript JSON
 - [ ] End-to-end voice call: frontend → click microphone → speak → hear agent → see transcript
-- [ ] Task persistence: after session, conversation appears via `GET /` with `tasks/get`
+- [ ] Task persistence: after session, conversation appears via `GET /tasks/{task_id}` (returns a specific conversation by id)
 - [ ] Session cleanup: sessions auto-end after timeout, resources freed
 - [ ] Agent card: voice-enabled agent shows `bindu://voice` in `capabilities.extensions`
 - [ ] Text-voice continuity: switch from voice to text chat in same context
 - [ ] `uv run pytest tests/ -v` — all existing tests pass (voice is opt-in, no regressions)
+
+### Security
+- [ ] WebSocket authentication required (session_token)
+- [ ] No API key exposure in frontend or logs
+- [ ] Rate limiting/flood protection tested
+- [ ] Input validation for oversized/malformed frames
+
+### Performance
+- [ ] STT, TTS, agent, and roundtrip latency meet targets
+- [ ] Memory usage per session within limits
+- [ ] Max concurrent sessions load test and behavior
+
+### Browser Compatibility
+- [ ] Chrome (desktop/mobile)
+- [ ] Edge (desktop/mobile)
+- [ ] Firefox (desktop/mobile)
+- [ ] Safari (desktop/mobile)
+- [ ] Microphone permission handling tested
+
+### Accessibility
+- [ ] Keyboard navigation for all controls
+- [ ] Screen reader announcements for state changes
+- [ ] Visual indicators for voice state and errors
 
 ---
 
