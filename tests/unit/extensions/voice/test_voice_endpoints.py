@@ -3,14 +3,13 @@
 import json
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse
-from starlette.testclient import TestClient
 
-from bindu.extensions.voice.session_manager import VoiceSession, VoiceSessionManager
+from bindu.extensions.voice.session_manager import VoiceSessionManager
 from bindu.server.endpoints.voice_endpoints import (
     _trim_overlap_text,
     voice_session_end,
@@ -28,16 +27,10 @@ def _make_mock_app(session_manager=None, voice_ext=None, manifest=None):
     return app
 
 
-def _make_request(method="POST", path="/voice/session/start", body=None, path_params=None):
+def _make_request(
+    method="POST", path="/voice/session/start", body=None, path_params=None
+):
     """Create a mock Starlette Request."""
-    scope = {
-        "type": "http",
-        "method": method,
-        "path": path,
-        "headers": [(b"content-type", b"application/json")],
-        "query_string": b"",
-        "path_params": path_params or {},
-    }
     url = MagicMock()
     url.scheme = "http"
     url.hostname = "localhost"
@@ -107,9 +100,7 @@ class TestVoiceSessionEndEndpoint:
     @pytest.mark.asyncio
     async def test_voice_not_enabled(self):
         app = _make_mock_app(session_manager=None)
-        request = _make_request(
-            method="DELETE", path_params={"session_id": "x"}
-        )
+        request = _make_request(method="DELETE", path_params={"session_id": "x"})
         response = await voice_session_end(app, request)
         assert response.status_code == 501
 
@@ -128,9 +119,7 @@ class TestVoiceSessionEndEndpoint:
         manager = VoiceSessionManager(max_sessions=5, session_timeout=300)
         session = await manager.create_session("c1")
         app = _make_mock_app(session_manager=manager)
-        request = _make_request(
-            method="DELETE", path_params={"session_id": session.id}
-        )
+        request = _make_request(method="DELETE", path_params={"session_id": session.id})
         response = await voice_session_end(app, request)
         assert response.status_code == 200
         body = json.loads(response.body)
@@ -143,9 +132,7 @@ class TestVoiceSessionStatusEndpoint:
     @pytest.mark.asyncio
     async def test_voice_not_enabled(self):
         app = _make_mock_app(session_manager=None)
-        request = _make_request(
-            method="GET", path_params={"session_id": "x"}
-        )
+        request = _make_request(method="GET", path_params={"session_id": "x"})
         response = await voice_session_status(app, request)
         assert response.status_code == 501
 
@@ -153,9 +140,7 @@ class TestVoiceSessionStatusEndpoint:
     async def test_session_not_found(self):
         manager = VoiceSessionManager(max_sessions=5, session_timeout=300)
         app = _make_mock_app(session_manager=manager)
-        request = _make_request(
-            method="GET", path_params={"session_id": "nope"}
-        )
+        request = _make_request(method="GET", path_params={"session_id": "nope"})
         response = await voice_session_status(app, request)
         assert response.status_code == 404
 
@@ -165,9 +150,7 @@ class TestVoiceSessionStatusEndpoint:
         session = await manager.create_session("c1")
         await manager.update_state(session.id, "active")
         app = _make_mock_app(session_manager=manager)
-        request = _make_request(
-            method="GET", path_params={"session_id": session.id}
-        )
+        request = _make_request(method="GET", path_params={"session_id": session.id})
         response = await voice_session_status(app, request)
         assert response.status_code == 200
         body = json.loads(response.body)

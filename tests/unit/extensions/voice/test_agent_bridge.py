@@ -1,7 +1,5 @@
 """Unit tests for AgentBridgeProcessor."""
 
-import asyncio
-
 import pytest
 
 from bindu.extensions.voice.agent_bridge import AgentBridgeProcessor
@@ -13,17 +11,21 @@ class TestAgentBridgeProcessor:
     @pytest.fixture
     def sync_manifest_run(self):
         """A manifest.run that returns a plain string."""
+
         def run(history):
             last = history[-1]["content"] if history else ""
             return f"Echo: {last}"
+
         return run
 
     @pytest.fixture
     def async_gen_manifest_run(self):
         """A manifest.run that returns an async generator."""
+
         async def run(history):
             last = history[-1]["content"] if history else ""
             yield f"Streamed: {last}"
+
         return run
 
     @pytest.fixture

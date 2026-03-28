@@ -16,8 +16,8 @@ pip install "bindu[voice]"
 - API keys in environment:
 
 ```bash
-export VOICE__STT_API_KEY="your-deepgram-api-key"
-export VOICE__TTS_API_KEY="your-elevenlabs-api-key"
+export VOICE__STT_API_KEY="your-deepgram-api-key" # pragma: allowlist secret
+export VOICE__TTS_API_KEY="your-elevenlabs-api-key" # pragma: allowlist secret
 ```
 
 You can also copy `.env.example` to `.env` and edit values.

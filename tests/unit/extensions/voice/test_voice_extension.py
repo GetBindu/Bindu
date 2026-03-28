@@ -2,9 +2,7 @@
 
 import pytest
 
-from bindu.extensions.voice import VoiceAgentExtension
 from bindu.extensions.voice.voice_agent_extension import VoiceAgentExtension
-from bindu.common.protocol.types import AgentExtension
 
 
 class TestVoiceAgentExtensionCreation:

@@ -12,7 +12,9 @@ BYTES_PER_SAMPLE: int = 2
 
 # Frame sizing for real-time streaming
 FRAME_DURATION_MS: int = 20  # 20ms frames
-FRAME_SIZE: int = DEFAULT_SAMPLE_RATE * FRAME_DURATION_MS // 1000 * BYTES_PER_SAMPLE  # 640 bytes
+FRAME_SIZE: int = (
+    DEFAULT_SAMPLE_RATE * FRAME_DURATION_MS // 1000 * BYTES_PER_SAMPLE
+)  # 640 bytes
 
 # Supported audio encodings
 SUPPORTED_ENCODINGS: frozenset[str] = frozenset({"linear16", "mulaw", "alaw"})

@@ -185,7 +185,9 @@ async def voice_websocket(websocket: WebSocket) -> None:
     voice_ext = getattr(app, "_voice_ext", None)
     manifest = getattr(app, "manifest", None)
     if voice_ext is None or manifest is None or not hasattr(manifest, "run"):
-        await _send_json(websocket, {"type": "error", "message": "Agent not configured for voice"})
+        await _send_json(
+            websocket, {"type": "error", "message": "Agent not configured for voice"}
+        )
         await websocket.close(code=1011)
         return
 
@@ -251,7 +253,9 @@ async def voice_websocket(websocket: WebSocket) -> None:
                         audio_buffer.clear()
                         last_transcribe_at = time.monotonic()
                         if transcript:
-                            delta = _trim_overlap_text(last_chunk_transcript, transcript)
+                            delta = _trim_overlap_text(
+                                last_chunk_transcript, transcript
+                            )
                             if delta:
                                 await _process_user_turn(websocket, bridge, delta)
                         last_chunk_transcript = ""
@@ -277,7 +281,10 @@ async def voice_websocket(websocket: WebSocket) -> None:
                 # Chunked transcription: process roughly every 1s of audio,
                 # throttled to avoid overwhelming the STT provider.
                 now = time.monotonic()
-                if len(audio_buffer) >= chunk_bytes and (now - last_transcribe_at) >= 0.8:
+                if (
+                    len(audio_buffer) >= chunk_bytes
+                    and (now - last_transcribe_at) >= 0.8
+                ):
                     transcript = await _transcribe_pcm_buffer(bytes(audio_buffer))
                     if overlap_bytes > 0:
                         audio_buffer = bytearray(audio_buffer[-overlap_bytes:])
@@ -305,19 +312,28 @@ async def voice_websocket(websocket: WebSocket) -> None:
             if audio_buffer:
                 try:
                     transcript = await _transcribe_pcm_buffer(bytes(audio_buffer))
-                    if transcript and websocket.client_state == WebSocketState.CONNECTED:
+                    if (
+                        transcript
+                        and websocket.client_state == WebSocketState.CONNECTED
+                    ):
                         delta = _trim_overlap_text(last_chunk_transcript, transcript)
                         if delta:
                             await _process_user_turn(websocket, bridge, delta)
                 except Exception as e:
-                    logger.exception(f"Error during final audio transcription for session {session_id}: {e}")
+                    logger.exception(
+                        f"Error during final audio transcription for session {session_id}: {e}"
+                    )
         except Exception as e:
-            logger.exception(f"Error in audio buffer cleanup for session {session_id}: {e}")
+            logger.exception(
+                f"Error in audio buffer cleanup for session {session_id}: {e}"
+            )
 
         try:
             await session_manager.update_state(session_id, "ending")
         except Exception as e:
-            logger.exception(f"Error updating session state to 'ending' for session {session_id}: {e}")
+            logger.exception(
+                f"Error updating session state to 'ending' for session {session_id}: {e}"
+            )
 
         try:
             await session_manager.end_session(session_id)
@@ -429,7 +445,9 @@ async def _transcribe_pcm_buffer(pcm_bytes: bytes) -> str | None:
 
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(url, params=params, headers=headers, content=pcm_bytes)
+            response = await client.post(
+                url, params=params, headers=headers, content=pcm_bytes
+            )
             response.raise_for_status()
             payload = response.json()
 

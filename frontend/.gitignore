@@ -10,7 +10,7 @@ vite.config.ts.timestamp-*
 SECRET_CONFIG
 .idea
 !.env.ci
-!.env
+!.env.example
 gcp-*.json
 db
 data

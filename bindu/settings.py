@@ -875,6 +875,12 @@ class SentrySettings(BaseSettings):
     and release health tracking for production deployments.
     """
 
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="SENTRY__",
+        extra="allow",
+    )
+
     # Enable/disable Sentry
     enabled: bool = False
 

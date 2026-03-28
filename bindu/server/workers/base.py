@@ -21,7 +21,7 @@ Workers implement the hybrid pattern by:
 from __future__ import annotations as _annotations
 
 from abc import ABC, abstractmethod
-from contextlib import asynccontextmanager, nullcontext
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any, AsyncIterator
 
@@ -45,9 +45,7 @@ tracer = get_tracer(__name__)
 logger = get_logger(__name__)
 
 
-def _reconstruct_span(
-    trace_id: str | None, span_id: str | None
-) -> NonRecordingSpan:
+def _reconstruct_span(trace_id: str | None, span_id: str | None) -> NonRecordingSpan:
     """Reconstruct a NonRecordingSpan from serialized trace_id/span_id strings.
 
     Used to restore OpenTelemetry trace context after the scheduler serializes

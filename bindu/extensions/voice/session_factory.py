@@ -7,12 +7,13 @@ storage backends without changing application code.
 
 from __future__ import annotations as _annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, Protocol
 
 from bindu.extensions.voice.session_manager import VoiceSessionManager
 from bindu.utils.logging import get_logger
 
 if TYPE_CHECKING:
+    from bindu.extensions.voice.session_manager import VoiceSession
     from bindu.settings import VoiceSettings
 
 logger = get_logger("bindu.voice.session_factory")
@@ -27,9 +28,35 @@ except ImportError:
     REDIS_AVAILABLE = False
 
 
+class SessionManagerBackend(Protocol):
+    """Common interface supported by voice session manager backends."""
+
+    async def create_session(self, context_id: str) -> VoiceSession:
+        """Create a voice session for a context ID."""
+
+    async def get_session(self, session_id: str) -> VoiceSession | None:
+        """Get an existing session by ID."""
+
+    async def end_session(self, session_id: str) -> None:
+        """End and cleanup a voice session."""
+
+    async def update_state(
+        self,
+        session_id: str,
+        state: Literal["connecting", "active", "ending", "ended"],
+    ) -> None:
+        """Update the lifecycle state of a session."""
+
+    async def start_cleanup_loop(self) -> None:
+        """Start periodic cleanup for stale sessions."""
+
+    async def stop_cleanup_loop(self) -> None:
+        """Stop the background cleanup task."""
+
+
 async def create_session_manager(
     settings: VoiceSettings | None = None,
-) -> VoiceSessionManager:
+) -> SessionManagerBackend:
     """Create session manager backend based on configuration.
 
     Args:
@@ -55,7 +82,7 @@ async def create_session_manager(
             session_timeout=voice_settings.session_timeout,
         )
 
-    elif backend == "redis":
+    if backend == "redis":
         if not REDIS_AVAILABLE or RedisVoiceSessionManager is None:
             raise ValueError(
                 "Redis session manager requires redis package. "
@@ -82,27 +109,28 @@ async def create_session_manager(
         await manager.__aenter__()
         return manager
 
-    else:
-        raise ValueError(
-            f"Unknown session backend: {backend}. Supported backends: memory, redis"
-        )
+    raise ValueError(
+        f"Unknown session backend: {backend}. Supported backends: memory, redis"
+    )
 
 
-async def close_session_manager(manager: VoiceSessionManager) -> None:
+async def close_session_manager(manager: SessionManagerBackend) -> None:
     """Close session manager connection gracefully.
 
     Args:
         manager: The session manager to close.
     """
     try:
-        # Check if it's a Redis-backed manager with __aexit__ method
-        if hasattr(manager, "__aexit__"):
+        await manager.stop_cleanup_loop()
+        logger.info(f"{type(manager).__name__} cleanup loop stopped")
+
+        # For Redis manager, close connection after cleanup task stops.
+        if (
+            REDIS_AVAILABLE
+            and RedisVoiceSessionManager is not None
+            and isinstance(manager, RedisVoiceSessionManager)
+        ):
             await manager.__aexit__(None, None, None)
             logger.info(f"{type(manager).__name__} connection closed")
-        else:
-            # For in-memory manager, just stop cleanup loop
-            if hasattr(manager, "stop_cleanup_loop"):
-                await manager.stop_cleanup_loop()
-                logger.info(f"{type(manager).__name__} cleanup loop stopped")
     except Exception as e:
         logger.error(f"Error closing {type(manager).__name__}: {e}")

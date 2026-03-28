@@ -1,8 +1,8 @@
 # Voice Agent Extension — Implementation Plan
 
-> **Status**: Planning  
-> **Date**: 12 March 2026  
-> **Goal**: Build a real-time voice agent (Vapi/Dograh alternative) into Bindu  
+> **Status**: Planning
+> **Date**: 12 March 2026
+> **Goal**: Build a real-time voice agent (Vapi/Dograh alternative) into Bindu
 > **Reference repos**: [dograh-hq/dograh](https://github.com/dograh-hq/dograh) · [pipecat-ai/pipecat-examples](https://github.com/pipecat-ai/pipecat-examples)
 
 ---
@@ -714,11 +714,11 @@ from bindu.penguin import bindufy
 
 def voice_handler(messages: list[dict]) -> str:
     """Simple voice agent that echoes back with personality.
-    
+
     Args:
         messages: List of message objects from the A2A protocol.
                   Each dict has keys like 'role' and 'content'.
-    
+
     Returns:
         A string response to be spoken by the TTS engine.
     """

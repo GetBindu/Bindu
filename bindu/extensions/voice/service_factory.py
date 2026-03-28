@@ -6,6 +6,7 @@ from the VoiceAgentExtension configuration.
 
 from __future__ import annotations
 
+import importlib
 from typing import TYPE_CHECKING, Any
 
 from bindu.settings import app_settings
@@ -38,7 +39,8 @@ def create_stt_service(config: VoiceAgentExtension) -> Any:
 
     if config.stt_provider == "deepgram":
         try:
-            from pipecat.services.deepgram.stt import DeepgramSTTService
+            deepgram_module = importlib.import_module("pipecat.services.deepgram.stt")
+            DeepgramSTTService = getattr(deepgram_module, "DeepgramSTTService")
         except ImportError as e:
             raise ImportError(
                 "Deepgram STT requires pipecat[deepgram]. "
@@ -79,7 +81,10 @@ def create_tts_service(config: VoiceAgentExtension) -> Any:
 
     if config.tts_provider == "elevenlabs":
         try:
-            from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
+            elevenlabs_module = importlib.import_module(
+                "pipecat.services.elevenlabs.tts"
+            )
+            ElevenLabsTTSService = getattr(elevenlabs_module, "ElevenLabsTTSService")
         except ImportError as e:
             raise ImportError(
                 "ElevenLabs TTS requires pipecat[elevenlabs]. "

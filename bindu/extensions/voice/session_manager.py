@@ -67,6 +67,7 @@ class VoiceSessionManager:
     """
 
     def __init__(self, max_sessions: int = 10, session_timeout: int = 300):
+        """Initialize in-memory voice session manager limits and cleanup state."""
         self._sessions: dict[str, VoiceSession] = {}
         self._max_sessions = max_sessions
         self._session_timeout = session_timeout

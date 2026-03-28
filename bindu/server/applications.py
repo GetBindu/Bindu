@@ -411,7 +411,9 @@ class BinduApplication(Starlette):
 
             # Initialize voice session manager if voice extension is enabled
             if app._voice_ext:
-                from bindu.extensions.voice.session_factory import create_session_manager
+                from bindu.extensions.voice.session_factory import (
+                    create_session_manager,
+                )
 
                 app._voice_session_manager = await create_session_manager(
                     app_settings.voice

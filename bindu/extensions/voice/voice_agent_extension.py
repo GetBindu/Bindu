@@ -38,6 +38,7 @@ class VoiceAgentExtension:
         vad_enabled: bool = True,
         description: Optional[str] = None,
     ):
+        """Initialize voice extension configuration for agent metadata and runtime."""
         self.stt_provider = stt_provider
         self.stt_model = stt_model
         self.stt_language = stt_language
@@ -89,6 +90,7 @@ class VoiceAgentExtension:
         }
 
     def __repr__(self) -> str:
+        """Return concise debug representation of this voice extension."""
         return (
             f"VoiceAgentExtension(stt={self.stt_provider}/{self.stt_model}, "
             f"tts={self.tts_provider}/{self.tts_voice_id})"

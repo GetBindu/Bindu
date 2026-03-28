@@ -8,8 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-import time
-from typing import Literal, Any, cast
+from typing import Literal, Any
 
 import redis.asyncio as redis
 from uuid import uuid4
@@ -67,7 +66,9 @@ class RedisVoiceSessionManager:
             logger.info(f"Redis session manager connected to {self.redis_url}")
         except redis.RedisError as e:
             logger.error(f"Failed to connect to Redis: {e}")
-            raise ConnectionError(f"Unable to connect to Redis at {self.redis_url}: {e}")
+            raise ConnectionError(
+                f"Unable to connect to Redis at {self.redis_url}: {e}"
+            )
         return self
 
     async def __aexit__(self, exc_type: Any, exc_value: Any, traceback: Any):
@@ -85,13 +86,10 @@ class RedisVoiceSessionManager:
         """Serialize session to JSON string."""
         return json.dumps(session.to_dict())
 
-    def _deserialize_session(self, key: str, data: str) -> VoiceSession:
+    def _deserialize_session(self, _key: str, data: str) -> VoiceSession:
         """Deserialize session from JSON string."""
         data_dict = json.loads(data)
-        session = VoiceSession.from_dict(data_dict)
-        # Extract session_id from key if needed
-        session_id = key.split(":")[-1] if ":" in key else session.id
-        return session
+        return VoiceSession.from_dict(data_dict)
 
     # ------------------------------------------------------------------
     # Session lifecycle
@@ -111,7 +109,9 @@ class RedisVoiceSessionManager:
             RuntimeError: If Redis client is not initialized.
         """
         if not self._redis_client:
-            raise RuntimeError("Redis client not initialized. Use async context manager.")
+            raise RuntimeError(
+                "Redis client not initialized. Use async context manager."
+            )
 
         async with self._lock:
             # Prune expired/ended sessions first
@@ -151,7 +151,9 @@ class RedisVoiceSessionManager:
             The session if found, None otherwise.
         """
         if not self._redis_client:
-            raise RuntimeError("Redis client not initialized. Use async context manager.")
+            raise RuntimeError(
+                "Redis client not initialized. Use async context manager."
+            )
 
         key = self._session_key(session_id)
         data = await self._redis_client.get(key)
@@ -170,7 +172,9 @@ class RedisVoiceSessionManager:
             session_id: The session ID to end.
         """
         if not self._redis_client:
-            raise RuntimeError("Redis client not initialized. Use async context manager.")
+            raise RuntimeError(
+                "Redis client not initialized. Use async context manager."
+            )
 
         async with self._lock:
             key = self._session_key(session_id)
@@ -181,8 +185,7 @@ class RedisVoiceSessionManager:
                 session.state = "ended"
                 duration = session.duration_seconds
                 logger.info(
-                    f"Voice session ended: {session_id} "
-                    f"(duration={duration:.1f}s)"
+                    f"Voice session ended: {session_id} (duration={duration:.1f}s)"
                 )
 
             # Remove from Redis
@@ -201,7 +204,9 @@ class RedisVoiceSessionManager:
             state: The new state.
         """
         if not self._redis_client:
-            raise RuntimeError("Redis client not initialized. Use async context manager.")
+            raise RuntimeError(
+                "Redis client not initialized. Use async context manager."
+            )
 
         async with self._lock:
             key = self._session_key(session_id)

@@ -39,7 +39,8 @@ class AgentBridgeProcessor:
         on_user_transcript: Callable[[str], Any] | None = None,
         on_agent_response: Callable[[str], Any] | None = None,
     ):
-        """
+        """Initialize bridge callbacks and context for one voice session.
+
         Args:
             manifest_run: The ``manifest.run`` callable (accepts chat history list).
             context_id: A2A context ID for this voice session.
@@ -101,7 +102,9 @@ class AgentBridgeProcessor:
             return response_text
 
         except Exception:
-            logger.exception(f"Error processing voice transcription in {self._context_id}")
+            logger.exception(
+                f"Error processing voice transcription in {self._context_id}"
+            )
             return None
         finally:
             async with self._lock:
@@ -140,7 +143,7 @@ class AgentBridgeProcessor:
 
     @property
     def history(self) -> list[dict[str, str]]:
-        """Current conversation history (read-only copy)."""
+        """Return a read-only copy of the conversation history."""
         return list(self._conversation_history)
 
     def clear_history(self) -> None:
