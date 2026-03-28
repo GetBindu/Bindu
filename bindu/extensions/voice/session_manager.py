@@ -27,10 +27,36 @@ class VoiceSession:
     start_time: float = field(default_factory=time.monotonic)
     state: Literal["connecting", "active", "ending", "ended"] = "connecting"
 
+    def __post_init__(self) -> None:
+        """Handle default start_time after initialization."""
+        if self.start_time is None or self.start_time == 0:
+            self.start_time = time.monotonic()
+
     @property
     def duration_seconds(self) -> float:
         """Elapsed time since session started."""
         return time.monotonic() - self.start_time
+
+    def to_dict(self) -> dict:
+        """Serialize session to dictionary for Redis storage."""
+        return {
+            "id": self.id,
+            "context_id": self.context_id,
+            "task_id": self.task_id,
+            "start_time": self.start_time,
+            "state": self.state,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> VoiceSession:
+        """Deserialize session from dictionary."""
+        return cls(
+            id=data.get("id", ""),
+            context_id=data.get("context_id", ""),
+            task_id=data.get("task_id"),
+            start_time=data.get("start_time", time.monotonic()),
+            state=data.get("state", "connecting"),
+        )
 
 
 class VoiceSessionManager:
