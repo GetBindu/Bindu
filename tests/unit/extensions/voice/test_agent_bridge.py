@@ -57,8 +57,11 @@ class TestAgentBridgeProcessor:
         assert history[0]["role"] == "user"
         assert history[0]["content"] == "Hello"
         assert history[1]["role"] == "assistant"
+        assert history[1]["content"] == "Echo: Hello"
         assert history[2]["role"] == "user"
         assert history[2]["content"] == "How are you?"
+        assert history[3]["role"] == "assistant"
+        assert history[3]["content"] == "Echo: How are you?"
 
     @pytest.mark.asyncio
     async def test_clear_history(self, bridge):

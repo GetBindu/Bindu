@@ -49,6 +49,30 @@ def setup_opentelemetry_stubs():
         def get_span_context(self):
             return self._context
 
+    class _NonRecordingSpan:
+        """Non-recording span that returns False for is_recording."""
+
+        def __init__(self, context=None):
+            self._context = context or _SpanContext()
+
+        def is_recording(self) -> bool:
+            return False
+
+        def add_event(self, *args, **kwargs):
+            return None
+
+        def set_attributes(self, *args, **kwargs):
+            return None
+
+        def set_attribute(self, *args, **kwargs):
+            return None
+
+        def set_status(self, *args, **kwargs):
+            return None
+
+        def get_span_context(self):
+            return self._context
+
     def get_current_span():
         return _Span()
 
@@ -83,7 +107,7 @@ def setup_opentelemetry_stubs():
 
     # Setup trace.span submodule symbols imported by worker code.
     ot_trace_span = ModuleType("opentelemetry.trace.span")
-    ot_trace_span.NonRecordingSpan = _Span  # type: ignore[attr-defined]
+    ot_trace_span.NonRecordingSpan = _NonRecordingSpan  # type: ignore[attr-defined]
     ot_trace_span.SpanContext = _SpanContext  # type: ignore[attr-defined]
     ot_trace_span.TraceFlags = _TraceFlags  # type: ignore[attr-defined]
     ot_trace_span.INVALID_SPAN_CONTEXT = _SpanContext(  # type: ignore[attr-defined]

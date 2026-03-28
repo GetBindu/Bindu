@@ -18,9 +18,9 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
-# Debug: print environment variables to verify .env loading
+# Debug: print provider (non-sensitive) and mask API key presence
 print("VOICE__STT_PROVIDER:", os.environ.get("VOICE__STT_PROVIDER"))
-print("VOICE__STT_API_KEY:", os.environ.get("VOICE__STT_API_KEY"))
+print("VOICE__STT_API_KEY set:", bool(os.environ.get("VOICE__STT_API_KEY")))
 
 from bindu.penguin.bindufy import bindufy
 
