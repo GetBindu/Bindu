@@ -6,10 +6,10 @@ ensuring they meet the required schema and have proper defaults.
 """
 
 import os
-from typing import Any, Dict
+from typing import Any, Dict, get_args
 
 from bindu import __version__
-from bindu.common.protocol.types import AgentCapabilities, Skill
+from bindu.common.protocol.types import AgentCapabilities, AgentTrustConfig, IdentityProvider, Skill, TrustLevel
 
 
 class ConfigValidator:
@@ -132,6 +132,15 @@ class ConfigValidator:
 
         if config.get("auth"):
             cls._validate_auth_config(config["auth"])
+
+        # Validate agent_trust configuration if provided
+        if config.get("agent_trust") is not None:
+            trust_config = config["agent_trust"]
+            
+            if not isinstance(trust_config, dict):
+                raise ValueError("Field 'agent_trust' must be a dictionary")
+            
+            cls._validate_agent_trust_config(trust_config)
 
         if config.get("telemetry"):
             cls._process_oltp_config(config)
@@ -266,6 +275,100 @@ class ConfigValidator:
     # ------------------------------------------------------------------
     # Telemetry processing
     # ------------------------------------------------------------------
+
+    @classmethod
+    def _validate_agent_trust_config(cls, trust_config: AgentTrustConfig) -> None:
+        """Validate agent trust configuration.
+
+        Args:
+            trust_config: Agent trust configuration (AgentTrustConfig TypedDict)
+
+        Raises:
+            ValueError: If trust configuration is invalid
+        """
+        if not isinstance(trust_config, dict):
+            raise ValueError("Field 'agent_trust' must be a dictionary")
+
+        # Validate required fields are present
+        required_fields = ["required_verification_level", "max_agent_hierarchy_depth"]
+        missing_fields = [field for field in required_fields if field not in trust_config]
+        if missing_fields:
+            raise ValueError(
+                f"Missing required agent_trust fields: {', '.join(missing_fields)}. "
+                f"Required fields: {', '.join(required_fields)}"
+            )
+
+        # Validate required_verification_level
+        if "required_verification_level" in trust_config:
+            level = trust_config["required_verification_level"]
+            valid_levels = get_args(TrustLevel)
+            if level not in valid_levels:
+                raise ValueError(
+                    f"Invalid required_verification_level: '{level}'. "
+                    f"Must be one of: {', '.join(valid_levels)}"
+                )
+
+        # Validate max_agent_hierarchy_depth
+        if "max_agent_hierarchy_depth" in trust_config:
+            depth = trust_config["max_agent_hierarchy_depth"]
+            if not isinstance(depth, int) or depth < 1:
+                raise ValueError(
+                    f"Invalid max_agent_hierarchy_depth: '{depth}'. "
+                    f"Must be a positive integer (>= 1)"
+                )
+
+        # Validate identity_provider if provided
+        if "identity_provider" in trust_config:
+            provider = trust_config["identity_provider"]
+            valid_providers = get_args(IdentityProvider)
+            if provider not in valid_providers:
+                raise ValueError(
+                    f"Invalid identity_provider: '{provider}'. "
+                    f"Supported providers: {', '.join(valid_providers)}"
+                )
+
+        # Validate allowed_origins if provided
+        if "allowed_origins" in trust_config:
+            origins = trust_config["allowed_origins"]
+            if not isinstance(origins, list):
+                raise ValueError(
+                    "Field 'allowed_origins' must be a list of strings"
+                )
+            for origin in origins:
+                if not isinstance(origin, str):
+                    raise ValueError(
+                        f"Invalid origin in allowed_origins: {origin}. "
+                        f"All origins must be strings"
+                    )
+                # Validate URL format
+                if not (
+                    origin.startswith("http://")
+                    or origin.startswith("https://")
+                    or "*" in origin
+                ):
+                    raise ValueError(
+                        f"Invalid origin format: '{origin}'. "
+                        f"Expected http:// or https:// URL or wildcard pattern"
+                    )
+
+        # Validate trust_verification_required if provided
+        if "trust_verification_required" in trust_config:
+            if not isinstance(trust_config["trust_verification_required"], bool):
+                raise ValueError(
+                    "Field 'trust_verification_required' must be a boolean"
+                )
+
+        # Validate certificate_required if provided
+        if "certificate_required" in trust_config:
+            if not isinstance(trust_config["certificate_required"], bool):
+                raise ValueError(
+                    "Field 'certificate_required' must be a boolean"
+                )
+
+        # Validate metadata if provided
+        if "metadata" in trust_config:
+            if not isinstance(trust_config["metadata"], dict):
+                raise ValueError("Field 'metadata' must be a dictionary")
 
     @classmethod
     def _process_oltp_config(cls, config: Dict[str, Any]) -> None:

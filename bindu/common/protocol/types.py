@@ -1657,6 +1657,61 @@ class AgentTrust(TypedDict):
     allowed_operations: Dict[str, TrustLevel]
 
 
+@pydantic.with_config(ConfigDict(alias_generator=to_camel))
+class AgentTrustConfig(TypedDict):
+    """Agent trust configuration for deployment and validation.
+
+    This TypedDict defines the trust policies and security requirements
+    for agent deployments, ensuring proper verification and hierarchy constraints.
+    """
+
+    identity_provider: NotRequired[IdentityProvider]
+    """The identity provider for the agent (e.g., 'hydra').
+    
+    Defaults to 'hydra' if not specified.
+    """
+
+    required_verification_level: Required[TrustLevel]
+    """The minimum required verification level for agent operations.
+    
+    Examples: 'admin', 'analyst', 'auditor', 'editor', 'guest', 'manager',
+    'operator', 'super_admin', 'support', 'viewer'
+    """
+
+    allowed_origins: NotRequired[list[str]]
+    """List of allowed domains/origins that can invoke this agent.
+    
+    Examples: ['https://example.com', 'https://api.example.com']
+    Wildcard patterns are supported: ['https://*.example.com']
+    If empty, all origins are allowed.
+    """
+
+    max_agent_hierarchy_depth: Required[int]
+    """Maximum nesting depth for agent-to-agent calls.
+    
+    Prevents circular dependencies and infinite loops.
+    Value >= 1 is required. Typical value: 5
+    """
+
+    trust_verification_required: NotRequired[bool]
+    """Whether explicit trust verification is required before execution.
+    
+    Defaults to False if not specified.
+    """
+
+    certificate_required: NotRequired[bool]
+    """Whether agent certificate is required for security.
+    
+    Defaults to False if not specified.
+    """
+
+    metadata: NotRequired[dict[str, Any]]
+    """Additional trust-related metadata.
+    
+    Can include custom fields for specific deployment scenarios.
+    """
+
+
 # -----------------------------------------------------------------------------
 # Agent
 # -----------------------------------------------------------------------------
@@ -1945,10 +2000,6 @@ class AgentCard(TypedDict):
 
 agent_card_ta = pydantic.TypeAdapter(AgentCard)
 
-# Rebuild TypeAdapters to resolve forward references
-a2a_request_ta.rebuild()
-a2a_response_ta.rebuild()
-send_message_request_ta.rebuild()
-send_message_response_ta.rebuild()
-stream_message_request_ta.rebuild()
-stream_message_response_ta.rebuild()
+# TypeAdapter in Pydantic 2.x automatically handles forward references
+# No need to manually call rebuild() as in v1.x
+

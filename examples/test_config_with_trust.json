@@ -1,0 +1,38 @@
+{
+  "author": "test@getbindu.com",
+  "name": "test-agent-with-trust",
+  "description": "Test agent with complete trust configuration",
+  "version": "1.0.0",
+  "recreate_keys": false,
+  "kind": "agent",
+  "debug_mode": false,
+  "debug_level": 1,
+  "monitoring": false,
+  "telemetry": true,
+  "num_history_sessions": 10,
+  "agent_trust": {
+    "identity_provider": "hydra",
+    "required_verification_level": "manager",
+    "allowed_origins": [
+      "https://api.example.com",
+      "https://*.getbindu.com"
+    ],
+    "max_agent_hierarchy_depth": 5,
+    "trust_verification_required": true,
+    "certificate_required": true,
+    "metadata": {
+      "region": "us-east-1",
+      "compliance_level": "high"
+    }
+  },
+  "deployment": {
+    "type": "cloud",
+    "expose": true
+  },
+  "storage": {
+    "type": "memory"
+  },
+  "scheduler": {
+    "type": "memory"
+  }
+}
