@@ -85,6 +85,12 @@ agents = [
     "eth-utils>=5.0.0",
 ]
 
+# Semantic memory extension (use: pip install bindu[semantic-memory])
+semantic-memory = [
+    "openai>=1.0.0",
+    "numpy>=1.24.0",
+]
+
 # gRPC adapter for language-agnostic agent support (use: pip install bindu[grpc])
 grpc = [
     "grpcio>=1.62.0",
