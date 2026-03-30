@@ -9,7 +9,12 @@ import os
 from typing import Any, Dict
 
 from bindu import __version__
-from bindu.common.protocol.types import AgentCapabilities, Skill
+from bindu.common.protocol.types import (
+    AgentCapabilities,
+    AgentTrustConfig,
+    Skill,
+    _VALID_VERIFICATION_LEVELS,
+)
 
 
 class ConfigValidator:
@@ -130,6 +135,9 @@ class ConfigValidator:
         if isinstance(config.get("capabilities"), dict):
             config["capabilities"] = AgentCapabilities(**config["capabilities"])
 
+        if config.get("agent_trust") is not None:
+            cls._validate_agent_trust_config(config["agent_trust"])
+
         if config.get("auth"):
             cls._validate_auth_config(config["auth"])
 
@@ -230,6 +238,63 @@ class ConfigValidator:
                 # Any other type is invalid
                 raise ValueError(
                     "Field 'execution_cost' must be a dict or a list of dicts"
+                )
+
+    # ------------------------------------------------------------------
+    # Agent trust validation
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def _validate_agent_trust_config(cls, trust_config: Any) -> None:
+        """Validate the ``agent_trust`` config block.
+
+        Args:
+            trust_config: The value supplied for the ``agent_trust`` key.
+
+        Raises:
+            ValueError: If the trust config is not a dict or contains invalid
+                field values.
+        """
+        if not isinstance(trust_config, dict):
+            raise ValueError("Field 'agent_trust' must be a dictionary")
+
+        # required_verification_level
+        level = trust_config.get("required_verification_level")
+        if level is not None:
+            if not isinstance(level, str):
+                raise ValueError(
+                    "Field 'agent_trust.required_verification_level' must be a string"
+                )
+            if level not in _VALID_VERIFICATION_LEVELS:
+                valid = ", ".join(sorted(_VALID_VERIFICATION_LEVELS))
+                raise ValueError(
+                    f"Field 'agent_trust.required_verification_level' must be one of: "
+                    f"{valid}; got '{level}'"
+                )
+
+        # allowed_origins
+        origins = trust_config.get("allowed_origins")
+        if origins is not None:
+            if not isinstance(origins, list):
+                raise ValueError(
+                    "Field 'agent_trust.allowed_origins' must be a list of strings"
+                )
+            for origin in origins:
+                if not isinstance(origin, str):
+                    raise ValueError(
+                        "Field 'agent_trust.allowed_origins' must be a list of strings"
+                    )
+
+        # max_agent_hierarchy_depth
+        depth = trust_config.get("max_agent_hierarchy_depth")
+        if depth is not None:
+            if not isinstance(depth, int) or isinstance(depth, bool):
+                raise ValueError(
+                    "Field 'agent_trust.max_agent_hierarchy_depth' must be an integer"
+                )
+            if depth < 0:
+                raise ValueError(
+                    "Field 'agent_trust.max_agent_hierarchy_depth' must be >= 0"
                 )
 
     # ------------------------------------------------------------------

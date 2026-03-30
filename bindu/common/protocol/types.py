@@ -1843,6 +1843,31 @@ class Skill(TypedDict):
     """
 
 
+class AgentTrustConfig(TypedDict, total=False):
+    """Agent trust policy configuration for agent deployment config.
+
+    This is the config-layer representation used in bindu.json / bindufy()
+    calls, distinct from :class:`AgentTrust` (the A2A card type).  All fields
+    are optional so that partial trust policies can be specified and merged
+    with platform defaults.
+    """
+
+    required_verification_level: str
+    """Minimum verification level required before the agent may be invoked.
+
+    Accepted values: ``"none"`` | ``"basic"`` | ``"standard"`` | ``"strict"``.
+    """
+
+    allowed_origins: List[str]
+    """Allowlist of caller origins (URL prefixes or ``"*"`` for any)."""
+
+    max_agent_hierarchy_depth: int
+    """Maximum depth of nested agent-to-agent delegation chains (≥ 0)."""
+
+
+_VALID_VERIFICATION_LEVELS = frozenset({"none", "basic", "standard", "strict"})
+
+
 @pydantic.with_config(ConfigDict(alias_generator=to_camel))
 class AgentCapabilities(TypedDict):
     """Defines optional capabilities supported by an agent."""
