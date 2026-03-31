@@ -18,6 +18,8 @@ if TYPE_CHECKING:
 
 logger = get_logger("bindu.voice.agent_bridge")
 
+MAX_HISTORY_TURNS = 20
+
 
 class AgentBridgeProcessor:
     """Bridges pipecat STT ↔ Bindu manifest ↔ pipecat TTS.
@@ -52,6 +54,8 @@ class AgentBridgeProcessor:
         self._on_user_transcript = on_user_transcript
         self._on_agent_response = on_agent_response
         self._conversation_history: list[dict[str, str]] = []
+        self._max_history_messages = MAX_HISTORY_TURNS * 2
+        self._background_tasks: set[asyncio.Task[Any]] = set()
         self._processing = False
         self._lock = asyncio.Lock()
 
@@ -77,10 +81,11 @@ class AgentBridgeProcessor:
         try:
             # Notify caller about the user transcript
             if self._on_user_transcript:
-                _safe_callback(self._on_user_transcript, text)
+                self._safe_callback(self._on_user_transcript, text)
 
             # Add user message to history
             self._conversation_history.append({"role": "user", "content": text})
+            self._trim_history()
             logger.debug(
                 f"Voice user ({self._context_id}): {text[:80]}{'...' if len(text) > 80 else ''}"
             )
@@ -92,12 +97,13 @@ class AgentBridgeProcessor:
                 self._conversation_history.append(
                     {"role": "assistant", "content": response_text}
                 )
+                self._trim_history()
                 logger.debug(
                     f"Voice agent ({self._context_id}): {response_text[:80]}{'...' if len(response_text) > 80 else ''}"
                 )
 
                 if self._on_agent_response:
-                    _safe_callback(self._on_agent_response, response_text)
+                    self._safe_callback(self._on_agent_response, response_text)
 
             return response_text
 
@@ -150,12 +156,19 @@ class AgentBridgeProcessor:
         """Clear the conversation history."""
         self._conversation_history.clear()
 
+    def _trim_history(self) -> None:
+        """Keep only the most recent conversation turns."""
+        overflow = len(self._conversation_history) - self._max_history_messages
+        if overflow > 0:
+            del self._conversation_history[:overflow]
 
-def _safe_callback(fn: Callable[..., Any], *args: Any) -> None:
-    """Call a callback, swallowing exceptions and handling async callbacks."""
-    try:
-        result = fn(*args)
-        if asyncio.iscoroutine(result):
-            asyncio.create_task(result)
-    except Exception:
-        logger.exception("Error in voice callback")
+    def _safe_callback(self, fn: Callable[..., Any], *args: Any) -> None:
+        """Call a callback, tracking async tasks so they are not GC'd early."""
+        try:
+            result = fn(*args)
+            if asyncio.iscoroutine(result):
+                task = asyncio.create_task(result)
+                self._background_tasks.add(task)
+                task.add_done_callback(self._background_tasks.discard)
+        except Exception:
+            logger.exception("Error in voice callback")
