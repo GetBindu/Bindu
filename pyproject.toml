@@ -63,13 +63,14 @@ dependencies = [
     "grpcio>=1.67.0,<1.78.0",
     "grpcio-tools>=1.67.0,<1.78.0",
     "protobuf>=5.29.6,<5.30.0",
+    "agno>=2.5.2",
+    "openai>=2.17.0",
 ]
 
 [project.optional-dependencies]
 # Agent frameworks and tools for examples (use: pip install bindu[agents])
 agents = [
     "ag2[openai]>=0.11.0",
-    "agno>=2.5.2",
     "langchain>=1.2.9",
     "langchain-openai>=1.1.8",
     "langgraph>=1.0.8",

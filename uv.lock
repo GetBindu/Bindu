@@ -422,6 +422,7 @@ wheels = [
 name = "bindu"
 source = { editable = "." }
 dependencies = [
+    { name = "agno" },
     { name = "aiofiles" },
     { name = "alembic" },
     { name = "asyncpg" },
@@ -436,6 +437,7 @@ dependencies = [
     { name = "httpx" },
     { name = "loguru" },
     { name = "numpy" },
+    { name = "openai" },
     { name = "opentelemetry-api" },
     { name = "opentelemetry-exporter-otlp" },
     { name = "opentelemetry-exporter-otlp-proto-http" },
@@ -467,7 +469,6 @@ dependencies = [
 [package.optional-dependencies]
 agents = [
     { name = "ag2", extra = ["openai"] },
-    { name = "agno" },
     { name = "ddgs" },
     { name = "duckduckgo-search" },
     { name = "eth-utils" },
@@ -528,7 +529,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "ag2", extras = ["openai"], marker = "extra == 'agents'", specifier = ">=0.11.0" },
-    { name = "agno", marker = "extra == 'agents'", specifier = ">=2.5.2" },
+    { name = "agno", specifier = ">=2.5.2" },
     { name = "aiofiles", specifier = "==24.1.0" },
     { name = "aiofiles", marker = "extra == 'core'", specifier = "==24.1.0" },
     { name = "alembic", specifier = "==1.17.2" },
@@ -558,6 +559,7 @@ requires-dist = [
     { name = "mem0ai", marker = "extra == 'agents'", specifier = ">=0.1.0" },
     { name = "numpy", specifier = "==2.3.5" },
     { name = "ollama", marker = "extra == 'agents'", specifier = ">=0.6.1" },
+    { name = "openai", specifier = ">=2.17.0" },
     { name = "openrouter", marker = "extra == 'agents'", specifier = ">=0.6.0" },
     { name = "opentelemetry-api", specifier = "==1.35.0" },
     { name = "opentelemetry-exporter-otlp", specifier = "==1.35.0" },
