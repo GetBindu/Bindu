@@ -32,7 +32,7 @@
 	import ReplyIndicator from "./ReplyIndicator.svelte";
 	import { agentInspector, resetAgentInspector } from "$lib/stores/agentInspector";
 
-	import { fly } from "svelte/transition";
+	import { fade, fly } from "svelte/transition";
 	import { cubicInOut } from "svelte/easing";
 
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
@@ -146,6 +146,16 @@
 		!!(page.data as { transcriptionEnabled?: boolean }).transcriptionEnabled
 	);
 	let isTouchDevice = $derived(browser && navigator.maxTouchPoints > 0);
+
+	async function handleSubmit() {
+		if (!draft) {
+			return;
+		}
+		const fileParts = (sources ? await Promise.all(sources) : []).filter(
+			(Boolean)
+		) as MessageFile[];
+		await submit(draft, fileParts);
+	}
 
 
 	async function submit(message: string, fileParts: MessageFile[]) {
@@ -395,7 +405,7 @@
 			if (trimmedText) {
 				// Set draft and send immediately
 				draft = draft.trim() ? `${draft.trim()} ${trimmedText}` : trimmedText;
-				handleSubmit();
+				await handleSubmit();
 			}
 		} catch (err) {
 			console.error("Transcription error:", err);
@@ -431,7 +441,7 @@
 			previousVoiceError = $voiceError;
 		} else if ($error && $error === previousVoiceError) {
 			// Voice error was cleared, and the global error is that voice error, so clear it.
-			$error = null;
+			$error = undefined;
 			previousVoiceError = null;
 		}
 	});
@@ -510,7 +520,7 @@
 					{#if !loading && !pending}
 						<div
 							class="intro-pills mt-10 flex flex-wrap items-center justify-center gap-2.5 px-4 transition-opacity duration-300"
-							transition:fade
+					transition:fade
 						>
 							{#each [
 								{ text: "Generate an image", icon: "🎨" },
@@ -524,9 +534,9 @@
 								<button
 									type="button"
 									class="prompt-pill flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-bold transition-all"
-									onclick={() => {
+									onclick={async () => {
 										draft = prompt.text;
-										handleSubmit();
+										await handleSubmit();
 									}}
 								>
 									{prompt.text}
@@ -607,10 +617,7 @@
 				       aria-label={isFileUploadEnabled ? "file dropzone" : undefined}
 				       onsubmit={async (e) => {
 				       e.preventDefault();
-				       if (draft) {
-					       const fileParts = sources ? await Promise.all(sources) : [];
-					       await submit(draft, fileParts.filter(Boolean));
-				       }
+				       await handleSubmit();
 				       }}
 				       class="composer {isReadOnly ? 'opacity-30' : ''} {focused && isVirtualKeyboard() ? 'max-sm:mb-4' : ''} {pastedLongContent ? 'paste-glow' : ''}"
 			       >
@@ -641,10 +648,9 @@
 										       bind:value={draft}
 										       bind:files
 										       mimeTypes={activeMimeTypes}
-											       on:submit={async (event) => {
-												       const { message, fileParts } = event.detail;
-												       await submit(message, fileParts);
-											       }}
+										       onsubmit={async (message, fileParts) => {
+											       await submit(message, fileParts as MessageFile[]);
+										       }}
 										       {onPaste}
 										       disabled={isReadOnly || lastIsError}
 										       {modelIsMultimodal}
@@ -679,7 +685,7 @@
 								onclick={toggleVoiceSession}
 							/>
 							<button
-								class="btn absolute bottom-2 right-2 size-8 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:enabled:bg-black sm:size-7 {!draft ||
+								class="btn send-btn absolute bottom-2 right-2 size-8 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:enabled:bg-black sm:size-7 {!draft ||
 								isReadOnly
 									? ''
 									: '!bg-black !text-white dark:!bg-white dark:!text-black'}"

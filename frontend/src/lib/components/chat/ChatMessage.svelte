@@ -272,7 +272,12 @@
 			{/if}
 
 			<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-			<div bind:this={contentEl} oncopy={handleCopy} onclick={handleContentClick}>
+			<div
+				bind:this={contentEl}
+				role="presentation"
+				oncopy={handleCopy}
+				onclick={handleContentClick}
+			>
 				{#if isLast && loading && blocks.length === 0}
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
 				{/if}
