@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import time
+import asyncio
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
@@ -180,13 +181,16 @@ async def voice_websocket(websocket: WebSocket) -> None:
 
     await websocket.accept()
     await session_manager.update_state(session_id, "active")
+    send_lock = asyncio.Lock()
 
     # Build the agent bridge for this session
     voice_ext = getattr(app, "_voice_ext", None)
     manifest = getattr(app, "manifest", None)
     if voice_ext is None or manifest is None or not hasattr(manifest, "run"):
         await _send_json(
-            websocket, {"type": "error", "message": "Agent not configured for voice"}
+            websocket,
+            {"type": "error", "message": "Agent not configured for voice"},
+            send_lock,
         )
         await websocket.close(code=1011)
         return
@@ -199,10 +203,12 @@ async def voice_websocket(websocket: WebSocket) -> None:
         on_user_transcript=lambda text: _try_send_json(
             websocket,
             {"type": "transcript", "role": "user", "text": text, "is_final": True},
+            send_lock,
         ),
         on_agent_response=lambda text: _try_send_json(
             websocket,
             {"type": "agent_response", "text": text, "task_id": session.task_id},
+            send_lock,
         ),
     )
 
@@ -214,7 +220,7 @@ async def voice_websocket(websocket: WebSocket) -> None:
     last_chunk_transcript = ""
 
     try:
-        await _send_json(websocket, {"type": "state", "state": "listening"})
+        await _send_json(websocket, {"type": "state", "state": "listening"}, send_lock)
 
         while True:
             message = await websocket.receive()
@@ -236,15 +242,21 @@ async def voice_websocket(websocket: WebSocket) -> None:
 
                 elif msg_type == "mute":
                     muted = True
-                    await _send_json(websocket, {"type": "state", "state": "muted"})
+                    await _send_json(
+                        websocket, {"type": "state", "state": "muted"}, send_lock
+                    )
 
                 elif msg_type == "unmute":
                     muted = False
-                    await _send_json(websocket, {"type": "state", "state": "listening"})
+                    await _send_json(
+                        websocket, {"type": "state", "state": "listening"}, send_lock
+                    )
 
                 elif msg_type == "start":
                     # Client confirms start (config already set on session creation)
-                    await _send_json(websocket, {"type": "state", "state": "listening"})
+                    await _send_json(
+                        websocket, {"type": "state", "state": "listening"}, send_lock
+                    )
 
                 elif msg_type == "commit_turn":
                     # Deterministic turn boundary: process whatever audio has been buffered.
@@ -257,7 +269,9 @@ async def voice_websocket(websocket: WebSocket) -> None:
                                 last_chunk_transcript, transcript
                             )
                             if delta:
-                                await _process_user_turn(websocket, bridge, delta)
+                                await _process_user_turn(
+                                    websocket, bridge, delta, send_lock
+                                )
                         last_chunk_transcript = ""
 
                 elif msg_type == "user_text":
@@ -268,7 +282,7 @@ async def voice_websocket(websocket: WebSocket) -> None:
                     last_chunk_transcript = ""
                     audio_buffer.clear()
 
-                    await _process_user_turn(websocket, bridge, text)
+                    await _process_user_turn(websocket, bridge, text, send_lock)
 
             # Binary audio frames
             elif "bytes" in message and not muted:
@@ -296,7 +310,9 @@ async def voice_websocket(websocket: WebSocket) -> None:
                         delta = _trim_overlap_text(last_chunk_transcript, transcript)
                         last_chunk_transcript = transcript
                         if delta:
-                            await _process_user_turn(websocket, bridge, delta)
+                            await _process_user_turn(
+                                websocket, bridge, delta, send_lock
+                            )
 
     except WebSocketDisconnect:
         logger.info(f"Voice WebSocket disconnected: {session_id}")
@@ -304,7 +320,9 @@ async def voice_websocket(websocket: WebSocket) -> None:
         logger.exception(f"Error in voice WebSocket: {session_id}")
         if websocket.client_state == WebSocketState.CONNECTED:
             await _send_json(
-                websocket, {"type": "error", "message": "Internal server error"}
+                websocket,
+                {"type": "error", "message": "Internal server error"},
+                send_lock,
             )
     finally:
         # Flush any pending audio when the socket is closing.
@@ -318,7 +336,9 @@ async def voice_websocket(websocket: WebSocket) -> None:
                     ):
                         delta = _trim_overlap_text(last_chunk_transcript, transcript)
                         if delta:
-                            await _process_user_turn(websocket, bridge, delta)
+                            await _process_user_turn(
+                                websocket, bridge, delta, send_lock
+                            )
                 except Exception as e:
                     logger.exception(
                         f"Error during final audio transcription for session {session_id}: {e}"
@@ -351,13 +371,14 @@ async def _process_user_turn(
     websocket: WebSocket,
     bridge: "AgentBridgeProcessor",
     text: str,
+    send_lock: asyncio.Lock,
 ) -> None:
     """Process one user turn and stream response artifacts/events."""
     text = text.strip()
     if not text:
         return
 
-    await _send_json(websocket, {"type": "state", "state": "agent-speaking"})
+    await _send_json(websocket, {"type": "state", "state": "agent-speaking"}, send_lock)
     response_text = await bridge.process_transcription(text)
     if response_text:
         await _send_json(
@@ -368,19 +389,39 @@ async def _process_user_turn(
                 "text": response_text,
                 "is_final": True,
             },
+            send_lock,
         )
 
         # Best-effort TTS synthesis and binary streaming.
         tts_audio = await _synthesize_tts_audio(response_text)
         if tts_audio:
-            await websocket.send_bytes(tts_audio)
+            await _send_bytes(websocket, tts_audio, send_lock)
 
-    await _send_json(websocket, {"type": "state", "state": "listening"})
+    await _send_json(websocket, {"type": "state", "state": "listening"}, send_lock)
 
 
-async def _send_json(websocket: WebSocket, data: dict) -> None:
+async def _send_json(
+    websocket: WebSocket,
+    data: dict,
+    send_lock: asyncio.Lock | None = None,
+) -> None:
     """Send a JSON message over WebSocket."""
-    await websocket.send_text(json.dumps(data))
+    if send_lock is None:
+        await websocket.send_text(json.dumps(data))
+        return
+
+    async with send_lock:
+        await websocket.send_text(json.dumps(data))
+
+
+async def _send_bytes(
+    websocket: WebSocket,
+    data: bytes,
+    send_lock: asyncio.Lock,
+) -> None:
+    """Send binary audio over WebSocket without concurrent write races."""
+    async with send_lock:
+        await websocket.send_bytes(data)
 
 
 async def _synthesize_tts_audio(text: str) -> bytes | None:
@@ -424,7 +465,12 @@ async def _synthesize_tts_audio(text: str) -> bytes | None:
 async def _transcribe_pcm_buffer(pcm_bytes: bytes) -> str | None:
     """Transcribe PCM16 mono audio buffer with Deepgram prerecorded API."""
     api_key = app_settings.voice.stt_api_key
-    if not api_key or not pcm_bytes:
+    if not api_key:
+        logger.warning("Deepgram STT API key not configured")
+        return None
+    
+    if not pcm_bytes:
+        logger.debug("Empty audio buffer, skipping transcription")
         return None
 
     url = "https://api.deepgram.com/v1/listen"
@@ -460,8 +506,13 @@ async def _transcribe_pcm_buffer(pcm_bytes: bytes) -> str | None:
 
         text = str(transcript).strip()
         return text if text else None
-    except Exception:
-        logger.exception("STT transcription failed")
+    except httpx.HTTPStatusError as e:
+        logger.error(
+            f"Deepgram API error: {e.response.status_code} - {e.response.text}"
+        )
+        return None
+    except Exception as e:
+        logger.exception(f"STT transcription failed: {e}")
         return None
 
 
@@ -494,12 +545,14 @@ def _trim_overlap_text(previous: str, current: str) -> str:
     return " ".join(curr_words[overlap:]).strip()
 
 
-def _try_send_json(websocket: WebSocket, data: dict) -> None:
+def _try_send_json(
+    websocket: WebSocket,
+    data: dict,
+    send_lock: asyncio.Lock,
+) -> None:
     """Enqueue a JSON send (safe to call from sync callbacks)."""
-    import asyncio
-
     try:
         loop = asyncio.get_running_loop()
-        loop.create_task(_send_json(websocket, data))
+        loop.create_task(_send_json(websocket, data, send_lock))
     except RuntimeError:
         pass
