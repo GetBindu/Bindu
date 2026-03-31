@@ -6,13 +6,14 @@ agno
 # Model + Tools
 
 openai
-ddgs
+duckduckgo-search>=8.1.1
 requests
 rich
 pyperclip
 
 # Memory + Environment
 
+mem0ai
 python-dotenv
 
 # Database compatibility (Bindu requires this version)
