@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 import os
 import io
 import base64
+from typing import Any
 
 from pypdf import PdfReader
 from docx import Document
@@ -103,34 +104,31 @@ def get_file_bytes(part):
     return data
 
 # Handler
-def handler(messages: list[dict]):
-    """
-    Receives task.history — a list of A2A Message objects.
-    Each message has: role, parts[], kind, messageId, contextId, taskId
-    Each part has: kind="text"|"file", and either text or file.bytes+mimeType
-    """
-    if not messages:
-        return "No messages received."
-    import json
-    print("DEBUG messages:", json.dumps(messages, indent=2, default=str))
-
-    prompt = ""
-    extracted_docs = []
+def _collect_prompt_and_documents(messages: list[dict[str, Any]]) -> tuple[str, list[str]]:
+    """Support both raw A2A messages and runtime chat-format messages."""
+    prompt_parts: list[str] = []
+    extracted_docs: list[str] = []
 
     for msg in messages:
-        # if a role is provided, only process user messages; treat missing
-        # roles as coming from the user so that tests/clients without a role
-        # field still work.
         role = msg.get("role")
         if role is not None and role != "user":
             continue
 
-        # be defensive: parts could be None or omitted
+        # Runtime path: manifest worker passes chat-format messages.
+        content = msg.get("content")
+        if isinstance(content, str) and content.strip():
+            prompt_parts.append(content)
+            if "--- Document Uploaded" in content:
+                extracted_docs.append(content)
+            continue
+
+        # Compatibility path: raw A2A messages with parts.
         parts = msg.get("parts") or []
         for part in parts:
             if part.get("kind") == "text":
-                prompt = part.get("text", "")
-
+                text = part.get("text", "")
+                if text:
+                    prompt_parts.append(text)
             elif part.get("kind") == "file":
                 try:
                     file_info = part.get("file", {})
@@ -147,9 +145,21 @@ def handler(messages: list[dict]):
                     )
                     doc_text = extract_document_text(file_bytes, mime_type)
                     extracted_docs.append(doc_text)
-
                 except Exception as e:
                     extracted_docs.append(f"Error processing file: {str(e)}")
+
+    return "\n".join(prompt_parts).strip(), extracted_docs
+
+
+def handler(messages: list[dict]):
+    """
+    Receives task.history — a list of A2A Message objects.
+    Each message has: role, parts[], kind, messageId, contextId, taskId
+    Each part has: kind="text"|"file", and either text or file.bytes+mimeType
+    """
+    if not messages:
+        return "No messages received."
+    prompt, extracted_docs = _collect_prompt_and_documents(messages)
 
     if not extracted_docs:
         return "No valid document found in the messages."
