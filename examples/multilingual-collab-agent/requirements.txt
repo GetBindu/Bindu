@@ -1,0 +1,24 @@
+# Core Bindu stack
+
+bindu
+agno
+
+# Model + Tools
+
+openai
+ddgs
+requests
+rich
+pyperclip
+
+# Memory + Environment
+
+python-dotenv
+
+# Database compatibility (Bindu requires this version)
+
+sqlalchemy==2.0.44
+
+# MCP runtime
+
+mcp==1.26.0

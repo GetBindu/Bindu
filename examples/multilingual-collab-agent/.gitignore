@@ -1,0 +1,5 @@
+.env
+.bindu/
+__pycache__/
+*.pyc
+*.pem
