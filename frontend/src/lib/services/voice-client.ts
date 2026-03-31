@@ -27,6 +27,11 @@ export class VoiceClient {
   private ws: WebSocket | null = null;
   private sessionId: string | null = null;
   private state: VoiceState = 'idle';
+  private mediaStream: MediaStream | null = null;
+  private audioContext: AudioContext | null = null;
+  private sourceNode: MediaStreamAudioSourceNode | null = null;
+  private processorNode: ScriptProcessorNode | null = null;
+  private isStreamingAudio = false;
 
   onTranscript?: (event: TranscriptEvent) => void;
   onAgentResponse?: (text: string) => void;
@@ -68,7 +73,7 @@ export class VoiceClient {
 
     await new Promise<void>((resolve, reject) => {
       try {
-        this.ws = new WebSocket(wsUrl);
+        this.ws = new WebSocket(this.resolveWebSocketUrl(wsUrl));
       } catch (err) {
         reject(err);
         return;
@@ -94,6 +99,7 @@ export class VoiceClient {
       };
 
       this.ws.onclose = () => {
+        this.cleanupAudioStreaming();
         if (this.state !== 'ended' && this.state !== 'idle') {
           this.setState('ended');
         }
@@ -176,6 +182,7 @@ export class VoiceClient {
   async stopSession(): Promise<void> {
     const id = this.sessionId;
     this.sendControl({ type: 'stop' });
+    this.cleanupAudioStreaming();
 
     if (this.ws) {
       this.ws.close();
@@ -203,4 +210,115 @@ export class VoiceClient {
     this.state = state;
     this.onStateChange?.(state);
   }
+
+  async startAudioStreaming(): Promise<void> {
+    if (this.isStreamingAudio) {
+      return;
+    }
+
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      throw new Error('Voice WebSocket is not connected');
+    }
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        channelCount: 1,
+        sampleRate: 16000,
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+    });
+
+    const AudioContextCtor =
+      window.AudioContext ||
+      (window as typeof window & { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
+
+    if (!AudioContextCtor) {
+      stream.getTracks().forEach((track) => track.stop());
+      throw new Error('AudioContext is not supported in this browser');
+    }
+
+    const audioContext = new AudioContextCtor({ sampleRate: 16000 });
+    await audioContext.resume();
+    const sourceNode = audioContext.createMediaStreamSource(stream);
+    const processorNode = audioContext.createScriptProcessor(4096, 1, 1);
+
+    processorNode.onaudioprocess = (event) => {
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN || this.state === 'muted') {
+        return;
+      }
+
+      const inputData = event.inputBuffer.getChannelData(0);
+      const pcmChunk = convertFloat32ToPcm16(inputData);
+      if (pcmChunk.byteLength > 0) {
+        this.ws.send(pcmChunk);
+      }
+    };
+
+    sourceNode.connect(processorNode);
+    processorNode.connect(audioContext.destination);
+
+    this.mediaStream = stream;
+    this.audioContext = audioContext;
+    this.sourceNode = sourceNode;
+    this.processorNode = processorNode;
+    this.isStreamingAudio = true;
+  }
+
+  stopAudioStreaming(): void {
+    this.cleanupAudioStreaming();
+    this.commitTurn();
+  }
+
+  private cleanupAudioStreaming(): void {
+    this.isStreamingAudio = false;
+
+    if (this.processorNode) {
+      this.processorNode.disconnect();
+      this.processorNode.onaudioprocess = null;
+      this.processorNode = null;
+    }
+
+    if (this.sourceNode) {
+      this.sourceNode.disconnect();
+      this.sourceNode = null;
+    }
+
+    if (this.audioContext) {
+      void this.audioContext.close();
+      this.audioContext = null;
+    }
+
+    if (this.mediaStream) {
+      this.mediaStream.getTracks().forEach((track) => track.stop());
+      this.mediaStream = null;
+    }
+  }
+
+  private resolveWebSocketUrl(wsUrl: string): string {
+    const configuredBaseUrl = (
+      (agentAPI as unknown as { baseUrl?: string }).baseUrl || 'http://localhost:3773'
+    ).replace(/^http/, 'ws');
+
+    try {
+      const endpointUrl = new URL(wsUrl);
+      const proxyBaseUrl = new URL(configuredBaseUrl);
+      endpointUrl.protocol = proxyBaseUrl.protocol;
+      endpointUrl.host = proxyBaseUrl.host;
+      return endpointUrl.toString();
+    } catch {
+      return wsUrl;
+    }
+  }
+}
+
+function convertFloat32ToPcm16(input: Float32Array): ArrayBuffer {
+  const pcm = new Int16Array(input.length);
+  for (let index = 0; index < input.length; index += 1) {
+    const sample = Math.max(-1, Math.min(1, input[index] ?? 0));
+    pcm[index] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+  }
+  return pcm.buffer;
 }

@@ -44,6 +44,17 @@ export async function startVoiceSession(contextId?: string): Promise<void> {
   }
 
   client = new VoiceClient();
+  client.onTranscript = appendTranscript;
+  client.onStateChange = (state) => {
+    voiceState.set(state);
+  };
+  client.onAgentAudio = (audioData) => {
+    latestAgentAudio.set(audioData);
+  };
+  client.onError = (message) => {
+    voiceError.set(message);
+    voiceState.set('error');
+  };
 
   voiceState.set('connecting');
   try {
@@ -52,19 +63,6 @@ export async function startVoiceSession(contextId?: string): Promise<void> {
     voiceContextId.set(session.context_id);
 
     await client.connect(session.ws_url, session.session_id);
-
-    // Only attach handlers after successful start
-    client.onTranscript = appendTranscript;
-    client.onStateChange = (state) => {
-      voiceState.set(state);
-    };
-    client.onAgentAudio = (audioData) => {
-      latestAgentAudio.set(audioData);
-    };
-    client.onError = (message) => {
-      voiceError.set(message);
-      voiceState.set('error');
-    };
   } catch (err) {
     // On failure, clear the partially-initialized client
     const errorMessage = err instanceof Error ? err.message : String(err);
@@ -125,4 +123,15 @@ export function commitVoiceTurn(): void {
     return;
   }
   client.commitTurn();
+}
+
+export async function startVoiceStreaming(): Promise<void> {
+  if (!client) {
+    throw new Error('No active voice session');
+  }
+  await client.startAudioStreaming();
+}
+
+export function stopVoiceStreaming(): void {
+  client?.stopAudioStreaming();
 }
