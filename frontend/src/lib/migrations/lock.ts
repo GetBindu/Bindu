@@ -9,13 +9,15 @@ export async function acquireLock(key: Semaphores | string): Promise<ObjectId | 
 	try {
 		const id = new ObjectId();
 
-		const insert = await collections.semaphores.insertOne({
-			_id: id,
-			key,
-			createdAt: new Date(),
-			updatedAt: new Date(),
-			deleteAt: new Date(Date.now() + 1000 * 60 * 3), // 3 minutes
-		});
+		const insert = await collections.semaphores.insertOne(
+			{
+				_id: id,
+				key,
+				createdAt: new Date(),
+				updatedAt: new Date(),
+				deleteAt: new Date(Date.now() + 1000 * 60 * 3), // 3 minutes
+			} as Semaphores | string extends never ? never : Record<string, unknown>
+		);
 
 		return insert.acknowledged ? id : false; // true if the document was inserted
 	} catch (e) {
