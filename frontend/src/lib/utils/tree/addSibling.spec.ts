@@ -29,7 +29,7 @@ describe("addSibling", async () => {
 
 	it("should fail on legacy conversations", async () => {
 		const convId = await insertLegacyConversation();
-		const conv = await collections.conversations.findOne({ _id: new ObjectId(convId) });
+		const conv = await collections.conversations.findOne({ _id: convId });
 		if (!conv) throw new Error("Conversation not found");
 
 		expect(() => addSibling(conv, newMessage, conv.messages[0].id)).toThrow(
@@ -39,7 +39,7 @@ describe("addSibling", async () => {
 
 	it("should fail if the sibling message doesn't exist", async () => {
 		const convId = await insertSideBranchesConversation();
-		const conv = await collections.conversations.findOne({ _id: new ObjectId(convId) });
+		const conv = await collections.conversations.findOne({ _id: convId });
 		if (!conv) throw new Error("Conversation not found");
 
 		expect(() => addSibling(conv, newMessage, "not-a-real-id-test")).toThrow(
@@ -50,7 +50,7 @@ describe("addSibling", async () => {
 	// TODO: This behaviour should be fixed, we do not need to fail on the root message.
 	it("should fail if the sibling message is the root message", async () => {
 		const convId = await insertSideBranchesConversation();
-		const conv = await collections.conversations.findOne({ _id: new ObjectId(convId) });
+		const conv = await collections.conversations.findOne({ _id: convId });
 		if (!conv) throw new Error("Conversation not found");
 		if (!conv.rootMessageId) throw new Error("Root message not found");
 
@@ -61,7 +61,7 @@ describe("addSibling", async () => {
 
 	it("should add a sibling to a message", async () => {
 		const convId = await insertSideBranchesConversation();
-		const conv = await collections.conversations.findOne({ _id: new ObjectId(convId) });
+		const conv = await collections.conversations.findOne({ _id: convId });
 		if (!conv) throw new Error("Conversation not found");
 
 		// add sibling and check children count for parnets

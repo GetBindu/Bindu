@@ -64,10 +64,11 @@ export async function submitTaskFeedback(
 
 interface FilePart {
 	kind: 'file';
-	type: 'base64';
-	value: string;
-	mime: string;
-	name: string;
+	file: {
+		bytes: string;
+		mimeType?: string;
+		name?: string;
+	};
 }
 
 
@@ -233,10 +234,11 @@ export async function* sendAgentMessage(
 		       for (const f of files) {
 			       parts.push({
 				       kind: 'file',
-				       type: 'base64',
-				       value: f.value,
-				       mime: f.mime,
-				       name: f.name
+				       file: {
+					       bytes: f.value,
+					       mimeType: f.mime,
+					       name: f.name
+				       }
 			       });
 		       }
 	       }
