@@ -59,8 +59,26 @@ class InMemoryCollection<T = Record<string, unknown>> {
 		this.name = name;
 	}
 
-	async findOne(filter: Record<string, unknown> = {}): Promise<T | null> {
-		for (const doc of this.data.values()) {
+	async findOne(
+		filter: Record<string, unknown> = {},
+		options?: { sort?: Record<string, 1 | -1> }
+	): Promise<T | null> {
+		const docs = Array.from(this.data.values());
+		const matched = docs.filter((doc) => this.matchesFilter(doc, filter));
+		if (options?.sort) {
+			const [sortKey, sortDir] = Object.entries(options.sort)[0] ?? [];
+			if (sortKey && sortDir) {
+				matched.sort((a, b) => {
+					const aVal = this.getNestedValue(a, sortKey);
+					const bVal = this.getNestedValue(b, sortKey);
+					if (aVal === bVal) return 0;
+					if (aVal === undefined || aVal === null) return 1;
+					if (bVal === undefined || bVal === null) return -1;
+					return aVal < bVal ? -1 * sortDir : 1 * sortDir;
+				});
+			}
+		}
+		for (const doc of matched) {
 			if (this.matchesFilter(doc, filter)) {
 				return doc;
 			}
@@ -78,9 +96,12 @@ class InMemoryCollection<T = Record<string, unknown>> {
 		return new InMemoryCursor(results);
 	}
 
-	async insertOne(doc: T): Promise<{ insertedId: ObjectId; acknowledged: boolean }> {
-		const id = new ObjectId();
-		const docWithId = { ...doc, _id: id } as T;
+	async insertOne(
+		doc: Partial<T> | T
+	): Promise<{ insertedId: ObjectId; acknowledged: boolean }> {
+		const source = doc as Record<string, unknown>;
+		const id = ("_id" in source && source._id ? source._id : new ObjectId()) as ObjectId;
+		const docWithId = { ...source, _id: id } as T;
 		this.data.set(id.toString(), docWithId);
 		return { insertedId: id, acknowledged: true };
 	}
@@ -98,32 +119,43 @@ class InMemoryCollection<T = Record<string, unknown>> {
 		filter: Record<string, unknown>,
 		update: Record<string, unknown>,
 		options: { upsert?: boolean } = {}
-	): Promise<{ matchedCount: number; modifiedCount: number; upsertedId?: ObjectId }> {
+	): Promise<{ matchedCount: number; modifiedCount: number; upsertedId?: ObjectId; acknowledged: boolean }> {
 		for (const [id, doc] of this.data.entries()) {
 			if (this.matchesFilter(doc, filter)) {
 				const updated = this.applyUpdate(doc, update);
 				this.data.set(id, updated);
-				return { matchedCount: 1, modifiedCount: 1 };
+				return { matchedCount: 1, modifiedCount: 1, acknowledged: true };
 			}
 		}
 		if (options.upsert) {
 			const $set = (update.$set || {}) as Partial<T>;
 			const $setOnInsert = (update.$setOnInsert || {}) as Partial<T>;
 			const newDoc = { ...filter, ...$set, ...$setOnInsert } as T;
-			const result = await this.insertOne(newDoc);
-			return { matchedCount: 0, modifiedCount: 0, upsertedId: result.insertedId };
+			const result = await this.insertOne(newDoc as Partial<T>);
+			return {
+				matchedCount: 0,
+				modifiedCount: 0,
+				upsertedId: result.insertedId,
+				acknowledged: true,
+			};
 		}
-		return { matchedCount: 0, modifiedCount: 0 };
+		return { matchedCount: 0, modifiedCount: 0, acknowledged: true };
 	}
 
 	async updateMany(
 		filter: Record<string, unknown>,
-		update: Record<string, unknown>
+		update: Record<string, unknown> | Array<Record<string, unknown>>
 	): Promise<{ matchedCount: number; modifiedCount: number }> {
 		let count = 0;
 		for (const [id, doc] of this.data.entries()) {
 			if (this.matchesFilter(doc, filter)) {
-				const updated = this.applyUpdate(doc, update);
+				const pipelineUpdate = Array.isArray(update)
+					? update.reduce(
+							(acc, stage) => this.applyUpdate(acc, stage),
+							doc
+					  )
+					: this.applyUpdate(doc, update);
+				const updated = pipelineUpdate;
 				this.data.set(id, updated);
 				count++;
 			}
@@ -171,7 +203,10 @@ class InMemoryCollection<T = Record<string, unknown>> {
 		return "index_" + Date.now();
 	}
 
-	aggregate<R = T>(_pipeline: Record<string, unknown>[]): InMemoryCursor<R> {
+	aggregate<R = T>(
+		_pipeline: Record<string, unknown>[],
+		_options?: Record<string, unknown>
+	): InMemoryCursor<R> {
 		// Simplified aggregation - just return all docs
 		return new InMemoryCursor(Array.from(this.data.values()) as unknown as R[]);
 	}
@@ -369,6 +404,10 @@ class InMemoryCursor<T> {
 		return this.getProcessed();
 	}
 
+	map<U>(fn: (value: T, index: number) => U): InMemoryCursor<U> {
+		return new InMemoryCursor(this.getProcessed().map(fn));
+	}
+
 	async hasNext(): Promise<boolean> {
 		return this._index < this.getProcessed().length;
 	}
@@ -416,6 +455,10 @@ class InMemoryBucket {
 				if (_event === "finish") setTimeout(() => cb(), 0);
 				return stream;
 			},
+			once: (_event: string, cb: (err?: Error) => void) => {
+				if (_event === "finish") setTimeout(() => cb(), 0);
+				return stream;
+			},
 		};
 		return stream;
 	}
@@ -428,8 +471,10 @@ class InMemoryBucket {
 				dest.end();
 				return dest;
 			},
-			on(_event: string, cb: (err?: Error) => void) {
+			on(_event: string, cb: (arg?: Error | Uint8Array) => void) {
 				if (_event === "error" && !file) cb(new Error("File not found"));
+				if (_event === "data" && file) setTimeout(() => cb(file.data), 0);
+				if (_event === "end") setTimeout(() => cb(), 0);
 				return downloadStream;
 			},
 		};
@@ -470,6 +515,12 @@ export class Database {
 		// Return a mock client for compatibility with MongoDB client interface
 		return {
 			connect: async () => ({
+				startSession: () => ({
+					withTransaction: async (fn: () => Promise<void>) => {
+						await fn();
+					},
+					endSession: async () => {},
+				}),
 				db: () => ({
 					collection: (name: string) => new InMemoryCollection(name),
 				}),
