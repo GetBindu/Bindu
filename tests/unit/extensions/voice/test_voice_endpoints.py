@@ -1,5 +1,6 @@
 """Unit tests for voice session endpoints."""
 
+import asyncio
 import json
 
 import pytest
@@ -11,6 +12,7 @@ from starlette.responses import JSONResponse
 
 from bindu.extensions.voice.session_manager import VoiceSessionManager
 from bindu.server.endpoints.voice_endpoints import (
+    _send_json,
     _trim_overlap_text,
     voice_session_end,
     voice_session_start,
@@ -206,3 +208,19 @@ class TestOverlapTranscriptTrimming:
             prev = chunk
 
         assert " ".join(deltas) == "hello this is a voice session test"
+
+
+class TestWebSocketSendHelpers:
+    """Regression tests for outbound WebSocket send serialization."""
+
+    @pytest.mark.asyncio
+    async def test_send_json_uses_lock_when_provided(self):
+        websocket = AsyncMock()
+        send_lock = asyncio.Lock()
+
+        await asyncio.gather(
+            _send_json(websocket, {"type": "one"}, send_lock),
+            _send_json(websocket, {"type": "two"}, send_lock),
+        )
+
+        assert websocket.send_text.await_count == 2

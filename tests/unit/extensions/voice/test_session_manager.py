@@ -1,6 +1,7 @@
 """Unit tests for VoiceSessionManager."""
 
 import asyncio
+import time
 
 import pytest
 
@@ -21,6 +22,22 @@ class TestVoiceSession:
         session = VoiceSession(id="s1", context_id="c1")
         # duration should be >=0 immediately
         assert session.duration_seconds >= 0
+
+    def test_duration_uses_epoch_time(self):
+        session = VoiceSession(id="s1", context_id="c1", start_time=time.time() - 5)
+        assert 4 <= session.duration_seconds <= 6
+
+    def test_from_dict_uses_epoch_start_time(self):
+        session = VoiceSession.from_dict(
+            {
+                "id": "abc123",
+                "context_id": "ctx-1",
+                "start_time": time.time() - 3,
+                "state": "active",
+            }
+        )
+        assert 2 <= session.duration_seconds <= 4
+        assert session.state == "active"
 
 
 class TestVoiceSessionManager:

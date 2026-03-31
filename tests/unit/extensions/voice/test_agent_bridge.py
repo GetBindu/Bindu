@@ -1,5 +1,7 @@
 """Unit tests for AgentBridgeProcessor."""
 
+import asyncio
+
 import pytest
 
 from bindu.extensions.voice.agent_bridge import AgentBridgeProcessor
@@ -128,3 +130,41 @@ class TestAgentBridgeProcessor:
         bridge = AgentBridgeProcessor(manifest_run=run, context_id="ctx")
         result = await bridge.process_transcription("Hello")
         assert result is None
+
+    @pytest.mark.asyncio
+    async def test_history_is_trimmed_to_recent_turns(self):
+        def run(history):
+            return f"Echo: {history[-1]['content']}"
+
+        bridge = AgentBridgeProcessor(manifest_run=run, context_id="ctx")
+
+        for index in range(25):
+            await bridge.process_transcription(f"message {index}")
+
+        history = bridge.history
+        assert len(history) == 40
+        assert history[0]["content"] == "message 5"
+        assert history[-1]["content"] == "Echo: message 24"
+
+    @pytest.mark.asyncio
+    async def test_async_callbacks_are_tracked_until_completion(self):
+        event = asyncio.Event()
+        user_texts: list[str] = []
+
+        async def on_user(text: str) -> None:
+            await asyncio.sleep(0)
+            user_texts.append(text)
+            event.set()
+
+        bridge = AgentBridgeProcessor(
+            manifest_run=lambda history: "Agent response",
+            context_id="ctx",
+            on_user_transcript=on_user,
+        )
+
+        await bridge.process_transcription("Hello")
+        await asyncio.wait_for(event.wait(), timeout=1)
+        await asyncio.sleep(0)
+
+        assert user_texts == ["Hello"]
+        assert bridge._background_tasks == set()
