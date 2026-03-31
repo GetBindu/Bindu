@@ -63,8 +63,8 @@ class InMemoryScheduler(Scheduler):
     ) -> None:
         """Send task operation with live span for trace context.
 
-        Uses non-blocking send_nowait to fail fast when the buffer is full,
-        preventing the API handler from hanging indefinitely.
+        Uses bounded backpressure with a timeout so brief spikes wait for
+        worker capacity instead of failing immediately.
 
         Args:
             operation_class: The operation class to instantiate
@@ -72,20 +72,13 @@ class InMemoryScheduler(Scheduler):
             params: Task parameters
 
         Raises:
-            Exception: If the bounded buffer is full (task queue at capacity)
+            TimeoutError: If the queue stays blocked past the timeout window.
         """
         task_op = operation_class(
             operation=operation, params=params, _current_span=get_current_span()
         )
-        try:
-            # Use send_nowait for non-blocking behavior - fails fast if buffer is full
-            self._write_stream.send_nowait(task_op)
-        except anyio.WouldBlock:
-            # Re-raise with a clear message indicating buffer/full condition
-            raise RuntimeError(
-                f"Task queue buffer full: could not schedule {operation} operation. "
-                f"Maximum capacity ({_TASK_QUEUE_BUFFER_SIZE}) reached."
-            )
+        with anyio.fail_after(5.0):
+            await self._write_stream.send(task_op)
 
     @retry_scheduler_operation(
         max_attempts=DEFAULT_RETRY_ATTEMPTS,

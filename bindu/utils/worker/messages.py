@@ -61,21 +61,29 @@ class FileInterceptor:
                 processed_parts.append(part)
                 continue
 
-            mime_type = part.get("mimeType", "")
-            base64_data = part.get("data", "")
+            file_info = part.get("file") or {}
+            mime_type = file_info.get("mimeType", "")
+            file_name = file_info.get("name", "uploaded file")
+            base64_data = file_info.get("bytes") or file_info.get("data", "")
 
             if mime_type not in cls.SUPPORTED_MIME_TYPES:
                 logger.warning(f"Unsupported MIME type rejected: {mime_type}")
                 processed_parts.append(
                     {
                         "kind": "text",
-                        "text": f"[System: User uploaded an unsupported file format ({mime_type})]",
+                        "text": (
+                            f"[System: User uploaded an unsupported file format "
+                            f"({mime_type or 'unknown'}) for {file_name}]"
+                        ),
                     }
                 )
                 continue
 
             try:
                 # Decode the Base64 payload
+                if not base64_data:
+                    raise ValueError("Missing file bytes")
+
                 file_bytes = base64.b64decode(base64_data)
                 extracted_text = ""
 
@@ -94,7 +102,11 @@ class FileInterceptor:
                 processed_parts.append(
                     {
                         "kind": "text",
-                        "text": f"--- Document Uploaded ---\n{extracted_text}\n--- End of Document ---",
+                        "text": (
+                            f"--- Document Uploaded: {file_name} ({mime_type}) ---\n"
+                            f"{extracted_text}\n"
+                            f"--- End of Document ---"
+                        ),
                     }
                 )
 
