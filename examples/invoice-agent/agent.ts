@@ -19,7 +19,13 @@ export const invoiceAgent = {
     },
 
     get_invoice: async ({ invoice_id }: any) => {
-      return { invoice: getInvoiceById(invoice_id) }
+      const invoice = { invoice: getInvoiceById(invoice_id) }
+
+      if(!invoice){
+        throw new Error(`Invoice not found: ${invoice_id}`)
+      }
+
+      return {invoice}
     },
 
     list_invoices: async () => {

@@ -1,9 +1,10 @@
-import { getInvoiceById } from "./storage.js"
+import { getInvoiceById, saveInvoice } from "./storage.js"
+import { Invoice } from "./types.js"
 
 // mock interface (real lib can replace later)
 export async function verifyTransaction(
   tx_hash: string,
-  invoice: any
+  invoice: Invoice
 ) {
   // TODO: replace with real x402 verify lib
   return {
@@ -28,6 +29,7 @@ export async function verifyPayment(
   if (result.success) {
     invoice.status = "paid"
     invoice.tx_hash = tx_hash
+    saveInvoice(invoice)
   }
 
   return {

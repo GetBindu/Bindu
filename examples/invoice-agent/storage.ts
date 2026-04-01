@@ -7,9 +7,9 @@ export function saveInvoice(invoice: Invoice) {
 }
 
 export function getInvoiceById(id: string): Invoice | null {
-  return db[id] || null
+  return db[id] ?? null
 }
 
-export function listInvoices() {
+export function listInvoices(): Invoice[] {
   return Object.values(db)
 }

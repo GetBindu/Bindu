@@ -30,7 +30,7 @@ It demonstrates a complete payment lifecycle:
 *   Persistent invoice state tracking (in-memory, pluggable)
     
 
-Example Run
+## Example Run
 -----------
 ```bash
   npm run dev   
@@ -127,7 +127,7 @@ Example Run
 *   verify\_payment – verify payment and update invoice state
     
 
-Setup
+## Setup
 -----
 ```bash
    npm install   
@@ -143,7 +143,7 @@ Run:
    npm run dev   
    ```
 
-Notes
+## Notes
 -----
 *   Payment verification is mocked for demonstration
 *   Storage is in-memory and can be replaced with a database
