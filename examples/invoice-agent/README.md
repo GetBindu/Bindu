@@ -1,4 +1,4 @@
-# Invoice Agent with X402 Payment Flow
+Invoice Agent with X402 Payment Flow
 ====================================
 
 ## Overview
@@ -31,7 +31,7 @@ It demonstrates a complete payment lifecycle:
     
 
 ## Example Run
------------
+--------
 ```bash
   npm run dev   
   ```
@@ -110,13 +110,13 @@ It demonstrates a complete payment lifecycle:
 ```
 
 ## Example Input
--------------
+--------
 ```json
    {  "recipient": "acme@example.com",  "items": [    { "description": "API access", "quantity": 1, "unit_price": 50 },    { "description": "Compute", "quantity": 2, "unit_price": 20 }  ],  "currency": "USDC"}   
    ```
 
 ## Skills
-------
+--------
 
 *   generate\_invoice – create invoice and emit X402 payment request
     
@@ -128,7 +128,7 @@ It demonstrates a complete payment lifecycle:
     
 
 ## Setup
------
+--------
 ```bash
    npm install   
    ```
@@ -144,7 +144,7 @@ Run:
    ```
 
 ## Notes
------
+--------
 *   Payment verification is mocked for demonstration
 *   Storage is in-memory and can be replaced with a database
 *   Wallet address can be any valid EVM address
