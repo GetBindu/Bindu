@@ -1,12 +1,28 @@
-skills:
-  - name: generate_invoice
-    description: Create invoice and emit X402 payment request
+---
+id: invoice-agent-v1
+name: invoice-agent
+version: 1.0.0
+author: akash
+tags:
+  - billing
+  - payments
+  - x402
+input_modes:
+  - application/json
+output_modes:
+  - application/json
+---
 
-  - name: get_invoice
-    description: Fetch invoice by ID
+# Invoice Agent
 
-  - name: list_invoices
-    description: List invoices
+## generate_invoice
+Create invoice and emit X402 payment request
 
-  - name: verify_payment
-    description: Verify on-chain payment
+## get_invoice
+Fetch invoice by ID
+
+## list_invoices
+List invoices
+
+## verify_payment
+Verify payment and update invoice state
