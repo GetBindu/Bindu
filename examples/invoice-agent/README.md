@@ -2,7 +2,6 @@
 ====================================
 
 ## Overview
---------
 
 This example implements a billing agent that:
 
@@ -17,12 +16,11 @@ It demonstrates a complete payment lifecycle:
    ```
 
 ## Features
---------
 
 *   Invoice creation with structured payload
 *   X402 payment header generation
 *   Payment verification (mocked for demo)
-*   Persistent invoice state tracking (in-memory, pluggable)
+*   In-memory (non-persistent) invoice state tracking
     
 ## Setup
 
@@ -38,13 +36,11 @@ Create .env:
    ```
 
 Run the agent:
------------
 ```bash
   python invoice_agent.py  
   ```
 
 ## Example Input
--------------
 ```json
    {
   "type": "generate_invoice",
@@ -86,7 +82,6 @@ Run the agent:
 
 
 ## Skills
-------
 
 *   generate\_invoice – create invoice and emit X402 payment request
 *   get\_invoice – fetch invoice by ID
@@ -95,7 +90,7 @@ Run the agent:
     
 
 ## Notes
------
+
 *   Payment verification is mocked for demonstration
 *   Storage is in-memory and can be replaced with a database
 *   Wallet address can be any valid EVM address

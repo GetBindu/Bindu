@@ -1,10 +1,12 @@
 from bindu.penguin.bindufy import bindufy
 from dotenv import load_dotenv
 import os
+import logging
 import uuid
+import json
 
 load_dotenv()
-
+logger = logging.getLogger(__name__)
 # Simple in-memory storage
 
 db = {}
@@ -29,13 +31,32 @@ def create_invoice(payload):
     if not isinstance(payload, dict) or "items" not in payload:
         raise ValueError("Invalid payload")
 
-    total = sum(item["quantity"] * item["unit_price"] for item in payload["items"])
+    if not isinstance(payload["items"], list) or not payload["items"]:
+        raise ValueError("items must be a non-empty list")
 
+    total = 0
+    for i, item in enumerate(payload["items"]):
+        qty = item.get("quantity")
+        price = item.get("unit_price")
+
+        if not isinstance(qty, (int, float)) or not isinstance(price, (int, float)):
+            raise ValueError(f"Invalid item at index {i}")
+
+        if qty <= 0 or price < 0:
+            raise ValueError(f"Invalid values at index {i}")
+
+        total += qty * price
+
+    recipient_wallet = payload.get("recipient_wallet") or os.getenv(
+        "AGENT_WALLET_ADDRESS"
+    )
+
+    if not recipient_wallet:
+        raise ValueError("recipient_wallet is required")
     invoice = {
         "id": f"inv_{uuid.uuid4()}",
         "recipient": payload.get("recipient"),
-        "recipient_wallet": payload.get("recipient_wallet")
-        or os.getenv("AGENT_WALLET_ADDRESS"),
+        "recipient_wallet": recipient_wallet,
         "items": payload["items"],
         "currency": payload.get("currency", "USDC"),
         "total": total,
@@ -69,7 +90,7 @@ def verify_payment(invoice_id, tx_hash):
 config = {
     "author": "akash",
     "name": "invoice-agent",
-    "deployment": {"url": "http://localhost:3773", "expose": False},
+    "deployment": {"url": "http://localhost:3773", "expose": True},
     "description": "Invoice agent with X402 payment flow",
     "version": "1.0.0",
     "capabilities": {
@@ -91,7 +112,12 @@ def handler(messages):
         if not user_messages:
             return "No user message found"
 
-        input_data = user_messages[-1].get("content", {})
+        raw = user_messages[-1].get("parts", [{}])[0].get("text", "{}")
+
+        try:
+            input_data = json.loads(raw)
+        except json.JSONDecodeError:
+            return {"error": "bad_request", "message": "Invalid JSON input"}
 
         if input_data.get("type") == "generate_invoice":
             invoice = create_invoice(input_data.get("payload", {}))
@@ -99,14 +125,22 @@ def handler(messages):
             return {
                 "invoice_id": invoice["id"],
                 "total": invoice["total"],
-                "payment_header": f"X402 {invoice['recipient_wallet']}:{invoice['total']}",
+                "payment_header": {
+                    "amount": str(invoice["total"]),
+                    "token": invoice.get("currency", "USDC"),
+                    "network": os.getenv("X402_NETWORK", "base-sepolia"),
+                    "pay_to_address": invoice["recipient_wallet"],
+                },
             }
 
         if input_data.get("type") == "get_invoice":
             invoice = get_invoice_by_id(input_data.get("invoice_id"))
 
             if not invoice:
-                return f"Invoice not found: {input_data.get('invoice_id')}"
+                return {
+                    "error": "not_found",
+                    "message": f"Invoice not found: {input_data.get('invoice_id')}",
+                }
 
             return {"invoice": invoice}
 
@@ -121,13 +155,90 @@ def handler(messages):
 
         return "Unknown request type"
 
-    except Exception as e:
-        return f"Error: {str(e)}"
+    except Exception:
+        logger.exception("Unhandled error")
+        return {"error": "internal_error", "message": "Internal Server Error"}
 
 
 # Run agent
 
 if __name__ == "__main__":
     print("Invoice Agent running...")
-    bindufy(config, handler)
+    # bindufy(config, handler)
+    print("\n--- FULL FLOW ---")
 
+# create
+invoice = handler(
+    [
+        {
+            "role": "user",
+            "parts": [
+                {
+                    "text": json.dumps(
+                        {
+                            "type": "generate_invoice",
+                            "payload": {
+                                "recipient": "acme@example.com",
+                                "items": [
+                                    {
+                                        "description": "API",
+                                        "quantity": 1,
+                                        "unit_price": 50,
+                                    },
+                                    {
+                                        "description": "Compute",
+                                        "quantity": 2,
+                                        "unit_price": 20,
+                                    },
+                                ],
+                                "currency": "USDC",
+                            },
+                        }
+                    )
+                }
+            ],
+        }
+    ]
+)
+
+print("Created:", invoice)
+
+# fetch
+fetched = handler(
+    [
+        {
+            "role": "user",
+            "parts": [
+                {
+                    "text": json.dumps(
+                        {"type": "get_invoice", "invoice_id": invoice["invoice_id"]}
+                    )
+                }
+            ],
+        }
+    ]
+)
+
+print("Fetched:", fetched)
+
+# verify
+payment = handler(
+    [
+        {
+            "role": "user",
+            "parts": [
+                {
+                    "text": json.dumps(
+                        {
+                            "type": "verify_payment",
+                            "invoice_id": invoice["invoice_id"],
+                            "tx_hash": "0xabc123",
+                        }
+                    )
+                }
+            ],
+        }
+    ]
+)
+
+print("Payment:", payment)
