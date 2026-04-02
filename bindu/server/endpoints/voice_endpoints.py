@@ -367,7 +367,10 @@ async def voice_websocket(websocket: WebSocket) -> None:
                         f"Error during final audio transcription for session {session_id}: {e}"
                     )
 
-            if interim_transcript and websocket.client_state == WebSocketState.CONNECTED:
+            if (
+                interim_transcript
+                and websocket.client_state == WebSocketState.CONNECTED
+            ):
                 try:
                     await _process_user_turn(
                         websocket, bridge, interim_transcript, send_lock
@@ -501,7 +504,7 @@ async def _transcribe_pcm_buffer(pcm_bytes: bytes) -> str | None:
     if not api_key:
         logger.warning("Deepgram STT API key not configured")
         return None
-    
+
     if not pcm_bytes:
         logger.debug("Empty audio buffer, skipping transcription")
         return None
