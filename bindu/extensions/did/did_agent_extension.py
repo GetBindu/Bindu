@@ -1,12 +1,3 @@
-# |---------------------------------------------------------|
-# |                                                         |
-# |                 Give Feedback / Get Help                |
-# | https://github.com/getbindu/Bindu/issues/new/choose    |
-# |                                                         |
-# |---------------------------------------------------------|
-#
-#  Thank you users! We ❤️ you! - 🌻
-
 """DID (Decentralized Identifier) Extension for Bindu Agents.
 
 Why is DID an Extension?
