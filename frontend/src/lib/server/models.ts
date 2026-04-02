@@ -57,7 +57,7 @@ const processModel = async (m: ModelConfig) => ({
 	parameters: {
 		stop_sequences: [] as string[],
 		stop: [] as string[],
-		truncate: 0,
+		truncate: null,
 	},
 	unlisted: m.unlisted ?? false,
 });
