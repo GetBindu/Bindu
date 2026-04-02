@@ -23,6 +23,25 @@ REDIS_KEY_PREFIX = "voice:sessions"
 DEFAULT_SESSION_TTL = 300  # seconds
 
 
+_CREATE_SESSION_LUA = """
+-- Atomically creates a session if the number of active sessions is below the limit.
+--
+-- KEYS[1]: The key for the new session to create.
+-- ARGV[1]: The pattern for scanning session keys (e.g., 'voice:sessions:*').
+-- ARGV[2]: The maximum number of sessions allowed.
+-- ARGV[3]: The serialized session data to store.
+-- ARGV[4]: The TTL for the new session key.
+--
+-- Returns: 1 if the session was created, 0 otherwise.
+local keys = redis.call('keys', ARGV[1])
+if #keys >= tonumber(ARGV[2]) then
+  return 0
+end
+redis.call('set', KEYS[1], ARGV[3], 'EX', ARGV[4])
+return 1
+"""
+
+
 class RedisVoiceSessionManager:
     """Manages active voice sessions with Redis backend.
 
@@ -52,7 +71,7 @@ class RedisVoiceSessionManager:
         self._redis_session_ttl = redis_session_ttl
         self._redis_client: redis.Redis | None = None
         self._cleanup_task: asyncio.Task[None] | None = None
-        self._lock = asyncio.Lock()
+        self._create_session_script_sha: str | None = None
 
     async def __aenter__(self) -> RedisVoiceSessionManager:
         """Enter async context manager and initialize Redis connection."""
@@ -64,6 +83,9 @@ class RedisVoiceSessionManager:
         try:
             await self._redis_client.ping()
             logger.info(f"Redis session manager connected to {self.redis_url}")
+            self._create_session_script_sha = await self._redis_client.script_load(
+                _CREATE_SESSION_LUA
+            )
         except redis.RedisError as e:
             logger.error(f"Failed to connect to Redis: {e}")
             raise ConnectionError(
@@ -108,38 +130,39 @@ class RedisVoiceSessionManager:
             RuntimeError: If the maximum number of concurrent sessions is reached.
             RuntimeError: If Redis client is not initialized.
         """
-        if not self._redis_client:
+        if not self._redis_client or not self._create_session_script_sha:
             raise RuntimeError(
                 "Redis client not initialized. Use async context manager."
             )
 
-        async with self._lock:
-            # Prune expired/ended sessions first
-            await self._prune_ended_sessions()
+        session_id = uuid4().hex
+        session = VoiceSession(id=session_id, context_id=context_id)
+        key = self._session_key(session_id)
+        serialized_session = self._serialize_session(session)
 
-            # Check session count
-            current_count = await self.active_count
-            if current_count >= self._max_sessions:
-                raise RuntimeError(
-                    f"Maximum concurrent voice sessions ({self._max_sessions}) reached"
-                )
+        # Atomically check session count and create the new session using a Lua script.
+        # This prevents a race condition across multiple workers.
+        # The script counts keys matching the session pattern. This is acceptable for
+        # a small number of max_sessions and avoids counter desynchronization.
+        pattern = f"{REDIS_KEY_PREFIX}:*"
+        success = await self._redis_client.evalsha(
+            self._create_session_script_sha,
+            1,  # Number of keys
+            key,  # KEYS[1]
+            pattern,  # ARGV[1]
+            self._max_sessions,  # ARGV[2]
+            serialized_session,  # ARGV[3]
+            self._redis_session_ttl,  # ARGV[4]
+        )
 
-            session_id = uuid4().hex
-            session = VoiceSession(id=session_id, context_id=context_id)
-
-            # Store in Redis with TTL
-            key = self._session_key(session_id)
-            await self._redis_client.set(
-                key,
-                self._serialize_session(session),
-                ex=self._redis_session_ttl,
+        if not success:
+            raise RuntimeError(
+                f"Maximum concurrent voice sessions ({self._max_sessions}) reached"
             )
 
-            logger.info(
-                f"Voice session created: {session_id} (context={context_id}, "
-                f"active={current_count + 1})"
-            )
-            return session
+        # The active count is not efficiently available here, so we omit it.
+        logger.info(f"Voice session created: {session_id} (context={context_id})")
+        return session
 
     async def get_session(self, session_id: str) -> VoiceSession | None:
         """Get a session by ID, or ``None`` if not found.
@@ -252,24 +275,6 @@ class RedisVoiceSessionManager:
         except redis.RedisError as e:
             logger.error(f"Error getting active session count: {e}")
             return 0
-
-    async def _prune_ended_sessions(self) -> None:
-        """Remove all ended sessions from Redis."""
-        if not self._redis_client:
-            return
-
-        try:
-            pattern = f"{REDIS_KEY_PREFIX}:*"
-            async for key in self._redis_client.scan_iter(match=pattern):
-                data = await self._redis_client.get(key)
-                if data:
-                    # Extract session_id from key for deserialization
-                    session_id_from_key = key.split(":")[-1]
-                    session = self._deserialize_session(session_id_from_key, data)
-                    if session.state == "ended":
-                        await self._redis_client.delete(key)
-        except redis.RedisError as e:
-            logger.error(f"Error pruning ended sessions: {e}")
 
     # ------------------------------------------------------------------
     # Background cleanup
