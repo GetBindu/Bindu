@@ -218,6 +218,7 @@ async def voice_websocket(websocket: WebSocket) -> None:
     chunk_bytes = app_settings.voice.sample_rate * app_settings.voice.audio_channels * 2
     overlap_bytes = int(chunk_bytes * 0.25)  # Keep 250ms audio overlap between chunks.
     last_chunk_transcript = ""
+    interim_transcript = ""
 
     try:
         await _send_json(websocket, {"type": "state", "state": "listening"}, send_lock)
@@ -269,10 +270,20 @@ async def voice_websocket(websocket: WebSocket) -> None:
                                 last_chunk_transcript, transcript
                             )
                             if delta:
-                                await _process_user_turn(
-                                    websocket, bridge, delta, send_lock
+                                interim_transcript = (
+                                    f"{interim_transcript} {delta}"
+                                    if interim_transcript
+                                    else delta
                                 )
-                        last_chunk_transcript = ""
+
+                    if interim_transcript:
+                        await _process_user_turn(
+                            websocket, bridge, interim_transcript, send_lock
+                        )
+
+                    # Reset for next turn
+                    last_chunk_transcript = ""
+                    interim_transcript = ""
 
                 elif msg_type == "user_text":
                     text = str(data.get("text", "")).strip()
@@ -280,6 +291,7 @@ async def voice_websocket(websocket: WebSocket) -> None:
                         continue
 
                     last_chunk_transcript = ""
+                    interim_transcript = ""
                     audio_buffer.clear()
 
                     await _process_user_turn(websocket, bridge, text, send_lock)
@@ -308,11 +320,23 @@ async def voice_websocket(websocket: WebSocket) -> None:
 
                     if transcript:
                         delta = _trim_overlap_text(last_chunk_transcript, transcript)
-                        last_chunk_transcript = transcript
                         if delta:
-                            await _process_user_turn(
-                                websocket, bridge, delta, send_lock
+                            interim_transcript = (
+                                f"{interim_transcript} {delta}"
+                                if interim_transcript
+                                else delta
                             )
+                            await _send_json(
+                                websocket,
+                                {
+                                    "type": "transcript",
+                                    "role": "user",
+                                    "text": interim_transcript,
+                                    "is_final": False,
+                                },
+                                send_lock,
+                            )
+                        last_chunk_transcript = transcript
 
     except WebSocketDisconnect:
         logger.info(f"Voice WebSocket disconnected: {session_id}")
@@ -330,18 +354,27 @@ async def voice_websocket(websocket: WebSocket) -> None:
             if audio_buffer:
                 try:
                     transcript = await _transcribe_pcm_buffer(bytes(audio_buffer))
-                    if (
-                        transcript
-                        and websocket.client_state == WebSocketState.CONNECTED
-                    ):
+                    if transcript:
                         delta = _trim_overlap_text(last_chunk_transcript, transcript)
                         if delta:
-                            await _process_user_turn(
-                                websocket, bridge, delta, send_lock
+                            interim_transcript = (
+                                f"{interim_transcript} {delta}"
+                                if interim_transcript
+                                else delta
                             )
                 except Exception as e:
                     logger.exception(
                         f"Error during final audio transcription for session {session_id}: {e}"
+                    )
+
+            if interim_transcript and websocket.client_state == WebSocketState.CONNECTED:
+                try:
+                    await _process_user_turn(
+                        websocket, bridge, interim_transcript, send_lock
+                    )
+                except Exception as e:
+                    logger.exception(
+                        f"Error during final turn processing for session {session_id}: {e}"
                     )
         except Exception as e:
             logger.exception(
