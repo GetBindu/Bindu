@@ -7,6 +7,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
+from fastapi import HTTPException
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
@@ -44,8 +45,14 @@ def _make_request(
     request.path_params = path_params or {}
 
     if body is not None:
+        request.body = AsyncMock(
+            return_value=json.dumps(body).encode("utf-8")
+            if not isinstance(body, (bytes, bytearray))
+            else body
+        )
         request.json = AsyncMock(return_value=body)
     else:
+        request.body = AsyncMock(return_value=b"")
         request.json = AsyncMock(side_effect=Exception("No body"))
 
     return request
@@ -84,6 +91,19 @@ class TestVoiceSessionStartEndpoint:
         response = await voice_session_start(app, request)
         body = json.loads(response.body)
         assert body["context_id"] == ctx
+
+    @pytest.mark.asyncio
+    async def test_session_start_with_malformed_json(self):
+        manager = VoiceSessionManager(max_sessions=5, session_timeout=300)
+        app = _make_mock_app(session_manager=manager)
+        request = _make_request()
+        request.body = AsyncMock(return_value=b"{not valid json")
+
+        with pytest.raises(HTTPException) as exc_info:
+            await voice_session_start(app, request)
+
+        assert exc_info.value.status_code == 400
+        assert exc_info.value.detail == "Malformed JSON payload"
 
     @pytest.mark.asyncio
     async def test_session_start_max_reached(self):

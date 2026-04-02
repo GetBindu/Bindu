@@ -47,6 +47,9 @@ class SessionManagerBackend(Protocol):
     ) -> None:
         """Update the lifecycle state of a session."""
 
+    async def get_active_count(self) -> int:
+        """Return the number of sessions that are not ended."""
+
     async def start_cleanup_loop(self) -> None:
         """Start periodic cleanup for stale sessions."""
 

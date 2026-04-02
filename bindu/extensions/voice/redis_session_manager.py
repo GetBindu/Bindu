@@ -70,6 +70,7 @@ class RedisVoiceSessionManager:
         self._session_timeout = session_timeout
         self._redis_session_ttl = redis_session_ttl
         self._redis_client: redis.Redis | None = None
+        self._lock = asyncio.Lock()
         self._cleanup_task: asyncio.Task[None] | None = None
         self._create_session_script_sha: str | None = None
 
@@ -90,7 +91,7 @@ class RedisVoiceSessionManager:
             logger.error(f"Failed to connect to Redis: {e}")
             raise ConnectionError(
                 f"Unable to connect to Redis at {self.redis_url}: {e}"
-            )
+            ) from e
         return self
 
     async def __aexit__(self, exc_type: Any, exc_value: Any, traceback: Any):
@@ -245,8 +246,7 @@ class RedisVoiceSessionManager:
                     ex=self._redis_session_ttl,
                 )
 
-    @property
-    async def active_count(self) -> int:
+    async def get_active_count(self) -> int:
         """Number of sessions that are not ended."""
         if not self._redis_client:
             return 0

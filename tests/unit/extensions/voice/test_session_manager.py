@@ -52,7 +52,7 @@ class TestVoiceSessionManager:
         session = await manager.create_session("ctx-1")
         assert session.context_id == "ctx-1"
         assert session.state == "connecting"
-        assert manager.active_count == 1
+        assert await manager.get_active_count() == 1
 
     @pytest.mark.asyncio
     async def test_get_session(self, manager):
@@ -71,7 +71,7 @@ class TestVoiceSessionManager:
         await manager.end_session(session.id)
         found = await manager.get_session(session.id)
         assert found is None
-        assert manager.active_count == 0
+        assert await manager.get_active_count() == 0
 
     @pytest.mark.asyncio
     async def test_end_nonexistent_session(self, manager):

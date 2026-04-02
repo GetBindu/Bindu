@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 from uuid import uuid4
 
 import httpx
+from fastapi import HTTPException
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.websockets import WebSocket, WebSocketDisconnect, WebSocketState
@@ -29,6 +30,8 @@ if TYPE_CHECKING:
     from bindu.server.applications import BinduApplication
 
 logger = get_logger("bindu.server.endpoints.voice")
+
+_BACKGROUND_TASKS: set[asyncio.Task[None]] = set()
 
 
 # ---------------------------------------------------------------------------
@@ -54,12 +57,15 @@ async def voice_session_start(app: BinduApplication, request: Request) -> Respon
 
     # Parse optional context_id from body
     context_id = str(uuid4())
-    try:
-        body = await request.json()
+    raw_body = await request.body()
+    if raw_body:
+        try:
+            body = json.loads(raw_body)
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=400, detail="Malformed JSON payload") from exc
+
         if isinstance(body, dict) and "context_id" in body:
             context_id = str(body["context_id"])
-    except Exception:
-        pass  # empty body is fine, we'll generate a new context_id
 
     try:
         session = await session_manager.create_session(context_id)
@@ -215,8 +221,12 @@ async def voice_websocket(websocket: WebSocket) -> None:
     muted = False
     audio_buffer = bytearray()
     last_transcribe_at = 0.0
-    chunk_bytes = app_settings.voice.sample_rate * app_settings.voice.audio_channels * 2
-    overlap_bytes = int(chunk_bytes * 0.25)  # Keep 250ms audio overlap between chunks.
+    chunk_bytes = (
+        app_settings.voice.sample_rate
+        * app_settings.voice.audio_channels
+        * app_settings.voice.audio_sample_width_bytes
+    )
+    overlap_bytes = int(chunk_bytes * app_settings.voice.chunk_overlap_fraction)
     last_chunk_transcript = ""
     interim_transcript = ""
 
@@ -309,7 +319,8 @@ async def voice_websocket(websocket: WebSocket) -> None:
                 now = time.monotonic()
                 if (
                     len(audio_buffer) >= chunk_bytes
-                    and (now - last_transcribe_at) >= 0.8
+                    and (now - last_transcribe_at)
+                    >= (app_settings.voice.chunk_throttle_ms / 1000.0)
                 ):
                     transcript = await _transcribe_pcm_buffer(bytes(audio_buffer))
                     if overlap_bytes > 0:
@@ -473,13 +484,13 @@ async def _synthesize_tts_audio(text: str) -> bytes | None:
     if not api_key or not voice_id:
         return None
 
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+    url = f"{app_settings.voice.provider_urls['elevenlabs_tts']}/{voice_id}"
     payload = {
         "text": text,
         "model_id": model_id,
         "voice_settings": {
-            "stability": 0.5,
-            "similarity_boost": 0.75,
+            "stability": app_settings.voice.tts_stability,
+            "similarity_boost": app_settings.voice.tts_similarity_boost,
         },
     }
     headers = {
@@ -489,7 +500,7 @@ async def _synthesize_tts_audio(text: str) -> bytes | None:
     }
 
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=app_settings.voice.http_timeout_seconds) as client:
             response = await client.post(url, json=payload, headers=headers)
             response.raise_for_status()
             return response.content
@@ -509,7 +520,7 @@ async def _transcribe_pcm_buffer(pcm_bytes: bytes) -> str | None:
         logger.debug("Empty audio buffer, skipping transcription")
         return None
 
-    url = "https://api.deepgram.com/v1/listen"
+    url = app_settings.voice.provider_urls["deepgram_listen"]
     params = {
         "model": app_settings.voice.stt_model,
         "language": app_settings.voice.stt_language,
@@ -526,7 +537,7 @@ async def _transcribe_pcm_buffer(pcm_bytes: bytes) -> str | None:
     }
 
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=app_settings.voice.http_timeout_seconds) as client:
             response = await client.post(
                 url, params=params, headers=headers, content=pcm_bytes
             )
@@ -581,6 +592,19 @@ def _trim_overlap_text(previous: str, current: str) -> str:
     return " ".join(curr_words[overlap:]).strip()
 
 
+def _background_task_done(task: asyncio.Task[None]) -> None:
+    """Remove a completed background task and log any failure."""
+    _BACKGROUND_TASKS.discard(task)
+
+    try:
+        exception = task.exception()
+    except asyncio.CancelledError:
+        return
+
+    if exception is not None:
+        logger.error(f"Background voice send task failed: {exception}")
+
+
 def _try_send_json(
     websocket: WebSocket,
     data: dict,
@@ -589,6 +613,8 @@ def _try_send_json(
     """Enqueue a JSON send (safe to call from sync callbacks)."""
     try:
         loop = asyncio.get_running_loop()
-        loop.create_task(_send_json(websocket, data, send_lock))
+        task = loop.create_task(_send_json(websocket, data, send_lock))
+        _BACKGROUND_TASKS.add(task)
+        task.add_done_callback(_background_task_done)
     except RuntimeError:
         pass

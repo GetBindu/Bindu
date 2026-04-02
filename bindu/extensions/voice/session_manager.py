@@ -140,8 +140,7 @@ class VoiceSessionManager:
             if session:
                 session.state = state
 
-    @property
-    def active_count(self) -> int:
+    async def get_active_count(self) -> int:
         """Number of sessions that are not ended."""
         return sum(1 for s in self._sessions.values() if s.state != "ended")
 

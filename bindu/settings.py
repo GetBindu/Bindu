@@ -1044,16 +1044,34 @@ class VoiceSettings(BaseSettings):
     stt_model: str = "nova-3"
     stt_language: str = "en"
 
+    # Provider URLs
+    provider_urls: dict[str, str] = Field(
+        default_factory=lambda: {
+            "deepgram_listen": "https://api.deepgram.com/v1/listen",
+            "elevenlabs_tts": "https://api.elevenlabs.io/v1/text-to-speech",
+        }
+    )
+
+    # HTTP client behavior
+    http_timeout_seconds: float = 30.0
+
     # Text-to-Speech
     tts_provider: Literal["elevenlabs"] = "elevenlabs"
     tts_api_key: str = ""
     tts_voice_id: str = "21m00Tcm4TlvDq8ikWAM"  # ElevenLabs "Rachel"
     tts_model: str = "eleven_turbo_v2_5"
+    tts_stability: float = 0.5
+    tts_similarity_boost: float = 0.75
 
     # Audio format
     sample_rate: int = 16000
     audio_channels: int = 1
     audio_encoding: str = "linear16"  # PCM 16-bit
+    audio_sample_width_bytes: int = 2
+
+    # Audio chunking and streaming
+    chunk_overlap_fraction: float = 0.25
+    chunk_throttle_ms: int = 800
 
     # Voice Activity Detection
     vad_enabled: bool = True
