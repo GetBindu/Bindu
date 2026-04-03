@@ -11,6 +11,8 @@
 
 Add real-time voice conversation capability to Bindu agents. A user clicks a microphone button in the UI, speaks naturally, and hears the agent respond — just like Vapi or Dograh, but built natively into Bindu's A2A protocol and extension system.
 
+Implementation note: the current voice client and session lifecycle already enforce 16 kHz mono PCM on the browser side, surface playback/session errors in the UI, and remove ended sessions from the active session registry. The remaining work in this document focuses on the broader extension, configuration, and provider integration story.
+
 ### Architecture at a Glance
 
 ```

@@ -118,8 +118,6 @@ def _collect_prompt_and_documents(messages: list[dict[str, Any]]) -> tuple[str, 
         content = msg.get("content")
         if isinstance(content, str) and content.strip():
             prompt_parts.append(content)
-            if "--- Document Uploaded" in content:
-                extracted_docs.append(content)
             continue
 
         # Compatibility path: raw A2A messages with parts.
@@ -146,7 +144,7 @@ def _collect_prompt_and_documents(messages: list[dict[str, Any]]) -> tuple[str, 
                     doc_text = extract_document_text(file_bytes, mime_type)
                     extracted_docs.append(doc_text)
                 except Exception as e:
-                    extracted_docs.append(f"Error processing file: {str(e)}")
+                    prompt_parts.append(f"Error processing file: {str(e)}")
 
     return "\n".join(prompt_parts).strip(), extracted_docs
 

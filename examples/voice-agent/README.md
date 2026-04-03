@@ -9,8 +9,7 @@ This example runs a voice-enabled Bindu agent with the custom voice extension.
 - Voice dependencies installed:
 
 ```bash
-uv sync --dev --extra agents
-pip install "bindu[voice]"
+uv sync --dev --extra agents --extra voice
 ```
 
 - API keys in environment:
