@@ -6,7 +6,6 @@
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
 
-	import { error } from "$lib/stores/errors";
 	import { createSettingsStore } from "$lib/stores/settings";
 	import { loading } from "$lib/stores/loading";
 
@@ -104,15 +103,11 @@
 	}
 
 	let isNavCollapsed = $state(false);
-	let errorToastTimeout: ReturnType<typeof setTimeout> | undefined;
 	let currentError: string | undefined = $state();
 
 	const settings = createSettingsStore(data.settings);
 
 	onDestroy(() => {
-		if (errorToastTimeout) {
-			clearTimeout(errorToastTimeout);
-		}
 	});
 </script>
 

@@ -129,7 +129,9 @@ export const GET: RequestHandler = async ({ locals }) => {
 									fileStream.on("data", (chunk) => {
 										if (chunk instanceof Uint8Array) {
 											chunks.push(chunk);
+											return;
 										}
+										reject(new Error("Unexpected chunk type from avatar download stream"));
 									});
 									fileStream.on("error", (err) =>
 										reject(err ?? new Error("Avatar download failed"))

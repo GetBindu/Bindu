@@ -474,7 +474,7 @@ class InMemoryBucket {
 			on(_event: string, cb: (arg?: Error | Uint8Array) => void) {
 				if (_event === "error" && !file) cb(new Error("File not found"));
 				if (_event === "data" && file) setTimeout(() => cb(file.data), 0);
-				if (_event === "end") setTimeout(() => cb(), 0);
+				if (_event === "end" && file) setTimeout(() => cb(), 0);
 				return downloadStream;
 			},
 		};
@@ -516,8 +516,8 @@ export class Database {
 		return {
 			connect: async () => ({
 				startSession: () => ({
-					withTransaction: async (fn: () => Promise<void>) => {
-						await fn();
+					withTransaction: async <T>(fn: () => Promise<T>) => {
+						return await fn();
 					},
 					endSession: async () => {},
 				}),
@@ -529,7 +529,9 @@ export class Database {
 				collection: (name: string) => new InMemoryCollection(name),
 			}),
 			startSession: () => ({
-				withTransaction: async (fn: () => Promise<void>) => { await fn(); },
+				withTransaction: async <T>(fn: () => Promise<T>) => {
+					return await fn();
+				},
 				endSession: async () => {},
 			}),
 		};

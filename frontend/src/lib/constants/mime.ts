@@ -10,8 +10,8 @@ export const TEXT_MIME_ALLOWLIST = [
 
 export const IMAGE_MIME_ALLOWLIST_DEFAULT = ["image/jpeg", "image/png"] as const;
 
-// Document types permitted as attachments (non-image, non-previewable as text)
-// Includes PDF, Word, Excel, PowerPoint, plain text, and CSV
+// Document types permitted as attachments.
+// Includes binary document formats (PDF, Word, Excel, PowerPoint) plus text/plain and text/csv.
 export const DOCUMENT_MIME_ALLOWLIST = [
 	"application/pdf",
 	"application/msword",

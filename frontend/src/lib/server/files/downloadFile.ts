@@ -28,7 +28,9 @@ export async function downloadFile(
 		fileStream.on("data", (chunk) => {
 			if (chunk instanceof Uint8Array) {
 				chunks.push(chunk);
+				return;
 			}
+			reject(new Error("Unexpected chunk type from fileStream"));
 		});
 		fileStream.on("error", (err) => reject(err ?? new Error("File download failed")));
 		fileStream.on("end", () => resolve(Buffer.concat(chunks)));
