@@ -64,7 +64,7 @@ describe("addSibling", async () => {
 		const conv = await collections.conversations.findOne({ _id: convId });
 		if (!conv) throw new Error("Conversation not found");
 
-		// add sibling and check children count for parnets
+		// Add a sibling and check the parent children count.
 
 		const nChildren = conv.messages[1].children?.length;
 		const siblingId = addSibling(conv, newMessage, conv.messages[2].id);

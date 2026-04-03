@@ -1,7 +1,7 @@
 import { get, writable } from 'svelte/store';
 import { VoiceClient, type TranscriptEvent, type VoiceState } from '../services/voice-client';
 
-export type VoiceTranscript = TranscriptEvent;
+export type VoiceTranscript = TranscriptEvent & { id: string };
 
 export const voiceSessionId = writable<string | null>(null);
 export const voiceContextId = writable<string | null>(null);
@@ -16,13 +16,18 @@ export const voiceError = writable<string | null>(null);
 let client: VoiceClient | null = null;
 let isStarting = false;
 let startTokenCounter = 0;
+let transcriptIdCounter = 0;
 
 function appendTranscript(event: VoiceTranscript): void {
-  transcripts.update((items) => [...items, event]);
-  if (event.role === 'user') {
-    currentUserTranscript.set(event.text);
+  const transcript = {
+    ...event,
+    id: `${event.role}-${event.ts}-${transcriptIdCounter++}`,
+  };
+  transcripts.update((items) => [...items, transcript]);
+  if (transcript.role === 'user') {
+    currentUserTranscript.set(transcript.text);
   } else {
-    currentAgentTranscript.set(event.text);
+    currentAgentTranscript.set(transcript.text);
   }
 }
 

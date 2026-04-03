@@ -35,6 +35,7 @@
 		};
 
 		const handleError = () => {
+			voiceError.set("Unable to play agent audio response");
 			cleanup();
 		};
 

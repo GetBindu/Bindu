@@ -151,8 +151,13 @@
 		if (!draft) {
 			return;
 		}
-		const fileParts = (sources ? await Promise.all(sources) : []).filter(Boolean) as MessageFile[];
-		await submit(draft, { fileParts });
+		try {
+			const fileParts = (sources ? await Promise.all(sources) : []).filter(Boolean) as MessageFile[];
+			await submit(draft, { fileParts });
+		} catch (err) {
+			console.error("Error preparing chat submission:", err);
+			$error = err instanceof Error ? err.message : String(err);
+		}
 	}
 
 	async function submit(

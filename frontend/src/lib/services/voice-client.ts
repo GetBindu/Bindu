@@ -249,6 +249,13 @@ export class VoiceClient {
 
     const audioContext = new AudioContextCtor({ sampleRate: 16000 });
     await audioContext.resume();
+    if (audioContext.sampleRate !== 16000) {
+      void audioContext.close();
+      stream.getTracks().forEach((track) => track.stop());
+      throw new Error(
+        `Unsupported microphone sample rate: ${audioContext.sampleRate}. Expected 16000.`
+      );
+    }
     const sourceNode = audioContext.createMediaStreamSource(stream);
     const processorNode = audioContext.createScriptProcessor(4096, 1, 1);
     const silentGain = audioContext.createGain();
@@ -267,14 +274,14 @@ export class VoiceClient {
     };
 
     sourceNode.connect(processorNode);
-  processorNode.connect(silentGain);
-  silentGain.connect(audioContext.destination);
+    processorNode.connect(silentGain);
+    silentGain.connect(audioContext.destination);
 
     this.mediaStream = stream;
     this.audioContext = audioContext;
     this.sourceNode = sourceNode;
     this.processorNode = processorNode;
-  this.silentGainNode = silentGain;
+    this.silentGainNode = silentGain;
     this.isStreamingAudio = true;
   }
 
