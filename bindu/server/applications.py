@@ -598,12 +598,19 @@ class BinduApplication(Starlette):
             rl_exempt = frozenset(
                 _rl.get("exempt_paths", app_settings.rate_limit.exempt_paths)
             )
+            rl_trust_proxy = _rl.get("trust_proxy", app_settings.rate_limit.trust_proxy)
+            rl_cleanup_interval = _rl.get(
+                "request_cleanup_interval",
+                app_settings.rate_limit.request_cleanup_interval,
+            )
             middleware_list.append(
                 Middleware(
                     RateLimitMiddleware,  # type: ignore[arg-type]
                     requests_per_window=rl_requests,
                     window_seconds=rl_window,
                     exempt_paths=rl_exempt,
+                    trust_proxy=rl_trust_proxy,
+                    request_cleanup_interval=rl_cleanup_interval,
                 )
             )
 
