@@ -204,55 +204,135 @@ def _register_in_hydra(
     return credentials
 
 
+class TunnelError(RuntimeError):
+    """Raised when tunnel creation fails and fail_on_tunnel_error=True."""
+
+
+_TUNNEL_MAX_ATTEMPTS = 3
+_TUNNEL_BASE_BACKOFF = 1  # seconds; doubles each retry: 1s, 2s, 4s
+_TUNNEL_HEALTH_TIMEOUT = 3  # seconds for health check request
+
+
 def _setup_tunnel(
     tunnel_config: Any,
     port: int,
     manifest: AgentManifest,
     bindu_app: Any,
-) -> str | None:
-    """Set up tunnel if enabled and update URLs.
+    fail_on_tunnel_error: bool = True,
+) -> tuple[str | None, str | None]:
+    """Set up tunnel if enabled, validate it, and update URLs.
+
+    Retries tunnel creation + health check up to _TUNNEL_MAX_ATTEMPTS times
+    with exponential backoff (1s, 2s, 4s) before giving up.
+
+    After obtaining a tunnel URL, a GET request is sent to {tunnel_url}/health
+    (falling back to tunnel_url itself) with a short timeout. A non-200 response
+    or any request error is treated as a tunnel failure and triggers a retry.
 
     Args:
         tunnel_config: Tunnel configuration
         port: Local port number
         manifest: Agent manifest to update
         bindu_app: Bindu application to update
+        fail_on_tunnel_error: If True (default), raise TunnelError on failure.
+            If False, log a warning and continue with local-only server.
 
     Returns:
-        Tunnel URL if successful, None otherwise
+        Tuple of (tunnel_url, failure_reason). tunnel_url is None on failure or
+        when tunneling is not requested. failure_reason is set only on failure.
+
+    Raises:
+        TunnelError: If all retries fail and fail_on_tunnel_error is True.
     """
+    import time
+
+    import httpx
+
     if not (tunnel_config and tunnel_config.enabled):
-        return None
+        return None, None
 
     from bindu.tunneling.manager import TunnelManager
 
     logger.info("Tunnel enabled, creating public URL...")
     tunnel_config.local_port = port
 
-    try:
-        tunnel_manager = TunnelManager()
-        tunnel_url = tunnel_manager.create_tunnel(
-            local_port=port,
-            config=tunnel_config,
-            subdomain=tunnel_config.subdomain,
+    tunnel_manager = TunnelManager()
+    failure_reason = "Unknown error"
+
+    for attempt in range(1, _TUNNEL_MAX_ATTEMPTS + 1):
+        try:
+            tunnel_url = tunnel_manager.create_tunnel(
+                local_port=port,
+                config=tunnel_config,
+                subdomain=tunnel_config.subdomain,
+            )
+            logger.info(
+                f"Tunnel URL obtained (attempt {attempt}/{_TUNNEL_MAX_ATTEMPTS}): "
+                f"{tunnel_url} — validating..."
+            )
+
+            # Health check: prefer /health, fall back to root
+            health_url = f"{tunnel_url.rstrip('/')}/health"
+            root_url = tunnel_url
+
+            try:
+                response = httpx.get(health_url, timeout=_TUNNEL_HEALTH_TIMEOUT, follow_redirects=True)
+                if response.status_code != 200:
+                    raise ValueError(f"Health check returned HTTP {response.status_code} from {health_url}")
+            except (httpx.RequestError, ValueError):
+                # Fallback to root URL
+                try:
+                    response = httpx.get(root_url, timeout=_TUNNEL_HEALTH_TIMEOUT, follow_redirects=True)
+                    if response.status_code != 200:
+                        raise ValueError(f"Health check returned HTTP {response.status_code} from {root_url}")
+                except httpx.RequestError as exc:
+                    raise ValueError(f"Health check requests failed for both /health and root: {exc}") from exc
+
+            logger.info(f"✅ Tunnel created and validated: {tunnel_url}")
+
+            manifest.url = tunnel_url
+            bindu_app.url = tunnel_url
+            bindu_app._agent_card_json_schema = None
+
+            return tunnel_url, None
+
+        except Exception as e:
+            failure_reason = str(e)
+            tunnel_manager.stop_tunnel()  # Cleanup failed tunnel
+            if attempt < _TUNNEL_MAX_ATTEMPTS:
+                backoff = _TUNNEL_BASE_BACKOFF * (2 ** (attempt - 1))
+                logger.info(
+                    f"Tunnel attempt {attempt}/{_TUNNEL_MAX_ATTEMPTS} failed "
+                    f"({failure_reason}). Retrying in {backoff}s..."
+                )
+                time.sleep(backoff)
+            else:
+                logger.error(
+                    f"Tunnel attempt {attempt}/{_TUNNEL_MAX_ATTEMPTS} failed "
+                    f"({failure_reason}). All retries exhausted."
+                )
+
+    # Cleanup any remaining tunnel after all attempts
+    tunnel_manager.stop_tunnel()
+
+    if fail_on_tunnel_error:
+        raise TunnelError(
+            f"Tunnel creation failed after {_TUNNEL_MAX_ATTEMPTS} attempts: {failure_reason}\n"
+            "Your agent was NOT started. To start without a public URL, "
+            "set fail_on_tunnel_error=False or remove launch=True."
         )
-        logger.info(f"✅ Tunnel created: {tunnel_url}")
 
-        # Update manifest URL to use tunnel URL
-        manifest.url = tunnel_url
-
-        # Update BinduApplication URL to use tunnel URL
-        bindu_app.url = tunnel_url
-
-        # Invalidate cached agent card so it gets regenerated with new URL
-        bindu_app._agent_card_json_schema = None
-
-        return tunnel_url
-
-    except Exception as e:
-        logger.error(f"Failed to create tunnel: {e}")
-        logger.warning("Continuing with local-only server...")
-        return None
+    logger.warning(
+        "=" * 60 + "\n"
+        "⚠️  TUNNEL FAILURE — AGENT IS NOT PUBLICLY ACCESSIBLE\n"
+        f"   Reason      : {failure_reason}\n"
+        f"   Attempts    : {_TUNNEL_MAX_ATTEMPTS}/{_TUNNEL_MAX_ATTEMPTS} exhausted\n"
+        "   Status      : Running on LOCAL network only\n"
+        "   Action      : Check tunnel config, network, or remove launch=True\n"
+        "   Suppress    : Pass fail_on_tunnel_error=False to bindufy() to silence this\n"
+        + "=" * 60
+    )
+    return None, failure_reason
 
 
 def _create_telemetry_config(validated_config: Dict[str, Any]) -> TelemetryConfig:
@@ -354,6 +434,7 @@ def _bindufy_core(
     skills_override: list | None = None,
     skip_handler_validation: bool = False,
     run_server_in_background: bool = False,
+    fail_on_tunnel_error: bool = True,
 ) -> AgentManifest:
     """Core bindufy logic shared by both Python and gRPC registration paths.
 
@@ -377,6 +458,8 @@ def _bindufy_core(
             Used for gRPC path where handler is a GrpcAgentClient.
         run_server_in_background: If True, start uvicorn in a background thread
             instead of blocking. Used by gRPC service so RegisterAgent can return.
+        fail_on_tunnel_error: If True (default), raise TunnelError when tunnel
+            creation fails. If False, log a warning and continue locally.
 
     Returns:
         AgentManifest: The manifest for the bindufied agent.
@@ -568,7 +651,7 @@ def _bindufy_core(
     host, port = _parse_deployment_url(deployment_config)
 
     # Create tunnel if enabled
-    tunnel_url = _setup_tunnel(tunnel_config, port, _manifest, bindu_app)
+    tunnel_url, tunnel_failure_reason = _setup_tunnel(tunnel_config, port, _manifest, bindu_app, fail_on_tunnel_error)
 
     # Start server if requested
     if run_server:
@@ -581,6 +664,8 @@ def _bindufy_core(
             client_id=credentials.client_id if credentials else None,
             client_secret=credentials.client_secret if credentials else None,
             tunnel_url=tunnel_url,
+            tunnel_requested=launch,
+            tunnel_failure_reason=tunnel_failure_reason,
         )
 
         if run_server_in_background:
@@ -613,6 +698,7 @@ def bindufy(
     run_server: bool = True,
     key_dir: str | Path | None = None,
     launch: bool = False,
+    fail_on_tunnel_error: bool = True,
 ) -> AgentManifest:
     """Transform an agent handler into a Bindu microservice.
 
@@ -653,6 +739,9 @@ def bindufy(
                 directory (may fail in REPL/notebooks). Falls back to current working directory.
         launch: If True, creates a public tunnel via FRP to expose the server to the internet
                with an auto-generated subdomain (default: False)
+        fail_on_tunnel_error: If True (default), raise TunnelError when tunnel creation fails
+               so the agent does not silently start without a public URL. Set to False to
+               fall back to local-only with a warning instead (default: True)
 
     Returns:
         AgentManifest: The manifest for the bindufied agent
@@ -692,4 +781,5 @@ def bindufy(
         key_dir=key_dir,
         launch=launch,
         caller_dir=caller_dir,
+        fail_on_tunnel_error=fail_on_tunnel_error,
     )
