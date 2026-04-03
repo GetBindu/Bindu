@@ -949,6 +949,38 @@ class SentrySettings(BaseSettings):
     debug: bool = False
 
 
+class RateLimitSettings(BaseSettings):
+    """Per-agent sliding-window rate limiting configuration."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="RATE_LIMIT__",
+        extra="allow",
+    )
+
+    enabled: bool = Field(
+        default=False,
+        description="Enable per-client-IP rate limiting",
+    )
+    requests_per_window: int = Field(
+        default=60,
+        description="Maximum requests allowed per client per window",
+    )
+    window_seconds: int = Field(
+        default=60,
+        description="Rolling window size in seconds",
+    )
+    exempt_paths: list[str] = Field(
+        default_factory=lambda: [
+            "/health",
+            "/healthz",
+            "/metrics",
+            "/.well-known/agent.json",
+        ],
+        description="URL paths exempt from rate limiting",
+    )
+
+
 class GrpcSettings(BaseSettings):
     """gRPC adapter configuration for language-agnostic agent support.
 
@@ -1044,6 +1076,7 @@ class Settings(BaseSettings):
     negotiation: NegotiationSettings = NegotiationSettings()
     sentry: SentrySettings = SentrySettings()
     grpc: GrpcSettings = GrpcSettings()
+    rate_limit: RateLimitSettings = RateLimitSettings()
 
 
 app_settings = Settings()

@@ -24,9 +24,10 @@ By implementing DID as an extension (https://a2a-protocol.org/v0.3.0/topics/exte
 This extension provides cryptographic identity management using Ed25519 keys and W3C-compliant
 DID documents, enabling agents to establish trust in a decentralized network.
 """
+from __future__ import annotations
+
 import os
 import platform
-from __future__ import annotations
 
 from datetime import datetime, timezone
 from functools import cached_property

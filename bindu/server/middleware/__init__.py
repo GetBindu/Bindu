@@ -35,6 +35,9 @@ from .x402 import X402Middleware
 # Export metrics middleware
 from .metrics import MetricsMiddleware
 
+# Export rate limiting middleware
+from .rate_limit import RateLimitMiddleware
+
 __all__ = [
     # Authentication implementations
     "HydraMiddleware",
@@ -42,4 +45,6 @@ __all__ = [
     "X402Middleware",
     # Metrics middleware
     "MetricsMiddleware",
+    # Rate limiting middleware
+    "RateLimitMiddleware",
 ]

@@ -75,6 +75,7 @@ class BinduApplication(Starlette):
         telemetry_config: TelemetryConfig | None = None,
         sentry_config: SentryConfig | None = None,
         cors_origins: list[str] | None = None,
+        rate_limit_config: dict[str, Any] | None = None,
     ):
         """Initialize Bindu application.
 
@@ -93,6 +94,9 @@ class BinduApplication(Starlette):
             auth_enabled: Enable Hydra OAuth2 authentication middleware
             telemetry_config: Optional telemetry configuration (defaults to disabled)
             sentry_config: Optional Sentry configuration (defaults to disabled)
+            rate_limit_config: Optional rate limit config dict. Keys: enabled (bool),
+                requests_per_window (int), window_seconds (int), exempt_paths (list[str]).
+                Falls back to app_settings.rate_limit when not provided.
         """
         # Generate penguin_id if not provided
         if penguin_id is None:
@@ -127,6 +131,7 @@ class BinduApplication(Starlette):
             manifest,
             auth_enabled,
             cors_origins,
+            rate_limit_config,
         )
 
         super().__init__(
@@ -543,6 +548,7 @@ class BinduApplication(Starlette):
         manifest: AgentManifest,
         auth_enabled: bool,
         cors_origins: list[str] | None = None,
+        rate_limit_config: dict[str, Any] | None = None,
     ) -> list[Middleware]:
         """Set up middleware chain with CORS, X402 and Hydra middleware.
 
@@ -553,6 +559,9 @@ class BinduApplication(Starlette):
             manifest: Agent manifest
             auth_enabled: Whether authentication is enabled
             cors_origins: List of allowed CORS origins
+            rate_limit_config: Optional rate limit config dict from agent config.
+                Keys: enabled (bool), requests_per_window (int), window_seconds (int),
+                exempt_paths (list[str]).
 
         Returns:
             List of configured middleware
@@ -575,6 +584,35 @@ class BinduApplication(Starlette):
             # CORS must be first in middleware chain
             middleware_list.insert(0, cors_middleware)
             logger.info("CORS middleware added to position 0 in middleware chain")
+
+        # Add rate limiting middleware if enabled (agent config takes precedence over settings)
+        _rl = rate_limit_config or {}
+        rl_enabled = _rl.get("enabled", app_settings.rate_limit.enabled)
+        if rl_enabled:
+            from .middleware import RateLimitMiddleware
+
+            rl_requests = _rl.get(
+                "requests_per_window", app_settings.rate_limit.requests_per_window
+            )
+            rl_window = _rl.get("window_seconds", app_settings.rate_limit.window_seconds)
+            rl_exempt = frozenset(
+                _rl.get("exempt_paths", app_settings.rate_limit.exempt_paths)
+            )
+            rl_trust_proxy = _rl.get("trust_proxy", app_settings.rate_limit.trust_proxy)
+            rl_cleanup_interval = _rl.get(
+                "request_cleanup_interval",
+                app_settings.rate_limit.request_cleanup_interval,
+            )
+            middleware_list.append(
+                Middleware(
+                    RateLimitMiddleware,  # type: ignore[arg-type]
+                    requests_per_window=rl_requests,
+                    window_seconds=rl_window,
+                    exempt_paths=rl_exempt,
+                    trust_proxy=rl_trust_proxy,
+                    request_cleanup_interval=rl_cleanup_interval,
+                )
+            )
 
         # Add X402 middleware if configured
         if x402_ext and payment_requirements:
