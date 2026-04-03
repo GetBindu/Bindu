@@ -62,7 +62,9 @@ async def voice_session_start(app: BinduApplication, request: Request) -> Respon
         try:
             body = json.loads(raw_body)
         except json.JSONDecodeError as exc:
-            raise HTTPException(status_code=400, detail="Malformed JSON payload") from exc
+            raise HTTPException(
+                status_code=400, detail="Malformed JSON payload"
+            ) from exc
 
         if isinstance(body, dict) and "context_id" in body:
             context_id = str(body["context_id"])
@@ -317,10 +319,8 @@ async def voice_websocket(websocket: WebSocket) -> None:
                 # Chunked transcription: process roughly every 1s of audio,
                 # throttled to avoid overwhelming the STT provider.
                 now = time.monotonic()
-                if (
-                    len(audio_buffer) >= chunk_bytes
-                    and (now - last_transcribe_at)
-                    >= (app_settings.voice.chunk_throttle_ms / 1000.0)
+                if len(audio_buffer) >= chunk_bytes and (now - last_transcribe_at) >= (
+                    app_settings.voice.chunk_throttle_ms / 1000.0
                 ):
                     transcript = await _transcribe_pcm_buffer(bytes(audio_buffer))
                     if overlap_bytes > 0:
@@ -500,7 +500,9 @@ async def _synthesize_tts_audio(text: str) -> bytes | None:
     }
 
     try:
-        async with httpx.AsyncClient(timeout=app_settings.voice.http_timeout_seconds) as client:
+        async with httpx.AsyncClient(
+            timeout=app_settings.voice.http_timeout_seconds
+        ) as client:
             response = await client.post(url, json=payload, headers=headers)
             response.raise_for_status()
             return response.content
@@ -537,7 +539,9 @@ async def _transcribe_pcm_buffer(pcm_bytes: bytes) -> str | None:
     }
 
     try:
-        async with httpx.AsyncClient(timeout=app_settings.voice.http_timeout_seconds) as client:
+        async with httpx.AsyncClient(
+            timeout=app_settings.voice.http_timeout_seconds
+        ) as client:
             response = await client.post(
                 url, params=params, headers=headers, content=pcm_bytes
             )
