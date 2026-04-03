@@ -14,6 +14,8 @@ export const latestAgentAudio = writable<ArrayBuffer | null>(null);
 export const voiceError = writable<string | null>(null);
 
 let client: VoiceClient | null = null;
+let isStarting = false;
+let startTokenCounter = 0;
 
 function appendTranscript(event: VoiceTranscript): void {
   transcripts.update((items) => [...items, event]);
@@ -25,6 +27,14 @@ function appendTranscript(event: VoiceTranscript): void {
 }
 
 export async function startVoiceSession(contextId?: string): Promise<void> {
+  if (isStarting) {
+    throw new Error('A voice session is already starting');
+  }
+
+  isStarting = true;
+  const startToken = ++startTokenCounter;
+  const localClient = new VoiceClient();
+
   voiceError.set(null);
   transcripts.set([]);
   currentUserTranscript.set('');
@@ -34,44 +44,56 @@ export async function startVoiceSession(contextId?: string): Promise<void> {
   const existingClient = client;
   if (existingClient) {
     try {
-      // Call cleanup method if available, otherwise just null out
-      if (typeof existingClient.stopSession === 'function') {
-        await existingClient.stopSession();
-      }
+      await existingClient.stopSession();
     } catch (err) {
       console.error("Error cleaning up existing client:", err);
     }
   }
 
-  client = new VoiceClient();
-  client.onTranscript = appendTranscript;
-  client.onStateChange = (state) => {
+  localClient.onTranscript = appendTranscript;
+  localClient.onStateChange = (state) => {
     voiceState.set(state);
   };
-  client.onAgentAudio = (audioData) => {
+  localClient.onAgentAudio = (audioData) => {
     latestAgentAudio.set(audioData);
   };
-  client.onError = (message) => {
+  localClient.onError = (message) => {
     voiceError.set(message);
     voiceState.set('error');
   };
 
   voiceState.set('connecting');
   try {
-    const session = await client.startSession(contextId);
+    const session = await localClient.startSession(contextId);
+    if (startToken !== startTokenCounter) {
+      await localClient.stopSession().catch(() => undefined);
+      return;
+    }
     voiceSessionId.set(session.session_id);
     voiceContextId.set(session.context_id);
 
-    await client.connect(session.ws_url, session.session_id);
+    await localClient.connect(session.ws_url, session.session_id);
+    if (startToken !== startTokenCounter) {
+      await localClient.stopSession().catch(() => undefined);
+      return;
+    }
+    client = localClient;
   } catch (err) {
     // On failure, clear the partially-initialized client
     const errorMessage = err instanceof Error ? err.message : String(err);
     voiceError.set(errorMessage);
     voiceState.set('error');
-    client = null;
+    if (client === localClient) {
+      client = null;
+    }
+    await localClient.stopSession().catch(() => undefined);
     voiceSessionId.set(null);
     voiceContextId.set(null);
     throw err;
+  } finally {
+    if (startToken === startTokenCounter) {
+      isStarting = false;
+    }
   }
 }
 

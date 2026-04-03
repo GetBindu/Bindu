@@ -31,6 +31,7 @@ export class VoiceClient {
   private audioContext: AudioContext | null = null;
   private sourceNode: MediaStreamAudioSourceNode | null = null;
   private processorNode: ScriptProcessorNode | null = null;
+  private silentGainNode: GainNode | null = null;
   private isStreamingAudio = false;
 
   onTranscript?: (event: TranscriptEvent) => void;
@@ -64,7 +65,13 @@ export class VoiceClient {
       throw new Error(`Failed to start voice session: ${response.status} ${text}`);
     }
 
-    return response.json() as Promise<VoiceSessionStart>;
+    try {
+      return (await response.json()) as VoiceSessionStart;
+    } catch (err) {
+      throw new Error(
+        `Failed to parse voice session response: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
   }
 
   async connect(wsUrl: string, sessionId: string): Promise<void> {
@@ -244,6 +251,8 @@ export class VoiceClient {
     await audioContext.resume();
     const sourceNode = audioContext.createMediaStreamSource(stream);
     const processorNode = audioContext.createScriptProcessor(4096, 1, 1);
+    const silentGain = audioContext.createGain();
+    silentGain.gain.value = 0;
 
     processorNode.onaudioprocess = (event) => {
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN || this.state === 'muted') {
@@ -258,12 +267,14 @@ export class VoiceClient {
     };
 
     sourceNode.connect(processorNode);
-    processorNode.connect(audioContext.destination);
+  processorNode.connect(silentGain);
+  silentGain.connect(audioContext.destination);
 
     this.mediaStream = stream;
     this.audioContext = audioContext;
     this.sourceNode = sourceNode;
     this.processorNode = processorNode;
+  this.silentGainNode = silentGain;
     this.isStreamingAudio = true;
   }
 
@@ -279,6 +290,11 @@ export class VoiceClient {
       this.processorNode.disconnect();
       this.processorNode.onaudioprocess = null;
       this.processorNode = null;
+    }
+
+    if (this.silentGainNode) {
+      this.silentGainNode.disconnect();
+      this.silentGainNode = null;
     }
 
     if (this.sourceNode) {

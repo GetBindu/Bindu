@@ -172,12 +172,21 @@ function extractTextFromTask(task: AgentTask): string {
 export async function* sendAgentMessage(
 	message: string,
 	contextId?: string,
-	abortSignal?: AbortSignal,
-	currentTaskId?: string,
-	taskState?: string,
-	replyToTaskId?: string,
-	files?: Array<{ name: string; mime: string; value: string }>
+	options: {
+		abortSignal?: AbortSignal;
+		currentTaskId?: string;
+		taskState?: string;
+		replyToTaskId?: string;
+		fileParts?: Array<{ name: string; mime: string; value: string }>;
+	} = {}
 ): AsyncGenerator<MessageUpdate, void, unknown> {
+	const {
+		abortSignal,
+		currentTaskId,
+		taskState,
+		replyToTaskId,
+		fileParts,
+	} = options;
 	const token = typeof window !== 'undefined' ? localStorage.getItem('bindu_oauth_token') : null;
 	const headers: Record<string, string> = {
 		'Content-Type': 'application/json',
@@ -230,8 +239,8 @@ export async function* sendAgentMessage(
 	       const parts: AgentMessage["parts"] = [
 		       { kind: 'text', text: message }
 	       ];
-	       if (files && files.length > 0) {
-		       for (const f of files) {
+	       if (fileParts && fileParts.length > 0) {
+		       for (const f of fileParts) {
 			       parts.push({
 				       kind: 'file',
 				       file: {

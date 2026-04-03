@@ -151,26 +151,26 @@
 		if (!draft) {
 			return;
 		}
-		const fileParts = (sources ? await Promise.all(sources) : []).filter(
-			(Boolean)
-		) as MessageFile[];
-		await submit(draft, fileParts);
+		const fileParts = (sources ? await Promise.all(sources) : []).filter(Boolean) as MessageFile[];
+		await submit(draft, { fileParts });
 	}
 
-
-	async function submit(message: string, fileParts: MessageFile[]) {
+	async function submit(
+		message: string,
+		options: { fileParts?: MessageFile[] } = {}
+	) {
+		const fileParts = options.fileParts ?? [];
 		if (!message || loading || isReadOnly) return;
 		if (requireAuthUser()) return;
 
 		const contextId = agentContextId ?? undefined;
 		try {
-			for await (const _update of sendAgentMessage(message, contextId, undefined, undefined, undefined, undefined, fileParts)) {
+			for await (const _update of sendAgentMessage(message, contextId, { fileParts })) {
 				// Process updates if needed
 			}
 		} catch (err) {
 			console.error("Error sending agent message:", err);
-			// Optionally surface error to user
-			alert(`Error: ${err instanceof Error ? err.message : String(err)}`);
+			$error = err instanceof Error ? err.message : String(err);
 		} finally {
 			// Always clear draft and files
 			draft = "";
@@ -536,7 +536,11 @@
 									class="prompt-pill flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-bold transition-all"
 									onclick={async () => {
 										draft = prompt.text;
-										await handleSubmit();
+										try {
+											await handleSubmit();
+										} catch (err) {
+											$error = err instanceof Error ? err.message : String(err);
+										}
 									}}
 								>
 									{prompt.text}
@@ -649,7 +653,7 @@
 										       bind:files
 										       mimeTypes={activeMimeTypes}
 										       onsubmit={async (message, fileParts) => {
-											       await submit(message, fileParts as MessageFile[]);
+											       await submit(message, { fileParts: fileParts as MessageFile[] });
 										       }}
 										       {onPaste}
 										       disabled={isReadOnly || lastIsError}

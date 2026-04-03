@@ -28,11 +28,17 @@
 		const url = URL.createObjectURL(blob);
 		const audio = new Audio(url);
 
-		// Handle errors during playback
-		const handleError = () => {
+		const cleanup = () => {
+			audio.onended = null;
+			audio.onerror = null;
 			URL.revokeObjectURL(url);
 		};
 
+		const handleError = () => {
+			cleanup();
+		};
+
+		audio.onended = cleanup;
 		audio.onerror = handleError;
 
 		// Start playback and handle failure
@@ -45,9 +51,7 @@
 			if (!audio.paused) {
 				audio.pause();
 			}
-			audio.onended = null;
-			audio.onerror = null;
-			URL.revokeObjectURL(url);
+			cleanup();
 		};
 	});
 

@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { onMount, tick, createEventDispatcher } from "svelte";
-const dispatch = createEventDispatcher();
+	import { onMount, tick } from "svelte";
 
 	import { afterNavigate } from "$app/navigation";
 
@@ -33,7 +32,10 @@ const dispatch = createEventDispatcher();
 		children?: import("svelte").Snippet;
 		onPaste?: (e: ClipboardEvent) => void;
 		focused?: boolean;
-		onsubmit?: (message: string, fileParts: Array<{ name: string; mime: string; value: string }>) => void;
+		onsubmit?: (
+			message: string,
+			fileParts: Array<{ name: string; mime: string; value: string }>
+		) => Promise<void> | void;
 	}
 
 	let {
@@ -169,7 +171,7 @@ const dispatch = createEventDispatcher();
 			try {
 				const fileParts = await getFileParts();
 				if (typeof onsubmit === "function") {
-					onsubmit(value, fileParts);
+					await onsubmit(value, fileParts);
 				}
 				// Clear files and input after successful submit
 				files = [];
