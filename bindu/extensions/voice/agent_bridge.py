@@ -104,10 +104,21 @@ class AgentBridgeProcessor:
 
                 if self._on_agent_response:
                     self._safe_callback(self._on_agent_response, response_text)
+            elif self._conversation_history:
+                # Keep history consistent when invocation fails or yields no response.
+                last = self._conversation_history[-1]
+                if last.get("role") == "user" and last.get("content") == text:
+                    self._conversation_history.pop()
+                    self._trim_history()
 
             return response_text
 
         except Exception:
+            if self._conversation_history:
+                last = self._conversation_history[-1]
+                if last.get("role") == "user" and last.get("content") == text:
+                    self._conversation_history.pop()
+                    self._trim_history()
             logger.exception(
                 f"Error processing voice transcription in {self._context_id}"
             )

@@ -169,15 +169,18 @@
 		if (requireAuthUser()) return;
 
 		const contextId = agentContextId ?? undefined;
+		let success = false;
 		try {
 			for await (const _update of sendAgentMessage(message, contextId, { fileParts })) {
 				// Process updates if needed
 			}
+			success = true;
 		} catch (err) {
 			console.error("Error sending agent message:", err);
 			$error = err instanceof Error ? err.message : String(err);
-		} finally {
-			// Always clear draft and files
+		}
+
+		if (success) {
 			draft = "";
 			files = [];
 		}

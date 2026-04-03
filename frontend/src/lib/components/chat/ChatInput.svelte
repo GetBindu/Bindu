@@ -168,14 +168,9 @@
 		) {
 			event.preventDefault();
 			await tick();
+			let fileParts = [];
 			try {
-				const fileParts = await getFileParts();
-				if (typeof onsubmit === "function") {
-					await onsubmit(value, fileParts);
-				}
-				// Clear files and input after successful submit
-				files = [];
-				value = "";
+				fileParts = await getFileParts();
 			} catch (err) {
 				console.error("Error reading file parts:", err);
 				// Surface error to user via alert as fallback
@@ -183,6 +178,21 @@
 				// Reset file input state
 				if (fileInputEl) fileInputEl.value = "";
 				files = [];
+				return;
+			}
+
+			try {
+				if (typeof onsubmit === "function") {
+					await onsubmit(value, fileParts);
+				}
+				// Clear files and input after successful submit
+				files = [];
+				value = "";
+			} catch (err) {
+				console.error("Error submitting message:", err);
+				alert(
+					`Error submitting message: ${err instanceof Error ? err.message : String(err)}`
+				);
 			}
 		}
 	}

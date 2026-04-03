@@ -1,6 +1,5 @@
 """Unit tests for VoiceSessionManager."""
 
-import asyncio
 import time
 
 import pytest
@@ -114,10 +113,10 @@ class TestVoiceSessionManager:
     @pytest.mark.asyncio
     async def test_timeout_expiration(self):
         """Test that sessions exceeding timeout are expired."""
-        manager = VoiceSessionManager(max_sessions=5, session_timeout=0)
+        manager = VoiceSessionManager(max_sessions=5, session_timeout=1)
         session = await manager.create_session("ctx-1")
-        # Wait a tiny bit so duration > 0 (which > timeout of 0)
-        await asyncio.sleep(0.01)
+        # Make the session appear old enough to exceed timeout.
+        session.start_time -= 2
         await manager._expire_timed_out_sessions()
         found = await manager.get_session(session.id)
         assert found is None

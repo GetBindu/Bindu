@@ -35,6 +35,13 @@ _CREATE_SESSION_LUA = """
 -- ARGV[3]: The TTL for the new session key.
 --
 -- Returns: 1 if the session was created, 0 otherwise.
+local active_members = redis.call('smembers', KEYS[1])
+for _, member in ipairs(active_members) do
+    if redis.call('exists', member) == 0 then
+        redis.call('srem', KEYS[1], member)
+    end
+end
+
 local active_count = redis.call('scard', KEYS[1])
 if active_count >= tonumber(ARGV[1]) then
     return 0
@@ -251,6 +258,11 @@ class RedisVoiceSessionManager:
                 "Redis client not initialized. Use async context manager."
             )
 
+        if not self._delete_session_script_sha:
+            raise RuntimeError(
+                "Redis delete script not initialized. Use async context manager."
+            )
+
         key = self._session_key(session_id)
         session_data = await self._redis_client.get(key)
 
@@ -258,11 +270,6 @@ class RedisVoiceSessionManager:
             session = self._deserialize_session(session_id, session_data)
             duration = session.duration_seconds
             logger.info(f"Voice session ended: {session_id} (duration={duration:.1f}s)")
-
-        if not self._delete_session_script_sha:
-            raise RuntimeError(
-                "Redis delete script not initialized. Use async context manager."
-            )
 
         await self._redis_client.evalsha(
             self._delete_session_script_sha,

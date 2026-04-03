@@ -40,7 +40,7 @@ jobs:
 
       - name: Run unit tests with coverage
         run: |
-          uv run pytest \
+          uv run pytest tests/unit/ \
             --cov=bindu \
             --cov-report=term-missing \
             --cov-report=xml:coverage.xml \

@@ -99,6 +99,19 @@ class VoiceSessionManager:
 
     def __init__(self, max_sessions: int = 10, session_timeout: int = 300):
         """Initialize in-memory voice session manager limits and cleanup state."""
+        if (
+            not isinstance(max_sessions, int)
+            or isinstance(max_sessions, bool)
+            or max_sessions <= 0
+        ):
+            raise ValueError("max_sessions must be a positive integer")
+        if (
+            not isinstance(session_timeout, int)
+            or isinstance(session_timeout, bool)
+            or session_timeout <= 0
+        ):
+            raise ValueError("session_timeout must be a positive integer")
+
         self._sessions: dict[str, VoiceSession] = {}
         self._max_sessions = max_sessions
         self._session_timeout = session_timeout
@@ -113,14 +126,18 @@ class VoiceSessionManager:
         """Create a new voice session.
 
         Args:
-            context_id: A2A context ID to associate with this session.
+            context_id: A2A context ID as a non-empty string.
 
         Returns:
             The newly created ``VoiceSession``.
 
         Raises:
             RuntimeError: If the maximum number of concurrent sessions is reached.
+            ValueError: If context_id is not a non-empty string.
         """
+        if not isinstance(context_id, str) or not context_id.strip():
+            raise ValueError("context_id must be a non-empty string")
+
         async with self._lock:
             # Prune any already-ended sessions first
             self._sessions = {
@@ -144,7 +161,8 @@ class VoiceSessionManager:
 
     async def get_session(self, session_id: str) -> VoiceSession | None:
         """Get a session by ID, or ``None`` if not found."""
-        return self._sessions.get(session_id)
+        async with self._lock:
+            return self._sessions.get(session_id)
 
     async def end_session(self, session_id: str) -> None:
         """Gracefully end a voice session.
@@ -176,7 +194,8 @@ class VoiceSessionManager:
 
     async def get_active_count(self) -> int:
         """Return the number of sessions that are not ended."""
-        return sum(1 for s in self._sessions.values() if s.state != "ended")
+        async with self._lock:
+            return sum(1 for s in self._sessions.values() if s.state != "ended")
 
     # ------------------------------------------------------------------
     # Background cleanup
@@ -184,19 +203,25 @@ class VoiceSessionManager:
 
     async def start_cleanup_loop(self) -> None:
         """Start the periodic session cleanup background task."""
-        if self._cleanup_task is None:
-            self._cleanup_task = asyncio.create_task(self._cleanup_loop())
-            logger.info("Voice session cleanup loop started")
+        async with self._lock:
+            if self._cleanup_task is None:
+                self._cleanup_task = asyncio.create_task(self._cleanup_loop())
+                logger.info("Voice session cleanup loop started")
 
     async def stop_cleanup_loop(self) -> None:
         """Stop the cleanup background task."""
-        if self._cleanup_task is not None:
-            self._cleanup_task.cancel()
+        task: asyncio.Task[None] | None = None
+        async with self._lock:
+            if self._cleanup_task is not None:
+                task = self._cleanup_task
+                self._cleanup_task = None
+
+        if task is not None:
+            task.cancel()
             try:
-                await self._cleanup_task
+                await task
             except asyncio.CancelledError:
                 pass
-            self._cleanup_task = None
             logger.info("Voice session cleanup loop stopped")
 
     async def _cleanup_loop(self) -> None:

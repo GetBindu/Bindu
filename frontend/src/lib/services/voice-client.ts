@@ -33,6 +33,8 @@ export class VoiceClient {
   private processorNode: ScriptProcessorNode | null = null;
   private silentGainNode: GainNode | null = null;
   private isStreamingAudio = false;
+  private pendingConnectResolve: (() => void) | null = null;
+  private pendingConnectReject: ((reason?: unknown) => void) | null = null;
 
   onTranscript?: (event: TranscriptEvent) => void;
   onAgentResponse?: (text: string) => void;
@@ -79,14 +81,20 @@ export class VoiceClient {
     this.sessionId = sessionId;
 
     await new Promise<void>((resolve, reject) => {
+      this.pendingConnectResolve = resolve;
+      this.pendingConnectReject = reject;
       try {
         this.ws = new WebSocket(this.resolveWebSocketUrl(wsUrl));
       } catch (err) {
+        this.pendingConnectResolve = null;
+        this.pendingConnectReject = null;
         reject(err);
         return;
       }
 
       if (!this.ws) {
+        this.pendingConnectResolve = null;
+        this.pendingConnectReject = null;
         reject(new Error('WebSocket initialization failed'));
         return;
       }
@@ -94,18 +102,27 @@ export class VoiceClient {
       this.ws.binaryType = 'arraybuffer';
 
       this.ws.onopen = () => {
+        this.pendingConnectResolve = null;
+        this.pendingConnectReject = null;
         this.sendControl({ type: 'start', config: { sampleRate: 16000 } });
         this.setState('active');
         resolve();
       };
 
       this.ws.onerror = () => {
+        this.pendingConnectResolve = null;
+        this.pendingConnectReject = null;
         this.setState('error');
         this.onError?.('Voice WebSocket connection error');
         reject(new Error('Voice WebSocket connection error'));
       };
 
       this.ws.onclose = () => {
+        if (this.pendingConnectReject) {
+          this.pendingConnectReject(new Error('WebSocket closed before open'));
+          this.pendingConnectResolve = null;
+          this.pendingConnectReject = null;
+        }
         this.cleanupAudioStreaming();
         if (this.state !== 'ended' && this.state !== 'idle') {
           this.setState('ended');

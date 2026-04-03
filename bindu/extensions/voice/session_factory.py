@@ -143,6 +143,9 @@ async def close_session_manager(manager: SessionManagerBackend) -> None:
                 await manager.__aexit__(None, None, None)
                 logger.info(f"{type(manager).__name__} connection closed")
             except Exception as e:
+                if cleanup_error is not None:
+                    e.__cause__ = cleanup_error
+                cleanup_error = e
                 logger.error(f"Error closing {type(manager).__name__}: {e}")
 
     if cleanup_error is not None:

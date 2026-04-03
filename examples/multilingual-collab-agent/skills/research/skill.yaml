@@ -1,7 +1,7 @@
 id: research-v1
 name: research
 version: 1.0.0
-author: dassubhojit750075@gmail.com
+author: bindu-maintainers
 
 description: |
   Multilingual web research skill that searches the internet using DuckDuckGo
@@ -54,7 +54,7 @@ requirements:
     - "duckduckgo-search>=8.1.1"
     - "agno>=2.5.2"
   system: []
-  min_memory_mb: 256
+  min_memory_mb: 640
 
 performance:
   avg_processing_time_ms: 3000

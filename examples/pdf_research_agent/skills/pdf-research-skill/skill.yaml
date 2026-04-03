@@ -6,7 +6,8 @@ description: >
   Processes PDF files and raw document text to produce structured, LLM-generated
   summaries. Identifies the main thesis, extracts key findings, and surfaces
   conclusions or recommendations. Powered by OpenRouter and exposed as a live
-  A2A-compliant Bindu microservice.
+  A2A-compliant Bindu microservice. Security warning: disabling auth can expose
+  document content to unauthorized callers.
 
 features:
   - Accept a local PDF file path or raw document text as input
@@ -75,6 +76,24 @@ capabilities_detail:
     protocol: A2A (JSON-RPC over HTTP)
     endpoint: POST /
     port: 3775
-    auth: disabled (configurable via config.auth.enabled)
+    auth: enabled (configurable via config.auth.enabled)
     storage: in-memory (configurable — see .env.example for Postgres/Redis options)
     scheduler: in-memory (configurable — see .env.example for Redis options)
+
+security:
+  warning: |
+    Authentication should remain enabled in all non-test environments.
+    If auth is disabled, any reachable client may invoke the skill.
+  config:
+    auth:
+      enabled: true
+      token_env: TOKEN
+      api_key_env: API_KEY # pragma: allowlist secret
+      disable_for_testing: "Set config.auth.enabled=false only in local test setups"
+  auth:
+    enabled: true
+    token_env: TOKEN
+    api_key_env: API_KEY # pragma: allowlist secret
+    notes:
+      - "Primary behavior is token-based auth when config.auth.enabled=true"
+      - "Disable only for local testing by setting config.auth.enabled=false"

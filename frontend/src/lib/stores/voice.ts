@@ -18,7 +18,7 @@ let isStarting = false;
 let startTokenCounter = 0;
 let transcriptIdCounter = 0;
 
-function appendTranscript(event: VoiceTranscript): void {
+function appendTranscript(event: TranscriptEvent): void {
   const transcript = {
     ...event,
     id: `${event.role}-${event.ts}-${transcriptIdCounter++}`,

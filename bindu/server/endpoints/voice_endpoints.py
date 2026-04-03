@@ -190,6 +190,7 @@ async def voice_websocket(websocket: WebSocket) -> None:
     await websocket.accept()
     await session_manager.update_state(session_id, "active")
     send_lock = asyncio.Lock()
+    session_tasks: set[asyncio.Task[None]] = set()
 
     # Build the agent bridge for this session
     voice_ext = getattr(app, "_voice_ext", None)
@@ -212,11 +213,13 @@ async def voice_websocket(websocket: WebSocket) -> None:
             websocket,
             {"type": "transcript", "role": "user", "text": text, "is_final": True},
             send_lock,
+            session_tasks,
         ),
         on_agent_response=lambda text: _try_send_json(
             websocket,
             {"type": "agent_response", "text": text, "task_id": session.task_id},
             send_lock,
+            session_tasks,
         ),
     )
 
@@ -400,6 +403,18 @@ async def voice_websocket(websocket: WebSocket) -> None:
         except Exception as e:
             logger.exception(
                 f"Error updating session state to 'ending' for session {session_id}: {e}"
+            )
+
+        try:
+            if session_tasks:
+                tasks = list(session_tasks)
+                for task in tasks:
+                    task.cancel()
+                await asyncio.gather(*tasks, return_exceptions=True)
+                session_tasks.clear()
+        except Exception as e:
+            logger.exception(
+                f"Error cleaning up session send tasks for session {session_id}: {e}"
             )
 
         try:
@@ -637,12 +652,23 @@ def _try_send_json(
     websocket: WebSocket,
     data: dict,
     send_lock: asyncio.Lock,
+    session_tasks: set[asyncio.Task[None]] | None = None,
 ) -> None:
     """Enqueue a JSON send (safe to call from sync callbacks)."""
     try:
         loop = asyncio.get_running_loop()
         task = loop.create_task(_send_json(websocket, data, send_lock))
         _BACKGROUND_TASKS.add(task)
+        if session_tasks is not None:
+            session_tasks.add(task)
+
+            def _on_done(done_task: asyncio.Task[None]) -> None:
+                session_tasks.discard(done_task)
+                _background_task_done(done_task)
+
+            task.add_done_callback(_on_done)
+            return
+
         task.add_done_callback(_background_task_done)
     except RuntimeError:
         pass

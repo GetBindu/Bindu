@@ -87,7 +87,7 @@ export async function checkAndRunMigrations() {
 			const session =
 				"startSession" in connectedClient
 					? connectedClient.startSession()
-					: (await Database.getInstance()).getClient().startSession();
+					: (await (await Database.getInstance()).getClient().connect()).startSession();
 			let result = false;
 
 			try {

@@ -132,11 +132,11 @@ class FileInterceptor:
                 )
 
             except Exception as e:
-                logger.error(f"Base64 decoding or routing failed: {e}")
+                logger.exception(f"Base64 decoding or routing failed: {e}")
                 processed_parts.append(
                     {
                         "kind": "text",
-                        "text": f"[System: Failed to decode uploaded file data: {e}]",
+                        "text": "[System: Failed to decode uploaded file data]",
                     }
                 )
 

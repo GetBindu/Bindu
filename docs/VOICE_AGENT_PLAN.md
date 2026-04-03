@@ -197,12 +197,12 @@ class VoiceSettings(BaseSettings):
     session_auth_required: bool = True  # Require session authentication
     session_token_ttl: int = 600        # Session token time-to-live (seconds)
     session_auth_provider: str | None = None  # Optional: external auth provider id
-    per_agent_voice_access: dict | str | None = None  # Per-agent access control or policy id
+    per_agent_voice_access: dict | str | None = None  # Enforced by PerAgentAccessValidator with canonical policy schema
     rate_limit_per_user: int = 60       # Max requests per user per minute
     rate_limit_per_ip: int = 120        # Max requests per IP per minute
     secret_store: Literal["env", "vault"] = "env"  # Where API keys are stored
     secret_rotation_policy: str = "manual"  # e.g., "manual", "auto-30d"
-    encrypt_api_keys_at_rest: bool = True
+    encrypt_api_keys_at_rest: bool = True  # Enforced by KeyManagerService (KMS-backed key_id + rotation)
 
     # Privacy & Compliance
     store_transcripts: bool = False  # Default to False, require explicit opt-in
@@ -212,10 +212,12 @@ class VoiceSettings(BaseSettings):
     require_user_consent: bool = True  # Must have user consent before enabling transcripts
     compliance_guidelines: list[str] = ["gdpr", "ccpa"]
     # Enforcement mechanisms:
-    # - Validation checks: when store_transcripts=True, enforce PII redaction on transcript content
-    # - Automated retention worker: scheduled job using transcript_retention_days and audio_retention_days
-    #   to purge expired data
-    # - Audit logging: log all consent grant/revoke events and data access events for compliance
+    # - KeyManagerService: KMS-backed key generation, key_id tracking, and rotation policy enforcement
+    # - PerAgentAccessValidator: validates per_agent_voice_access schema and policy references
+    # - PIIRedactor: sanitizes transcripts when store_transcripts=True before persistence
+    # - RetentionWorker: scheduled purge using transcript_retention_days and audio_retention_days
+    # - AuditLogger: records consent grant/revoke and voice data access/export events
+    # - RateLimitMiddleware / RateLimitDecorator: enforces rate_limit_per_user and rate_limit_per_ip
 
     # Behavior
     allow_interruptions: bool = True
@@ -273,6 +275,10 @@ class VoiceAgentExtension:
 ```python
 def create_stt_service(config: VoiceAgentExtension) -> DeepgramSTTService:
     """Create Deepgram STT service from extension config."""
+    if not app_settings.voice.stt_api_key:
+        raise ValueError(
+            "create_stt_service requires app_settings.voice.stt_api_key for DeepgramSTTService"
+        )
     return DeepgramSTTService(
         api_key=app_settings.voice.stt_api_key,
         model=config.stt_model,
@@ -282,6 +288,10 @@ def create_stt_service(config: VoiceAgentExtension) -> DeepgramSTTService:
 
 def create_tts_service(config: VoiceAgentExtension) -> ElevenLabsTTSService:
     """Create ElevenLabs TTS service from extension config."""
+    if not app_settings.voice.tts_api_key:
+        raise ValueError(
+            "create_tts_service requires app_settings.voice.tts_api_key for ElevenLabsTTSService"
+        )
     return ElevenLabsTTSService(
         api_key=app_settings.voice.tts_api_key,
         voice_id=config.tts_voice_id,
@@ -386,15 +396,31 @@ class AgentBridgeProcessor(FrameProcessor):
     async def process_frame(self, frame, direction):
         # Handle TranscriptionFrame → invoke agent → emit TextFrame
         # 1. Cancel any running agent task if interrupted
-        # 2. Start new agent handler in asyncio.Task, enforce timeout
-        # 3. On timeout, send "thinking..." to TTS, continue waiting for agent
+        # 2. Start new agent handler in asyncio.Task, enforce 10s agent timeout
+        # 3. Keep a 30s total utterance timeout before fallback error path
         # 4. On exception or invalid response, send fallback TTS message
         # 5. On streaming response, forward partials to TTS incrementally
-        # 6. Guard storage and TTS sends with try/except
-        # 7. Truncate conversation history if needed
-        # 8. Update state machine for transitions and error recovery
+        # 6. Guard storage writes with retries: 3 attempts, exponential backoff
+        #    starting at 200ms, factor 2, max delay 2s
+        # 7. Cancellation grace period: 0.5s before force-cancelling self._current_task
+        # 8. Truncate self._conversation_history to the most recent 50 messages
+        #    and persist truncation metadata
+        # 9. Update state machine transitions and error recovery
         ...
 ```
+
+    State transitions:
+
+    ```
+    idle -> listening       (session start)
+    listening -> processing (TranscriptionFrame)
+    processing -> speaking  (self._handler response)
+    speaking -> idle        (TTS finished)
+    any -> interrupted      (new user input cancels self._current_task)
+    interrupted -> processing (next utterance accepted)
+    any -> idle             (recoverable error via fallback TTS/send)
+    any -> ended            (session close/stop)
+    ```
 
 **`audio_config.py`** — constants:
 
@@ -423,25 +449,37 @@ WS     /ws/voice/{session_id}            → bidirectional audio stream (wss:// 
 
 - POST /voice/session/start requires Authorization: Bearer <user_token> and returns a short-lived session_token
 - ws_url is always wss:// (secure transport)
-- Client must present session_token in the WebSocket handshake using one of these methods:
-  1. Send session_token in the Sec-WebSocket-Protocol header
-  2. Send session_token in a custom header such as Authorization: Bearer <session_token>
-  3. Perform an application-level handshake by sending session_token as the first text frame after connection
+- Client must present session_token in the WebSocket handshake using this priority order:
+    1. Primary: session_token via Sec-WebSocket-Protocol header (preferred for standards compliance)
+    2. Fallback: Authorization: Bearer <session_token> header for clients that cannot set Sec-WebSocket-Protocol
+    3. Last-resort fallback: application-level handshake with session_token as first text frame
 - Query parameter tokens are NOT allowed for security reasons
-- Server validates session_token for session ownership from header/handshake mechanisms only
-- Input validation: max binary frame size, max frames/sec, reject malformed JSON text frames
+- Server validates session_token in the same priority order (Sec-WebSocket-Protocol → Authorization header → application handshake)
+- Input validation:
+    - Max binary frame size = 64 KB per frame
+    - Max frames per second = 50 fps (20ms chunks)
+    - Max concurrent frames in flight = 10
+    - Reject malformed JSON text frames
+    - On violation, return `{ "type": "error" }` with a specific reason
 - Error handling: explicit error frames ({"type": "error"}), state frames ({"type": "state"}), and clear messages for malformed audio, STT/TTS failures, and network interruptions
 - Endpoints referenced: POST /voice/session/start, DELETE /voice/session/{session_id}, GET /voice/session/{session_id}/status, WS /ws/voice/{session_id}
 
 **Frame types:**
 ```
+Handshake (connection establishment)
+
+Direction    Frame Type    Content
+─────────    ──────────    ───────────────────────────────────────
+Client→Svr   text          session_token (in handshake)
+
+Runtime (post-handshake)
+
 Direction    Frame Type    Content
 ─────────    ──────────    ───────────────────────────────────────
 Client→Svr   text          { "type": "start", "config": { "sampleRate": 16000 } }
 Client→Svr   binary        Raw PCM 16-bit audio frames (20ms chunks)
 Client→Svr   text          { "type": "mute" } / { "type": "unmute" }
 Client→Svr   text          { "type": "stop" }
-Client→Svr   text          session_token (in handshake)
 
 Svr→Client   text          { "type": "transcript", "role": "user",
                              "text": "...", "is_final": true }
@@ -639,6 +677,11 @@ real-time voice conversation partner.
 - Agent responses → stored as task messages (role: `agent`)
 - Session end → task state → `completed`
 - `context_id` links voice and text conversations for continuity
+- Storage failure handling:
+    - Transient A2A task create/update failures retry with jittered exponential backoff (max 3 attempts, 10s total timeout)
+    - During retries, task state is marked `retrying`
+    - If retries exhaust, apply configurable policy: continue conversation as `unsaved`/`ephemeral` or terminate session
+    - User notifications: transient retries use non-blocking notice; permanent failures show immediate warning with optional retry/restore action
 
 **Interruption flow:**
 1. User speaks while agent audio is playing
@@ -646,6 +689,10 @@ real-time voice conversation partner.
 3. Bridge cancels in-flight LLM call (if any)
 4. TTS output queue is cleared
 5. New user utterance is processed normally
+6. If Bridge cannot cancel a non-cancellable in-flight LLM operation, mark request as orphaned and immediately continue with new user utterances
+7. Bridge records orphaned request ID and registers completion callback to release pending resources (timeouts, memory, request handles)
+8. Delayed orphaned outputs are discarded when they eventually return
+9. On failed cancellation, InterruptionFrame triggers a short "processing delayed" notice via the TTS output queue or UI
 
 #### Step 3.2 — Voice-Aware A2A Task Lifecycle
 
@@ -697,6 +744,23 @@ Session End → Task state: "completed"
 - Interruption and reconnection scenarios
 - Concurrent session handling and resource cleanup
 
+**Security Tests**
+- Session token validation and expiration behavior
+- Rate-limiting enforcement for per-user and per-IP limits
+- Malformed/oversized frame handling and auth bypass attempts
+- WebSocket hijacking prevention and handshake integrity checks
+
+**Network Resilience Tests**
+- Packet loss simulation at 5%, 10%, and 20%
+- High-latency scenarios at 200ms and 500ms+
+- Reconnection behavior and state recovery correctness
+- Graceful degradation under intermittent provider/network failures
+
+**Accessibility Tests**
+- Keyboard-only navigation across all voice controls
+- Screen-reader compatibility for transcript and state changes
+- WCAG-focused checks for contrast, focus visibility, and announcements
+
 **Performance Tests**
 - Measure STT, agent, and TTS latency
 - Load test for max concurrent sessions
@@ -724,9 +788,29 @@ def voice_handler(messages: list[dict]) -> str:
     Returns:
         A string response to be spoken by the TTS engine.
     """
-    # Extract text from messages - concatenate all user messages
+    # Extract bounded, sanitized recent user text before concatenation.
+    max_messages = 10
+    max_chars_per_message = 500
+    max_total_chars = 2000
+
     user_texts = [m.get("content", "") for m in messages if m.get("role") == "user"]
-    combined = " ".join(user_texts)
+    user_texts = user_texts[-max_messages:]
+
+    sanitized_parts: list[str] = []
+    total_chars = 0
+    for text in user_texts:
+        cleaned = str(text).replace("<", "").replace(">", "")
+        cleaned = "".join(ch for ch in cleaned if ch.isprintable() or ch in "\n\t")
+        cleaned = cleaned[:max_chars_per_message]
+        remaining = max_total_chars - total_chars
+        if remaining <= 0:
+            break
+        cleaned = cleaned[:remaining]
+        if cleaned:
+            sanitized_parts.append(cleaned)
+            total_chars += len(cleaned)
+
+    combined = " ".join(sanitized_parts)
     return f"I heard you say: {combined}. That's interesting!"
 
 config = {
@@ -870,6 +954,12 @@ Phases 2 and 3 can proceed in parallel once Phase 1 is complete.
 - [ ] No API key exposure in frontend or logs
 - [ ] Rate limiting/flood protection tested
 - [ ] Input validation for oversized/malformed frames
+- [ ] Transcript retention policy enforced via `VoiceSettings.transcript_retention_days`
+- [ ] Audio retention policy enforced via `VoiceSettings.audio_retention_days`
+- [ ] User consent captured and logged before enabling `VoiceSettings.store_transcripts`
+- [ ] PII redaction applied when `VoiceSettings.store_transcripts` is true
+- [ ] Audit logging records consent events and voice data access
+- [ ] GDPR/CCPA voice data export and deletion flows validated
 
 ### Performance
 - [ ] STT, TTS, agent, and roundtrip latency meet targets

@@ -104,10 +104,13 @@ def get_file_bytes(part):
     return data
 
 # Handler
-def _collect_prompt_and_documents(messages: list[dict[str, Any]]) -> tuple[str, list[str]]:
+def _collect_prompt_and_documents(
+    messages: list[dict[str, Any]],
+) -> tuple[str, list[str], list[str]]:
     """Support both raw A2A messages and runtime chat-format messages."""
     prompt_parts: list[str] = []
     extracted_docs: list[str] = []
+    errors: list[str] = []
 
     for msg in messages:
         role = msg.get("role")
@@ -144,9 +147,9 @@ def _collect_prompt_and_documents(messages: list[dict[str, Any]]) -> tuple[str, 
                     doc_text = extract_document_text(file_bytes, mime_type)
                     extracted_docs.append(doc_text)
                 except Exception as e:
-                    prompt_parts.append(f"Error processing file: {str(e)}")
+                    errors.append(str(e))
 
-    return "\n".join(prompt_parts).strip(), extracted_docs
+    return "\n".join(prompt_parts).strip(), extracted_docs, errors
 
 
 def handler(messages: list[dict]):
@@ -157,9 +160,11 @@ def handler(messages: list[dict]):
     """
     if not messages:
         return "No messages received."
-    prompt, extracted_docs = _collect_prompt_and_documents(messages)
+    prompt, extracted_docs, errors = _collect_prompt_and_documents(messages)
 
     if not extracted_docs:
+        if errors:
+            return "Failed to process documents:\n" + "\n".join(errors)
         return "No valid document found in the messages."
 
     combined_document = "\n\n".join(extracted_docs)

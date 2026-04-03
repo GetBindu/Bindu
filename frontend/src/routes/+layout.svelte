@@ -1,7 +1,7 @@
 <script lang="ts">
 	import "../styles/main.css";
 
-	import { onDestroy, onMount, untrack } from "svelte";
+	import { onMount, untrack } from "svelte";
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
@@ -107,8 +107,6 @@
 
 	const settings = createSettingsStore(data.settings);
 
-	onDestroy(() => {
-	});
 </script>
 
 <svelte:head>

@@ -57,7 +57,7 @@ cp .env.example .env
 uv run python supervisor_cbt.py
 ```
 
-Agent starts at `http://localhost:3773`. See [`cbt/README.md`](cbt/README.md) for full usage instructions including example curl commands.
+Agent starts at `http://localhost:3773`. Use the sections below in this README for full usage instructions, including example curl commands.
 
 ---
 
