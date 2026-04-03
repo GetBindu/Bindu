@@ -52,15 +52,23 @@ class VoiceSession:
         """Deserialize session from dictionary."""
         session_id = data.get("id")
         if not isinstance(session_id, str) or not session_id.strip():
-            raise ValueError("VoiceSession.id is required and must be a non-empty string")
+            raise ValueError(
+                "VoiceSession.id is required and must be a non-empty string"
+            )
 
         context_id = data.get("context_id")
         if not isinstance(context_id, str) or not context_id.strip():
-            raise ValueError("VoiceSession.context_id is required and must be a non-empty string")
+            raise ValueError(
+                "VoiceSession.context_id is required and must be a non-empty string"
+            )
 
         task_id = data.get("task_id")
-        if task_id is not None and (not isinstance(task_id, str) or not task_id.strip()):
-            raise ValueError("VoiceSession.task_id must be a non-empty string when provided")
+        if task_id is not None and (
+            not isinstance(task_id, str) or not task_id.strip()
+        ):
+            raise ValueError(
+                "VoiceSession.task_id must be a non-empty string when provided"
+            )
 
         start_time = data.get("start_time", time.time())
         if not isinstance(start_time, (int, float)) or isinstance(start_time, bool):
@@ -159,7 +167,10 @@ class VoiceSessionManager:
     ) -> None:
         """Update the state of a session."""
         async with self._lock:
-            session = self._sessions.get(session_id)
+            if state == "ended":
+                session = self._sessions.pop(session_id, None)
+            else:
+                session = self._sessions.get(session_id)
             if session:
                 session.state = state
 

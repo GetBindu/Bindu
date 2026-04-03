@@ -56,7 +56,7 @@ class FileInterceptor:
     @staticmethod
     def _decode_plain_text(file_bytes: bytes) -> str:
         """Decode plain text with UTF-8 first and safe fallbacks."""
-        for encoding in ("utf-8", "latin-1", "cp1252"):
+        for encoding in ("utf-8", "cp1252", "latin-1"):
             try:
                 if encoding == "utf-8":
                     return file_bytes.decode(encoding)

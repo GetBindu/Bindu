@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from urllib.parse import urlsplit
 from typing import Literal, Any
 
 import redis.asyncio as redis
@@ -79,9 +80,9 @@ return removed
 class RedisVoiceSessionManager:
     """Manages active voice sessions with Redis backend.
 
-    Uses Redis hash storage for session data, enabling session sharing
-    across multiple Uvicorn workers. Implements the same interface as
-    VoiceSessionManager for compatibility.
+    Uses Redis string keys with JSON-serialized session data via SET/GET,
+    enabling session sharing across multiple Uvicorn workers. Implements the
+    same interface as VoiceSessionManager for compatibility.
     """
 
     def __init__(
@@ -118,7 +119,9 @@ class RedisVoiceSessionManager:
         )
         try:
             await self._redis_client.ping()
-            logger.info(f"Redis session manager connected to {self.redis_url}")
+            logger.info(
+                f"Redis session manager connected to {self._safe_redis_target()}"
+            )
             self._create_session_script_sha = await self._redis_client.script_load(
                 _CREATE_SESSION_LUA
             )
@@ -134,7 +137,7 @@ class RedisVoiceSessionManager:
                 await self._redis_client.aclose()
                 self._redis_client = None
             raise ConnectionError(
-                f"Unable to connect to Redis at {self.redis_url}: {e}"
+                f"Unable to connect to Redis at {self._safe_redis_target()}: {e}"
             ) from e
         return self
 
@@ -152,6 +155,14 @@ class RedisVoiceSessionManager:
     def _serialize_session(self, session: VoiceSession) -> str:
         """Serialize session to JSON string."""
         return json.dumps(session.to_dict())
+
+    def _safe_redis_target(self) -> str:
+        """Return a redacted Redis target for logs and errors."""
+        parsed = urlsplit(self.redis_url)
+        scheme = parsed.scheme or "redis"
+        host = parsed.hostname or "unknown-host"
+        port = f":{parsed.port}" if parsed.port else ""
+        return f"{scheme}://***@{host}{port}"
 
     def _deserialize_session(self, _key: str, data: str) -> VoiceSession:
         """Deserialize session from JSON string."""
@@ -246,12 +257,12 @@ class RedisVoiceSessionManager:
         if session_data:
             session = self._deserialize_session(session_id, session_data)
             duration = session.duration_seconds
-            logger.info(
-                f"Voice session ended: {session_id} (duration={duration:.1f}s)"
-            )
+            logger.info(f"Voice session ended: {session_id} (duration={duration:.1f}s)")
 
         if not self._delete_session_script_sha:
-            raise RuntimeError("Redis delete script not initialized. Use async context manager.")
+            raise RuntimeError(
+                "Redis delete script not initialized. Use async context manager."
+            )
 
         await self._redis_client.evalsha(
             self._delete_session_script_sha,
@@ -370,7 +381,10 @@ class RedisVoiceSessionManager:
                     continue
 
                 session = self._deserialize_session(key.split(":")[-1], data)
-                if session.state != "ended" and session.duration_seconds > self._session_timeout:
+                if (
+                    session.state != "ended"
+                    and session.duration_seconds > self._session_timeout
+                ):
                     session_id = session.id
                     expired.append(key)
                     logger.warning(

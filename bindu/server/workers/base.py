@@ -142,7 +142,10 @@ class Worker(ABC):
         """Dispatch task operation to appropriate handler.
 
         Args:
-            task_operation: Operation dict with 'operation', 'params', 'trace_id', 'span_id'
+            task_operation: Operation dict with 'operation', 'params', and tracing metadata.
+                Prefer providing _current_span first. It should be a Span-like object or
+                a dict containing the live span context. If _current_span is unavailable,
+                provide trace_id and span_id as strings so the span can be reconstructed.
 
         Supported Operations:
         - run: Execute a task

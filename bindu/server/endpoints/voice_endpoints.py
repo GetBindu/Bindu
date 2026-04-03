@@ -454,7 +454,13 @@ async def _process_user_turn(
             if tts_audio:
                 await _send_bytes(websocket, tts_audio, send_lock)
     finally:
-        await _send_json(websocket, {"type": "state", "state": "listening"}, send_lock)
+        if websocket.client_state == WebSocketState.CONNECTED:
+            try:
+                await _send_json(
+                    websocket, {"type": "state", "state": "listening"}, send_lock
+                )
+            except Exception:
+                pass
 
 
 async def _send_json(

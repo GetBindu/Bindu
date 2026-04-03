@@ -41,7 +41,7 @@ def create_stt_service(config: VoiceAgentExtension) -> Any:
         try:
             deepgram_module = importlib.import_module("pipecat.services.deepgram.stt")
             DeepgramSTTService = getattr(deepgram_module, "DeepgramSTTService")
-        except ImportError as e:
+        except (ImportError, AttributeError) as e:
             raise ImportError(
                 "Deepgram STT requires pipecat[deepgram]. "
                 "Install with: pip install 'bindu[voice]'"
@@ -85,7 +85,7 @@ def create_tts_service(config: VoiceAgentExtension) -> Any:
                 "pipecat.services.elevenlabs.tts"
             )
             ElevenLabsTTSService = getattr(elevenlabs_module, "ElevenLabsTTSService")
-        except ImportError as e:
+        except (ImportError, AttributeError) as e:
             raise ImportError(
                 "ElevenLabs TTS requires pipecat[elevenlabs]. "
                 "Install with: pip install 'bindu[voice]'"

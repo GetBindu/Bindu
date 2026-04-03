@@ -112,7 +112,6 @@ async def create_session_manager(
         try:
             await manager.__aenter__()
         except Exception:
-            await manager.__aexit__(None, None, None)
             raise
         return manager
 
