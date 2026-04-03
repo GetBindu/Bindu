@@ -146,9 +146,9 @@ def prepare_server_display(
                 "Check tunnel config/network, or remove launch=True.\n",
                 style="white",
             )
-            warning_lines.append("Suppress: ", style="bold white")
+            warning_lines.append("Fallback: ", style="bold white")
             warning_lines.append(
-                "Pass fail_on_tunnel_error=False to bindufy() to continue locally without this warning.",
+                "Pass fail_on_tunnel_error=False to bindufy() to continue locally when tunnel fails (instead of raising an error).",
                 style="white",
             )
             console.print(

@@ -208,11 +208,6 @@ class TunnelError(RuntimeError):
     """Raised when tunnel creation fails and fail_on_tunnel_error=True."""
 
 
-_TUNNEL_MAX_ATTEMPTS = 3
-_TUNNEL_BASE_BACKOFF = 1  # seconds; doubles each retry: 1s, 2s, 4s
-_TUNNEL_HEALTH_TIMEOUT = 3  # seconds for health check request
-
-
 def _setup_tunnel(
     tunnel_config: Any,
     port: int,
@@ -220,14 +215,12 @@ def _setup_tunnel(
     bindu_app: Any,
     fail_on_tunnel_error: bool = True,
 ) -> tuple[str | None, str | None]:
-    """Set up tunnel if enabled, validate it, and update URLs.
+    """Set up tunnel if enabled and update URLs.
 
-    Retries tunnel creation + health check up to _TUNNEL_MAX_ATTEMPTS times
-    with exponential backoff (1s, 2s, 4s) before giving up.
-
-    After obtaining a tunnel URL, a GET request is sent to {tunnel_url}/health
-    (falling back to tunnel_url itself) with a short timeout. A non-200 response
-    or any request error is treated as a tunnel failure and triggers a retry.
+    Retries tunnel creation up to app_settings.tunnel.max_attempts times with
+    exponential backoff before giving up. Health validation is intentionally
+    deferred — it is performed separately after the HTTP server is accepting
+    requests (see _validate_tunnel_health).
 
     Args:
         tunnel_config: Tunnel configuration
@@ -246,12 +239,13 @@ def _setup_tunnel(
     """
     import time
 
-    import httpx
-
     if not (tunnel_config and tunnel_config.enabled):
         return None, None
 
     from bindu.tunneling.manager import TunnelManager
+
+    max_attempts = app_settings.tunnel.max_attempts
+    base_backoff = app_settings.tunnel.base_backoff_seconds
 
     logger.info("Tunnel enabled, creating public URL...")
     tunnel_config.local_port = port
@@ -259,7 +253,7 @@ def _setup_tunnel(
     tunnel_manager = TunnelManager()
     failure_reason = "Unknown error"
 
-    for attempt in range(1, _TUNNEL_MAX_ATTEMPTS + 1):
+    for attempt in range(1, max_attempts + 1):
         try:
             tunnel_url = tunnel_manager.create_tunnel(
                 local_port=port,
@@ -267,28 +261,8 @@ def _setup_tunnel(
                 subdomain=tunnel_config.subdomain,
             )
             logger.info(
-                f"Tunnel URL obtained (attempt {attempt}/{_TUNNEL_MAX_ATTEMPTS}): "
-                f"{tunnel_url} — validating..."
+                f"✅ Tunnel created (attempt {attempt}/{max_attempts}): {tunnel_url}"
             )
-
-            # Health check: prefer /health, fall back to root
-            health_url = f"{tunnel_url.rstrip('/')}/health"
-            root_url = tunnel_url
-
-            try:
-                response = httpx.get(health_url, timeout=_TUNNEL_HEALTH_TIMEOUT, follow_redirects=True)
-                if response.status_code != 200:
-                    raise ValueError(f"Health check returned HTTP {response.status_code} from {health_url}")
-            except (httpx.RequestError, ValueError):
-                # Fallback to root URL
-                try:
-                    response = httpx.get(root_url, timeout=_TUNNEL_HEALTH_TIMEOUT, follow_redirects=True)
-                    if response.status_code != 200:
-                        raise ValueError(f"Health check returned HTTP {response.status_code} from {root_url}")
-                except httpx.RequestError as exc:
-                    raise ValueError(f"Health check requests failed for both /health and root: {exc}") from exc
-
-            logger.info(f"✅ Tunnel created and validated: {tunnel_url}")
 
             manifest.url = tunnel_url
             bindu_app.url = tunnel_url
@@ -298,26 +272,22 @@ def _setup_tunnel(
 
         except Exception as e:
             failure_reason = str(e)
-            tunnel_manager.stop_tunnel()  # Cleanup failed tunnel
-            if attempt < _TUNNEL_MAX_ATTEMPTS:
-                backoff = _TUNNEL_BASE_BACKOFF * (2 ** (attempt - 1))
+            if attempt < max_attempts:
+                backoff = base_backoff * (2 ** (attempt - 1))
                 logger.info(
-                    f"Tunnel attempt {attempt}/{_TUNNEL_MAX_ATTEMPTS} failed "
+                    f"Tunnel attempt {attempt}/{max_attempts} failed "
                     f"({failure_reason}). Retrying in {backoff}s..."
                 )
                 time.sleep(backoff)
             else:
                 logger.error(
-                    f"Tunnel attempt {attempt}/{_TUNNEL_MAX_ATTEMPTS} failed "
+                    f"Tunnel attempt {attempt}/{max_attempts} failed "
                     f"({failure_reason}). All retries exhausted."
                 )
 
-    # Cleanup any remaining tunnel after all attempts
-    tunnel_manager.stop_tunnel()
-
     if fail_on_tunnel_error:
         raise TunnelError(
-            f"Tunnel creation failed after {_TUNNEL_MAX_ATTEMPTS} attempts: {failure_reason}\n"
+            f"Tunnel creation failed after {max_attempts} attempts: {failure_reason}\n"
             "Your agent was NOT started. To start without a public URL, "
             "set fail_on_tunnel_error=False or remove launch=True."
         )
@@ -326,13 +296,41 @@ def _setup_tunnel(
         "=" * 60 + "\n"
         "⚠️  TUNNEL FAILURE — AGENT IS NOT PUBLICLY ACCESSIBLE\n"
         f"   Reason      : {failure_reason}\n"
-        f"   Attempts    : {_TUNNEL_MAX_ATTEMPTS}/{_TUNNEL_MAX_ATTEMPTS} exhausted\n"
+        f"   Attempts    : {max_attempts}/{max_attempts} exhausted\n"
         "   Status      : Running on LOCAL network only\n"
         "   Action      : Check tunnel config, network, or remove launch=True\n"
-        "   Suppress    : Pass fail_on_tunnel_error=False to bindufy() to silence this\n"
+        "   Note        : fail_on_tunnel_error=False allows local fallback on tunnel failure\n"
         + "=" * 60
     )
     return None, failure_reason
+
+
+def _validate_tunnel_health(tunnel_url: str) -> str | None:
+    """Validate a tunnel URL by sending a health check request.
+
+    This is called AFTER the HTTP server is already accepting requests so the
+    health endpoint actually exists. Separating creation from validation avoids
+    the race condition where the server hasn't started yet.
+
+    Args:
+        tunnel_url: The public tunnel URL to validate.
+
+    Returns:
+        None if healthy, or a failure reason string if the check fails.
+    """
+    import httpx
+
+    health_timeout = app_settings.tunnel.health_check_timeout_seconds
+    health_url = f"{tunnel_url.rstrip('/')}/health"
+
+    try:
+        response = httpx.get(health_url, timeout=health_timeout, follow_redirects=True)
+        if response.status_code != 200:
+            return f"Health check returned HTTP {response.status_code} from {health_url}"
+        logger.info(f"✅ Tunnel health check passed: {health_url}")
+        return None
+    except httpx.RequestError as exc:
+        return f"Health check request failed: {exc}"
 
 
 def _create_telemetry_config(validated_config: Dict[str, Any]) -> TelemetryConfig:
