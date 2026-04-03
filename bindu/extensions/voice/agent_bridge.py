@@ -160,7 +160,8 @@ class AgentBridgeProcessor:
         """Keep only the most recent conversation turns."""
         overflow = len(self._conversation_history) - self._max_history_messages
         if overflow > 0:
-            del self._conversation_history[:overflow]
+            turns_to_drop = max(1, (overflow + 1) // 2)
+            del self._conversation_history[: turns_to_drop * 2]
 
     def _safe_callback(self, fn: Callable[..., Any], *args: Any) -> None:
         """Call a callback, tracking async tasks so they are not GC'd early."""

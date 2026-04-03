@@ -247,7 +247,7 @@ class RedisVoiceSessionManager:
                 )
 
     async def get_active_count(self) -> int:
-        """Number of sessions that are not ended."""
+        """Return the number of sessions that are not ended."""
         if not self._redis_client:
             return 0
 
