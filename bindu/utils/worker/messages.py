@@ -18,6 +18,8 @@ from .parts import PartConverter
 
 logger = get_logger("bindu.utils.worker.messages")
 
+MAX_FILE_SIZE = 10 * 1024 * 1024
+
 # Type aliases for better readability
 ChatMessage = dict[str, str]
 ProtocolMessage = Message
@@ -50,6 +52,22 @@ class FileInterceptor:
         except Exception as e:
             logger.error(f"Failed to parse DOCX: {e}")
             return "[Error: Could not parse DOCX content]"
+
+    @staticmethod
+    def _decode_plain_text(file_bytes: bytes) -> str:
+        """Decode plain text with UTF-8 first and safe fallbacks."""
+        for encoding in ("utf-8", "latin-1", "cp1252"):
+            try:
+                if encoding == "utf-8":
+                    return file_bytes.decode(encoding)
+                text = file_bytes.decode(encoding)
+                logger.info(f"Decoded plain text file using {encoding}")
+                return text
+            except UnicodeDecodeError:
+                continue
+
+        logger.warning("Falling back to replacement decoding for plain text file")
+        return file_bytes.decode("utf-8", errors="replace")
 
     @classmethod
     def intercept_and_parse(cls, parts: list[Part]) -> list[dict[str, Any]]:
@@ -85,13 +103,16 @@ class FileInterceptor:
                     raise ValueError("Missing file bytes")
 
                 file_bytes = base64.b64decode(base64_data)
+                if len(file_bytes) > MAX_FILE_SIZE:
+                    raise ValueError("File too large")
+
                 extracted_text = ""
 
                 # Route to specific parser based on MIME type
                 if mime_type == "application/pdf":
                     extracted_text = cls._extract_pdf(file_bytes)
                 elif mime_type == "text/plain":
-                    extracted_text = file_bytes.decode("utf-8")
+                    extracted_text = cls._decode_plain_text(file_bytes)
                 elif (
                     mime_type
                     == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -115,7 +136,7 @@ class FileInterceptor:
                 processed_parts.append(
                     {
                         "kind": "text",
-                        "text": "[System: Failed to decode uploaded file data]",
+                        "text": f"[System: Failed to decode uploaded file data: {e}]",
                     }
                 )
 

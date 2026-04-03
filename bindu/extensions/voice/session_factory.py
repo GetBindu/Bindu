@@ -109,7 +109,11 @@ async def create_session_manager(
         )
 
         # Enter async context to initialize Redis connection
-        await manager.__aenter__()
+        try:
+            await manager.__aenter__()
+        except Exception:
+            await manager.__aexit__(None, None, None)
+            raise
         return manager
 
     raise ValueError(
@@ -123,17 +127,24 @@ async def close_session_manager(manager: SessionManagerBackend) -> None:
     Args:
         manager: The session manager to close.
     """
+    cleanup_error: Exception | None = None
     try:
         await manager.stop_cleanup_loop()
         logger.info(f"{type(manager).__name__} cleanup loop stopped")
-
-        # For Redis manager, close connection after cleanup task stops.
+    except Exception as e:
+        cleanup_error = e
+        logger.error(f"Error stopping cleanup loop for {type(manager).__name__}: {e}")
+    finally:
         if (
             REDIS_AVAILABLE
             and RedisVoiceSessionManager is not None
             and isinstance(manager, RedisVoiceSessionManager)
         ):
-            await manager.__aexit__(None, None, None)
-            logger.info(f"{type(manager).__name__} connection closed")
-    except Exception as e:
-        logger.error(f"Error closing {type(manager).__name__}: {e}")
+            try:
+                await manager.__aexit__(None, None, None)
+                logger.info(f"{type(manager).__name__} connection closed")
+            except Exception as e:
+                logger.error(f"Error closing {type(manager).__name__}: {e}")
+
+    if cleanup_error is not None:
+        raise cleanup_error

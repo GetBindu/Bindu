@@ -156,6 +156,24 @@ class AgentBridgeProcessor:
         """Clear the conversation history."""
         self._conversation_history.clear()
 
+    async def cleanup_background_tasks(self) -> None:
+        """Cancel and await any background callback tasks."""
+        if not self._background_tasks:
+            return
+
+        tasks = list(self._background_tasks)
+        self._background_tasks.clear()
+
+        for task in tasks:
+            task.cancel()
+
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        for result in results:
+            if isinstance(result, Exception) and not isinstance(
+                result, asyncio.CancelledError
+            ):
+                logger.error(f"Error while cleaning up voice callback task: {result}")
+
     def _trim_history(self) -> None:
         """Keep only the most recent conversation turns."""
         overflow = len(self._conversation_history) - self._max_history_messages

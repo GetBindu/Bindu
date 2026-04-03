@@ -50,12 +50,35 @@ class VoiceSession:
     @classmethod
     def from_dict(cls, data: dict) -> VoiceSession:
         """Deserialize session from dictionary."""
+        session_id = data.get("id")
+        if not isinstance(session_id, str) or not session_id.strip():
+            raise ValueError("VoiceSession.id is required and must be a non-empty string")
+
+        context_id = data.get("context_id")
+        if not isinstance(context_id, str) or not context_id.strip():
+            raise ValueError("VoiceSession.context_id is required and must be a non-empty string")
+
+        task_id = data.get("task_id")
+        if task_id is not None and (not isinstance(task_id, str) or not task_id.strip()):
+            raise ValueError("VoiceSession.task_id must be a non-empty string when provided")
+
+        start_time = data.get("start_time", time.time())
+        if not isinstance(start_time, (int, float)) or isinstance(start_time, bool):
+            raise ValueError("VoiceSession.start_time must be a numeric timestamp")
+
+        state = data.get("state", "connecting")
+        allowed_states = {"connecting", "active", "ending", "ended"}
+        if state not in allowed_states:
+            raise ValueError(
+                f"VoiceSession.state must be one of {sorted(allowed_states)}; got {state!r}"
+            )
+
         return cls(
-            id=data.get("id", ""),
-            context_id=data.get("context_id", ""),
-            task_id=data.get("task_id"),
-            start_time=data.get("start_time", time.time()),
-            state=data.get("state", "connecting"),
+            id=session_id,
+            context_id=context_id,
+            task_id=task_id,
+            start_time=float(start_time),
+            state=state,
         )
 
 

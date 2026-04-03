@@ -403,6 +403,13 @@ async def voice_websocket(websocket: WebSocket) -> None:
             )
 
         try:
+            await bridge.cleanup_background_tasks()
+        except Exception as e:
+            logger.exception(
+                f"Error cleaning up voice bridge background tasks for session {session_id}: {e}"
+            )
+
+        try:
             await session_manager.end_session(session_id)
         except Exception as e:
             logger.exception(f"Error ending session {session_id}: {e}")
@@ -425,26 +432,29 @@ async def _process_user_turn(
     if not text:
         return
 
-    await _send_json(websocket, {"type": "state", "state": "agent-speaking"}, send_lock)
-    response_text = await bridge.process_transcription(text)
-    if response_text:
+    try:
         await _send_json(
-            websocket,
-            {
-                "type": "transcript",
-                "role": "agent",
-                "text": response_text,
-                "is_final": True,
-            },
-            send_lock,
+            websocket, {"type": "state", "state": "agent-speaking"}, send_lock
         )
+        response_text = await bridge.process_transcription(text)
+        if response_text:
+            await _send_json(
+                websocket,
+                {
+                    "type": "transcript",
+                    "role": "agent",
+                    "text": response_text,
+                    "is_final": True,
+                },
+                send_lock,
+            )
 
-        # Best-effort TTS synthesis and binary streaming.
-        tts_audio = await _synthesize_tts_audio(response_text)
-        if tts_audio:
-            await _send_bytes(websocket, tts_audio, send_lock)
-
-    await _send_json(websocket, {"type": "state", "state": "listening"}, send_lock)
+            # Best-effort TTS synthesis and binary streaming.
+            tts_audio = await _synthesize_tts_audio(response_text)
+            if tts_audio:
+                await _send_bytes(websocket, tts_audio, send_lock)
+    finally:
+        await _send_json(websocket, {"type": "state", "state": "listening"}, send_lock)
 
 
 async def _send_json(
@@ -484,7 +494,12 @@ async def _synthesize_tts_audio(text: str) -> bytes | None:
     if not api_key or not voice_id:
         return None
 
-    url = f"{app_settings.voice.provider_urls['elevenlabs_tts']}/{voice_id}"
+    provider_url = app_settings.voice.provider_urls.get("elevenlabs_tts")
+    if not provider_url:
+        logger.error("ElevenLabs TTS provider URL is not configured")
+        return None
+
+    url = f"{provider_url}/{voice_id}"
     payload = {
         "text": text,
         "model_id": model_id,
@@ -522,7 +537,10 @@ async def _transcribe_pcm_buffer(pcm_bytes: bytes) -> str | None:
         logger.debug("Empty audio buffer, skipping transcription")
         return None
 
-    url = app_settings.voice.provider_urls["deepgram_listen"]
+    url = app_settings.voice.provider_urls.get("deepgram_listen")
+    if not url:
+        logger.error("Deepgram STT provider URL is not configured")
+        return None
     params = {
         "model": app_settings.voice.stt_model,
         "language": app_settings.voice.stt_language,
