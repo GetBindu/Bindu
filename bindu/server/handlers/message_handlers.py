@@ -140,9 +140,11 @@ class MessageHandlers:
 
         config = request_params.get("configuration", {})
         if "history_length" in config:
-            scheduler_params["history_length"] = self._parse_non_negative_history_length(
+            history_length = self._parse_non_negative_history_length(
                 config["history_length"]
             )
+            if history_length is not None:
+                scheduler_params["history_length"] = history_length
 
         push_config = config.get("push_notification_config")
         if push_config and self.push_manager:
