@@ -55,6 +55,24 @@ class TestContextHandlers:
         assert response["result"] == []
 
     @pytest.mark.asyncio
+    async def test_list_contexts_preserves_explicit_zero_length(self):
+        """Test explicit zero length is not replaced by history_length fallback."""
+        mock_storage = AsyncMock()
+        mock_storage.list_contexts.return_value = []
+
+        handler = ContextHandlers(storage=mock_storage)
+        request = {
+            "jsonrpc": "2.0",
+            "id": "2",
+            "params": {"length": 0, "history_length": 5},
+        }
+
+        response = await handler.list_contexts(request)
+
+        assert response["result"] == []
+        mock_storage.list_contexts.assert_called_once_with(0)
+
+    @pytest.mark.asyncio
     async def test_clear_context_success(self):
         """Test clearing context successfully."""
         mock_storage = AsyncMock()

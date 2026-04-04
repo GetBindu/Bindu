@@ -325,7 +325,9 @@ class PostgresStorage(Storage[dict[str, Any]]):
                 task = self._row_to_task(row)
 
                 # Limit history if requested
-                if history_length is not None and history_length > 0:
+                if history_length == 0:
+                    task["history"] = []
+                elif history_length is not None and history_length > 0:
                     task["history"] = task["history"][-history_length:]
 
                 return task

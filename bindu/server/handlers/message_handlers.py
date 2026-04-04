@@ -128,8 +128,8 @@ class MessageHandlers:
         )
 
         config = request_params.get("configuration", {})
-        if history_length := config.get("history_length"):
-            scheduler_params["history_length"] = history_length
+        if "history_length" in config:
+            scheduler_params["history_length"] = config["history_length"]
 
         push_config = config.get("push_notification_config")
         if push_config and self.push_manager:

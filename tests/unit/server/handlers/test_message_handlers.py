@@ -168,6 +168,40 @@ class TestMessageHandlers:
         assert call_args["history_length"] == 10
 
     @pytest.mark.asyncio
+    async def test_submit_and_schedule_task_preserves_zero_history_length(self):
+        """Test explicit zero history_length is forwarded to the scheduler."""
+        mock_storage = AsyncMock()
+        mock_scheduler = AsyncMock()
+        task_id = uuid4()
+        context_id = uuid4()
+
+        mock_task = {
+            "id": task_id,
+            "context_id": context_id,
+            "status": {
+                "state": "pending",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+        }
+        mock_storage.submit_task.return_value = mock_task
+
+        handler = MessageHandlers(
+            scheduler=mock_scheduler,
+            storage=mock_storage,
+            context_id_parser=lambda x: context_id,
+        )
+
+        request_params = {
+            "message": {"content": "test", "context_id": str(context_id)},
+            "configuration": {"history_length": 0},
+        }
+
+        await handler._submit_and_schedule_task(request_params)
+
+        call_args = mock_scheduler.run_task.call_args[0][0]
+        assert call_args["history_length"] == 0
+
+    @pytest.mark.asyncio
     async def test_submit_and_schedule_task_with_push_config(self):
         """Test task submission with push notification config."""
         mock_storage = AsyncMock()

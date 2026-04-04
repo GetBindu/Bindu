@@ -261,6 +261,18 @@ class TestTaskOperations:
         assert len(loaded_task["history"]) == 3
 
     @pytest.mark.asyncio
+    async def test_load_task_with_zero_history_limit_returns_empty_history(
+        self, storage, sample_context_id, sample_message
+    ):
+        """Test loading task with zero history length returns no history."""
+        task = await storage.submit_task(sample_context_id, sample_message)
+
+        loaded_task = await storage.load_task(task["id"], history_length=0)
+
+        assert loaded_task is not None
+        assert loaded_task["history"] == []
+
+    @pytest.mark.asyncio
     async def test_load_nonexistent_task(self, storage):
         """Test loading a task that doesn't exist."""
         result = await storage.load_task(uuid4())
@@ -430,6 +442,27 @@ class TestTaskOperations:
         assert len(tasks) == 3
 
     @pytest.mark.asyncio
+    async def test_list_tasks_with_zero_limit_returns_empty(
+        self, storage, sample_context_id
+    ):
+        """Test listing tasks with zero limit returns an empty list."""
+        from bindu.common.protocol.types import TextPart
+
+        msg = Message(
+            message_id=uuid4(),
+            task_id=uuid4(),
+            context_id=sample_context_id,
+            kind="message",
+            role="user",
+            parts=[TextPart(kind="text", text="Test")],
+        )
+        await storage.submit_task(sample_context_id, msg)
+
+        tasks = await storage.list_tasks(length=0)
+
+        assert tasks == []
+
+    @pytest.mark.asyncio
     async def test_count_tasks(self, storage, sample_context_id):
         """Test counting all tasks."""
         from bindu.common.protocol.types import TextPart
@@ -578,6 +611,26 @@ class TestContextOperations:
         assert len(context_list) == 3
         assert all("context_id" in c for c in context_list)
         assert all("task_count" in c for c in context_list)
+
+    @pytest.mark.asyncio
+    async def test_list_contexts_with_zero_limit_returns_empty(self, storage):
+        """Test listing contexts with zero limit returns an empty list."""
+        from bindu.common.protocol.types import TextPart
+
+        ctx = uuid4()
+        msg = Message(
+            message_id=uuid4(),
+            task_id=uuid4(),
+            context_id=ctx,
+            kind="message",
+            role="user",
+            parts=[TextPart(kind="text", text="Test")],
+        )
+        await storage.submit_task(ctx, msg)
+
+        context_list = await storage.list_contexts(length=0)
+
+        assert context_list == []
 
     @pytest.mark.asyncio
     async def test_clear_context(self, storage, sample_context_id, sample_message):
