@@ -55,6 +55,17 @@ class MessageHandlers:
     context_id_parser: Any = None
     push_manager: Any | None = None
 
+    @staticmethod
+    def _parse_non_negative_history_length(value: Any) -> int | None:
+        """Validate optional non-negative integer history length values."""
+        if value is None:
+            return None
+
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError("Field 'history_length' must be a non-negative integer")
+
+        return value
+
     async def _handle_stream_error(
         self,
         task: Task,
@@ -129,7 +140,9 @@ class MessageHandlers:
 
         config = request_params.get("configuration", {})
         if "history_length" in config:
-            scheduler_params["history_length"] = config["history_length"]
+            scheduler_params["history_length"] = self._parse_non_negative_history_length(
+                config["history_length"]
+            )
 
         push_config = config.get("push_notification_config")
         if push_config and self.push_manager:

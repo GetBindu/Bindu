@@ -38,15 +38,28 @@ class ContextHandlers:
     storage: Storage[Any]
     error_response_creator: Any = None
 
+    @staticmethod
+    def _parse_non_negative_length(value: Any, field_name: str) -> int | None:
+        """Validate optional non-negative integer length parameters."""
+        if value is None:
+            return None
+
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError(f"Field '{field_name}' must be a non-negative integer")
+
+        return value
+
     @trace_context_operation("list_contexts")
     async def list_contexts(self, request: ListContextsRequest) -> ListContextsResponse:
         """List all contexts in storage."""
         # Support both 'length' and 'history_length' for backwards compatibility
         params = request.get("params", {})
         if "length" in params:
-            length = params["length"]
+            length = self._parse_non_negative_length(params["length"], "length")
         else:
-            length = params.get("history_length")
+            length = self._parse_non_negative_length(
+                params.get("history_length"), "history_length"
+            )
 
         contexts = await self.storage.list_contexts(length)
 

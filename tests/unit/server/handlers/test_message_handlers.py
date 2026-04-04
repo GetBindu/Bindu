@@ -202,6 +202,78 @@ class TestMessageHandlers:
         assert call_args["history_length"] == 0
 
     @pytest.mark.asyncio
+    async def test_submit_and_schedule_task_rejects_invalid_history_length_type(self):
+        """Test invalid history_length values are rejected before scheduling."""
+        mock_storage = AsyncMock()
+        mock_scheduler = AsyncMock()
+        task_id = uuid4()
+        context_id = uuid4()
+
+        mock_task = {
+            "id": task_id,
+            "context_id": context_id,
+            "status": {
+                "state": "pending",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+        }
+        mock_storage.submit_task.return_value = mock_task
+
+        handler = MessageHandlers(
+            scheduler=mock_scheduler,
+            storage=mock_storage,
+            context_id_parser=lambda x: context_id,
+        )
+
+        request_params = {
+            "message": {"content": "test", "context_id": str(context_id)},
+            "configuration": {"history_length": "0"},
+        }
+
+        with pytest.raises(
+            ValueError, match="Field 'history_length' must be a non-negative integer"
+        ):
+            await handler._submit_and_schedule_task(request_params)
+
+        mock_scheduler.run_task.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_submit_and_schedule_task_rejects_negative_history_length(self):
+        """Test negative history_length values are rejected before scheduling."""
+        mock_storage = AsyncMock()
+        mock_scheduler = AsyncMock()
+        task_id = uuid4()
+        context_id = uuid4()
+
+        mock_task = {
+            "id": task_id,
+            "context_id": context_id,
+            "status": {
+                "state": "pending",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+        }
+        mock_storage.submit_task.return_value = mock_task
+
+        handler = MessageHandlers(
+            scheduler=mock_scheduler,
+            storage=mock_storage,
+            context_id_parser=lambda x: context_id,
+        )
+
+        request_params = {
+            "message": {"content": "test", "context_id": str(context_id)},
+            "configuration": {"history_length": -1},
+        }
+
+        with pytest.raises(
+            ValueError, match="Field 'history_length' must be a non-negative integer"
+        ):
+            await handler._submit_and_schedule_task(request_params)
+
+        mock_scheduler.run_task.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_submit_and_schedule_task_with_push_config(self):
         """Test task submission with push notification config."""
         mock_storage = AsyncMock()

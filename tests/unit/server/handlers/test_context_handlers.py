@@ -73,6 +73,32 @@ class TestContextHandlers:
         mock_storage.list_contexts.assert_called_once_with(0)
 
     @pytest.mark.asyncio
+    async def test_list_contexts_rejects_invalid_length_type(self):
+        """Test invalid length values are rejected before reaching storage."""
+        mock_storage = AsyncMock()
+        handler = ContextHandlers(storage=mock_storage)
+        request = {"jsonrpc": "2.0", "id": "2", "params": {"length": "0"}}
+
+        with pytest.raises(ValueError, match="Field 'length' must be a non-negative integer"):
+            await handler.list_contexts(request)
+
+        mock_storage.list_contexts.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_list_contexts_rejects_negative_history_length(self):
+        """Test negative fallback history_length values are rejected."""
+        mock_storage = AsyncMock()
+        handler = ContextHandlers(storage=mock_storage)
+        request = {"jsonrpc": "2.0", "id": "2", "params": {"history_length": -1}}
+
+        with pytest.raises(
+            ValueError, match="Field 'history_length' must be a non-negative integer"
+        ):
+            await handler.list_contexts(request)
+
+        mock_storage.list_contexts.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_clear_context_success(self):
         """Test clearing context successfully."""
         mock_storage = AsyncMock()
