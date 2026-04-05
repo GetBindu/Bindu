@@ -128,8 +128,13 @@ async def _rate_limit_allow_ip(
     async with _VOICE_RATE_LIMIT_LOCK:
         window = _VOICE_RATE_LIMIT_IP_BUCKET.get(ip, [])
         window = [ts for ts in window if ts >= cutoff]
+
+        if not window:
+            _VOICE_RATE_LIMIT_IP_BUCKET.pop(ip, None)
+
         if len(window) >= limit_per_minute:
-            _VOICE_RATE_LIMIT_IP_BUCKET[ip] = window
+            if window:
+                _VOICE_RATE_LIMIT_IP_BUCKET[ip] = window
             return False
         window.append(t)
         _VOICE_RATE_LIMIT_IP_BUCKET[ip] = window
