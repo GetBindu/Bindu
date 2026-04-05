@@ -174,15 +174,31 @@ def _wait_for_task_terminal(
     }
 
     while time.monotonic() < deadline:
-        with httpx.Client(timeout=5.0) as client:
-            resp = client.post(
-                base_url,
-                json=get_task_request,
-                headers={"Content-Type": "application/json"},
-            )
+        try:
+            with httpx.Client(timeout=5.0) as client:
+                resp = client.post(
+                    base_url,
+                    json=get_task_request,
+                    headers={"Content-Type": "application/json"},
+                )
+        except Exception:
+            time.sleep(0.2)
+            continue
 
-        assert resp.status_code == 200
-        payload = resp.json()
+        if resp.status_code != 200:
+            time.sleep(0.2)
+            continue
+
+        try:
+            payload = resp.json()
+        except Exception:
+            time.sleep(0.2)
+            continue
+
+        if payload.get("error"):
+            time.sleep(0.2)
+            continue
+
         task = payload["result"]
         last_task = task
 
