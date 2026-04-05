@@ -88,9 +88,6 @@ export async function startVoiceSession(contextId?: string): Promise<void> {
     const errorMessage = err instanceof Error ? err.message : String(err);
     voiceError.set(errorMessage);
     voiceState.set('error');
-    if (client === localClient) {
-      client = null;
-    }
     await localClient.stopSession().catch(() => undefined);
     voiceSessionId.set(null);
     voiceContextId.set(null);
