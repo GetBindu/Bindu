@@ -72,7 +72,7 @@ async def create_session_manager(
         settings: Voice settings. If not provided, uses app_settings.voice.
 
     Returns:
-        VoiceSessionManager: An instance of the appropriate session manager.
+        SessionManagerBackend: An instance of the appropriate session manager backend.
 
     Raises:
         ValueError: If Redis backend is requested but Redis is not available.
