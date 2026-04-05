@@ -102,6 +102,17 @@ class FileInterceptor:
                 if not base64_data:
                     raise ValueError("Missing file bytes")
 
+                padding = (
+                    2
+                    if base64_data.endswith("==")
+                    else 1
+                    if base64_data.endswith("=")
+                    else 0
+                )
+                estimated_size = (len(base64_data) * 3) // 4 - padding
+                if estimated_size > MAX_FILE_SIZE:
+                    raise ValueError("File too large")
+
                 file_bytes = base64.b64decode(base64_data)
                 if len(file_bytes) > MAX_FILE_SIZE:
                     raise ValueError("File too large")
