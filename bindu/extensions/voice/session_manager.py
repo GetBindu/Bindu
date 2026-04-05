@@ -24,6 +24,8 @@ class VoiceSession:
     id: str
     context_id: str
     task_id: str | None = None
+    session_token: str | None = None
+    session_token_expires_at: float | None = None
     start_time: float = field(default_factory=time.time)
     state: Literal["connecting", "active", "ending", "ended"] = "connecting"
 
@@ -43,6 +45,8 @@ class VoiceSession:
             "id": self.id,
             "context_id": self.context_id,
             "task_id": self.task_id,
+            "session_token": self.session_token,
+            "session_token_expires_at": self.session_token_expires_at,
             "start_time": self.start_time,
             "state": self.state,
         }
@@ -70,6 +74,23 @@ class VoiceSession:
                 "VoiceSession.task_id must be a non-empty string when provided"
             )
 
+        session_token = data.get("session_token")
+        if session_token is not None and (
+            not isinstance(session_token, str) or not session_token.strip()
+        ):
+            raise ValueError(
+                "VoiceSession.session_token must be a non-empty string when provided"
+            )
+
+        session_token_expires_at = data.get("session_token_expires_at")
+        if session_token_expires_at is not None and (
+            not isinstance(session_token_expires_at, (int, float))
+            or isinstance(session_token_expires_at, bool)
+        ):
+            raise ValueError(
+                "VoiceSession.session_token_expires_at must be a numeric timestamp when provided"
+            )
+
         start_time = data.get("start_time", time.time())
         if not isinstance(start_time, (int, float)) or isinstance(start_time, bool):
             raise ValueError("VoiceSession.start_time must be a numeric timestamp")
@@ -85,6 +106,10 @@ class VoiceSession:
             id=session_id,
             context_id=context_id,
             task_id=task_id,
+            session_token=session_token,
+            session_token_expires_at=float(session_token_expires_at)
+            if session_token_expires_at is not None
+            else None,
             start_time=float(start_time),
             state=state,
         )
@@ -122,7 +147,13 @@ class VoiceSessionManager:
     # Session lifecycle
     # ------------------------------------------------------------------
 
-    async def create_session(self, context_id: str) -> VoiceSession:
+    async def create_session(
+        self,
+        context_id: str,
+        *,
+        session_token: str | None = None,
+        session_token_expires_at: float | None = None,
+    ) -> VoiceSession:
         """Create a new voice session.
 
         Args:
@@ -150,7 +181,12 @@ class VoiceSessionManager:
                 )
 
             session_id = uuid4().hex
-            session = VoiceSession(id=session_id, context_id=context_id)
+            session = VoiceSession(
+                id=session_id,
+                context_id=context_id,
+                session_token=session_token,
+                session_token_expires_at=session_token_expires_at,
+            )
             self._sessions[session_id] = session
 
             logger.info(

@@ -31,7 +31,13 @@ except ImportError:
 class SessionManagerBackend(Protocol):
     """Common interface supported by voice session manager backends."""
 
-    async def create_session(self, context_id: str) -> VoiceSession:
+    async def create_session(
+        self,
+        context_id: str,
+        *,
+        session_token: str | None = None,
+        session_token_expires_at: float | None = None,
+    ) -> VoiceSession:
         """Create a voice session for a context ID."""
 
     async def get_session(self, session_id: str) -> VoiceSession | None:

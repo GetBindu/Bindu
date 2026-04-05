@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
+from bindu.settings import app_settings
 from bindu.utils.logging import get_logger
 
 from .agent_bridge import AgentBridgeProcessor
@@ -24,8 +25,10 @@ def build_voice_pipeline(
     manifest_run: Callable[..., Any],
     context_id: str,
     *,
+    on_state_change: Callable[[str], Any] | None = None,
     on_user_transcript: Callable[[str], Any] | None = None,
     on_agent_response: Callable[[str], Any] | None = None,
+    on_agent_transcript: Callable[[str, bool], Any] | None = None,
 ) -> dict[str, Any]:
     """Build the voice pipeline components.
 
@@ -41,7 +44,7 @@ def build_voice_pipeline(
         on_agent_response: Optional callback for agent response events.
 
     Returns:
-        Dictionary with ``stt``, ``tts``, and ``bridge`` components.
+        Dictionary with ``stt``, ``tts``, ``bridge``, and ``vad`` components.
     """
     stt = create_stt_service(voice_ext)
     tts = create_tts_service(voice_ext)
@@ -49,18 +52,29 @@ def build_voice_pipeline(
     bridge = AgentBridgeProcessor(
         manifest_run=manifest_run,
         context_id=context_id,
+        allow_interruptions=voice_ext.allow_interruptions,
+        on_state_change=on_state_change,
         on_user_transcript=on_user_transcript,
         on_agent_response=on_agent_response,
+        on_agent_transcript=on_agent_transcript,
     )
+    
+    vad_analyzer = None
+    if app_settings.voice.vad_enabled:
+        from pipecat.audio.vad.silero import SileroVADAnalyzer
+        vad_analyzer = SileroVADAnalyzer(
+            sample_rate=app_settings.voice.sample_rate,
+        )
 
     logger.info(
         f"Voice pipeline built: STT={voice_ext.stt_provider}/{voice_ext.stt_model}, "
         f"TTS={voice_ext.tts_provider}/{voice_ext.tts_voice_id}, "
-        f"context={context_id}"
+        f"context={context_id}, VAD={app_settings.voice.vad_enabled}"
     )
 
     return {
         "stt": stt,
         "tts": tts,
         "bridge": bridge,
+        "vad": vad_analyzer,
     }

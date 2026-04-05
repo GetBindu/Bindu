@@ -77,7 +77,7 @@ export async function startVoiceSession(contextId?: string): Promise<void> {
     voiceSessionId.set(session.session_id);
     voiceContextId.set(session.context_id);
 
-    await localClient.connect(session.ws_url, session.session_id);
+    await localClient.connect(session.ws_url, session.session_id, session.session_token);
     if (startToken !== startTokenCounter) {
       await localClient.stopSession().catch(() => undefined);
       return;

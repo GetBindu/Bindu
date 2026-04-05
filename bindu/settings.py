@@ -1087,6 +1087,14 @@ class VoiceSettings(BaseSettings):
     redis_url: str = ""  # e.g., "redis://localhost:6379/0"
     redis_session_ttl: int = 300  # seconds, TTL for session keys in Redis
 
+    # WebSocket session authentication
+    session_auth_required: bool = False
+    session_token_ttl: int = 600  # seconds
+
+    # Rate limiting (0 disables)
+    rate_limit_per_ip_per_minute: int = 120
+    rate_limit_backend: Literal["memory", "redis"] = "memory"
+
     # Extension metadata
     # Note: bindu:// is an internal routing scheme used by the voice agent extension.
     # Consumers should handle this as a special case for internal routing.

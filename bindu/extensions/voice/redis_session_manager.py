@@ -180,7 +180,13 @@ class RedisVoiceSessionManager:
     # Session lifecycle
     # ------------------------------------------------------------------
 
-    async def create_session(self, context_id: str) -> VoiceSession:
+    async def create_session(
+        self,
+        context_id: str,
+        *,
+        session_token: str | None = None,
+        session_token_expires_at: float | None = None,
+    ) -> VoiceSession:
         """Create a new voice session.
 
         Args:
@@ -199,7 +205,12 @@ class RedisVoiceSessionManager:
             )
 
         session_id = uuid4().hex
-        session = VoiceSession(id=session_id, context_id=context_id)
+        session = VoiceSession(
+            id=session_id,
+            context_id=context_id,
+            session_token=session_token,
+            session_token_expires_at=session_token_expires_at,
+        )
         key = self._session_key(session_id)
         serialized_session = self._serialize_session(session)
 

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 
 
+import asyncio
 import os
 from dotenv import load_dotenv
 load_dotenv()
@@ -25,23 +26,26 @@ print("VOICE__STT_API_KEY set:", bool(os.environ.get("VOICE__STT_API_KEY")))
 from bindu.penguin.bindufy import bindufy
 
 
-def handler(messages: list[dict[str, str]]) -> list[dict[str, str]]:
-    """Simple voice-friendly echo handler.
+async def handler(messages: list[dict[str, str]]):
+    """Streaming voice-friendly handler (async generator).
 
-    The voice bridge converts speech to text and submits user turns as regular
-    text messages to this handler.
+    This demonstrates true "start speaking while thinking" behavior: the voice
+    bridge can forward partial text chunks to TTS as they are yielded.
     """
     latest = messages[-1].get("content", "") if messages else ""
-    return [
-        {
-            "role": "assistant",
-            "content": (
-                "I heard you say: "
-                f"{latest}. "
-                "You can keep speaking and I will respond turn by turn."
-            ),
-        }
-    ]
+    full = (
+        "I heard you say: "
+        f"{latest}. "
+        "You can keep speaking and I will respond turn by turn."
+    )
+
+    words = full.split()
+    built: list[str] = []
+    for word in words:
+        built.append(word)
+        # Yield cumulative text (common streaming pattern). The bridge will emit only deltas.
+        yield " ".join(built)
+        await asyncio.sleep(0.02)
 
 
 config = {

@@ -982,6 +982,13 @@ Phases 2 and 3 can proceed in parallel once Phase 1 is complete.
 
 ## 9. Future Extensions (Out of Scope for v1)
 
+### Production Hardening (Future Improvements)
+
+- **Per-user authentication and authorization**: enforce authenticated users for voice sessions, plus per-agent/per-user access policies (not just per-IP).
+- **Provider reconnect + retries**: structured backoff and recovery for STT/TTS provider disconnects instead of immediate session termination.
+- **Observability**: metrics/tracing for STT/TTS/agent latency, disconnect rates, and per-session resource usage.
+- **True end-to-end tests**: WebSocket integration tests using a real ASGI app + test client (beyond unit tests / stubs).
+
 | Feature | Notes |
 |---------|-------|
 | **Telephony (Twilio/Vonage)** | Add `TelephonyTransport` that bridges SIP/PSTN via Twilio into the same pipecat pipeline |

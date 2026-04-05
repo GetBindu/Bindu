@@ -3,8 +3,11 @@
 import asyncio
 
 import pytest
+from unittest.mock import AsyncMock
 
 from bindu.extensions.voice.agent_bridge import AgentBridgeProcessor
+from pipecat.frames.frames import TranscriptionFrame, InterruptionFrame
+from pipecat.processors.frame_processor import FrameDirection
 
 
 class TestAgentBridgeProcessor:
@@ -91,6 +94,86 @@ class TestAgentBridgeProcessor:
         await bridge.process_transcription("Hello")
         assert user_texts == ["Hello"]
         assert agent_texts == ["Agent response"]
+
+    @pytest.mark.asyncio
+    async def test_agent_transcript_deltas_emitted_when_emit_frames_true(self):
+        deltas: list[tuple[str, bool]] = []
+
+        async def run(history):
+            yield "hello this"
+            yield "hello this is"
+            yield "hello this is agent"
+
+        bridge = AgentBridgeProcessor(
+            manifest_run=run,
+            context_id="ctx",
+            on_agent_transcript=lambda text, is_final: deltas.append((text, is_final)),
+        )
+        bridge.push_frame = AsyncMock()
+
+        result = await bridge.process_transcription("Hi", emit_frames=True)
+        assert result == "hello this is agent"
+        assert deltas[0] == ("hello this", False)
+        assert deltas[1] == ("is", False)
+        assert deltas[2] == ("agent", False)
+        assert deltas[-1] == ("hello this is agent", True)
+
+    @pytest.mark.asyncio
+    async def test_new_transcription_interrupts_downstream_when_allow_interruptions(self):
+        first_started = asyncio.Event()
+        unblock_first = asyncio.Event()
+
+        async def run(history):
+            if history and history[-1]["content"] == "first":
+                first_started.set()
+                await unblock_first.wait()
+                return "done"
+            return "ok"
+
+        bridge = AgentBridgeProcessor(manifest_run=run, context_id="ctx", allow_interruptions=True)
+        bridge.push_frame = AsyncMock()
+
+        await bridge.process_frame(
+            TranscriptionFrame("first", user_id="u", timestamp=0.0),
+            direction=FrameDirection.DOWNSTREAM,
+        )
+        await asyncio.wait_for(first_started.wait(), timeout=1)
+
+        await bridge.process_frame(
+            TranscriptionFrame("second", user_id="u", timestamp=1.0),
+            direction=FrameDirection.DOWNSTREAM,
+        )
+
+        # Should have pushed an interruption downstream due to barge-in.
+        assert any(
+            isinstance(call.args[0], InterruptionFrame)
+            for call in bridge.push_frame.await_args_list
+            if call.args
+        )
+
+        unblock_first.set()
+
+    @pytest.mark.asyncio
+    async def test_agent_timeout_returns_fallback_and_emits_tts_filler(self):
+        async def run(history):
+            await asyncio.sleep(0.05)
+            yield "late response"
+
+        bridge = AgentBridgeProcessor(
+            manifest_run=run,
+            context_id="ctx",
+            allow_interruptions=True,
+            first_token_timeout_seconds=0.01,
+            total_response_timeout_seconds=0.02,
+        )
+        bridge.push_frame = AsyncMock()
+
+        result = await bridge.process_transcription("Hello", emit_frames=True)
+        assert isinstance(result, str)
+        assert "Sorry" in result
+
+        # First filler, then fallback.
+        assert bridge.push_frame.await_count >= 2
 
     @pytest.mark.asyncio
     async def test_agent_error_returns_none(self):

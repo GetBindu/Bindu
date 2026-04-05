@@ -32,7 +32,7 @@ uv run examples/voice-agent/main.py
 Check agent health and card:
 
 ```bash
-curl -sS http://localhost:3773/healthz
+curl -sS http://localhost:3773/health
 curl -sS http://localhost:3773/.well-known/agent.json
 ```
 
@@ -50,7 +50,8 @@ Expected response:
 {
   "session_id": "...",
   "context_id": "...",
-  "ws_url": "ws://localhost:3773/ws/voice/..."
+  "ws_url": "ws://localhost:3773/ws/voice/...",
+  "session_token": "..." // only when VOICE__SESSION_AUTH_REQUIRED=true
 }
 ```
 
@@ -59,3 +60,6 @@ Expected response:
 - The frontend voice panel can connect to this server and stream mic audio.
 - If provider keys are missing, voice routes still exist but STT/TTS processing will fail.
 - Use `BINDU_PORT` or `BINDU_DEPLOYMENT_URL` to run on a different port.
+- When `VOICE__SESSION_AUTH_REQUIRED=true`, the frontend sends the `session_token` via `Sec-WebSocket-Protocol`.
+- If `VOICE__VAD_ENABLED=false`, the backend relies on `{ "type": "commit_turn" }` to end user turns.
+- `examples/voice-agent/main.py` uses an async-generator handler to demonstrate token streaming (lower latency to first audio).

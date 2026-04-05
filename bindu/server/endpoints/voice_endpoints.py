@@ -10,12 +10,14 @@ Provides:
 from __future__ import annotations
 
 import json
-import time
 import asyncio
-from typing import TYPE_CHECKING
+import importlib
+import secrets
+import time
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
-import httpx
 from fastapi import HTTPException
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
@@ -32,6 +34,386 @@ if TYPE_CHECKING:
 logger = get_logger("bindu.server.endpoints.voice")
 
 _BACKGROUND_TASKS: set[asyncio.Task[None]] = set()
+_VOICE_RATE_LIMIT_LOCK = asyncio.Lock()
+_VOICE_RATE_LIMIT_IP_BUCKET: dict[str, list[float]] = {}
+_VOICE_RATE_LIMIT_REDIS_LOCK = asyncio.Lock()
+_VOICE_RATE_LIMIT_REDIS_CLIENT: Any | None = None
+
+try:
+    import redis.asyncio as _redis_async  # type: ignore[import-not-found]
+
+    _REDIS_AVAILABLE = True
+except Exception:  # pragma: no cover
+    _redis_async = None
+    _REDIS_AVAILABLE = False
+
+
+_RATE_LIMIT_LUA = """
+-- Sliding-window rate limit using a sorted set.
+-- KEYS[1] = zset key
+-- ARGV[1] = now (seconds)
+-- ARGV[2] = cutoff (seconds)
+-- ARGV[3] = member (unique)
+-- ARGV[4] = limit (int)
+redis.call('ZREMRANGEBYSCORE', KEYS[1], 0, tonumber(ARGV[2]))
+redis.call('ZADD', KEYS[1], tonumber(ARGV[1]), ARGV[3])
+local count = redis.call('ZCARD', KEYS[1])
+redis.call('EXPIRE', KEYS[1], 120)
+if count > tonumber(ARGV[4]) then
+  return 0
+end
+return 1
+"""
+
+
+async def _get_rate_limit_redis_client() -> Any | None:
+    """Lazy init a Redis client for rate limiting (best-effort)."""
+    global _VOICE_RATE_LIMIT_REDIS_CLIENT
+    if _VOICE_RATE_LIMIT_REDIS_CLIENT is not None:
+        return _VOICE_RATE_LIMIT_REDIS_CLIENT
+
+    if not _REDIS_AVAILABLE:
+        return None
+
+    redis_url = app_settings.voice.redis_url
+    if not redis_url:
+        return None
+
+    async with _VOICE_RATE_LIMIT_REDIS_LOCK:
+        if _VOICE_RATE_LIMIT_REDIS_CLIENT is not None:
+            return _VOICE_RATE_LIMIT_REDIS_CLIENT
+        try:
+            _VOICE_RATE_LIMIT_REDIS_CLIENT = _redis_async.from_url(  # type: ignore[union-attr]
+                redis_url,
+                encoding="utf-8",
+                decode_responses=True,
+            )
+            return _VOICE_RATE_LIMIT_REDIS_CLIENT
+        except Exception:
+            logger.exception("Failed to initialize Redis rate limiter client")
+            _VOICE_RATE_LIMIT_REDIS_CLIENT = None
+            return None
+
+
+async def _rate_limit_allow_ip(
+    ip: str,
+    *,
+    limit_per_minute: int,
+    now: float | None = None,
+) -> bool:
+    """Simple sliding-window rate limiter keyed by IP."""
+    if limit_per_minute <= 0:
+        return True
+    t = float(time.time() if now is None else now)
+    cutoff = t - 60.0
+
+    if app_settings.voice.rate_limit_backend == "redis":
+        client = await _get_rate_limit_redis_client()
+        if client is not None:
+            key = f"voice:rate_limit:ip:{ip}"
+            member = f"{t}:{time.time_ns()}"
+            try:
+                allowed = await client.eval(
+                    _RATE_LIMIT_LUA,
+                    1,
+                    key,
+                    t,
+                    cutoff,
+                    member,
+                    int(limit_per_minute),
+                )
+                return bool(allowed)
+            except Exception:
+                logger.exception("Redis rate limiter failed; falling back to memory")
+
+    async with _VOICE_RATE_LIMIT_LOCK:
+        window = _VOICE_RATE_LIMIT_IP_BUCKET.get(ip, [])
+        window = [ts for ts in window if ts >= cutoff]
+        if len(window) >= limit_per_minute:
+            _VOICE_RATE_LIMIT_IP_BUCKET[ip] = window
+            return False
+        window.append(t)
+        _VOICE_RATE_LIMIT_IP_BUCKET[ip] = window
+        return True
+
+
+@dataclass
+class _VoiceControlState:
+    muted: bool = False
+    stopped: bool = False
+
+
+class _FilteredWebSocket:
+    """WebSocket wrapper that filters inbound frames.
+
+    Used to keep Pipecat's transport focused on audio frames while this endpoint
+    consumes and handles JSON control messages (start/mute/unmute/stop/etc).
+    """
+
+    def __init__(self, websocket: WebSocket, queue: asyncio.Queue[dict[str, Any]]):
+        self._ws = websocket
+        self._queue = queue
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._ws, name)
+
+    async def receive(self) -> dict[str, Any]:
+        return await self._queue.get()
+
+    async def receive_text(self) -> str:
+        message = await self.receive()
+        if message.get("type") == "websocket.disconnect":
+            raise WebSocketDisconnect(code=message.get("code", 1000))
+        text = message.get("text")
+        if text is None:
+            raise RuntimeError("Expected text WebSocket message")
+        return text
+
+    async def receive_bytes(self) -> bytes:
+        message = await self.receive()
+        if message.get("type") == "websocket.disconnect":
+            raise WebSocketDisconnect(code=message.get("code", 1000))
+        data = message.get("bytes")
+        if data is None:
+            raise RuntimeError("Expected bytes WebSocket message")
+        return data
+
+
+async def _send_json(
+    websocket: Any,
+    payload: dict[str, Any],
+    send_lock: asyncio.Lock | None = None,
+) -> None:
+    """Send a JSON payload over a WebSocket safely.
+
+    If a lock is provided, it is used to serialize concurrent send_text calls.
+    """
+    data = json.dumps(payload)
+    if send_lock is None:
+        await websocket.send_text(data)
+        return
+    async with send_lock:
+        await websocket.send_text(data)
+
+
+def _trim_overlap_text(previous: str, current: str) -> str:
+    """Trim repeated word-overlap between adjacent transcript chunks.
+
+    Returns only the delta portion of ``current`` that does not duplicate
+    the suffix of ``previous``.
+    """
+    prev = (previous or "").strip()
+    curr = (current or "").strip()
+    if not prev:
+        return curr
+    if prev == curr:
+        return ""
+
+    prev_tokens = prev.split()
+    curr_tokens = curr.split()
+    max_overlap = min(len(prev_tokens), len(curr_tokens))
+
+    for overlap in range(max_overlap, 0, -1):
+        if prev_tokens[-overlap:] == curr_tokens[:overlap]:
+            return " ".join(curr_tokens[overlap:]).strip()
+
+    return curr
+
+
+def _extract_bearer_token(value: str | None) -> str | None:
+    if not value:
+        return None
+    parts = value.split()
+    if len(parts) == 2 and parts[0].lower() == "bearer":
+        token = parts[1].strip()
+        return token or None
+    return None
+
+
+def _extract_ws_session_token(websocket: WebSocket) -> str | None:
+    """Extract session token from WS headers (subprotocol or Authorization)."""
+    subprotocols = websocket.headers.get("sec-websocket-protocol")
+    if subprotocols:
+        # Starlette exposes the raw comma-separated list.
+        for item in subprotocols.split(","):
+            token = item.strip()
+            if token:
+                return token
+
+    return _extract_bearer_token(websocket.headers.get("authorization"))
+
+
+def _has_ws_subprotocols(websocket: WebSocket) -> bool:
+    return bool(websocket.headers.get("sec-websocket-protocol"))
+
+
+def _classify_voice_pipeline_error(exc: Exception) -> tuple[str, int]:
+    """Map internal pipeline exceptions to a user-facing error + close code."""
+    module = type(exc).__module__
+    name = type(exc).__name__
+    message = str(exc)
+
+    if isinstance(exc, asyncio.TimeoutError) or name == "TimeoutError":
+        return ("Voice pipeline timed out", 1011)
+
+    if module.startswith("websockets") or "ConnectionClosed" in name:
+        return ("Voice provider connection closed", 1011)
+
+    lowered = message.lower()
+    if "deepgram" in lowered and ("disconnect" in lowered or "closed" in lowered):
+        return ("Deepgram connection closed", 1011)
+    if "elevenlabs" in lowered and ("disconnect" in lowered or "closed" in lowered):
+        return ("ElevenLabs connection closed", 1011)
+
+    return ("Voice pipeline error", 1011)
+
+
+def _voice_preflight_error() -> str | None:
+    """Return a user-facing error if voice is not runnable in this process."""
+    # Ensure optional dependency group is installed.
+    try:
+        importlib.import_module("pipecat")
+    except Exception:
+        return "Voice dependencies are not installed. Install with: pip install 'bindu[voice]'"
+
+    # Ensure provider keys exist (current implementation relies on these env vars).
+    if not app_settings.voice.stt_api_key:
+        return "VOICE__STT_API_KEY is required for voice"
+    if not app_settings.voice.tts_api_key:
+        return "VOICE__TTS_API_KEY is required for voice"
+
+    return None
+
+async def _send_error_and_close(
+    websocket: WebSocket,
+    message: str,
+    *,
+    send_lock: asyncio.Lock,
+    close_code: int = 1008,
+) -> None:
+    try:
+        await _send_json(websocket, {"type": "error", "message": message}, send_lock)
+    finally:
+        try:
+            await websocket.close(code=close_code, reason=message)
+        except Exception:
+            pass
+
+
+async def _voice_control_reader(
+    websocket: WebSocket,
+    inbound_queue: asyncio.Queue[dict[str, Any]],
+    control: _VoiceControlState,
+    *,
+    vad_enabled: bool,
+    send_lock: asyncio.Lock,
+    on_user_text: Any | None = None,
+) -> None:
+    """Read from the real WebSocket and push only audio frames to the queue."""
+    max_binary_frame_bytes = 64 * 1024
+    max_frames_per_second = 50
+    max_frames_in_flight = 10
+
+    window_started_at = time.monotonic()
+    window_count = 0
+
+    while True:
+        message: dict[str, Any] = await websocket.receive()
+        message_type = message.get("type")
+
+        if message_type == "websocket.disconnect":
+            await inbound_queue.put(message)
+            return
+
+        if message_type != "websocket.receive":
+            await inbound_queue.put(message)
+            continue
+
+        text = message.get("text")
+        if text is not None:
+            try:
+                payload = json.loads(text)
+            except json.JSONDecodeError:
+                await _send_error_and_close(
+                    websocket,
+                    "Malformed JSON control frame",
+                    send_lock=send_lock,
+                )
+                return
+
+            frame_type = payload.get("type")
+            if frame_type == "mute":
+                control.muted = True
+                await _send_json(websocket, {"type": "state", "state": "muted"}, send_lock)
+                continue
+            if frame_type == "unmute":
+                control.muted = False
+                await _send_json(
+                    websocket, {"type": "state", "state": "listening"}, send_lock
+                )
+                continue
+            if frame_type == "stop":
+                control.stopped = True
+                await _send_json(websocket, {"type": "state", "state": "ended"}, send_lock)
+                try:
+                    await websocket.close()
+                finally:
+                    return
+            if frame_type == "user_text":
+                user_text = payload.get("text")
+                if isinstance(user_text, str) and user_text.strip() and on_user_text:
+                    try:
+                        await on_user_text(user_text.strip())
+                    except Exception:
+                        logger.exception("Failed to handle user_text control frame")
+                continue
+            if frame_type in {"start", "commit_turn"}:
+                # If VAD is disabled, the transport/STT may rely on explicit turn boundary
+                # control frames (e.g. commit_turn). Forward these to the transport.
+                if not vad_enabled:
+                    await inbound_queue.put(message)
+                continue
+
+            # Unknown control frame: ignore to preserve forward-compat.
+            continue
+
+        data = message.get("bytes")
+        if data is None:
+            continue
+
+        if control.muted:
+            continue
+
+        if len(data) > max_binary_frame_bytes:
+            await _send_error_and_close(
+                websocket,
+                f"Audio frame too large (max {max_binary_frame_bytes} bytes)",
+                send_lock=send_lock,
+            )
+            return
+
+        now = time.monotonic()
+        if now - window_started_at >= 1.0:
+            window_started_at = now
+            window_count = 0
+        window_count += 1
+        if window_count > max_frames_per_second:
+            await _send_error_and_close(
+                websocket,
+                f"Too many audio frames per second (max {max_frames_per_second})",
+                send_lock=send_lock,
+            )
+            return
+
+        if inbound_queue.qsize() >= max_frames_in_flight:
+            await _send_error_and_close(
+                websocket,
+                f"Too many audio frames in flight (max {max_frames_in_flight})",
+                send_lock=send_lock,
+            )
+            return
+
+        await inbound_queue.put(message)
 
 
 # ---------------------------------------------------------------------------
@@ -55,6 +437,25 @@ async def voice_session_start(app: BinduApplication, request: Request) -> Respon
             {"error": "Voice extension is not enabled"}, status_code=501
         )
 
+    if not app_settings.voice.enabled:
+        return JSONResponse({"error": "Voice is disabled"}, status_code=501)
+
+    preflight_error = _voice_preflight_error()
+    if preflight_error:
+        return JSONResponse({"error": preflight_error}, status_code=503)
+
+    # Per-IP rate limit (best-effort; request.client may be missing in tests/proxies)
+    client_host = request.client.host if request.client else None
+    if client_host:
+        allowed = await _rate_limit_allow_ip(
+            client_host,
+            limit_per_minute=int(app_settings.voice.rate_limit_per_ip_per_minute),
+        )
+        if not allowed:
+            return JSONResponse(
+                {"error": "Rate limit exceeded"}, status_code=429
+            )
+
     # Parse optional context_id from body
     context_id = str(uuid4())
     raw_body = await request.body()
@@ -69,8 +470,18 @@ async def voice_session_start(app: BinduApplication, request: Request) -> Respon
         if isinstance(body, dict) and "context_id" in body:
             context_id = str(body["context_id"])
 
+    session_token: str | None = None
+    session_token_expires_at: float | None = None
+    if app_settings.voice.session_auth_required:
+        session_token = secrets.token_urlsafe(32)
+        session_token_expires_at = time.time() + max(1, int(app_settings.voice.session_token_ttl))
+
     try:
-        session = await session_manager.create_session(context_id)
+        session = await session_manager.create_session(
+            context_id,
+            session_token=session_token,
+            session_token_expires_at=session_token_expires_at,
+        )
     except RuntimeError as exc:
         return JSONResponse({"error": str(exc)}, status_code=429)
 
@@ -93,6 +504,7 @@ async def voice_session_start(app: BinduApplication, request: Request) -> Respon
             "session_id": session.id,
             "context_id": session.context_id,
             "ws_url": ws_url,
+            **({"session_token": session_token} if session_token else {}),
         },
         status_code=201,
     )
@@ -160,20 +572,9 @@ async def voice_session_status(app: BinduApplication, request: Request) -> Respo
 # ---------------------------------------------------------------------------
 
 
+
 async def voice_websocket(websocket: WebSocket) -> None:
-    """Bidirectional voice WebSocket handler.
-
-    Protocol:
-        Client→Server (text):  { "type": "start", "config": { ... } }
-        Client→Server (binary): Raw PCM 16-bit audio frames
-        Client→Server (text):  { "type": "mute"/"unmute"/"stop" }
-
-        Server→Client (text):  { "type": "transcript", "role": "user"/"agent", "text": "...", "is_final": true }
-        Server→Client (binary): TTS audio (PCM 16-bit)
-        Server→Client (text):  { "type": "agent_response", "text": "...", "task_id": "..." }
-        Server→Client (text):  { "type": "state", "state": "listening"/"agent-speaking" }
-        Server→Client (text):  { "type": "error", "message": "..." }
-    """
+    """Bidirectional voice WebSocket handler using Pipecat pipeline."""
     app: BinduApplication = websocket.app  # type: ignore[assignment]
     session_id = websocket.path_params.get("session_id", "")
 
@@ -181,498 +582,217 @@ async def voice_websocket(websocket: WebSocket) -> None:
     if session_manager is None:
         await websocket.close(code=1008, reason="Voice extension is not enabled")
         return
+    if not app_settings.voice.enabled:
+        await websocket.close(code=1008, reason="Voice is disabled")
+        return
+
+    preflight_error = _voice_preflight_error()
+    if preflight_error:
+        await websocket.close(code=1008, reason=preflight_error)
+        return
 
     session = await session_manager.get_session(session_id)
     if session is None:
         await websocket.close(code=1008, reason="Invalid session ID")
         return
 
-    await websocket.accept()
-    await session_manager.update_state(session_id, "active")
-    send_lock = asyncio.Lock()
-    session_tasks: set[asyncio.Task[None]] = set()
+    # Per-IP rate limit on websocket connects (best-effort)
+    client_host = websocket.client.host if websocket.client else None
+    if client_host:
+        allowed = await _rate_limit_allow_ip(
+            client_host,
+            limit_per_minute=int(app_settings.voice.rate_limit_per_ip_per_minute),
+        )
+        if not allowed:
+            await websocket.close(code=1008, reason="Rate limit exceeded")
+            return
 
-    # Build the agent bridge for this session
+    if app_settings.voice.session_auth_required:
+        expected = getattr(session, "session_token", None)
+        expires_at = getattr(session, "session_token_expires_at", None)
+        provided = _extract_ws_session_token(websocket)
+
+        # If the client sent Sec-WebSocket-Protocol, the server should select one.
+        # We select the token itself as the negotiated subprotocol.
+        if provided and _has_ws_subprotocols(websocket):
+            await websocket.accept(subprotocol=provided)
+        else:
+            await websocket.accept()
+        if not provided:
+            try:
+                provided = (await websocket.receive_text()).strip()
+            except Exception:
+                await websocket.close(code=1008, reason="Missing session token")
+                return
+
+        if not expected or provided != expected:
+            await websocket.close(code=1008, reason="Invalid session token")
+            return
+        if isinstance(expires_at, (int, float)) and time.time() > float(expires_at):
+            await websocket.close(code=1008, reason="Session token expired")
+            return
+    else:
+        await websocket.accept()
+
+    await session_manager.update_state(session_id, "active")
+
     voice_ext = getattr(app, "_voice_ext", None)
     manifest = getattr(app, "manifest", None)
     if voice_ext is None or manifest is None or not hasattr(manifest, "run"):
-        await _send_json(
-            websocket,
-            {"type": "error", "message": "Agent not configured for voice"},
-            send_lock,
-        )
+        await websocket.send_text(json.dumps({"type": "error", "message": "Agent not configured for voice"}))
         await websocket.close(code=1011)
         return
 
-    from bindu.extensions.voice.agent_bridge import AgentBridgeProcessor
+    from bindu.extensions.voice.pipeline_builder import build_voice_pipeline
+    from pipecat.transports.websocket.fastapi import FastAPIWebsocketTransport, FastAPIWebsocketParams
+    from pipecat.pipeline.pipeline import Pipeline
+    from pipecat.pipeline.task import PipelineTask
+    from pipecat.pipeline.runner import PipelineRunner
 
-    bridge = AgentBridgeProcessor(
-        manifest_run=manifest.run,
-        context_id=session.context_id,
-        on_user_transcript=lambda text: _try_send_json(
+    # Notify UI we are listening
+    send_lock = asyncio.Lock()
+    await _send_json(websocket, {"type": "state", "state": "listening"}, send_lock)
+
+    async def _on_user_transcript(text: str) -> None:
+        await _send_json(
             websocket,
             {"type": "transcript", "role": "user", "text": text, "is_final": True},
             send_lock,
-            session_tasks,
-        ),
-        on_agent_response=lambda text: _try_send_json(
+        )
+
+    async def _on_agent_response(text: str) -> None:
+        await _send_json(
             websocket,
             {"type": "agent_response", "text": text, "task_id": session.task_id},
             send_lock,
-            session_tasks,
-        ),
+        )
+
+    async def _on_state_change(state: str) -> None:
+        await _send_json(websocket, {"type": "state", "state": state}, send_lock)
+
+    async def _on_agent_transcript(text: str, is_final: bool) -> None:
+        await _send_json(
+            websocket,
+            {
+                "type": "transcript",
+                "role": "agent",
+                "text": text,
+                "is_final": is_final,
+            },
+            send_lock,
+        )
+
+    components = build_voice_pipeline(
+        voice_ext=voice_ext,
+        manifest_run=manifest.run,
+        context_id=session.context_id,
+        on_state_change=_on_state_change,
+        on_user_transcript=_on_user_transcript,
+        on_agent_response=_on_agent_response,
+        on_agent_transcript=_on_agent_transcript,
     )
 
-    muted = False
-    audio_buffer = bytearray()
-    last_transcribe_at = 0.0
-    chunk_bytes = (
-        app_settings.voice.sample_rate
-        * app_settings.voice.audio_channels
-        * app_settings.voice.audio_sample_width_bytes
+    control = _VoiceControlState()
+    inbound_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=10)
+    filtered_ws = _FilteredWebSocket(websocket, inbound_queue)
+
+    async def _handle_user_text(text: str) -> None:
+        await _send_json(
+            websocket,
+            {"type": "transcript", "role": "user", "text": text, "is_final": True},
+            send_lock,
+        )
+        response = await components["bridge"].process_transcription(text, emit_frames=True)
+        if response:
+            await _on_agent_response(response)
+
+    reader_task = asyncio.create_task(
+        _voice_control_reader(
+            websocket,
+            inbound_queue,
+            control,
+            vad_enabled=app_settings.voice.vad_enabled,
+            send_lock=send_lock,
+            on_user_text=_handle_user_text,
+        )
     )
-    overlap_bytes = int(chunk_bytes * app_settings.voice.chunk_overlap_fraction)
-    last_chunk_transcript = ""
-    interim_transcript = ""
+
+    transport = FastAPIWebsocketTransport(
+        websocket=filtered_ws,  # type: ignore[arg-type]
+        params=FastAPIWebsocketParams(
+            audio_in_enabled=True,
+            audio_out_enabled=True,
+            audio_in_sample_rate=app_settings.voice.sample_rate,
+            audio_out_sample_rate=app_settings.voice.sample_rate,
+            add_wav_header=False,
+            vad_enabled=app_settings.voice.vad_enabled,
+            vad_analyzer=components.get("vad"),
+            vad_audio_passthrough=True,
+        )
+    )
+
+    pipeline = Pipeline([
+        transport.input(),
+        components["stt"],
+        components["bridge"],
+        components["tts"],
+        transport.output(),
+    ])
+
+    task = PipelineTask(pipeline)
+    runner = PipelineRunner()
 
     try:
-        await _send_json(websocket, {"type": "state", "state": "listening"}, send_lock)
-
-        while True:
-            message = await websocket.receive()
-
-            if message.get("type") == "websocket.disconnect":
-                break
-
-            # Text control messages
-            if "text" in message:
-                try:
-                    data = json.loads(message["text"])
-                except (json.JSONDecodeError, TypeError):
-                    continue
-
-                msg_type = data.get("type")
-
-                if msg_type == "stop":
-                    break
-
-                elif msg_type == "mute":
-                    muted = True
-                    await _send_json(
-                        websocket, {"type": "state", "state": "muted"}, send_lock
-                    )
-
-                elif msg_type == "unmute":
-                    muted = False
-                    await _send_json(
-                        websocket, {"type": "state", "state": "listening"}, send_lock
-                    )
-
-                elif msg_type == "start":
-                    # Client confirms start (config already set on session creation)
-                    await _send_json(
-                        websocket, {"type": "state", "state": "listening"}, send_lock
-                    )
-
-                elif msg_type == "commit_turn":
-                    # Deterministic turn boundary: process whatever audio has been buffered.
-                    if audio_buffer:
-                        transcript = await _transcribe_pcm_buffer(bytes(audio_buffer))
-                        audio_buffer.clear()
-                        last_transcribe_at = time.monotonic()
-                        if transcript:
-                            delta = _trim_overlap_text(
-                                last_chunk_transcript, transcript
-                            )
-                            if delta:
-                                interim_transcript = (
-                                    f"{interim_transcript} {delta}"
-                                    if interim_transcript
-                                    else delta
-                                )
-
-                    if interim_transcript:
-                        await _process_user_turn(
-                            websocket, bridge, interim_transcript, send_lock
-                        )
-
-                    # Reset for next turn
-                    last_chunk_transcript = ""
-                    interim_transcript = ""
-
-                elif msg_type == "user_text":
-                    text = str(data.get("text", "")).strip()
-                    if not text:
-                        continue
-
-                    last_chunk_transcript = ""
-                    interim_transcript = ""
-                    audio_buffer.clear()
-
-                    await _process_user_turn(websocket, bridge, text, send_lock)
-
-            # Binary audio frames
-            elif "bytes" in message and not muted:
-                audio_bytes = message["bytes"]
-                if not isinstance(audio_bytes, (bytes, bytearray)):
-                    continue
-
-                audio_buffer.extend(audio_bytes)
-
-                # Chunked transcription: process roughly every 1s of audio,
-                # throttled to avoid overwhelming the STT provider.
-                now = time.monotonic()
-                if len(audio_buffer) >= chunk_bytes and (now - last_transcribe_at) >= (
-                    app_settings.voice.chunk_throttle_ms / 1000.0
-                ):
-                    transcript = await _transcribe_pcm_buffer(bytes(audio_buffer))
-                    if overlap_bytes > 0:
-                        audio_buffer = bytearray(audio_buffer[-overlap_bytes:])
-                    else:
-                        audio_buffer.clear()
-                    last_transcribe_at = now
-
-                    if transcript:
-                        delta = _trim_overlap_text(last_chunk_transcript, transcript)
-                        if delta:
-                            interim_transcript = (
-                                f"{interim_transcript} {delta}"
-                                if interim_transcript
-                                else delta
-                            )
-                            await _send_json(
-                                websocket,
-                                {
-                                    "type": "transcript",
-                                    "role": "user",
-                                    "text": interim_transcript,
-                                    "is_final": False,
-                                },
-                                send_lock,
-                            )
-                        last_chunk_transcript = transcript
-
+        async with asyncio.timeout(float(app_settings.voice.session_timeout)):
+            await runner.run(task)
     except WebSocketDisconnect:
         logger.info(f"Voice WebSocket disconnected: {session_id}")
-    except Exception:
-        logger.exception(f"Error in voice WebSocket: {session_id}")
+    except TimeoutError:
+        logger.info(f"Voice session timed out: {session_id}")
         if websocket.client_state == WebSocketState.CONNECTED:
             await _send_json(
                 websocket,
-                {"type": "error", "message": "Internal server error"},
+                {"type": "error", "message": "Voice session timed out"},
                 send_lock,
             )
+    except Exception as e:
+        logger.exception(f"Error in voice WebSocket: {session_id}: {e}")
+        if websocket.client_state == WebSocketState.CONNECTED:
+            user_message, close_code = _classify_voice_pipeline_error(e)
+            await _send_json(websocket, {"type": "error", "message": user_message}, send_lock)
+            try:
+                await websocket.close(code=close_code, reason=user_message)
+            except Exception:
+                pass
     finally:
-        # Flush any pending audio when the socket is closing.
+        reader_task.cancel()
         try:
-            if audio_buffer:
-                try:
-                    transcript = await _transcribe_pcm_buffer(bytes(audio_buffer))
-                    if transcript:
-                        delta = _trim_overlap_text(last_chunk_transcript, transcript)
-                        if delta:
-                            interim_transcript = (
-                                f"{interim_transcript} {delta}"
-                                if interim_transcript
-                                else delta
-                            )
-                except Exception as e:
-                    logger.exception(
-                        f"Error during final audio transcription for session {session_id}: {e}"
-                    )
+            await reader_task
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            logger.exception("Voice control reader task failed")
 
-            if (
-                interim_transcript
-                and websocket.client_state == WebSocketState.CONNECTED
-            ):
-                try:
-                    await _process_user_turn(
-                        websocket, bridge, interim_transcript, send_lock
-                    )
-                except Exception as e:
-                    logger.exception(
-                        f"Error during final turn processing for session {session_id}: {e}"
-                    )
-        except Exception as e:
-            logger.exception(
-                f"Error in audio buffer cleanup for session {session_id}: {e}"
-            )
-
-        try:
-            await session_manager.update_state(session_id, "ending")
-        except Exception as e:
-            logger.exception(
-                f"Error updating session state to 'ending' for session {session_id}: {e}"
-            )
-
-        try:
-            if session_tasks:
-                tasks = list(session_tasks)
-                for task in tasks:
-                    task.cancel()
-                await asyncio.gather(*tasks, return_exceptions=True)
-                session_tasks.clear()
-        except Exception as e:
-            logger.exception(
-                f"Error cleaning up session send tasks for session {session_id}: {e}"
-            )
-
-        try:
-            await bridge.cleanup_background_tasks()
-        except Exception as e:
-            logger.exception(
-                f"Error cleaning up voice bridge background tasks for session {session_id}: {e}"
-            )
-
-        try:
-            await session_manager.end_session(session_id)
-        except Exception as e:
-            logger.exception(f"Error ending session {session_id}: {e}")
-
-        try:
-            if websocket.client_state == WebSocketState.CONNECTED:
-                await websocket.close()
-        except Exception as e:
-            logger.exception(f"Error closing websocket for session {session_id}: {e}")
-
-
-async def _process_user_turn(
-    websocket: WebSocket,
-    bridge: "AgentBridgeProcessor",
-    text: str,
-    send_lock: asyncio.Lock,
-) -> None:
-    """Process one user turn and stream response artifacts/events."""
-    text = text.strip()
-    if not text:
-        return
-
-    try:
-        await _send_json(
-            websocket, {"type": "state", "state": "agent-speaking"}, send_lock
-        )
-        response_text = await bridge.process_transcription(text)
-        if response_text:
-            await _send_json(
-                websocket,
-                {
-                    "type": "transcript",
-                    "role": "agent",
-                    "text": response_text,
-                    "is_final": True,
-                },
-                send_lock,
-            )
-
-            # Best-effort TTS synthesis and binary streaming.
-            tts_audio = await _synthesize_tts_audio(response_text)
-            if tts_audio:
-                await _send_bytes(websocket, tts_audio, send_lock)
-    finally:
         if websocket.client_state == WebSocketState.CONNECTED:
             try:
-                await _send_json(
-                    websocket, {"type": "state", "state": "listening"}, send_lock
-                )
+                await _send_json(websocket, {"type": "state", "state": "ended"}, send_lock)
             except Exception:
                 pass
 
-
-async def _send_json(
-    websocket: WebSocket,
-    data: dict,
-    send_lock: asyncio.Lock | None = None,
-) -> None:
-    """Send a JSON message over WebSocket."""
-    if send_lock is None:
-        await websocket.send_text(json.dumps(data))
-        return
-
-    async with send_lock:
-        await websocket.send_text(json.dumps(data))
-
-
-async def _send_bytes(
-    websocket: WebSocket,
-    data: bytes,
-    send_lock: asyncio.Lock,
-) -> None:
-    """Send binary audio over WebSocket without concurrent write races."""
-    async with send_lock:
-        await websocket.send_bytes(data)
-
-
-async def _synthesize_tts_audio(text: str) -> bytes | None:
-    """Synthesize TTS audio using ElevenLabs and return MPEG bytes.
-
-    This is intentionally best-effort. If credentials are not configured
-    or synthesis fails, the voice session continues with text-only output.
-    """
-    api_key = app_settings.voice.tts_api_key
-    voice_id = app_settings.voice.tts_voice_id
-    model_id = app_settings.voice.tts_model
-
-    if not api_key or not voice_id:
-        return None
-
-    provider_url = app_settings.voice.provider_urls.get("elevenlabs_tts")
-    if not provider_url:
-        logger.error("ElevenLabs TTS provider URL is not configured")
-        return None
-
-    url = f"{provider_url}/{voice_id}"
-    payload = {
-        "text": text,
-        "model_id": model_id,
-        "voice_settings": {
-            "stability": app_settings.voice.tts_stability,
-            "similarity_boost": app_settings.voice.tts_similarity_boost,
-        },
-    }
-    headers = {
-        "xi-api-key": api_key,
-        "Content-Type": "application/json",
-        "Accept": "audio/mpeg",
-    }
-
-    try:
-        async with httpx.AsyncClient(
-            timeout=app_settings.voice.http_timeout_seconds
-        ) as client:
-            response = await client.post(url, json=payload, headers=headers)
-            response.raise_for_status()
-            return response.content
-    except httpx.HTTPStatusError as e:
-        logger.error(
-            f"ElevenLabs API error: {e.response.status_code} - {e.response.text}"
-        )
-        return None
-    except Exception:
-        logger.exception("TTS synthesis failed")
-        return None
-
-
-async def _transcribe_pcm_buffer(pcm_bytes: bytes) -> str | None:
-    """Transcribe PCM16 mono audio buffer with Deepgram prerecorded API."""
-    api_key = app_settings.voice.stt_api_key
-    if not api_key:
-        logger.warning("Deepgram STT API key not configured")
-        return None
-
-    if not pcm_bytes:
-        logger.debug("Empty audio buffer, skipping transcription")
-        return None
-
-    url = app_settings.voice.provider_urls.get("deepgram_listen")
-    if not url:
-        logger.error("Deepgram STT provider URL is not configured")
-        return None
-    params = {
-        "model": app_settings.voice.stt_model,
-        "language": app_settings.voice.stt_language,
-        "punctuate": "true",
-        "smart_format": "true",
-        "encoding": app_settings.voice.audio_encoding,
-        "sample_rate": app_settings.voice.sample_rate,
-        "channels": app_settings.voice.audio_channels,
-    }
-    headers = {
-        "Authorization": f"Token {api_key}",
-        "Content-Type": "audio/raw",
-    }
-
-    try:
-        async with httpx.AsyncClient(
-            timeout=app_settings.voice.http_timeout_seconds
-        ) as client:
-            response = await client.post(
-                url, params=params, headers=headers, content=pcm_bytes
-            )
-            response.raise_for_status()
-            payload = response.json()
-
-        transcript = (
-            payload.get("results", {})
-            .get("channels", [{}])[0]
-            .get("alternatives", [{}])[0]
-            .get("transcript", "")
-        )
-
-        text = str(transcript).strip()
-        return text if text else None
-    except httpx.HTTPStatusError as e:
-        logger.error(
-            f"Deepgram API error: {e.response.status_code} - {e.response.text}"
-        )
-        return None
-    except Exception as e:
-        logger.exception(f"STT transcription failed: {e}")
-        return None
-
-
-def _trim_overlap_text(previous: str, current: str) -> str:
-    """Trim repeated overlap words between adjacent chunk transcripts.
-
-    We keep an audio overlap to avoid clipping words, which can cause
-    duplicated leading tokens in the next transcript. This helper removes
-    the longest matching suffix-prefix word overlap.
-    """
-    prev = previous.strip()
-    curr = current.strip()
-    if not curr:
-        return ""
-    if not prev:
-        return curr
-
-    prev_words = prev.split()
-    curr_words = curr.split()
-    if not curr_words:
-        return ""
-
-    max_overlap = min(len(prev_words), len(curr_words), 20)
-    overlap = 0
-    for k in range(max_overlap, 0, -1):
-        if prev_words[-k:] == curr_words[:k]:
-            overlap = k
-            break
-
-    return " ".join(curr_words[overlap:]).strip()
-
-
-def _background_task_done(task: asyncio.Task[None]) -> None:
-    """Remove a completed background task and log any failure."""
-    _BACKGROUND_TASKS.discard(task)
-
-    try:
-        exception = task.exception()
-    except asyncio.CancelledError:
-        return
-
-    if exception is not None:
-        logger.error(f"Background voice send task failed: {exception}")
-
-
-def _try_send_json(
-    websocket: WebSocket,
-    data: dict,
-    send_lock: asyncio.Lock,
-    session_tasks: set[asyncio.Task[None]] | None = None,
-) -> None:
-    """Enqueue a JSON send (safe to call from sync callbacks)."""
-    try:
-        loop = asyncio.get_running_loop()
-        task = loop.create_task(_send_json(websocket, data, send_lock))
-        _BACKGROUND_TASKS.add(task)
-        if session_tasks is not None:
-            session_tasks.add(task)
-
-            def _on_done(done_task: asyncio.Task[None]) -> None:
-                session_tasks.discard(done_task)
-                _background_task_done(done_task)
-
-            task.add_done_callback(_on_done)
-            return
-
-        task.add_done_callback(_background_task_done)
-    except RuntimeError:
-        pass
+        try:
+            await session_manager.update_state(session_id, "ending")
+        except Exception:
+            pass
+        try:
+            await components["bridge"].cleanup_background_tasks()
+        except Exception:
+            pass
+        try:
+            await session_manager.end_session(session_id)
+        except Exception:
+            pass
+        if websocket.client_state == WebSocketState.CONNECTED:
+            try:
+                await websocket.close()
+            except Exception:
+                pass
