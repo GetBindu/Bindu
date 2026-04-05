@@ -12,11 +12,12 @@
 		voiceState,
 	} from "$lib/stores/voice";
 	import IconMic from "~icons/lucide/mic";
-	import IconMicOff from "~icons/lucide/mic-off";
-	import IconPhoneOff from "~icons/lucide/phone-off";
+		import IconMicOff from "~icons/lucide/mic-off";
+		import IconPhoneOff from "~icons/lucide/phone-off";
 
-	let isRecording = $state(false);
-	let lastAudioChunk: ArrayBuffer | null = $state(null);
+		let isRecording = $state(false);
+		let isStarting = $state(false);
+		let lastAudioChunk: ArrayBuffer | null = $state(null);
 
 	$effect(() => {
 		if (!$latestAgentAudio || $latestAgentAudio === lastAudioChunk) {
@@ -62,15 +63,21 @@
 		}
 	});
 
-	async function beginStreaming() {
-		try {
-			await startVoiceStreaming();
+		async function beginStreaming() {
+			if (isStarting || isRecording) {
+				return;
+			}
+			isStarting = true;
 			isRecording = true;
-		} catch (err) {
-			voiceError.set((err as Error).message || "Microphone access failed");
-			isRecording = false;
+			try {
+				await startVoiceStreaming();
+			} catch (err) {
+				voiceError.set((err as Error).message || "Microphone access failed");
+				isRecording = false;
+			} finally {
+				isStarting = false;
+			}
 		}
-	}
 
 	function stopStreaming() {
 		stopVoiceStreaming();
@@ -123,14 +130,15 @@
 			>
 				Stop Microphone
 			</button>
-		{:else}
-			<button
-				type="button"
-				class="btn rounded-lg border bg-white px-3 py-1.5 text-sm shadow transition-none hover:bg-gray-100 dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:bg-gray-500"
-				onclick={beginStreaming}
-			>
-				Start Microphone
-			</button>
-		{/if}
+			{:else}
+				<button
+					type="button"
+					class="btn rounded-lg border bg-white px-3 py-1.5 text-sm shadow transition-none hover:bg-gray-100 dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:bg-gray-500"
+					onclick={beginStreaming}
+					disabled={isStarting}
+				>
+					{isStarting ? "Starting..." : "Start Microphone"}
+				</button>
+			{/if}
+		</div>
 	</div>
-</div>
