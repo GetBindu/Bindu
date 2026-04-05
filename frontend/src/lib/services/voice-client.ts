@@ -282,15 +282,45 @@ export class VoiceClient {
       throw new Error('AudioContext is not supported in this browser');
     }
 
-    const audioContext = new AudioContextCtor({ sampleRate: 16000 });
+    const desiredSampleRate = 16000;
+    const audioContext = new AudioContextCtor({ sampleRate: desiredSampleRate });
     await audioContext.resume();
-    if (audioContext.sampleRate !== 16000) {
-      void audioContext.close();
-      stream.getTracks().forEach((track) => track.stop());
-      throw new Error(
-        `Unsupported microphone sample rate: ${audioContext.sampleRate}. Expected 16000.`
-      );
-    }
+    const actualSampleRate = audioContext.sampleRate;
+
+    const resampleState =
+      actualSampleRate === desiredSampleRate
+        ? null
+        : { t: 0, lastSample: 0, ratio: actualSampleRate / desiredSampleRate };
+
+    const resampleChunk = (
+      input: Float32Array,
+      state: { t: number; lastSample: number; ratio: number }
+    ): Float32Array => {
+      const ratio = state.ratio;
+      if (!Number.isFinite(ratio) || ratio <= 0) {
+        return input;
+      }
+
+      const estimatedLength = Math.floor((input.length - state.t) / ratio);
+      const outputLength = Math.max(0, estimatedLength);
+      const output = new Float32Array(outputLength);
+
+      for (let i = 0; i < outputLength; i += 1) {
+        const idx = state.t;
+        const i0 = Math.floor(idx);
+        const frac = idx - i0;
+
+        const s0 = i0 >= 0 ? (input[i0] ?? 0) : state.lastSample;
+        const s1 = input[i0 + 1] ?? input[input.length - 1] ?? s0;
+        output[i] = s0 + (s1 - s0) * frac;
+
+        state.t += ratio;
+      }
+
+      state.lastSample = input[input.length - 1] ?? state.lastSample;
+      state.t -= input.length;
+      return output;
+    };
     const sourceNode = audioContext.createMediaStreamSource(stream);
     const processorNode = audioContext.createScriptProcessor(4096, 1, 1);
     const silentGain = audioContext.createGain();
@@ -302,7 +332,8 @@ export class VoiceClient {
       }
 
       const inputData = event.inputBuffer.getChannelData(0);
-      const pcmChunk = convertFloat32ToPcm16(inputData);
+      const floatChunk = resampleState ? resampleChunk(inputData, resampleState) : inputData;
+      const pcmChunk = convertFloat32ToPcm16(floatChunk);
       if (pcmChunk.byteLength > 0) {
         this.ws.send(pcmChunk);
       }
