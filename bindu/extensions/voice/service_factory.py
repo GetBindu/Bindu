@@ -33,9 +33,11 @@ def create_stt_service(config: VoiceAgentExtension) -> Any:
     """
     api_key = app_settings.voice.stt_api_key
     if not api_key:
-        raise ValueError(
-            "VOICE__STT_API_KEY is required. Set it in your .env or environment."
+        logger.warning(
+            "STT service configuration incomplete: missing API key",
+            setting="VOICE__STT_API_KEY",
         )
+        raise ValueError("STT service configuration incomplete")
 
     if config.stt_provider == "deepgram":
         try:
@@ -57,7 +59,8 @@ def create_stt_service(config: VoiceAgentExtension) -> Any:
         )
         return stt
 
-    raise ValueError(f"Unsupported STT provider: {config.stt_provider}")
+    logger.warning("Unsupported STT provider requested", provider=config.stt_provider)
+    raise ValueError("Unsupported STT provider")
 
 
 def create_tts_service(config: VoiceAgentExtension) -> Any:
@@ -75,9 +78,11 @@ def create_tts_service(config: VoiceAgentExtension) -> Any:
     """
     api_key = app_settings.voice.tts_api_key
     if not api_key:
-        raise ValueError(
-            "VOICE__TTS_API_KEY is required. Set it in your .env or environment."
+        logger.warning(
+            "TTS service configuration incomplete: missing API key",
+            setting="VOICE__TTS_API_KEY",
         )
+        raise ValueError("TTS service configuration incomplete")
 
     if config.tts_provider == "elevenlabs":
         try:
@@ -101,4 +106,5 @@ def create_tts_service(config: VoiceAgentExtension) -> Any:
         )
         return tts
 
-    raise ValueError(f"Unsupported TTS provider: {config.tts_provider}")
+    logger.warning("Unsupported TTS provider requested", provider=config.tts_provider)
+    raise ValueError("Unsupported TTS provider")

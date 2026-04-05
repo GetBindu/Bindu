@@ -19,7 +19,9 @@ class TestCreateSTTService:
             "bindu.extensions.voice.service_factory.app_settings"
         ) as mock_settings:
             mock_settings.voice.stt_api_key = ""
-            with pytest.raises(ValueError, match="VOICE__STT_API_KEY is required"):
+            with pytest.raises(
+                ValueError, match="STT service configuration incomplete"
+            ):
                 create_stt_service(ext)
 
     def test_unsupported_provider_raises(self):
@@ -70,7 +72,9 @@ class TestCreateTTSService:
             "bindu.extensions.voice.service_factory.app_settings"
         ) as mock_settings:
             mock_settings.voice.tts_api_key = ""
-            with pytest.raises(ValueError, match="VOICE__TTS_API_KEY is required"):
+            with pytest.raises(
+                ValueError, match="TTS service configuration incomplete"
+            ):
                 create_tts_service(ext)
 
     def test_unsupported_provider_raises(self):
