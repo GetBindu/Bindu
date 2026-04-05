@@ -3,7 +3,7 @@
 This module defines the configuration settings for the application using pydantic models.
 """
 
-from pydantic import Field, computed_field, BaseModel, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl, computed_field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import AliasChoices
 from typing import Literal
@@ -1052,6 +1052,11 @@ class VoiceSettings(BaseSettings):
         }
     )
 
+    # Optional credential lifecycle (for short-lived tokens, if used)
+    token_refresh_endpoint: str = ""
+    token_expiry_seconds: int = 0
+    token_refresh_leeway_seconds: int = 60
+
     # HTTP client behavior
     http_timeout_seconds: float = 30.0
 
@@ -1079,6 +1084,15 @@ class VoiceSettings(BaseSettings):
 
     # Behavior
     allow_interruptions: bool = True
+    agent_timeout_secs: float = 10.0
+    utterance_timeout_secs: float = 30.0
+    retry_attempts: int = 3
+    retry_backoff_start_ms: int = 200
+    retry_backoff_factor: float = 2.0
+    retry_backoff_max_ms: int = 2000
+    cancellation_grace_secs: float = 0.5
+    conversation_history_limit: int = 50
+    conversation_policy: Literal["unsaved", "terminate"] = "unsaved"
     session_timeout: int = 300  # seconds (5 min)
     max_concurrent_sessions: int = 10
 
@@ -1089,7 +1103,7 @@ class VoiceSettings(BaseSettings):
 
     # WebSocket session authentication
     session_auth_required: bool = False
-    session_token_ttl: int = 600  # seconds
+    session_token_ttl: int = 300  # seconds; must be <= session_timeout
 
     # Rate limiting (0 disables)
     rate_limit_per_ip_per_minute: int = 120
@@ -1100,6 +1114,15 @@ class VoiceSettings(BaseSettings):
     # Consumers should handle this as a special case for internal routing.
     extension_uri: str = "bindu://voice"
     extension_description: str = "Real-time voice conversation for Bindu agents"
+
+    @model_validator(mode="after")
+    def _validate_session_token_ttl(self) -> "VoiceSettings":
+        if self.session_token_ttl > self.session_timeout:
+            raise ValueError(
+                "VOICE__SESSION_TOKEN_TTL must be less than or equal to "
+                "VOICE__SESSION_TIMEOUT so tokens cannot outlive sessions."
+            )
+        return self
 
 
 class Settings(BaseSettings):

@@ -133,13 +133,15 @@ class TestVoiceSessionStartEndpoint:
         app = _make_mock_app(session_manager=manager)
         request = _make_request(body={})
 
-        original = module.app_settings.voice.session_auth_required
+        original_required = module.app_settings.voice.session_auth_required
+        original_ttl = module.app_settings.voice.session_token_ttl
         try:
             module.app_settings.voice.session_auth_required = True
-            module.app_settings.voice.session_token_ttl = 600
+            module.app_settings.voice.session_token_ttl = 300
             response = await voice_session_start(app, request)
         finally:
-            module.app_settings.voice.session_auth_required = original
+            module.app_settings.voice.session_auth_required = original_required
+            module.app_settings.voice.session_token_ttl = original_ttl
 
         assert response.status_code == 201
         body = json.loads(response.body)
