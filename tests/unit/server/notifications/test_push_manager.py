@@ -336,7 +336,9 @@ class TestPushNotificationManager:
         result = manager.build_task_push_config(task_id)
 
         assert result["id"] == task_id
-        assert result["push_notification_config"]["url"] == "https://93.184.216.34/webhook"
+        assert (
+            result["push_notification_config"]["url"] == "https://93.184.216.34/webhook"
+        )
 
     def test_build_task_push_config_not_found(self):
         """Test building task push config when not found."""
