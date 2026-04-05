@@ -131,7 +131,7 @@ async def test_voice_websocket_accepts_subprotocol_session_token(monkeypatch):
         websocket.send_text = AsyncMock()
 
         async def receive():
-            await asyncio.sleep(10)
+            await asyncio.sleep(0.1)
             return {"type": "websocket.disconnect", "code": 1000}
 
         websocket.receive = AsyncMock(side_effect=receive)
