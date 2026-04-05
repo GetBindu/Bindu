@@ -52,6 +52,7 @@ def build_voice_pipeline(
     bridge = AgentBridgeProcessor(
         manifest_run=manifest_run,
         context_id=context_id,
+        voice_settings=voice_ext.voice_settings,
         allow_interruptions=voice_ext.allow_interruptions,
         on_state_change=on_state_change,
         on_user_transcript=on_user_transcript,

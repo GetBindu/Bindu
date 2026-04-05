@@ -25,13 +25,14 @@ from bindu.server.workers.helpers.result_processor import ResultProcessor
 from bindu.utils.logging import get_logger
 
 if TYPE_CHECKING:
-    pass
+    from bindu.settings import VoiceSettings
 
 logger = get_logger("bindu.voice.agent_bridge")
 
 MAX_HISTORY_TURNS = 20
 DEFAULT_FIRST_TOKEN_TIMEOUT_SECONDS = 10.0
 DEFAULT_TOTAL_RESPONSE_TIMEOUT_SECONDS = 30.0
+DEFAULT_CANCELLATION_GRACE_SECONDS = 0.5
 DEFAULT_THINKING_TEXT = "One moment."
 DEFAULT_TIMEOUT_FALLBACK_TEXT = "Sorry — I’m having trouble responding right now."
 
@@ -53,6 +54,7 @@ class AgentBridgeProcessor(FrameProcessor):
         manifest_run: Callable[..., Any],
         context_id: str,
         *,
+        voice_settings: "VoiceSettings | None" = None,
         allow_interruptions: bool = True,
         first_token_timeout_seconds: float = DEFAULT_FIRST_TOKEN_TIMEOUT_SECONDS,
         total_response_timeout_seconds: float = DEFAULT_TOTAL_RESPONSE_TIMEOUT_SECONDS,
@@ -66,14 +68,26 @@ class AgentBridgeProcessor(FrameProcessor):
         self._manifest_run = manifest_run
         self._context_id = context_id
         self._allow_interruptions = bool(allow_interruptions)
-        self._first_token_timeout_seconds = float(first_token_timeout_seconds)
-        self._total_response_timeout_seconds = float(total_response_timeout_seconds)
+        if voice_settings is not None:
+            self._first_token_timeout_seconds = float(voice_settings.agent_timeout_secs)
+            self._total_response_timeout_seconds = float(
+                voice_settings.utterance_timeout_secs
+            )
+            self._cancellation_grace_seconds = float(
+                voice_settings.cancellation_grace_secs
+            )
+            self._max_history_messages = int(voice_settings.conversation_history_limit)
+        else:
+            self._first_token_timeout_seconds = float(first_token_timeout_seconds)
+            self._total_response_timeout_seconds = float(total_response_timeout_seconds)
+            self._cancellation_grace_seconds = float(DEFAULT_CANCELLATION_GRACE_SECONDS)
+            self._max_history_messages = MAX_HISTORY_TURNS * 2
+
         self._on_state_change = on_state_change
         self._on_user_transcript = on_user_transcript
         self._on_agent_response = on_agent_response
         self._on_agent_transcript = on_agent_transcript
         self._conversation_history: list[dict[str, str]] = []
-        self._max_history_messages = MAX_HISTORY_TURNS * 2
         self._background_tasks: set[asyncio.Task[Any]] = set()
 
         self._current_agent_task: asyncio.Task | None = None
@@ -174,9 +188,13 @@ class AgentBridgeProcessor(FrameProcessor):
                 await self.push_frame(InterruptionFrame())
             except Exception:
                 logger.exception("Failed to push InterruptionFrame downstream")
+            grace = max(0.0, float(self._cancellation_grace_seconds))
             try:
-                await self._current_agent_task
-            except asyncio.CancelledError:
+                if grace > 0:
+                    await asyncio.wait_for(self._current_agent_task, timeout=grace)
+                else:
+                    await self._current_agent_task
+            except (asyncio.CancelledError, TimeoutError):
                 pass
 
     async def _invoke_and_emit(self, user_text: str):
@@ -323,9 +341,13 @@ class AgentBridgeProcessor(FrameProcessor):
     async def _cancel_current_agent_task(self) -> None:
         if self._current_agent_task and not self._current_agent_task.done():
             self._current_agent_task.cancel()
+            grace = max(0.0, float(self._cancellation_grace_seconds))
             try:
-                await self._current_agent_task
-            except asyncio.CancelledError:
+                if grace > 0:
+                    await asyncio.wait_for(self._current_agent_task, timeout=grace)
+                else:
+                    await self._current_agent_task
+            except (asyncio.CancelledError, TimeoutError):
                 pass
 
     async def _iter_text_chunks(self, raw_results: Any) -> AsyncIterator[str]:

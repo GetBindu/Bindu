@@ -8,11 +8,14 @@ voice-enabled Bindu agents.
 from __future__ import annotations
 
 from functools import cached_property
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from bindu.common.protocol.types import AgentExtension
 from bindu.settings import app_settings
 from bindu.utils.logging import get_logger
+
+if TYPE_CHECKING:
+    from bindu.settings import VoiceSettings
 
 logger = get_logger("bindu.voice_agent_extension")
 
@@ -37,6 +40,7 @@ class VoiceAgentExtension:
         allow_interruptions: bool = True,
         vad_enabled: bool = True,
         description: Optional[str] = None,
+        voice_settings: "VoiceSettings | None" = None,
     ):
         """Initialize voice extension configuration for agent metadata and runtime."""
         self.stt_provider = stt_provider
@@ -49,6 +53,7 @@ class VoiceAgentExtension:
         self.allow_interruptions = allow_interruptions
         self.vad_enabled = vad_enabled
         self._description = description
+        self.voice_settings = voice_settings or app_settings.voice
 
         # Validate audio config eagerly
         from .audio_config import validate_sample_rate
