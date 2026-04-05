@@ -63,6 +63,7 @@ performance:
   scalability: horizontal
 
 allowed_tools:
+  # "Read" covers web access/search in this runtime.
   - Read
 
 documentation:
@@ -96,7 +97,7 @@ documentation:
     Sources cited inline where available.
 
   error_handling:
-    - "DuckDuckGo unavailable: returns cached knowledge, else informs user"
+    - "DuckDuckGo unavailable: informs user that real-time search is unavailable"
     - "Unknown language: defaults to English response"
     - "No results found: informs user and suggests alternative queries"
 

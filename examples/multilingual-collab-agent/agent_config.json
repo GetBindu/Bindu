@@ -25,7 +25,7 @@
     "debug_level": 0,
 
     "deployment": {
-        "url": "http://0.0.0.0:3773",
+        "url": "http://127.0.0.1:3773",
         "expose": false,
         "protocol_version": "1.0.0",
         "proxy_urls": ["http://127.0.0.1:8080"],
