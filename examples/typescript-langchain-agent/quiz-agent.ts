@@ -64,7 +64,7 @@ D) [Option D]
  */
 bindufy(
   {
-    author: "your.email@example.com",
+    author: "raahul@getbindu.com",
     name: "quiz-generator-agent",
     description: "Educational assessment expert for MCQ generation",
     version: "1.0.0",
@@ -86,7 +86,7 @@ bindufy(
   async (messages: ChatMessage[]) => {
     try {
       if (!messages || messages.length === 0) {
-        return "Error: No input provided.";
+        return JSON.stringify({ error: true, message: "No input provided." });
       }
 
       // Extract latest user input with validation
@@ -96,7 +96,7 @@ bindufy(
         userInput = last.content;
       } else {
         // Optionally: return error or fallback
-        return "Error: Invalid or empty user input.";
+        return JSON.stringify({ error: true, message: "Invalid or empty user input." });
       }
 
       // Construct LangChain messages

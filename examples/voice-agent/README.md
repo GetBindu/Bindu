@@ -51,9 +51,11 @@ Expected response:
   "session_id": "...",
   "context_id": "...",
   "ws_url": "ws://localhost:3773/ws/voice/...",
-  "session_token": "..." // only when VOICE__SESSION_AUTH_REQUIRED=true
+  "session_token": "..."
 }
 ```
+
+Note: `session_token` is only included when `VOICE__SESSION_AUTH_REQUIRED=true`.
 
 ## Notes
 
