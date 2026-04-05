@@ -195,7 +195,7 @@ class VoiceSettings(BaseSettings):
 
     # Security & Authentication
     session_auth_required: bool = True  # Require session authentication
-    session_token_ttl: int = 600        # Session token time-to-live (seconds)
+    session_token_ttl: int = 300        # Session token time-to-live (seconds); must be <= session_timeout
     session_auth_provider: str | None = None  # Optional: external auth provider id
     per_agent_voice_access: dict | str | None = None  # Enforced by PerAgentAccessValidator with canonical policy schema
     rate_limit_per_user: int = 60       # Max requests per user per minute
@@ -211,13 +211,25 @@ class VoiceSettings(BaseSettings):
     audio_retention_days: int = 7
     require_user_consent: bool = True  # Must have user consent before enabling transcripts
     compliance_guidelines: list[str] = ["gdpr", "ccpa"]
-    # Enforcement mechanisms:
-    # - KeyManagerService: KMS-backed key generation, key_id tracking, and rotation policy enforcement
-    # - PerAgentAccessValidator: validates per_agent_voice_access schema and policy references
-    # - PIIRedactor: sanitizes transcripts when store_transcripts=True before persistence
-    # - RetentionWorker: scheduled purge using transcript_retention_days and audio_retention_days
-    # - AuditLogger: records consent grant/revoke and voice data access/export events
-    # - RateLimitMiddleware / RateLimitDecorator: enforces rate_limit_per_user and rate_limit_per_ip
+
+    # Consent Management APIs (planned; not implemented in v1):
+    # - ConsentManager.captureConsent(user_id, session_id, scopes, source)
+    # - ConsentManager.revokeConsent(user_id, scopes, reason)
+    # - ConsentManager.getConsentStatus(user_id) -> status/scopes/timestamps
+    # These should be enforced when require_user_consent=True, before enabling
+    # transcript/audio persistence paths.
+    # Enforcement mechanisms (implementation status):
+    # - Rate limiting: implemented (in-memory/Redis sliding window in voice endpoints).
+    # - KeyManagerService: planned (not implemented in current codebase).
+    # - PerAgentAccessValidator: planned (not implemented in current codebase).
+    # - PIIRedactor: planned (not implemented in current codebase).
+    # - RetentionWorker: planned (not implemented in current codebase).
+    # - AuditLogger: planned (not implemented in current codebase).
+    #
+    # NOTE: Until the planned components are implemented, compliance-related
+    # settings like transcript/audio retention, PII redaction, per-agent access
+    # policy enforcement, and audit logging should be treated as "configured but
+    # not enforced in v1".
 
     # Behavior
     allow_interruptions: bool = True
@@ -276,9 +288,9 @@ class VoiceAgentExtension:
 def create_stt_service(config: VoiceAgentExtension) -> DeepgramSTTService:
     """Create Deepgram STT service from extension config."""
     if not app_settings.voice.stt_api_key:
-        raise ValueError(
-            "create_stt_service requires app_settings.voice.stt_api_key for DeepgramSTTService"
-        )
+        # Log operator detail server-side; raise generic message to callers.
+        logger.warning("STT service configuration incomplete: missing API key")
+        raise ValueError("STT service configuration incomplete")
     return DeepgramSTTService(
         api_key=app_settings.voice.stt_api_key,
         model=config.stt_model,
@@ -289,9 +301,9 @@ def create_stt_service(config: VoiceAgentExtension) -> DeepgramSTTService:
 def create_tts_service(config: VoiceAgentExtension) -> ElevenLabsTTSService:
     """Create ElevenLabs TTS service from extension config."""
     if not app_settings.voice.tts_api_key:
-        raise ValueError(
-            "create_tts_service requires app_settings.voice.tts_api_key for ElevenLabsTTSService"
-        )
+        # Log operator detail server-side; raise generic message to callers.
+        logger.warning("TTS service configuration incomplete: missing API key")
+        raise ValueError("TTS service configuration incomplete")
     return ElevenLabsTTSService(
         api_key=app_settings.voice.tts_api_key,
         voice_id=config.tts_voice_id,
@@ -408,6 +420,11 @@ class AgentBridgeProcessor(FrameProcessor):
         # 9. Update state machine transitions and error recovery
         ...
 ```
+
+Implementation note (current codebase):
+- The tunable policies above are exposed on `VoiceSettings` (e.g. `agent_timeout_secs`, `utterance_timeout_secs`,
+  `retry_attempts`, `retry_backoff_*`, `cancellation_grace_secs`, `conversation_history_limit`, `conversation_policy`).
+- `AgentBridgeProcessor` reads these via the `VoiceSettings` instance passed into the voice pipeline builder.
 
     State transitions:
 
