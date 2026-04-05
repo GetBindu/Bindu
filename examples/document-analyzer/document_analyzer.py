@@ -25,7 +25,7 @@ load_dotenv()
 
 # Define LLM agent
 agent = Agent(
-    instructions = """
+    instructions="""
 You are an advanced document analysis assistant.
 
 Your job is to analyze uploaded documents and answer the user's prompt
@@ -43,11 +43,12 @@ Guidelines:
 - If the prompt asks for summary, provide concise bullet points
 - Do not hallucinate information outside the document
 """,
-    model = OpenRouter(
-        id = "arcee-ai/trinity-large-preview:free",
+    model=OpenRouter(
+        id="arcee-ai/trinity-large-preview:free",
         api_key=os.getenv("OPENROUTER_API_KEY"),
     ),
 )
+
 
 # Document Parsing
 def extract_text_from_pdf(file_bytes):
@@ -68,10 +69,12 @@ def extract_text_from_pdf(file_bytes):
 
     return "\n".join(text)
 
+
 def extract_text_from_docx(file_bytes):
     """Extract text from docx bytes"""
     doc = Document(io.BytesIO(file_bytes))
     return "\n".join([p.text for p in doc.paragraphs])
+
 
 def extract_document_text(file_bytes, mime_type):
     """Parse document according to their mime type"""
@@ -84,6 +87,7 @@ def extract_document_text(file_bytes, mime_type):
         return extract_text_from_docx(file_bytes)
 
     raise ValueError(f"Unsupported file type: {mime_type}")
+
 
 # FilePart processing
 def get_file_bytes(part):
@@ -99,9 +103,11 @@ def get_file_bytes(part):
 
     if isinstance(data, str):
         import base64
+
         return base64.b64decode(data)
 
     return data
+
 
 # Handler
 def _collect_prompt_and_documents(
@@ -121,7 +127,6 @@ def _collect_prompt_and_documents(
         content = msg.get("content")
         if isinstance(content, str) and content.strip():
             prompt_parts.append(content)
-            continue
 
         # Compatibility path: raw A2A messages with parts.
         parts = msg.get("parts") or []
@@ -168,7 +173,8 @@ def handler(messages: list[dict]):
         return "No valid document found in the messages."
 
     combined_document = "\n\n".join(extracted_docs)
-    result = agent.run(input=f"""
+    result = agent.run(
+        input=f"""
 User Prompt:
 {prompt}
 
@@ -176,14 +182,15 @@ Document Content:
 {combined_document}
 
 Provide analysis based on the prompt.
-""")
+"""
+    )
     return result
 
 
 # Bindu config
 config = {
-    "author" : "vyomrohila@gmail.com",
-    "name" : "document_analyzer_agent",
+    "author": "vyomrohila@gmail.com",
+    "name": "document_analyzer_agent",
     "description": "AI agent that analyzes uploaded PDF or DOCX documents based on a user prompt.",
     "deployment": {
         "url": "http://localhost:3773",
