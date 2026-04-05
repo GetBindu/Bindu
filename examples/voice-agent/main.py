@@ -12,12 +12,17 @@ Run:
 
 from __future__ import annotations
 
-
-
 import asyncio
 import os
+from pathlib import Path
+
 from dotenv import load_dotenv
-load_dotenv()
+
+# Load env from the example folder first (so `VOICE__ENABLED=true` etc. is picked up
+# even when running from the repo root), then fall back to the working directory.
+example_env = Path(__file__).with_name(".env")
+load_dotenv(dotenv_path=example_env, override=False)
+load_dotenv(override=False)
 
 # Debug: print provider (non-sensitive) and mask API key presence
 print("VOICE__STT_PROVIDER:", os.environ.get("VOICE__STT_PROVIDER"))

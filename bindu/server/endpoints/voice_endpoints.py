@@ -727,19 +727,27 @@ async def voice_websocket(websocket: WebSocket) -> None:
         )
     )
 
-    transport = FastAPIWebsocketTransport(
-        websocket=filtered_ws,  # type: ignore[arg-type]
-        params=FastAPIWebsocketParams(
-            audio_in_enabled=True,
-            audio_out_enabled=True,
-            audio_in_sample_rate=app_settings.voice.sample_rate,
-            audio_out_sample_rate=app_settings.voice.sample_rate,
-            add_wav_header=False,
-            vad_enabled=app_settings.voice.vad_enabled,
-            vad_analyzer=components.get("vad"),
-            vad_audio_passthrough=True,
-        ),
-    )
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="Parameter 'vad_analyzer' is deprecated*",
+            category=DeprecationWarning,
+        )
+        transport = FastAPIWebsocketTransport(
+            websocket=filtered_ws,  # type: ignore[arg-type]
+            params=FastAPIWebsocketParams(
+                audio_in_enabled=True,
+                audio_out_enabled=True,
+                audio_in_sample_rate=app_settings.voice.sample_rate,
+                audio_out_sample_rate=app_settings.voice.sample_rate,
+                add_wav_header=False,
+                # VAD still requires a transport-level analyzer in Pipecat 0.0.105.
+                # Avoid deprecated vad_enabled/vad_audio_passthrough flags.
+                vad_analyzer=components.get("vad"),
+            ),
+        )
 
     pipeline = Pipeline(
         [
