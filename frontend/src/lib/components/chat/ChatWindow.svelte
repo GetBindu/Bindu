@@ -539,18 +539,14 @@
 								{ text: "Find a dataset", icon: "📊" },
 								{ text: "Gift ideas", icon: "🎁" }
 							] as prompt}
-								<button
-									type="button"
-									class="prompt-pill flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-bold transition-all"
-									onclick={async () => {
-										draft = prompt.text;
-										try {
+									<button
+										type="button"
+										class="prompt-pill flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-bold transition-all"
+										onclick={async () => {
+											draft = prompt.text;
 											await handleSubmit();
-										} catch (err) {
-											$error = err instanceof Error ? err.message : String(err);
-										}
-									}}
-								>
+										}}
+									>
 									{prompt.text}
 								</button>
 							{/each}
