@@ -67,12 +67,21 @@
 		}
 	}
 
-	function handleMessageClick(e: MouseEvent) {
-		handleContentClick(e);
-		if (!(e.target instanceof HTMLImageElement)) {
-			isTapped = !isTapped;
+		function handleMessageClick(e: MouseEvent) {
+			const target = e.target as HTMLElement | null;
+			if (
+				target &&
+				target.closest(
+					"button, a, input, textarea, select, [role='button'], [data-no-toggle]"
+				)
+			) {
+				return;
+			}
+			handleContentClick(e);
+			if (!(e.target instanceof HTMLImageElement)) {
+				isTapped = !isTapped;
+			}
 		}
-	}
 
 	$effect(() => {
 		// referenced to appease linter for currently-unused props
