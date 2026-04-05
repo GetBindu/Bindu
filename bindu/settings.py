@@ -1117,11 +1117,11 @@ class VoiceSettings(BaseSettings):
 
     @model_validator(mode="after")
     def _validate_session_token_ttl(self) -> "VoiceSettings":
+        # Enforce that tokens never outlive sessions.
+        # If misconfigured via env (e.g. TTL > timeout), clamp TTL to timeout
+        # to fail safe without preventing the server from starting.
         if self.session_token_ttl > self.session_timeout:
-            raise ValueError(
-                "VOICE__SESSION_TOKEN_TTL must be less than or equal to "
-                "VOICE__SESSION_TIMEOUT so tokens cannot outlive sessions."
-            )
+            self.session_token_ttl = self.session_timeout
         return self
 
 
