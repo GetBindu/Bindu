@@ -542,6 +542,11 @@ async def _synthesize_tts_audio(text: str) -> bytes | None:
             response = await client.post(url, json=payload, headers=headers)
             response.raise_for_status()
             return response.content
+    except httpx.HTTPStatusError as e:
+        logger.error(
+            f"ElevenLabs API error: {e.response.status_code} - {e.response.text}"
+        )
+        return None
     except Exception:
         logger.exception("TTS synthesis failed")
         return None
