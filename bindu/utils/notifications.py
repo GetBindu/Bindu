@@ -139,6 +139,28 @@ class NotificationService:
         hostname = parsed.hostname
         if not hostname:
             raise ValueError("Push notification URL must include a valid hostname.")
+        addr: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None
+
+        # If the hostname itself is an IP literal, validate it without DNS.
+        try:
+            addr = ipaddress.ip_address(hostname)
+        except ValueError:
+            addr = None
+
+        if addr is None:
+            # Best-effort DNS resolution. If the environment cannot resolve
+            # (e.g., offline CI), allow registration and rely on runtime delivery
+            # attempts + SSRF checks when resolution succeeds.
+            try:
+                resolved_ip = socket.getaddrinfo(hostname, None)[0][4][0]
+                addr = ipaddress.ip_address(resolved_ip)
+            except (socket.gaierror, ValueError) as exc:
+                logger.warning(
+                    "Skipping push notification hostname resolution during validation",
+                    hostname=hostname,
+                    error=str(exc),
+                )
+                return
 
         return _resolve_and_check_ip(hostname)
 

@@ -58,10 +58,11 @@ def build_voice_pipeline(
         on_agent_response=on_agent_response,
         on_agent_transcript=on_agent_transcript,
     )
-    
+
     vad_analyzer = None
     if app_settings.voice.vad_enabled:
         from pipecat.audio.vad.silero import SileroVADAnalyzer
+
         vad_analyzer = SileroVADAnalyzer(
             sample_rate=app_settings.voice.sample_rate,
         )

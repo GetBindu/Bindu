@@ -100,7 +100,9 @@ class AgentBridgeProcessor(FrameProcessor):
         elif isinstance(frame, ErrorFrame):
             logger.error(f"Error frame received in pipeline: {frame.error}")
 
-    async def process_transcription(self, text: str, *, emit_frames: bool = False) -> str | None:
+    async def process_transcription(
+        self, text: str, *, emit_frames: bool = False
+    ) -> str | None:
         """Process a user transcription and return the agent response.
 
         This is a convenience helper used by unit tests and non-pipeline callers.
@@ -229,27 +231,31 @@ class AgentBridgeProcessor(FrameProcessor):
             last_emitted = ""
             started_speaking = False
 
-            async def _consume_chunk(chunk_text: str) -> None:
-                nonlocal streamed_text, last_emitted, started_speaking
+            async def _consume_chunk(
+                chunk_text: str,
+                streamed: str,
+                last: str,
+                speaking: bool,
+            ) -> tuple[str, str, bool]:
                 if not chunk_text:
-                    return
+                    return streamed, last, speaking
 
                 # Some streaming handlers yield cumulative text. Emit only the delta.
-                delta = self._trim_overlap_text(last_emitted, chunk_text)
+                delta = self._trim_overlap_text(last, chunk_text)
                 if not delta:
-                    last_emitted = chunk_text
-                    return
+                    return streamed, chunk_text, speaking
 
                 if emit_frames:
-                    if not started_speaking:
-                        started_speaking = True
+                    if not speaking:
+                        speaking = True
                         self._set_state("agent-speaking")
                     if self._on_agent_transcript:
                         self._safe_callback(self._on_agent_transcript, delta, False)
-                    await self.push_frame(TextFrame(delta))
+                    await self.push_frame(TextFrame(text=delta))
 
-                streamed_text = self._append_text(streamed_text, delta)
-                last_emitted = chunk_text
+                streamed = self._append_text(streamed, delta)
+                last = chunk_text
+                return streamed, last, speaking
 
             chunks = self._iter_text_chunks(raw)
             try:
@@ -257,29 +263,45 @@ class AgentBridgeProcessor(FrameProcessor):
                     if emit_frames:
                         try:
                             first_task = asyncio.create_task(anext(chunks))
-                            timeout_seconds = max(0.0, self._first_token_timeout_seconds)
+                            timeout_seconds = max(
+                                0.0, self._first_token_timeout_seconds
+                            )
                             if timeout_seconds > 0:
                                 done, _pending = await asyncio.wait(
                                     {first_task}, timeout=timeout_seconds
                                 )
                                 if not done:
                                     # TTS filler so the agent doesn't feel "dead air".
-                                    await self.push_frame(TextFrame(DEFAULT_THINKING_TEXT))
+                                    await self.push_frame(
+                                        TextFrame(text=DEFAULT_THINKING_TEXT)
+                                    )
                             first = await first_task
                         except StopAsyncIteration:
                             return None
 
-                        await _consume_chunk(first)
+                        (
+                            streamed_text,
+                            last_emitted,
+                            started_speaking,
+                        ) = await _consume_chunk(
+                            first, streamed_text, last_emitted, started_speaking
+                        )
 
                     async for chunk_text in chunks:
-                        await _consume_chunk(chunk_text)
+                        (
+                            streamed_text,
+                            last_emitted,
+                            started_speaking,
+                        ) = await _consume_chunk(
+                            chunk_text, streamed_text, last_emitted, started_speaking
+                        )
             except TimeoutError:
                 if emit_frames:
                     self._set_state("error")
                     fallback = DEFAULT_TIMEOUT_FALLBACK_TEXT
                     if self._on_agent_transcript:
                         self._safe_callback(self._on_agent_transcript, fallback, True)
-                    await self.push_frame(TextFrame(fallback))
+                    await self.push_frame(TextFrame(text=fallback))
                     self._set_state("listening")
                     return fallback
                 return None
@@ -344,8 +366,10 @@ class AgentBridgeProcessor(FrameProcessor):
         if isinstance(normalized, str):
             return normalized
         if isinstance(normalized, dict):
-            content = normalized.get("content") or normalized.get("text") or normalized.get(
-                "message"
+            content = (
+                normalized.get("content")
+                or normalized.get("text")
+                or normalized.get("message")
             )
             if isinstance(content, str):
                 return content
@@ -395,7 +419,7 @@ class AgentBridgeProcessor(FrameProcessor):
     async def cleanup_background_tasks(self) -> None:
         """Cancel and await any background callback tasks."""
         await self._cancel_current_agent_task()
-            
+
         if not self._background_tasks:
             return
 

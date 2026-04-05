@@ -66,7 +66,9 @@ async def test_voice_websocket_accepts_subprotocol_session_token(monkeypatch):
 
     runner_mod.PipelineRunner = PipelineRunner
 
-    monkeypatch.setitem(sys.modules, "pipecat.transports.websocket.fastapi", fastapi_mod)
+    monkeypatch.setitem(
+        sys.modules, "pipecat.transports.websocket.fastapi", fastapi_mod
+    )
     monkeypatch.setitem(sys.modules, "pipecat.pipeline.pipeline", pipeline_mod)
     monkeypatch.setitem(sys.modules, "pipecat.pipeline.task", task_mod)
     monkeypatch.setitem(sys.modules, "pipecat.pipeline.runner", runner_mod)
@@ -86,7 +88,9 @@ async def test_voice_websocket_accepts_subprotocol_session_token(monkeypatch):
     def fake_build_voice_pipeline(**_kwargs):
         return {"stt": object(), "tts": object(), "bridge": dummy_bridge, "vad": None}
 
-    monkeypatch.setattr(pipeline_builder, "build_voice_pipeline", fake_build_voice_pipeline)
+    monkeypatch.setattr(
+        pipeline_builder, "build_voice_pipeline", fake_build_voice_pipeline
+    )
 
     # Enable session auth for the handshake.
     from bindu.server.endpoints import voice_endpoints as module
@@ -100,8 +104,12 @@ async def test_voice_websocket_accepts_subprotocol_session_token(monkeypatch):
         module.app_settings.voice.session_auth_required = True
         module.app_settings.voice.session_timeout = 300
         module.app_settings.voice.enabled = True
-        module.app_settings.voice.stt_api_key = "unit-test-stt-token"  # pragma: allowlist secret
-        module.app_settings.voice.tts_api_key = "unit-test-tts-token"  # pragma: allowlist secret
+        module.app_settings.voice.stt_api_key = (
+            "unit-test-stt-token"  # pragma: allowlist secret
+        )
+        module.app_settings.voice.tts_api_key = (
+            "unit-test-tts-token"  # pragma: allowlist secret
+        )
 
         manager = VoiceSessionManager(max_sessions=5, session_timeout=300)
         session = await manager.create_session(
@@ -136,9 +144,17 @@ async def test_voice_websocket_accepts_subprotocol_session_token(monkeypatch):
         # Should select the token as the negotiated subprotocol.
         assert websocket.accept.await_args.kwargs.get("subprotocol") == "token-abc"
 
-        sent = [json.loads(call.args[0]) for call in websocket.send_text.await_args_list]
-        assert any(item.get("type") == "state" and item.get("state") == "listening" for item in sent)
-        assert any(item.get("type") == "state" and item.get("state") == "ended" for item in sent)
+        sent = [
+            json.loads(call.args[0]) for call in websocket.send_text.await_args_list
+        ]
+        assert any(
+            item.get("type") == "state" and item.get("state") == "listening"
+            for item in sent
+        )
+        assert any(
+            item.get("type") == "state" and item.get("state") == "ended"
+            for item in sent
+        )
     finally:
         module.app_settings.voice.session_auth_required = original_required
         module.app_settings.voice.session_timeout = original_timeout
@@ -193,7 +209,9 @@ async def test_voice_websocket_times_out_and_sends_error(monkeypatch):
 
     runner_mod.PipelineRunner = PipelineRunner
 
-    monkeypatch.setitem(sys.modules, "pipecat.transports.websocket.fastapi", fastapi_mod)
+    monkeypatch.setitem(
+        sys.modules, "pipecat.transports.websocket.fastapi", fastapi_mod
+    )
     monkeypatch.setitem(sys.modules, "pipecat.pipeline.pipeline", pipeline_mod)
     monkeypatch.setitem(sys.modules, "pipecat.pipeline.task", task_mod)
     monkeypatch.setitem(sys.modules, "pipecat.pipeline.runner", runner_mod)
@@ -208,7 +226,9 @@ async def test_voice_websocket_times_out_and_sends_error(monkeypatch):
     def fake_build_voice_pipeline(**_kwargs):
         return {"stt": object(), "tts": object(), "bridge": dummy_bridge, "vad": None}
 
-    monkeypatch.setattr(pipeline_builder, "build_voice_pipeline", fake_build_voice_pipeline)
+    monkeypatch.setattr(
+        pipeline_builder, "build_voice_pipeline", fake_build_voice_pipeline
+    )
 
     from bindu.server.endpoints import voice_endpoints as module
 
@@ -219,8 +239,12 @@ async def test_voice_websocket_times_out_and_sends_error(monkeypatch):
     try:
         module.app_settings.voice.session_timeout = 0.01
         module.app_settings.voice.enabled = True
-        module.app_settings.voice.stt_api_key = "unit-test-stt-token"  # pragma: allowlist secret
-        module.app_settings.voice.tts_api_key = "unit-test-tts-token"  # pragma: allowlist secret
+        module.app_settings.voice.stt_api_key = (
+            "unit-test-stt-token"  # pragma: allowlist secret
+        )
+        module.app_settings.voice.tts_api_key = (
+            "unit-test-tts-token"  # pragma: allowlist secret
+        )
 
         manager = VoiceSessionManager(max_sessions=5, session_timeout=300)
         session = await manager.create_session("ctx")
@@ -246,8 +270,13 @@ async def test_voice_websocket_times_out_and_sends_error(monkeypatch):
 
         await voice_websocket(websocket)
 
-        sent = [json.loads(call.args[0]) for call in websocket.send_text.await_args_list]
-        assert any(item.get("type") == "error" and "timed out" in item.get("message", "") for item in sent)
+        sent = [
+            json.loads(call.args[0]) for call in websocket.send_text.await_args_list
+        ]
+        assert any(
+            item.get("type") == "error" and "timed out" in item.get("message", "")
+            for item in sent
+        )
     finally:
         module.app_settings.voice.session_timeout = original_timeout
         module.app_settings.voice.enabled = original_enabled

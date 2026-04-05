@@ -42,8 +42,12 @@ def _enable_voice_for_tests():
     original_stt = module.app_settings.voice.stt_api_key
     original_tts = module.app_settings.voice.tts_api_key
     module.app_settings.voice.enabled = True
-    module.app_settings.voice.stt_api_key = "unit-test-stt-token"  # pragma: allowlist secret
-    module.app_settings.voice.tts_api_key = "unit-test-tts-token"  # pragma: allowlist secret
+    module.app_settings.voice.stt_api_key = (
+        "unit-test-stt-token"  # pragma: allowlist secret
+    )
+    module.app_settings.voice.tts_api_key = (
+        "unit-test-tts-token"  # pragma: allowlist secret
+    )
     try:
         yield
     finally:
@@ -363,12 +367,16 @@ class TestVoiceRateLimiter:
                 return 1
 
         fake = FakeRedis()
-        monkeypatch.setattr(module, "_get_rate_limit_redis_client", AsyncMock(return_value=fake))
+        monkeypatch.setattr(
+            module, "_get_rate_limit_redis_client", AsyncMock(return_value=fake)
+        )
 
         original_backend = module.app_settings.voice.rate_limit_backend
         try:
             module.app_settings.voice.rate_limit_backend = "redis"
-            allowed = await module._rate_limit_allow_ip("192.168.1.5", limit_per_minute=1, now=100.0)
+            allowed = await module._rate_limit_allow_ip(
+                "192.168.1.5", limit_per_minute=1, now=100.0
+            )
         finally:
             module.app_settings.voice.rate_limit_backend = original_backend
 
@@ -576,4 +584,6 @@ class TestVoiceControlReader:
         forwarded = []
         while not queue.empty():
             forwarded.append(queue.get_nowait())
-        assert not any(m.get("text") and "commit_turn" in m.get("text") for m in forwarded)
+        assert not any(
+            m.get("text") and "commit_turn" in m.get("text") for m in forwarded
+        )

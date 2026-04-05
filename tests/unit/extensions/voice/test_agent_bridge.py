@@ -119,7 +119,9 @@ class TestAgentBridgeProcessor:
         assert deltas[-1] == ("hello this is agent", True)
 
     @pytest.mark.asyncio
-    async def test_new_transcription_interrupts_downstream_when_allow_interruptions(self):
+    async def test_new_transcription_interrupts_downstream_when_allow_interruptions(
+        self,
+    ):
         first_started = asyncio.Event()
         unblock_first = asyncio.Event()
 
@@ -130,7 +132,9 @@ class TestAgentBridgeProcessor:
                 return "done"
             return "ok"
 
-        bridge = AgentBridgeProcessor(manifest_run=run, context_id="ctx", allow_interruptions=True)
+        bridge = AgentBridgeProcessor(
+            manifest_run=run, context_id="ctx", allow_interruptions=True
+        )
         bridge.push_frame = AsyncMock()
 
         await bridge.process_frame(

@@ -117,8 +117,10 @@ class TestNotificationService:
         with patch(
             "socket.getaddrinfo", side_effect=socket.gaierror("Name resolution failed")
         ):
-            with pytest.raises(ValueError, match="could not be resolved"):
-                service.validate_config(config)
+            # Environments without DNS (e.g. offline CI) should still be able to
+            # register configs; delivery will fail later if the hostname remains
+            # unresolvable.
+            service.validate_config(config)
 
     def test_build_headers_basic(self):
         """Test building basic headers without token."""

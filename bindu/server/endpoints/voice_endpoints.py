@@ -28,7 +28,6 @@ from bindu.utils.logging import get_logger
 from bindu.server.endpoints.utils import handle_endpoint_errors
 
 if TYPE_CHECKING:
-    from bindu.extensions.voice.agent_bridge import AgentBridgeProcessor
     from bindu.server.applications import BinduApplication
 
 logger = get_logger("bindu.server.endpoints.voice")
@@ -44,7 +43,7 @@ try:
 
     _REDIS_AVAILABLE = True
 except Exception:  # pragma: no cover
-    _redis_async = None
+    _redis_async = None  # type: ignore[assignment]
     _REDIS_AVAILABLE = False
 
 
@@ -101,7 +100,7 @@ async def _rate_limit_allow_ip(
     limit_per_minute: int,
     now: float | None = None,
 ) -> bool:
-    """Simple sliding-window rate limiter keyed by IP."""
+    """Allow an IP through the sliding-window rate limiter."""
     if limit_per_minute <= 0:
         return True
     t = float(time.time() if now is None else now)
@@ -284,6 +283,7 @@ def _voice_preflight_error() -> str | None:
 
     return None
 
+
 async def _send_error_and_close(
     websocket: WebSocket,
     message: str,
@@ -344,7 +344,9 @@ async def _voice_control_reader(
             frame_type = payload.get("type")
             if frame_type == "mute":
                 control.muted = True
-                await _send_json(websocket, {"type": "state", "state": "muted"}, send_lock)
+                await _send_json(
+                    websocket, {"type": "state", "state": "muted"}, send_lock
+                )
                 continue
             if frame_type == "unmute":
                 control.muted = False
@@ -354,7 +356,9 @@ async def _voice_control_reader(
                 continue
             if frame_type == "stop":
                 control.stopped = True
-                await _send_json(websocket, {"type": "state", "state": "ended"}, send_lock)
+                await _send_json(
+                    websocket, {"type": "state", "state": "ended"}, send_lock
+                )
                 try:
                     await websocket.close()
                 finally:
@@ -452,9 +456,7 @@ async def voice_session_start(app: BinduApplication, request: Request) -> Respon
             limit_per_minute=int(app_settings.voice.rate_limit_per_ip_per_minute),
         )
         if not allowed:
-            return JSONResponse(
-                {"error": "Rate limit exceeded"}, status_code=429
-            )
+            return JSONResponse({"error": "Rate limit exceeded"}, status_code=429)
 
     # Parse optional context_id from body
     context_id = str(uuid4())
@@ -474,7 +476,9 @@ async def voice_session_start(app: BinduApplication, request: Request) -> Respon
     session_token_expires_at: float | None = None
     if app_settings.voice.session_auth_required:
         session_token = secrets.token_urlsafe(32)
-        session_token_expires_at = time.time() + max(1, int(app_settings.voice.session_token_ttl))
+        session_token_expires_at = time.time() + max(
+            1, int(app_settings.voice.session_token_ttl)
+        )
 
     try:
         session = await session_manager.create_session(
@@ -572,7 +576,6 @@ async def voice_session_status(app: BinduApplication, request: Request) -> Respo
 # ---------------------------------------------------------------------------
 
 
-
 async def voice_websocket(websocket: WebSocket) -> None:
     """Bidirectional voice WebSocket handler using Pipecat pipeline."""
     app: BinduApplication = websocket.app  # type: ignore[assignment]
@@ -639,12 +642,17 @@ async def voice_websocket(websocket: WebSocket) -> None:
     voice_ext = getattr(app, "_voice_ext", None)
     manifest = getattr(app, "manifest", None)
     if voice_ext is None or manifest is None or not hasattr(manifest, "run"):
-        await websocket.send_text(json.dumps({"type": "error", "message": "Agent not configured for voice"}))
+        await websocket.send_text(
+            json.dumps({"type": "error", "message": "Agent not configured for voice"})
+        )
         await websocket.close(code=1011)
         return
 
     from bindu.extensions.voice.pipeline_builder import build_voice_pipeline
-    from pipecat.transports.websocket.fastapi import FastAPIWebsocketTransport, FastAPIWebsocketParams
+    from pipecat.transports.websocket.fastapi import (
+        FastAPIWebsocketTransport,
+        FastAPIWebsocketParams,
+    )
     from pipecat.pipeline.pipeline import Pipeline
     from pipecat.pipeline.task import PipelineTask
     from pipecat.pipeline.runner import PipelineRunner
@@ -702,7 +710,9 @@ async def voice_websocket(websocket: WebSocket) -> None:
             {"type": "transcript", "role": "user", "text": text, "is_final": True},
             send_lock,
         )
-        response = await components["bridge"].process_transcription(text, emit_frames=True)
+        response = await components["bridge"].process_transcription(
+            text, emit_frames=True
+        )
         if response:
             await _on_agent_response(response)
 
@@ -728,16 +738,18 @@ async def voice_websocket(websocket: WebSocket) -> None:
             vad_enabled=app_settings.voice.vad_enabled,
             vad_analyzer=components.get("vad"),
             vad_audio_passthrough=True,
-        )
+        ),
     )
 
-    pipeline = Pipeline([
-        transport.input(),
-        components["stt"],
-        components["bridge"],
-        components["tts"],
-        transport.output(),
-    ])
+    pipeline = Pipeline(
+        [
+            transport.input(),
+            components["stt"],
+            components["bridge"],
+            components["tts"],
+            transport.output(),
+        ]
+    )
 
     task = PipelineTask(pipeline)
     runner = PipelineRunner()
@@ -759,7 +771,9 @@ async def voice_websocket(websocket: WebSocket) -> None:
         logger.exception(f"Error in voice WebSocket: {session_id}: {e}")
         if websocket.client_state == WebSocketState.CONNECTED:
             user_message, close_code = _classify_voice_pipeline_error(e)
-            await _send_json(websocket, {"type": "error", "message": user_message}, send_lock)
+            await _send_json(
+                websocket, {"type": "error", "message": user_message}, send_lock
+            )
             try:
                 await websocket.close(code=close_code, reason=user_message)
             except Exception:
@@ -775,7 +789,9 @@ async def voice_websocket(websocket: WebSocket) -> None:
 
         if websocket.client_state == WebSocketState.CONNECTED:
             try:
-                await _send_json(websocket, {"type": "state", "state": "ended"}, send_lock)
+                await _send_json(
+                    websocket, {"type": "state", "state": "ended"}, send_lock
+                )
             except Exception:
                 pass
 
