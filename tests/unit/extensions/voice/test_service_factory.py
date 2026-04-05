@@ -95,6 +95,7 @@ class TestCreateTTSService:
             tts_model="eleven_turbo_v2_5",
         )
         mock_tts_cls = MagicMock()
+        mock_tts_settings = MagicMock()
         with (
             patch(
                 "bindu.extensions.voice.service_factory.app_settings"
@@ -103,7 +104,8 @@ class TestCreateTTSService:
                 "sys.modules",
                 {
                     "pipecat.services.elevenlabs.tts": MagicMock(
-                        ElevenLabsTTSService=mock_tts_cls
+                        ElevenLabsTTSService=mock_tts_cls,
+                        ElevenLabsTTSSettings=mock_tts_settings,
                     )
                 },
             ),
@@ -112,9 +114,12 @@ class TestCreateTTSService:
                 "unit-test-tts-token"  # pragma: allowlist secret
             )
             result = create_tts_service(ext)
+            mock_tts_settings.assert_called_once_with(
+                voice="voice-abc",
+                model="eleven_turbo_v2_5",
+            )
             mock_tts_cls.assert_called_once_with(
                 api_key="unit-test-tts-token",  # pragma: allowlist secret
-                voice_id="voice-abc",
-                model="eleven_turbo_v2_5",
+                settings=mock_tts_settings.return_value,
             )
             assert result == mock_tts_cls.return_value

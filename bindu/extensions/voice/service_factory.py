@@ -90,17 +90,29 @@ def create_tts_service(config: VoiceAgentExtension) -> Any:
                 "pipecat.services.elevenlabs.tts"
             )
             ElevenLabsTTSService = getattr(elevenlabs_module, "ElevenLabsTTSService")
+            ElevenLabsTTSSettings = getattr(
+                elevenlabs_module, "ElevenLabsTTSSettings", None
+            )
         except (ImportError, AttributeError) as e:
             raise ImportError(
                 "ElevenLabs TTS requires pipecat[elevenlabs]. "
                 "Install with: pip install 'bindu[voice]'"
             ) from e
 
-        tts = ElevenLabsTTSService(
-            api_key=api_key,
-            voice_id=config.tts_voice_id,
-            model=config.tts_model,
-        )
+        if ElevenLabsTTSSettings is not None:
+            tts = ElevenLabsTTSService(
+                api_key=api_key,
+                settings=ElevenLabsTTSSettings(
+                    voice=config.tts_voice_id,
+                    model=config.tts_model,
+                ),
+            )
+        else:
+            tts = ElevenLabsTTSService(
+                api_key=api_key,
+                voice_id=config.tts_voice_id,
+                model=config.tts_model,
+            )
         logger.info(
             f"Created ElevenLabs TTS: voice={config.tts_voice_id}, model={config.tts_model}"
         )
