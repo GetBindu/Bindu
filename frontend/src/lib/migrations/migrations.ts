@@ -84,11 +84,8 @@ export async function checkAndRunMigrations() {
 				{ upsert: true }
 			);
 
-			const session =
-				"startSession" in connectedClient
-					? connectedClient.startSession()
-					: (await (await Database.getInstance()).getClient().connect()).startSession();
-			let result = false;
+				const session = connectedClient.startSession();
+				let result = false;
 
 			try {
 				await session.withTransaction(async () => {
