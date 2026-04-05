@@ -567,14 +567,13 @@ async def _transcribe_pcm_buffer(pcm_bytes: bytes) -> str | None:
         "language": app_settings.voice.stt_language,
         "punctuate": "true",
         "smart_format": "true",
+        "encoding": app_settings.voice.audio_encoding,
+        "sample_rate": app_settings.voice.sample_rate,
+        "channels": app_settings.voice.audio_channels,
     }
     headers = {
         "Authorization": f"Token {api_key}",
-        "Content-Type": (
-            f"audio/raw;encoding={app_settings.voice.audio_encoding};"
-            f"sample_rate={app_settings.voice.sample_rate};"
-            f"channels={app_settings.voice.audio_channels}"
-        ),
+        "Content-Type": "audio/raw",
     }
 
     try:
