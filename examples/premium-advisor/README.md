@@ -39,7 +39,7 @@ cp .env.example .env
 ```
 
 ```bash
-OPENROUTER_API_KEY=your_openrouter_api_key_here  # pragma: allowlist secret
+OPENROUTER_API_KEY=your_openrouter_api_key_here
 ```
 
 ### 2. Install Dependencies

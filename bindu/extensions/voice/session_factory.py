@@ -115,10 +115,7 @@ async def create_session_manager(
         )
 
         # Enter async context to initialize Redis connection
-        try:
-            await manager.__aenter__()
-        except Exception:
-            raise
+        await manager.__aenter__()
         return manager
 
     raise ValueError(

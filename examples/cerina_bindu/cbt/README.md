@@ -57,7 +57,32 @@ cp .env.example .env
 uv run python supervisor_cbt.py
 ```
 
-Agent starts at `http://localhost:3773`. See `examples/cerina_bindu/cbt/README.md` for setup and usage (including curl examples).
+Agent starts at `http://localhost:3773`.
+
+Minimal smoke test:
+
+```bash
+curl -X POST http://localhost:3773/ \
+     -H "Content-Type: application/json" \
+     -d '{
+          "jsonrpc": "2.0",
+          "method": "message/send",
+          "params": {
+               "message": {
+                    "role": "user",
+                    "parts": [{"kind": "text", "text": "I feel overwhelmed and procrastinate constantly. Give me a short CBT exercise."}],
+                    "kind": "message",
+                    "messageId": "msg-cbt-1",
+                    "contextId": "ctx-cbt-1",
+                    "taskId": "task-cbt-1"
+               },
+               "configuration": {"acceptedOutputModes": ["application/json"]}
+          },
+          "id": "1"
+     }'
+```
+
+Expected result: HTTP 200 with a JSON-RPC response containing a task/result payload with structured CBT guidance.
 
 ---
 

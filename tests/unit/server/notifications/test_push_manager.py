@@ -248,7 +248,7 @@ class TestPushNotificationManager:
         task_id = uuid4()
         config = cast(
             PushNotificationConfig,
-            {"id": task_id, "url": "https://93.184.216.34/webhook"},
+            {"id": task_id, "url": "https://example.com/webhook"},
         )
 
         await manager.register_push_config(task_id, config, persist=False)
@@ -264,7 +264,7 @@ class TestPushNotificationManager:
         task_id = uuid4()
         config = cast(
             PushNotificationConfig,
-            {"id": task_id, "url": "https://93.184.216.34/webhook"},
+            {"id": task_id, "url": "https://example.com/webhook"},
         )
 
         await manager.register_push_config(task_id, config, persist=True)
@@ -279,7 +279,7 @@ class TestPushNotificationManager:
         task_id = uuid4()
         config = cast(
             PushNotificationConfig,
-            {"id": task_id, "url": "https://93.184.216.34/webhook"},
+            {"id": task_id, "url": "https://example.com/webhook"},
         )
 
         await manager.register_push_config(task_id, config, persist=False)
@@ -297,7 +297,7 @@ class TestPushNotificationManager:
         task_id = uuid4()
         config = cast(
             PushNotificationConfig,
-            {"id": task_id, "url": "https://93.184.216.34/webhook"},
+            {"id": task_id, "url": "https://example.com/webhook"},
         )
 
         await manager.register_push_config(task_id, config, persist=True)
@@ -329,7 +329,7 @@ class TestPushNotificationManager:
         task_id = uuid4()
         config = cast(
             PushNotificationConfig,
-            {"id": task_id, "url": "https://93.184.216.34/webhook"},
+            {"id": task_id, "url": "https://example.com/webhook"},
         )
         manager._push_notification_configs[task_id] = config
 
@@ -337,7 +337,7 @@ class TestPushNotificationManager:
 
         assert result["id"] == task_id
         assert (
-            result["push_notification_config"]["url"] == "https://93.184.216.34/webhook"
+            result["push_notification_config"]["url"] == "https://example.com/webhook"
         )
 
     def test_build_task_push_config_not_found(self):

@@ -20,6 +20,9 @@ from typing import Any
 
 from pypdf import PdfReader
 from docx import Document
+from bindu.utils.logging import get_logger
+
+logger = get_logger("examples.document_analyzer")
 
 load_dotenv()
 
@@ -72,8 +75,12 @@ def extract_text_from_pdf(file_bytes):
 
 def extract_text_from_docx(file_bytes):
     """Extract text from docx bytes"""
-    doc = Document(io.BytesIO(file_bytes))
-    return "\n".join([p.text for p in doc.paragraphs])
+    try:
+        doc = Document(io.BytesIO(file_bytes))
+        return "\n".join([p.text for p in doc.paragraphs])
+    except Exception as e:
+        logger.error(f"Error extracting DOCX text: {e}")
+        return ""
 
 
 def extract_document_text(file_bytes, mime_type):

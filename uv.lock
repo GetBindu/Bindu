@@ -510,6 +510,7 @@ voice = [
 [package.dev-dependencies]
 dev = [
     { name = "bindu" },
+    { name = "pipecat-ai", extra = ["deepgram", "elevenlabs"] },
     { name = "pipreqs" },
     { name = "pre-commit" },
     { name = "pytest" },
@@ -564,7 +565,7 @@ requires-dist = [
     { name = "opentelemetry-sdk", specifier = "==1.35.0" },
     { name = "orjson", specifier = "==3.10.18" },
     { name = "orjson", marker = "extra == 'core'", specifier = "==3.10.18" },
-    { name = "pipecat-ai", extras = ["deepgram", "elevenlabs", "silero"], marker = "extra == 'voice'", specifier = ">=0.0.105" },
+    { name = "pipecat-ai", extras = ["deepgram", "elevenlabs", "silero"], marker = "extra == 'voice'", specifier = "~=0.0.105" },
     { name = "protobuf", marker = "extra == 'grpc'", specifier = ">=5.29.6,<6.0.0" },
     { name = "pycryptodome", marker = "extra == 'agents'", specifier = ">=3.20.0" },
     { name = "pydantic", specifier = ">=2.11.7" },
@@ -604,6 +605,7 @@ provides-extras = ["agents", "core", "grpc", "voice"]
 [package.metadata.requires-dev]
 dev = [
     { name = "bindu" },
+    { name = "pipecat-ai", extras = ["deepgram", "elevenlabs", "silero"], specifier = "~=0.0.105" },
     { name = "pipreqs", specifier = ">=0.5.0" },
     { name = "pre-commit", specifier = ">=3.0.0" },
     { name = "pytest", specifier = ">=8.0.0" },

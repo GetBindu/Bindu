@@ -32,9 +32,6 @@ jobs:
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
 
-      - name: Update lockfile
-        run: uv lock
-
       - name: Install dependencies
         run: uv sync --locked --all-extras --dev
 
@@ -75,9 +72,6 @@ jobs:
 
       - name: Set up Python 3.13
         run: uv python install 3.13
-
-      - name: Update lockfile
-        run: uv lock
 
       - name: Install dependencies
         run: uv sync --locked --all-extras --dev

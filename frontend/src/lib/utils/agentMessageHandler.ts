@@ -65,7 +65,7 @@ export async function submitTaskFeedback(
 interface FilePart {
 	kind: 'file';
 	file: {
-		bytes: string;
+		bytes: string | ArrayBuffer | Uint8Array | Blob;
 		mimeType?: string;
 		name?: string;
 	};
@@ -177,7 +177,11 @@ export async function* sendAgentMessage(
 		currentTaskId?: string;
 		taskState?: string;
 		replyToTaskId?: string;
-		fileParts?: Array<{ name: string; mime: string; value: string }>;
+		fileParts?: Array<{
+			name: string;
+			mime: string;
+			value: string | ArrayBuffer | Uint8Array | Blob;
+		}>;
 	} = {}
 ): AsyncGenerator<MessageUpdate, void, unknown> {
 	const {
@@ -234,55 +238,54 @@ export async function* sendAgentMessage(
 		? (contextId.length === 24 ? contextId.padEnd(32, '0') : contextId)
 		: generateId();
 
+	// Build message with optional referenceTaskIds
+	const parts: AgentMessage["parts"] = [{ kind: 'text', text: message }];
+	if (fileParts && fileParts.length > 0) {
+		for (const f of fileParts) {
+			const mime = typeof f.mime === 'string' ? f.mime.trim() : '';
+			const name = typeof f.name === 'string' ? f.name.trim() : '';
+			const value = f.value;
 
-		// Build message with optional referenceTaskIds
-		const parts: AgentMessage["parts"] = [{ kind: 'text', text: message }];
-		if (fileParts && fileParts.length > 0) {
-			for (const f of fileParts) {
-				const mime = typeof f.mime === 'string' ? f.mime.trim() : '';
-				const name = typeof f.name === 'string' ? f.name.trim() : '';
-				const value = f.value;
-
-				const hasValue =
-					typeof value === 'string'
-						? value.length > 0
-						: value instanceof ArrayBuffer
+			const hasValue =
+				typeof value === 'string'
+					? value.length > 0
+					: value instanceof ArrayBuffer
+						? value.byteLength > 0
+						: value instanceof Uint8Array
 							? value.byteLength > 0
-							: value instanceof Uint8Array
-								? value.byteLength > 0
-								: value instanceof Blob
-									? value.size > 0
-									: Boolean(value);
+							: value instanceof Blob
+								? value.size > 0
+								: Boolean(value);
 
-				if (!hasValue || !mime || !name) {
-					console.warn('[agentMessageHandler] Dropping invalid file part', {
-						hasValue,
-						mime,
-						name,
-					});
-					continue;
-				}
-
-				parts.push({
-					kind: 'file',
-					file: {
-						bytes: value,
-						mimeType: mime,
-						name,
-					},
+			if (!hasValue || !mime || !name) {
+				console.warn('[agentMessageHandler] Dropping invalid file part', {
+					hasValue,
+					mime,
+					name,
 				});
+				continue;
 			}
-		}
 
-		const agentMessage: AgentMessage = {
-			role: 'user',
-			parts,
-			kind: 'message',
-			messageId,
-			contextId: newContextId,
-			taskId,
-			...(referenceTaskIds.length > 0 && { referenceTaskIds }),
-		};
+			parts.push({
+				kind: 'file',
+				file: {
+					bytes: value,
+					mimeType: mime,
+					name,
+				},
+			});
+		}
+	}
+
+	const agentMessage: AgentMessage = {
+		role: 'user',
+		parts,
+		kind: 'message',
+		messageId,
+		contextId: newContextId,
+		taskId,
+		...(referenceTaskIds.length > 0 && { referenceTaskIds }),
+	};
 
 	// Step 1: Send message
 	yield { type: MessageUpdateType.Status, status: MessageUpdateStatus.Started };

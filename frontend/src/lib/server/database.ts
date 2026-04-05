@@ -465,6 +465,28 @@ class InMemoryBucket {
 
 	openDownloadStream(id: ObjectId | string) {
 		const file = this.files.get(id.toString());
+		const listeners = new Map<string, Set<(arg?: Error | Uint8Array) => void>>();
+		let destroyed = false;
+
+		const emit = (event: string, arg?: Error | Uint8Array) => {
+			if (destroyed) return;
+			const handlers = listeners.get(event);
+			if (!handlers) return;
+			for (const handler of handlers) {
+				handler(arg);
+			}
+		};
+
+		const addListener = (
+			event: string,
+			handler: (arg?: Error | Uint8Array) => void
+		) => {
+			if (!listeners.has(event)) {
+				listeners.set(event, new Set());
+			}
+			listeners.get(event)?.add(handler);
+		};
+
 		const downloadStream = {
 			pipe<T extends { write: (d: Buffer) => void; end: () => void }>(dest: T): T {
 				if (file) dest.write(file.data);
@@ -472,10 +494,38 @@ class InMemoryBucket {
 				return dest;
 			},
 			on(_event: string, cb: (arg?: Error | Uint8Array) => void) {
-				if (_event === "error" && !file) cb(new Error("File not found"));
-				if (_event === "data" && file) setTimeout(() => cb(file.data), 0);
-				if (_event === "end" && file) setTimeout(() => cb(), 0);
+				addListener(_event, cb);
+				if (_event === "error" && !file) setTimeout(() => emit("error", new Error("File not found")), 0);
+				if (_event === "data" && file) setTimeout(() => emit("data", file.data), 0);
+				if (_event === "end" && file) setTimeout(() => emit("end"), 0);
 				return downloadStream;
+			},
+			once(event: string, cb: (arg?: Error | Uint8Array) => void) {
+				const wrapped = (arg?: Error | Uint8Array) => {
+					downloadStream.off(event, wrapped);
+					cb(arg);
+				};
+				addListener(event, wrapped);
+				if (event === "error" && !file) setTimeout(() => emit("error", new Error("File not found")), 0);
+				if (event === "data" && file) setTimeout(() => emit("data", file.data), 0);
+				if (event === "end" && file) setTimeout(() => emit("end"), 0);
+				return downloadStream;
+			},
+			off(event: string, cb: (arg?: Error | Uint8Array) => void) {
+				listeners.get(event)?.delete(cb);
+				return downloadStream;
+			},
+			destroy(err?: Error) {
+				if (err) {
+					const errorHandlers = listeners.get("error");
+					if (errorHandlers) {
+						for (const handler of errorHandlers) {
+							handler(err);
+						}
+					}
+				}
+				destroyed = true;
+				listeners.clear();
 			},
 		};
 		return downloadStream;

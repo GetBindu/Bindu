@@ -75,7 +75,7 @@ capabilities_detail:
   transport:
     protocol: A2A (JSON-RPC over HTTP)
     endpoint: POST /
-    port: 3775
+    port: 3773
     auth: enabled (configurable via config.auth.enabled)
     storage: in-memory (configurable — see .env.example for Postgres/Redis options)
     scheduler: in-memory (configurable — see .env.example for Redis options)

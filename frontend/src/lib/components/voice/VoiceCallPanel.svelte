@@ -12,12 +12,48 @@
 		voiceState,
 	} from "$lib/stores/voice";
 	import IconMic from "~icons/lucide/mic";
-		import IconMicOff from "~icons/lucide/mic-off";
-		import IconPhoneOff from "~icons/lucide/phone-off";
+	import IconMicOff from "~icons/lucide/mic-off";
+	import IconPhoneOff from "~icons/lucide/phone-off";
 
-		let isRecording = $state(false);
-		let isStarting = $state(false);
-		let lastAudioChunk: ArrayBuffer | null = $state(null);
+	let isRecording = $state(false);
+	let isStarting = $state(false);
+	let lastAudioChunk: ArrayBuffer | null = $state(null);
+
+	function pcm16ToWavBuffer(
+		pcmBuffer: ArrayBuffer,
+		sampleRate = 16000,
+		channels = 1
+	): ArrayBuffer {
+		const bytesPerSample = 2;
+		const dataSize = pcmBuffer.byteLength;
+		const blockAlign = channels * bytesPerSample;
+		const byteRate = sampleRate * blockAlign;
+		const wavBuffer = new ArrayBuffer(44 + dataSize);
+		const view = new DataView(wavBuffer);
+
+		const writeString = (offset: number, value: string) => {
+			for (let i = 0; i < value.length; i++) {
+				view.setUint8(offset + i, value.charCodeAt(i));
+			}
+		};
+
+		writeString(0, "RIFF");
+		view.setUint32(4, 36 + dataSize, true);
+		writeString(8, "WAVE");
+		writeString(12, "fmt ");
+		view.setUint32(16, 16, true);
+		view.setUint16(20, 1, true);
+		view.setUint16(22, channels, true);
+		view.setUint32(24, sampleRate, true);
+		view.setUint32(28, byteRate, true);
+		view.setUint16(32, blockAlign, true);
+		view.setUint16(34, 16, true);
+		writeString(36, "data");
+		view.setUint32(40, dataSize, true);
+		new Uint8Array(wavBuffer, 44).set(new Uint8Array(pcmBuffer));
+
+		return wavBuffer;
+	}
 
 	$effect(() => {
 		if (!$latestAgentAudio || $latestAgentAudio === lastAudioChunk) {
@@ -25,7 +61,8 @@
 		}
 
 		lastAudioChunk = $latestAgentAudio;
-		const blob = new Blob([$latestAgentAudio], { type: "audio/mpeg" });
+		const wavBuffer = pcm16ToWavBuffer($latestAgentAudio);
+		const blob = new Blob([wavBuffer], { type: "audio/wav" });
 		const url = URL.createObjectURL(blob);
 		const audio = new Audio(url);
 
@@ -63,21 +100,21 @@
 		}
 	});
 
-		async function beginStreaming() {
-			if (isStarting || isRecording) {
-				return;
-			}
-			isStarting = true;
-			isRecording = true;
-			try {
-				await startVoiceStreaming();
-			} catch (err) {
-				voiceError.set((err as Error).message || "Microphone access failed");
-				isRecording = false;
-			} finally {
-				isStarting = false;
-			}
+	async function beginStreaming() {
+		if (isStarting || isRecording) {
+			return;
 		}
+		isStarting = true;
+		isRecording = true;
+		try {
+			await startVoiceStreaming();
+		} catch (err) {
+			voiceError.set((err as Error).message || "Microphone access failed");
+			isRecording = false;
+		} finally {
+			isStarting = false;
+		}
+	}
 
 	function stopStreaming() {
 		stopVoiceStreaming();

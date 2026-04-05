@@ -29,12 +29,12 @@ export async function downloadFile(
 			if (chunk instanceof Uint8Array) {
 				chunks.push(chunk);
 				return;
-				}
-				const err = new Error("Unexpected chunk type from fileStream");
-				fileStream.destroy();
-				cleanup();
-				reject(err);
-			};
+			}
+			const err = new Error("Unexpected chunk type from fileStream");
+			fileStream.destroy();
+			cleanup();
+			reject(err);
+		};
 
 		const onError = (err: Error | null | undefined) => {
 			cleanup();
