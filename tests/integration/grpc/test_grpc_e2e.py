@@ -194,7 +194,11 @@ def _wait_for_task_terminal(
 
     raise AssertionError(
         f"Task {task_id} did not reach a terminal state within {timeout_s}s"
-        + (f" (last state: {last_task.get('status', {}).get('state')})" if last_task else "")
+        + (
+            f" (last state: {last_task.get('status', {}).get('state')})"
+            if last_task
+            else ""
+        )
     )
 
 
