@@ -73,11 +73,11 @@ documentation:
     Hindi, and Bengali using an LLM backend via OpenRouter. Unlike rule-based
     translators, it understands context and produces natural-sounding output.
 
-	    Particularly useful for technical content about Bindu and AI agents where
-	    standard translators produce poor results for domain-specific terms.
+    Particularly useful for technical content about Bindu and AI agents where
+    standard translators produce poor results for domain-specific terms.
 
-	    Configuration: requires `OPENROUTER_API_KEY` in the environment (and optionally
-	    `OPENROUTER_API_BASE` / `OPENROUTER_API_URL` if using a non-default endpoint).
+    Configuration: requires `OPENROUTER_API_KEY` in the environment (and optionally
+    `OPENROUTER_API_BASE` / `OPENROUTER_API_URL` if using a non-default endpoint).
 
   use_cases:
     when_to_use:
