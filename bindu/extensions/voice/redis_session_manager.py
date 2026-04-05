@@ -150,8 +150,19 @@ class RedisVoiceSessionManager:
 
     async def __aexit__(self, exc_type: Any, exc_value: Any, traceback: Any):
         """Exit async context manager and close Redis connection."""
-        if self._redis_client:
-            await self._redis_client.aclose()
+        cleanup_task = self._cleanup_task
+        if cleanup_task is not None:
+            cleanup_task.cancel()
+            try:
+                await cleanup_task
+            except asyncio.CancelledError:
+                pass
+            finally:
+                self._cleanup_task = None
+
+        redis_client = self._redis_client
+        if redis_client is not None:
+            await redis_client.aclose()
             logger.info("Redis session manager connection closed")
             self._redis_client = None
 
