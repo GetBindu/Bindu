@@ -65,7 +65,7 @@ def handler(messages):
     symbols = [a.symbol for a in portfolio.assets]
     prices = pricer.run(symbols)
 
-    risk_scores, portfolio_risk = risk.run(drift)
+    _, portfolio_risk = risk.run(drift)
     portfolio_value = portfolio.total_value
     
     result = rebalancer.run(

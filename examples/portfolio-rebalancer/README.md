@@ -80,7 +80,7 @@ Output
 ## Structure
 ```bash
 examples/portfolio-rebalancer/
-├── portfolio_agent.py
+├── portfolio_rebalancer_agent.py
 ├── agents/
 │   ├── analyst.py
 │   ├── pricer.py
@@ -89,8 +89,6 @@ examples/portfolio-rebalancer/
 ├── shared/
 │   ├── types.py
 │   └── memory.py
-├── demo/
-│   └── demo.py
 ├── skills/
 │   └── portfolio-rebalancer-agent-skill/
 │       └── skill.yaml

@@ -11,7 +11,7 @@ class SemanticMemory:
         }
 
     def get(self) -> dict:
-        return self.store
+        return self.store.copy()
 
     def update(self, new_data: dict):
         if not new_data:

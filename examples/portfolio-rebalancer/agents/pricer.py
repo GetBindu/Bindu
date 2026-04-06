@@ -56,6 +56,6 @@ def run(symbols: list[str]) -> dict[str, float]:
 
         return prices
 
-    except Exception:
-        # full fallback
+    except (requests.RequestException, KeyError, ValueError) as e:
+        print(f"[pricer] warrenty: {e}, using fallback prices")
         return {s: FALLBACK_PRICES.get(s, 1) for s in symbols}

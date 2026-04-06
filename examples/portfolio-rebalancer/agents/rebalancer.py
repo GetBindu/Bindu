@@ -12,12 +12,11 @@ REBALANCE_FRACTION = 0.25  # partial rebalance
 def run(
     portfolio_id: str,
     drift: list[DriftResult],
-    prices: dict[str, float],
     portfolio_risk: PortfolioRisk,
     memory: dict,
     portfolio_value: float
 ) -> TradePlan:
-
+    print(f"[rebalancer] portfolio_value received: {portfolio_value}")
     actions: list[TradeAction] = []
 
     low_trade = memory.get("preferences", {}).get("low_trade_frequency", False)
