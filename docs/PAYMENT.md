@@ -262,13 +262,16 @@ When ready for production:
 Bindu's current x402 flow is structured in a way that can support additional
 EVM-compatible payment networks through configuration and middleware reuse.
 However, direct SKALE support is not fully available yet because the current
-upstream `x402` package still restricts supported network validation and
-token/chain mappings to:
+upstream `x402` package still restricts its own network validation and
+token/chain mappings to a limited set of networks, including:
 
 - `base`
 - `base-sepolia`
 - `avalanche`
 - `avalanche-fuji`
+
+These upstream `x402` constraints are separate from Bindu's own runtime
+configuration, where RPC endpoint configuration can be defined independently.
 
 ### What this means
 
