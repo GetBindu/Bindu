@@ -257,6 +257,40 @@ When ready for production:
 
 5. **Set Appropriate Pricing**: Adjust `amount` based on your service value
 
+## SKALE Integration Notes
+
+Bindu's current x402 flow is structured in a way that can support additional
+EVM-compatible payment networks through configuration and middleware reuse.
+However, direct SKALE support is not fully available yet because the current
+upstream `x402` package still restricts supported network validation and
+token/chain mappings to:
+
+- `base`
+- `base-sepolia`
+- `avalanche`
+- `avalanche-fuji`
+
+### What this means
+
+On the Bindu side, the payment middleware and RPC configuration model are
+already flexible enough for future network expansion. However, adding `skale`
+only in Bindu configuration is not sufficient yet, because the upstream `x402`
+dependency still needs:
+
+- SKALE network definition in supported network validation
+- SKALE chain ID mapping
+- SKALE token metadata and default token address handling
+
+### Safe integration path
+
+The safest path for SKALE support is:
+
+1. Confirm or extend upstream `x402` support for SKALE.
+2. Add SKALE RPC endpoint configuration in Bindu.
+3. Add a minimal example for gasless x402 payments using SKALE.
+4. Validate the payment flow end-to-end against the supported SKALE
+   environment.
+
 ## Tips
 
 - **Start Small**: Use low amounts for testing (e.g., `$0.0001`)
