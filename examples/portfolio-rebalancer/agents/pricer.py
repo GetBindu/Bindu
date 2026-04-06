@@ -1,4 +1,5 @@
 import requests
+from shared.config import REQUEST_TIMEOUT
 
 # simple symbol -> coingecko id map
 SYMBOL_MAP = {
@@ -31,7 +32,7 @@ def fetch_from_api(symbols: list[str]) -> dict[str, float]:
         "vs_currencies": "usd",
     }
 
-    response = requests.get(url, params=params, timeout=5)
+    response = requests.get(url, params=params, timeout=REQUEST_TIMEOUT)
     response.raise_for_status()
 
     data = response.json()

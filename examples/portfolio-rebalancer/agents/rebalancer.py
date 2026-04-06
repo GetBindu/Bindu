@@ -1,4 +1,5 @@
 from shared.types import DriftResult, TradeAction, TradePlan, PortfolioRisk
+from shared.config import REBALANCE_FRACTION
 
 DRIFT_THRESHOLD  = 5.0
 RISK_HIGH        = 7.0
@@ -6,7 +7,6 @@ RISK_LOW         = 4.0
 RISK_HIGH_MULT   = 1.2
 RISK_LOW_MULT    = 0.8
 LOW_TRADE_MULT   = 0.7
-REBALANCE_FRACTION = 0.25  # partial rebalance
 
 
 def run(

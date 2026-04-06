@@ -5,7 +5,6 @@ from shared.memory import SemanticMemory
 from shared.types import Portfolio, Asset
 
 
-memory = SemanticMemory()
 
 
 config = {
@@ -23,15 +22,15 @@ config = {
 
 
 def handler(messages):
-    """
-    Bindu handler using messages format
-    """
+    memory = SemanticMemory()
 
     if not isinstance(messages, list) or len(messages) == 0:
         return {"error": "Invalid messages format"}
 
     # --- GET LAST USER MESSAGE ---
     last_msg = messages[-1]
+    if not isinstance(last_msg, dict):
+        return {"error": "Invalid last message format"}
     content = last_msg.get("content", {})
 
     if not isinstance(content, dict):
@@ -47,12 +46,18 @@ def handler(messages):
     assets = []
     for a in raw_portfolio.get("assets", []):
         if "symbol" in a and "current_value" in a:
-            assets.append(
-                Asset(
-                    symbol=a["symbol"],
-                    current_value=a["current_value"]
-                )
-            )
+            try:
+                current_value = float(a["current_value"])
+            except (TypeError, ValueError):
+                continue
+            assets.append(Asset(
+                symbol=a["symbol"],
+                current_value=current_value,
+                target_pct=target.get(a["symbol"], 0)
+            ))
+
+    if not assets:
+        return {"error": "No valid assets found in portfolio"}
 
     portfolio = Portfolio(
         id=raw_portfolio.get("id", "unknown"),
@@ -71,7 +76,6 @@ def handler(messages):
     result = rebalancer.run(
         portfolio_id=portfolio.id,
         drift=drift,
-        prices=prices,
         portfolio_risk=portfolio_risk,
         memory=memory.get(),
         portfolio_value=portfolio_value
