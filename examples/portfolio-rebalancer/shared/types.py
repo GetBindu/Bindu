@@ -7,6 +7,7 @@ from datetime import datetime
 class Asset:
     symbol: str
     current_value: float
+    target_pct: float = 0.0
 
 
 @dataclass

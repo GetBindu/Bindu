@@ -88,6 +88,7 @@ def handler(messages):
         "role": "assistant",
         "content": {
             "portfolio_id": portfolio.id,
+            "prices": prices,
             "actions": [
                 {
                     "symbol": a.symbol,
