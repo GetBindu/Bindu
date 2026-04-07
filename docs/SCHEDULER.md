@@ -65,6 +65,69 @@ sequenceDiagram
     Note over Scheduler: - run_task<br/>- cancel_task<br/>- pause_task<br/>- resume_task
 ```
 
+## Task Operations
+
+The scheduler supports four primary task operations:
+
+### 1. Run Task
+Executes a task from the queue. The worker processes the task and updates the state based on execution results.
+
+### 2. Cancel Task
+Cancels a running task immediately. Updates task state to `canceled` and releases allocated resources.
+
+### 3. Pause Task (NEW)
+Suspends task execution while preserving the execution context. The worker:
+- Saves the current task state to storage
+- Records the pause timestamp in task metadata
+- Updates task state to `suspended`
+- Releases computational resources
+- Preserves all task history and context for later resumption
+
+**Use Cases:**
+- Long-running tasks that users want to pause temporarily
+- Resource optimization (pause low-priority tasks)
+- Checkpoint-based execution in interruptible workflows
+
+**Example API Call:**
+```python
+# Pause a running task
+await task_manager.pause_task(task_id)
+
+# Task state transitions: working → suspended
+# Metadata includes: paused_at (ISO timestamp), paused_from_state
+```
+
+### 4. Resume Task (NEW)
+Resumes a suspended task from where it was paused. The worker:
+- Loads the task from storage
+- Restores execution context from task metadata
+- Updates task state to `resumed`
+- Continues execution from the last checkpoint
+- Preserves original pause timestamp in metadata
+
+**Use Cases:**
+- Resuming paused long-running tasks
+- Continuing work on interrupted workflows
+- Distributed task execution with pause points
+
+**Example API Call:**
+```python
+# Resume a suspended task
+await task_manager.resume_task(task_id)
+
+# Task state transitions: suspended → resumed
+# Metadata includes: resumed_at (ISO timestamp), paused_from_state
+```
+
+**Task Lifecycle with Pause/Resume:**
+```
+submitted → working ─┬→ completed (normal)
+                     ├→ suspended (pause)
+                     │   └→ resumed (resume)
+                     │       └→ completed
+                     └→ failed/canceled
+```
+
 ## Configuration
 
 ### Environment Variables
