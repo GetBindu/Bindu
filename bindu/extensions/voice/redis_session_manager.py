@@ -259,13 +259,17 @@ class RedisVoiceSessionManager:
                 "Redis client not initialized. Use async context manager."
             )
 
-        key = self._session_key(session_id)
-        data = await self._redis_client.get(key)
+        try:
+            key = self._session_key(session_id)
+            data = await self._redis_client.get(key)
 
-        if data is None:
+            if data is None:
+                return None
+
+            return self._deserialize_session(session_id, data)
+        except redis.RedisError as e:
+            logger.error(f"Error getting voice session {session_id}: {e}")
             return None
-
-        return self._deserialize_session(session_id, data)
 
     async def end_session(self, session_id: str) -> None:
         """Gracefully end a voice session.

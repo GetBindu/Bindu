@@ -388,13 +388,22 @@ class AgentBridgeProcessor(FrameProcessor):
         if isinstance(normalized, str):
             return normalized
         if isinstance(normalized, dict):
-            content = (
-                normalized.get("content")
-                or normalized.get("text")
-                or normalized.get("message")
-            )
-            if isinstance(content, str):
-                return content
+            # Check "content" explicitly, preserving empty strings
+            if "content" in normalized and normalized["content"] is not None:
+                content = normalized["content"]
+                if isinstance(content, str):
+                    return content
+            # Check "text" explicitly, preserving empty strings
+            if "text" in normalized and normalized["text"] is not None:
+                text = normalized["text"]
+                if isinstance(text, str):
+                    return text
+            # Check "message" explicitly and convert to str if needed
+            if "message" in normalized and normalized["message"] is not None:
+                message = normalized["message"]
+                if isinstance(message, str):
+                    return message
+                return str(message)
             # Dict with state but no content: ignore for voice TTS.
             if "state" in normalized:
                 return None

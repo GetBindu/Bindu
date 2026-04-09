@@ -60,13 +60,15 @@ def build_voice_pipeline(
         on_agent_transcript=on_agent_transcript,
     )
 
-    vad_analyzer = None
+    vad_component = None
     if app_settings.voice.vad_enabled:
         from pipecat.audio.vad.silero import SileroVADAnalyzer
+        from pipecat.processors.audio.vad_processor import VADProcessor
 
         vad_analyzer = SileroVADAnalyzer(
             sample_rate=app_settings.voice.sample_rate,
         )
+        vad_component = VADProcessor(vad_analyzer=vad_analyzer)
 
     logger.info(
         f"Voice pipeline built: STT={voice_ext.stt_provider}/{voice_ext.stt_model}, "
@@ -78,5 +80,5 @@ def build_voice_pipeline(
         "stt": stt,
         "tts": tts,
         "bridge": bridge,
-        "vad": vad_analyzer,
+        "vad": vad_component,
     }
