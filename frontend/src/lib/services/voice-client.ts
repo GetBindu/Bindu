@@ -31,7 +31,7 @@ export class VoiceClient {
   private mediaStream: MediaStream | null = null;
   private audioContext: AudioContext | null = null;
   private sourceNode: MediaStreamAudioSourceNode | null = null;
-  private processorNode: ScriptProcessorNode | null = null;
+  private processorNode: AudioWorkletNode | null = null;
   private silentGainNode: GainNode | null = null;
   private isStreamingAudio = false;
   private pendingConnectResolve: (() => void) | null = null;
@@ -285,69 +285,106 @@ export class VoiceClient {
     const desiredSampleRate = 16000;
     const audioContext = new AudioContextCtor({ sampleRate: desiredSampleRate });
     await audioContext.resume();
-    const actualSampleRate = audioContext.sampleRate;
 
-    const resampleState =
-      actualSampleRate === desiredSampleRate
-        ? null
-        : { t: 0, lastSample: 0, ratio: actualSampleRate / desiredSampleRate };
+    // Inline AudioWorkletProcessor code to avoid external file dependencies
+    const workletCode = `
+      class PCM16Processor extends AudioWorkletProcessor {
+        constructor(options) {
+          super();
+          this.inSampleRate = options.processorOptions?.inSampleRate || 16000;
+          this.outSampleRate = options.processorOptions?.outSampleRate || 16000;
+          this.ratio = this.inSampleRate / this.outSampleRate;
+          this.t = 0;
+          this.lastSample = 0;
+          this.buffer = new Float32Array(4096);
+          this.bufferIndex = 0;
+        }
+        
+        process(inputs, outputs, parameters) {
+          const input = inputs[0];
+          if (!input || !input[0]) return true;
+          
+          const channelData = input[0];
+          
+          if (this.ratio === 1) {
+            for (let i = 0; i < channelData.length; i++) {
+              this.buffer[this.bufferIndex++] = channelData[i];
+              if (this.bufferIndex >= this.buffer.length) {
+                this.flushBuffer();
+              }
+            }
+          } else {
+            const estimatedLength = Math.floor((channelData.length - this.t) / this.ratio);
+            const outputLength = Math.max(0, estimatedLength);
+            
+            for (let i = 0; i < outputLength; i++) {
+              const idx = this.t;
+              const i0 = Math.floor(idx);
+              const frac = idx - i0;
+              
+              const s0 = i0 >= 0 ? (channelData[i0] ?? 0) : this.lastSample;
+              const s1 = channelData[i0 + 1] ?? channelData[channelData.length - 1] ?? s0;
+              const sample = s0 + (s1 - s0) * frac;
+              
+              this.buffer[this.bufferIndex++] = sample;
+              this.t += this.ratio;
+              
+              if (this.bufferIndex >= this.buffer.length) {
+                this.flushBuffer();
+              }
+            }
+            
+            this.lastSample = channelData[channelData.length - 1] ?? this.lastSample;
+            this.t -= channelData.length;
+          }
+          
+          return true;
+        }
 
-    const resampleChunk = (
-      input: Float32Array,
-      state: { t: number; lastSample: number; ratio: number }
-    ): Float32Array => {
-      const ratio = state.ratio;
-      if (!Number.isFinite(ratio) || ratio <= 0) {
-        return input;
+        flushBuffer() {
+          const pcm16 = new Int16Array(this.bufferIndex);
+          for (let j = 0; j < this.bufferIndex; j++) {
+            const s = Math.max(-1, Math.min(1, this.buffer[j]));
+            pcm16[j] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+          }
+          this.port.postMessage(pcm16.buffer, [pcm16.buffer]);
+          this.bufferIndex = 0;
+        }
       }
+      registerProcessor('pcm16-processor', PCM16Processor);
+    `;
 
-      const estimatedLength = Math.floor((input.length - state.t) / ratio);
-      const outputLength = Math.max(0, estimatedLength);
-      const output = new Float32Array(outputLength);
+    const blob = new Blob([workletCode], { type: 'application/javascript' });
+    const workletUrl = URL.createObjectURL(blob);
 
-      for (let i = 0; i < outputLength; i += 1) {
-        const idx = state.t;
-        const i0 = Math.floor(idx);
-        const frac = idx - i0;
+    try {
+      await audioContext.audioWorklet.addModule(workletUrl);
+    } finally {
+      URL.revokeObjectURL(workletUrl);
+    }
 
-        const s0 = i0 >= 0 ? (input[i0] ?? 0) : state.lastSample;
-        const s1 = input[i0 + 1] ?? input[input.length - 1] ?? s0;
-        output[i] = s0 + (s1 - s0) * frac;
-
-        state.t += ratio;
-      }
-
-      state.lastSample = input[input.length - 1] ?? state.lastSample;
-      state.t -= input.length;
-      return output;
-    };
     const sourceNode = audioContext.createMediaStreamSource(stream);
-    const processorNode = audioContext.createScriptProcessor(4096, 1, 1);
-    const silentGain = audioContext.createGain();
-    silentGain.gain.value = 0;
+    const workletNode = new AudioWorkletNode(audioContext, 'pcm16-processor', {
+      processorOptions: {
+        inSampleRate: audioContext.sampleRate,
+        outSampleRate: desiredSampleRate,
+      },
+    });
 
-    processorNode.onaudioprocess = (event) => {
+    workletNode.port.onmessage = (event) => {
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN || this.state === 'muted') {
         return;
       }
-
-      const inputData = event.inputBuffer.getChannelData(0);
-      const floatChunk = resampleState ? resampleChunk(inputData, resampleState) : inputData;
-      const pcmChunk = convertFloat32ToPcm16(floatChunk);
-      if (pcmChunk.byteLength > 0) {
-        this.ws.send(pcmChunk);
-      }
+      this.ws.send(event.data);
     };
 
-    sourceNode.connect(processorNode);
-    processorNode.connect(silentGain);
-    silentGain.connect(audioContext.destination);
+    sourceNode.connect(workletNode);
+    workletNode.connect(audioContext.destination);
 
     this.mediaStream = stream;
     this.audioContext = audioContext;
     this.sourceNode = sourceNode;
-    this.processorNode = processorNode;
-    this.silentGainNode = silentGain;
+    this.processorNode = workletNode;
     this.isStreamingAudio = true;
   }
 
@@ -361,7 +398,7 @@ export class VoiceClient {
 
     if (this.processorNode) {
       this.processorNode.disconnect();
-      this.processorNode.onaudioprocess = null;
+      this.processorNode.port.onmessage = null;
       this.processorNode = null;
     }
 

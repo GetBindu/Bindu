@@ -98,6 +98,9 @@
 		if (["idle", "ended", "error"].includes($voiceState)) {
 			isRecording = false;
 		}
+		if ($voiceState === "active" && !isRecording && !isStarting) {
+			beginStreaming();
+		}
 	});
 
 	async function beginStreaming() {
@@ -157,25 +160,4 @@
 	{/if}
 
 	<LiveTranscript items={$transcripts} />
-
-	<div class="mt-3">
-		{#if isRecording}
-			<button
-				type="button"
-				class="btn rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 shadow transition-none hover:bg-red-100 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200 dark:hover:bg-red-950/60"
-				onclick={stopStreaming}
-			>
-				Stop Microphone
-			</button>
-			{:else}
-				<button
-					type="button"
-					class="btn rounded-lg border bg-white px-3 py-1.5 text-sm shadow transition-none hover:bg-gray-100 dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:bg-gray-500"
-					onclick={beginStreaming}
-					disabled={isStarting}
-				>
-					{isStarting ? "Starting..." : "Start Microphone"}
-				</button>
-			{/if}
-		</div>
-	</div>
+</div>

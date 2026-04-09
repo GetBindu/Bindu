@@ -48,6 +48,7 @@ export async function startVoiceSession(contextId?: string): Promise<void> {
   // Clean up any existing client before creating a new one
   const existingClient = client;
   if (existingClient) {
+    client = null;
     try {
       await existingClient.stopSession();
     } catch (err) {
@@ -77,14 +78,17 @@ export async function startVoiceSession(contextId?: string): Promise<void> {
     voiceSessionId.set(session.session_id);
     voiceContextId.set(session.context_id);
 
+    client = localClient;
     await localClient.connect(session.ws_url, session.session_id, session.session_token);
     if (startToken !== startTokenCounter) {
       await localClient.stopSession().catch(() => undefined);
       return;
     }
-    client = localClient;
   } catch (err) {
     // On failure, clear the partially-initialized client
+    if (client === localClient) {
+      client = null;
+    }
     const errorMessage = err instanceof Error ? err.message : String(err);
     voiceError.set(errorMessage);
     voiceState.set('error');
