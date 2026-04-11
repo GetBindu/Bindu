@@ -17,6 +17,10 @@ uv sync --dev --extra agents --extra voice
 ```bash
 export VOICE__STT_API_KEY="your-deepgram-api-key" # pragma: allowlist secret
 export VOICE__TTS_API_KEY="your-elevenlabs-api-key" # pragma: allowlist secret
+export OPENROUTER_API_KEY="your-openrouter-api-key" # optional, enables full LLM responses
+export OPENROUTER_MODEL="openai/gpt-4o-mini" # optional
+export OPENROUTER_MEMORY_TURNS="4" # optional, recent turns to keep in prompt
+export VOICE_MAX_SENTENCES="2" # optional, hard cap for spoken response length
 ```
 
 You can also copy `.env.example` to `.env` and edit values.
@@ -61,6 +65,9 @@ Note: `session_token` is only included when `VOICE__SESSION_AUTH_REQUIRED=true`.
 
 - The frontend voice panel can connect to this server and stream mic audio.
 - If provider keys are missing, voice routes still exist but STT/TTS processing will fail.
+- If `OPENROUTER_API_KEY` is not set, the example falls back to a local template response mode.
+- `OPENROUTER_MEMORY_TURNS` controls lightweight context memory (default: 4 turns).
+- `VOICE_MAX_SENTENCES` hard-limits spoken output length (default: 2).
 - Use `BINDU_PORT` or `BINDU_DEPLOYMENT_URL` to run on a different port.
 - When `VOICE__SESSION_AUTH_REQUIRED=true`, the frontend sends the `session_token` via `Sec-WebSocket-Protocol`.
 - If `VOICE__VAD_ENABLED=false`, the backend relies on `{ "type": "commit_turn" }` to end user turns.

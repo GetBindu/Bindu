@@ -1,6 +1,6 @@
 """Factory for creating pipecat STT and TTS service instances.
 
-Creates configured Deepgram STT and ElevenLabs TTS services
+Creates configured Deepgram STT and Piper/ElevenLabs/Azure TTS services
 from the VoiceAgentExtension configuration.
 """
 
@@ -76,15 +76,71 @@ def create_tts_service(config: VoiceAgentExtension) -> Any:
         ImportError: If pipecat TTS dependencies are not installed.
         ValueError: If the TTS API key is not configured.
     """
-    api_key = app_settings.voice.tts_api_key
-    if not api_key:
-        logger.warning(
-            "TTS service configuration incomplete: missing API key",
-            setting="VOICE__TTS_API_KEY",
-        )
-        raise ValueError("TTS service configuration incomplete")
+    provider = config.tts_provider
+    fallback_provider_raw = app_settings.voice.tts_fallback_provider
+    fallback_provider = (
+        fallback_provider_raw if isinstance(fallback_provider_raw, str) else "none"
+    )
+    if fallback_provider not in {"none", "elevenlabs", "azure"}:
+        fallback_provider = "none"
 
-    if config.tts_provider == "elevenlabs":
+    try:
+        return _create_tts_service_for_provider(provider, config)
+    except Exception as primary_error:
+        if fallback_provider not in {"", "none", provider}:
+            logger.warning(
+                "Primary TTS provider failed; attempting fallback",
+                provider=provider,
+                fallback_provider=fallback_provider,
+                error=str(primary_error),
+            )
+            try:
+                return _create_tts_service_for_provider(fallback_provider, config)
+            except Exception as fallback_error:
+                raise RuntimeError(
+                    "TTS setup failed for primary and fallback providers"
+                ) from fallback_error
+        raise
+
+
+def _create_tts_service_for_provider(provider: str, config: VoiceAgentExtension) -> Any:
+    if provider == "piper":
+        voice_id = config.tts_voice_id
+        try:
+            piper_module = importlib.import_module("pipecat.services.piper.tts")
+            PiperTTSService = getattr(piper_module, "PiperTTSService")
+            PiperTTSSettings = getattr(piper_module, "PiperTTSSettings", None)
+        except (ImportError, AttributeError) as e:
+            raise ImportError(
+                "Piper TTS requires pipecat[piper]. "
+                "Install with: pip install 'bindu[voice]'"
+            ) from e
+
+        if PiperTTSSettings is not None:
+            tts = PiperTTSService(
+                settings=PiperTTSSettings(
+                    voice=voice_id,
+                ),
+                sample_rate=config.sample_rate,
+            )
+        else:
+            tts = PiperTTSService(
+                voice_id=voice_id,
+                sample_rate=config.sample_rate,
+            )
+
+        logger.info(f"Created Piper TTS: voice={voice_id}")
+        return tts
+
+    if provider == "elevenlabs":
+        api_key = app_settings.voice.tts_api_key
+        if not api_key:
+            logger.warning(
+                "TTS service configuration incomplete: missing API key",
+                setting="VOICE__TTS_API_KEY",
+            )
+            raise ValueError("TTS service configuration incomplete")
+
         try:
             elevenlabs_module = importlib.import_module(
                 "pipecat.services.elevenlabs.tts"
@@ -118,5 +174,50 @@ def create_tts_service(config: VoiceAgentExtension) -> Any:
         )
         return tts
 
-    logger.warning("Unsupported TTS provider requested", provider=config.tts_provider)
+    if provider == "azure":
+        azure_api_key = app_settings.voice.azure_tts_api_key
+        azure_region = app_settings.voice.azure_tts_region
+        azure_voice = app_settings.voice.azure_tts_voice or config.tts_voice_id
+        if not azure_api_key:
+            logger.warning(
+                "Azure TTS configuration incomplete: missing API key",
+                setting="VOICE__AZURE_TTS_API_KEY",
+            )
+            raise ValueError("Azure TTS configuration incomplete")
+        if not azure_region:
+            logger.warning(
+                "Azure TTS configuration incomplete: missing region",
+                setting="VOICE__AZURE_TTS_REGION",
+            )
+            raise ValueError("Azure TTS configuration incomplete")
+
+        try:
+            azure_module = importlib.import_module("pipecat.services.azure.tts")
+            AzureTTSService = getattr(azure_module, "AzureTTSService")
+            AzureTTSSettings = getattr(azure_module, "AzureTTSSettings", None)
+        except (ImportError, AttributeError) as e:
+            raise ImportError(
+                "Azure TTS requires pipecat[azure]. "
+                "Install with: pip install 'bindu[voice]'"
+            ) from e
+
+        if AzureTTSSettings is not None:
+            tts = AzureTTSService(
+                api_key=azure_api_key,
+                region=azure_region,
+                settings=AzureTTSSettings(voice=azure_voice),
+                sample_rate=config.sample_rate,
+            )
+        else:
+            tts = AzureTTSService(
+                api_key=azure_api_key,
+                region=azure_region,
+                voice=azure_voice,
+                sample_rate=config.sample_rate,
+            )
+
+        logger.info(f"Created Azure TTS: voice={azure_voice}, region={azure_region}")
+        return tts
+
+    logger.warning("Unsupported TTS provider requested", provider=provider)
     raise ValueError("Unsupported TTS provider")

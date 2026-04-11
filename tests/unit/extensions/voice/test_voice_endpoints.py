@@ -41,7 +41,9 @@ def _enable_voice_for_tests():
     original = module.app_settings.voice.enabled
     original_stt = module.app_settings.voice.stt_api_key
     original_tts = module.app_settings.voice.tts_api_key
+    original_session_auth_required = module.app_settings.voice.session_auth_required
     module.app_settings.voice.enabled = True
+    module.app_settings.voice.session_auth_required = False
     module.app_settings.voice.stt_api_key = (
         "unit-test-stt-token"  # pragma: allowlist secret
     )
@@ -54,6 +56,7 @@ def _enable_voice_for_tests():
         module.app_settings.voice.enabled = original
         module.app_settings.voice.stt_api_key = original_stt
         module.app_settings.voice.tts_api_key = original_tts
+        module.app_settings.voice.session_auth_required = original_session_auth_required
 
 
 def _make_request(

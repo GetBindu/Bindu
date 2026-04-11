@@ -1,301 +1,331 @@
-import { agentAPI } from '$lib/services/agent-api';
+import { agentAPI } from "$lib/services/agent-api";
 
 export type VoiceState =
-  | 'idle'
-  | 'connecting'
-  | 'active'
-  | 'listening'
-  | 'muted'
-  | 'agent-speaking'
-  | 'ended'
-  | 'error';
+	| "idle"
+	| "connecting"
+	| "active"
+	| "listening"
+	| "muted"
+	| "agent-speaking"
+	| "ended"
+	| "error";
 
 export type TranscriptEvent = {
-  role: 'user' | 'agent';
-  text: string;
-  isFinal: boolean;
-  ts: number;
+	role: "user" | "agent";
+	text: string;
+	isFinal: boolean;
+	ts: number;
 };
 
 type VoiceSessionStart = {
-  session_id: string;
-  context_id: string;
-  ws_url: string;
-  session_token?: string;
+	session_id: string;
+	context_id: string;
+	ws_url: string;
+	session_token?: string;
 };
 
 export class VoiceClient {
-  private ws: WebSocket | null = null;
-  private sessionId: string | null = null;
-  private state: VoiceState = 'idle';
-  private mediaStream: MediaStream | null = null;
-  private audioContext: AudioContext | null = null;
-  private sourceNode: MediaStreamAudioSourceNode | null = null;
-  private processorNode: AudioWorkletNode | null = null;
-  private silentGainNode: GainNode | null = null;
-  private isStreamingAudio = false;
-  private pendingConnectResolve: (() => void) | null = null;
-  private pendingConnectReject: ((reason?: unknown) => void) | null = null;
+	private ws: WebSocket | null = null;
+	private sessionId: string | null = null;
+	private state: VoiceState = "idle";
+	private mediaStream: MediaStream | null = null;
+	private audioContext: AudioContext | null = null;
+	private sourceNode: MediaStreamAudioSourceNode | null = null;
+	private processorNode: AudioWorkletNode | null = null;
+	private silentGainNode: GainNode | null = null;
+	private isStreamingAudio = false;
+	private pendingConnectResolve: (() => void) | null = null;
+	private pendingConnectReject: ((reason?: unknown) => void) | null = null;
+	private duplexHoldUntilMs = 0;
 
-  onTranscript?: (event: TranscriptEvent) => void;
-  onAgentResponse?: (text: string) => void;
-  onAgentAudio?: (audioData: ArrayBuffer) => void;
-  onStateChange?: (state: VoiceState) => void;
-  onError?: (message: string) => void;
+	private extendDuplexHold(ms: number): void {
+		this.duplexHoldUntilMs = Math.max(this.duplexHoldUntilMs, Date.now() + ms);
+	}
 
-  async startSession(contextId?: string): Promise<VoiceSessionStart> {
-    const baseUrl = (agentAPI as unknown as { baseUrl?: string }).baseUrl || 'http://localhost:3773';
-    let response: Response;
-    try {
-      response = await fetch(`${baseUrl}/voice/session/start`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(contextId ? { context_id: contextId } : {}),
-      });
-    } catch {
-      throw new Error(`Cannot reach voice backend at ${baseUrl}. Is the agent running?`);
-    }
+	holdMicFor(ms: number): void {
+		if (ms <= 0) {
+			return;
+		}
+		this.extendDuplexHold(ms);
+	}
 
-    if (!response.ok) {
-      const text = await response.text().catch(() => 'Unknown error');
-      if (response.status === 404) {
-        throw new Error(
-          'Voice endpoint not found. Run a voice-enabled agent (examples/voice-agent/main.py).'
-        );
-      }
-      throw new Error(`Failed to start voice session: ${response.status} ${text}`);
-    }
+	onTranscript?: (event: TranscriptEvent) => void;
+	onAgentResponse?: (text: string) => void;
+	onAgentAudio?: (audioData: ArrayBuffer) => void;
+	onStateChange?: (state: VoiceState) => void;
+	onError?: (message: string) => void;
 
-    try {
-      return (await response.json()) as VoiceSessionStart;
-    } catch (err) {
-      throw new Error(
-        `Failed to parse voice session response: ${err instanceof Error ? err.message : String(err)}`
-      );
-    }
-  }
+	async startSession(contextId?: string): Promise<VoiceSessionStart> {
+		const baseUrl =
+			(agentAPI as unknown as { baseUrl?: string }).baseUrl || "http://localhost:3773";
+		let response: Response;
+		try {
+			response = await fetch(`${baseUrl}/voice/session/start`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify(contextId ? { context_id: contextId } : {}),
+			});
+		} catch {
+			throw new Error(`Cannot reach voice backend at ${baseUrl}. Is the agent running?`);
+		}
 
-  async connect(wsUrl: string, sessionId: string, sessionToken?: string): Promise<void> {
-    this.setState('connecting');
-    this.sessionId = sessionId;
+		if (!response.ok) {
+			const text = await response.text().catch(() => "Unknown error");
+			if (response.status === 404) {
+				throw new Error(
+					"Voice endpoint not found. Run a voice-enabled agent (examples/voice-agent/main.py)."
+				);
+			}
+			throw new Error(`Failed to start voice session: ${response.status} ${text}`);
+		}
 
-    await new Promise<void>((resolve, reject) => {
-      this.pendingConnectResolve = resolve;
-      this.pendingConnectReject = reject;
-      try {
-        const resolved = this.resolveWebSocketUrl(wsUrl);
-        // If the backend requires session auth, it expects the token either as:
-        // - Sec-WebSocket-Protocol header (preferred), or
-        // - first text frame after connect (fallback).
-        this.ws = sessionToken ? new WebSocket(resolved, [sessionToken]) : new WebSocket(resolved);
-      } catch (err) {
-        this.pendingConnectResolve = null;
-        this.pendingConnectReject = null;
-        reject(err);
-        return;
-      }
+		try {
+			return (await response.json()) as VoiceSessionStart;
+		} catch (err) {
+			throw new Error(
+				`Failed to parse voice session response: ${err instanceof Error ? err.message : String(err)}`
+			);
+		}
+	}
 
-      if (!this.ws) {
-        this.pendingConnectResolve = null;
-        this.pendingConnectReject = null;
-        reject(new Error('WebSocket initialization failed'));
-        return;
-      }
+	async connect(wsUrl: string, sessionId: string, sessionToken?: string): Promise<void> {
+		this.setState("connecting");
+		this.sessionId = sessionId;
 
-      this.ws.binaryType = 'arraybuffer';
+		await new Promise<void>((resolve, reject) => {
+			this.pendingConnectResolve = resolve;
+			this.pendingConnectReject = reject;
+			try {
+				const resolved = this.resolveWebSocketUrl(wsUrl);
+				// If the backend requires session auth, it expects the token either as:
+				// - Sec-WebSocket-Protocol header (preferred), or
+				// - first text frame after connect (fallback).
+				this.ws = sessionToken ? new WebSocket(resolved, [sessionToken]) : new WebSocket(resolved);
+			} catch (err) {
+				this.pendingConnectResolve = null;
+				this.pendingConnectReject = null;
+				reject(err);
+				return;
+			}
 
-      this.ws.onopen = () => {
-        this.pendingConnectResolve = null;
-        this.pendingConnectReject = null;
-        if (sessionToken) {
-          // Only send the token as a first text frame if subprotocol negotiation
-          // did not succeed. Otherwise the server will treat this as a malformed
-          // JSON control frame and close the connection.
-          const negotiatedProtocol = this.ws?.protocol;
-          if (!negotiatedProtocol) {
-            try {
-              this.ws?.send(sessionToken);
-            } catch {
-              // Ignore and proceed; server may already have token via headers.
-            }
-          }
-        }
-        this.sendControl({ type: 'start', config: { sampleRate: 16000 } });
-        this.setState('active');
-        resolve();
-      };
+			if (!this.ws) {
+				this.pendingConnectResolve = null;
+				this.pendingConnectReject = null;
+				reject(new Error("WebSocket initialization failed"));
+				return;
+			}
 
-      this.ws.onerror = () => {
-        this.pendingConnectResolve = null;
-        this.pendingConnectReject = null;
-        this.setState('error');
-        this.onError?.('Voice WebSocket connection error');
-        reject(new Error('Voice WebSocket connection error'));
-      };
+			this.ws.binaryType = "arraybuffer";
 
-      this.ws.onclose = () => {
-        if (this.pendingConnectReject) {
-          this.pendingConnectReject(new Error('WebSocket closed before open'));
-          this.pendingConnectResolve = null;
-          this.pendingConnectReject = null;
-        }
-        this.cleanupAudioStreaming();
-        if (this.state !== 'ended' && this.state !== 'idle') {
-          this.setState('ended');
-        }
-      };
+			this.ws.onopen = () => {
+				this.pendingConnectResolve = null;
+				this.pendingConnectReject = null;
+				if (sessionToken) {
+					// Only send the token as a first text frame if subprotocol negotiation
+					// did not succeed. Otherwise the server will treat this as a malformed
+					// JSON control frame and close the connection.
+					const negotiatedProtocol = this.ws?.protocol;
+					if (!negotiatedProtocol) {
+						try {
+							this.ws?.send(sessionToken);
+						} catch {
+							// Ignore and proceed; server may already have token via headers.
+						}
+					}
+				}
+				this.sendControl({ type: "start", config: { sampleRate: 16000 } });
+				this.setState("active");
+				resolve();
+			};
 
-      this.ws.onmessage = (event) => {
-        if (event.data instanceof ArrayBuffer) {
-          this.onAgentAudio?.(event.data);
-          return;
-        }
+			this.ws.onerror = () => {
+				this.pendingConnectResolve = null;
+				this.pendingConnectReject = null;
+				this.setState("error");
+				this.onError?.("Voice WebSocket connection error");
+				reject(new Error("Voice WebSocket connection error"));
+			};
 
-        if (typeof event.data !== 'string') {
-          return;
-        }
+			this.ws.onclose = () => {
+				if (this.pendingConnectReject) {
+					this.pendingConnectReject(new Error("WebSocket closed before open"));
+					this.pendingConnectResolve = null;
+					this.pendingConnectReject = null;
+				}
+				this.cleanupAudioStreaming();
+				if (this.state !== "ended" && this.state !== "idle") {
+					this.setState("ended");
+				}
+			};
 
-        try {
-          const data = JSON.parse(event.data) as {
-            type?: string;
-            role?: 'user' | 'agent';
-            text?: string;
-            is_final?: boolean;
-            state?: VoiceState;
-            message?: string;
-          };
+			this.ws.onmessage = (event) => {
+				if (event.data instanceof ArrayBuffer) {
+					// While agent audio is arriving, hold mic uplink briefly to avoid
+					// speaker-to-mic feedback loops.
+					this.extendDuplexHold(1800);
+					this.onAgentAudio?.(event.data);
+					return;
+				}
 
-          if (data.type === 'transcript' && data.role && data.text) {
-            this.onTranscript?.({
-              role: data.role,
-              text: data.text,
-              isFinal: Boolean(data.is_final ?? true),
-              ts: Date.now(),
-            });
-            return;
-          }
+				if (typeof event.data !== "string") {
+					return;
+				}
 
-          if (data.type === 'agent_response' && data.text) {
-            this.onAgentResponse?.(data.text);
-            return;
-          }
+				try {
+					const data = JSON.parse(event.data) as {
+						type?: string;
+						role?: "user" | "agent";
+						text?: string;
+						is_final?: boolean;
+						state?: VoiceState;
+						message?: string;
+					};
 
-          if (data.type === 'state' && data.state) {
-            this.setState(data.state);
-            return;
-          }
+					if (data.type === "transcript" && data.role && data.text) {
+						if (data.role === "agent") {
+							this.extendDuplexHold(data.is_final ? 1800 : 2600);
+						}
+						this.onTranscript?.({
+							role: data.role,
+							text: data.text,
+							isFinal: Boolean(data.is_final ?? true),
+							ts: Date.now(),
+						});
+						return;
+					}
 
-          if (data.type === 'error' && data.message) {
-            this.setState('error');
-            this.onError?.(data.message);
-          }
-        } catch {
-          // Ignore malformed frames
-        }
-      };
-    });
-  }
+					if (data.type === "agent_response" && data.text) {
+						this.extendDuplexHold(1800);
+						this.onAgentResponse?.(data.text);
+						return;
+					}
 
-  async sendUserText(text: string): Promise<void> {
-    if (!text.trim()) {
-      return;
-    }
-    this.sendControl({ type: 'user_text', text: text.trim() });
-  }
+					if (data.type === "state" && data.state) {
+						this.setState(data.state);
+						return;
+					}
 
-  commitTurn(): void {
-    this.sendControl({ type: 'commit_turn' });
-  }
+					if (data.type === "error" && data.message) {
+						this.setState("error");
+						this.onError?.(data.message);
+					}
+				} catch {
+					// Ignore malformed frames
+				}
+			};
+		});
+	}
 
-  mute(): void {
-    if (this.sendControl({ type: 'mute' })) {
-      this.setState('muted');
-    }
-  }
+	async sendUserText(text: string): Promise<void> {
+		if (!text.trim()) {
+			return;
+		}
+		this.sendControl({ type: "user_text", text: text.trim() });
+	}
 
-  unmute(): void {
-    if (this.sendControl({ type: 'unmute' })) {
-      this.setState('listening');
-    }
-  }
+	commitTurn(): void {
+		this.sendControl({ type: "commit_turn" });
+	}
 
-  async stopSession(): Promise<void> {
-    const id = this.sessionId;
-    this.sendControl({ type: 'stop' });
-    this.cleanupAudioStreaming();
+	mute(): void {
+		if (this.sendControl({ type: "mute" })) {
+			this.setState("muted");
+		}
+	}
 
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
+	unmute(): void {
+		if (this.sendControl({ type: "unmute" })) {
+			this.setState("listening");
+		}
+	}
 
-    this.sessionId = null;
-    this.setState('ended');
+	async stopSession(): Promise<void> {
+		const id = this.sessionId;
+		this.sendControl({ type: "stop" });
+		this.cleanupAudioStreaming();
 
-    if (id) {
-      const baseUrl = (agentAPI as unknown as { baseUrl?: string }).baseUrl || 'http://localhost:3773';
-      await fetch(`${baseUrl}/voice/session/${id}`, { method: 'DELETE' }).catch(() => undefined);
-    }
-  }
+		if (this.ws) {
+			this.ws.close();
+			this.ws = null;
+		}
 
-  private sendControl(payload: Record<string, unknown>): boolean {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      return false;
-    }
-    this.ws.send(JSON.stringify(payload));
-    return true;
-  }
+		this.sessionId = null;
+		this.setState("ended");
 
-  private setState(state: VoiceState): void {
-    this.state = state;
-    this.onStateChange?.(state);
-  }
+		if (id) {
+			const baseUrl =
+				(agentAPI as unknown as { baseUrl?: string }).baseUrl || "http://localhost:3773";
+			await fetch(`${baseUrl}/voice/session/${id}`, { method: "DELETE" }).catch(() => undefined);
+		}
+	}
 
-  async startAudioStreaming(): Promise<void> {
-    if (this.isStreamingAudio) {
-      return;
-    }
+	private sendControl(payload: Record<string, unknown>): boolean {
+		if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+			return false;
+		}
+		this.ws.send(JSON.stringify(payload));
+		return true;
+	}
 
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      throw new Error('Voice WebSocket is not connected');
-    }
+	private setState(state: VoiceState): void {
+		this.state = state;
+		if (state === "agent-speaking") {
+			this.extendDuplexHold(2500);
+		} else if (state === "listening") {
+			this.extendDuplexHold(800);
+		}
+		this.onStateChange?.(state);
+	}
 
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        channelCount: 1,
-        sampleRate: 16000,
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-      },
-    });
+	private canSendMicAudio(): boolean {
+		if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+			return false;
+		}
+		if (this.state === "muted" || this.state === "agent-speaking") {
+			return false;
+		}
+		return Date.now() >= this.duplexHoldUntilMs;
+	}
 
-    const AudioContextCtor =
-      window.AudioContext ||
-      (window as typeof window & { webkitAudioContext?: typeof AudioContext })
-        .webkitAudioContext;
+	async startAudioStreaming(): Promise<void> {
+		if (this.isStreamingAudio) {
+			return;
+		}
 
-    if (!AudioContextCtor) {
-      stream.getTracks().forEach((track) => track.stop());
-      throw new Error('AudioContext is not supported in this browser');
-    }
+		if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+			throw new Error("Voice WebSocket is not connected");
+		}
 
-    const desiredSampleRate = 16000;
-    const audioContext = new AudioContextCtor({ sampleRate: desiredSampleRate });
-    await audioContext.resume();
+		const stream = await navigator.mediaDevices.getUserMedia({
+			audio: {
+				channelCount: 1,
+				sampleRate: 16000,
+				echoCancellation: true,
+				noiseSuppression: true,
+				autoGainControl: true,
+			},
+		});
 
-    // Inline AudioWorkletProcessor code to avoid external file dependencies
-    const workletCode = `
+		const AudioContextCtor =
+			window.AudioContext ||
+			(window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+
+		if (!AudioContextCtor) {
+			stream.getTracks().forEach((track) => track.stop());
+			throw new Error("AudioContext is not supported in this browser");
+		}
+
+		const desiredSampleRate = 16000;
+		const audioContext = new AudioContextCtor({ sampleRate: desiredSampleRate });
+		await audioContext.resume();
+
+		// Inline AudioWorkletProcessor code to avoid external file dependencies
+		const workletCode = `
       class PCM16Processor extends AudioWorkletProcessor {
-        constructor(options) {
+        constructor() {
           super();
-          this.inSampleRate = options.processorOptions?.inSampleRate || 16000;
-          this.outSampleRate = options.processorOptions?.outSampleRate || 16000;
-          this.ratio = this.inSampleRate / this.outSampleRate;
-          this.t = 0;
-          this.lastSample = 0;
           this.buffer = new Float32Array(4096);
           this.bufferIndex = 0;
         }
@@ -306,36 +336,11 @@ export class VoiceClient {
           
           const channelData = input[0];
           
-          if (this.ratio === 1) {
-            for (let i = 0; i < channelData.length; i++) {
-              this.buffer[this.bufferIndex++] = channelData[i];
-              if (this.bufferIndex >= this.buffer.length) {
-                this.flushBuffer();
-              }
+          for (let i = 0; i < channelData.length; i++) {
+            this.buffer[this.bufferIndex++] = channelData[i];
+            if (this.bufferIndex >= this.buffer.length) {
+              this.flushBuffer();
             }
-          } else {
-            const estimatedLength = Math.floor((channelData.length - this.t) / this.ratio);
-            const outputLength = Math.max(0, estimatedLength);
-            
-            for (let i = 0; i < outputLength; i++) {
-              const idx = this.t;
-              const i0 = Math.floor(idx);
-              const frac = idx - i0;
-              
-              const s0 = i0 >= 0 ? (channelData[i0] ?? 0) : this.lastSample;
-              const s1 = channelData[i0 + 1] ?? channelData[channelData.length - 1] ?? s0;
-              const sample = s0 + (s1 - s0) * frac;
-              
-              this.buffer[this.bufferIndex++] = sample;
-              this.t += this.ratio;
-              
-              if (this.bufferIndex >= this.buffer.length) {
-                this.flushBuffer();
-              }
-            }
-            
-            this.lastSample = channelData[channelData.length - 1] ?? this.lastSample;
-            this.t -= channelData.length;
           }
           
           return true;
@@ -354,97 +359,100 @@ export class VoiceClient {
       registerProcessor('pcm16-processor', PCM16Processor);
     `;
 
-    const blob = new Blob([workletCode], { type: 'application/javascript' });
-    const workletUrl = URL.createObjectURL(blob);
+		const blob = new Blob([workletCode], { type: "application/javascript" });
+		const workletUrl = URL.createObjectURL(blob);
 
-    try {
-      await audioContext.audioWorklet.addModule(workletUrl);
-    } finally {
-      URL.revokeObjectURL(workletUrl);
-    }
+		try {
+			await audioContext.audioWorklet.addModule(workletUrl);
+		} finally {
+			URL.revokeObjectURL(workletUrl);
+		}
 
-    const sourceNode = audioContext.createMediaStreamSource(stream);
-    const workletNode = new AudioWorkletNode(audioContext, 'pcm16-processor', {
-      processorOptions: {
-        inSampleRate: audioContext.sampleRate,
-        outSampleRate: desiredSampleRate,
-      },
-    });
+		const sourceNode = audioContext.createMediaStreamSource(stream);
+		const workletNode = new AudioWorkletNode(audioContext, "pcm16-processor");
+		const silentGainNode = audioContext.createGain();
+		silentGainNode.gain.value = 0;
 
-    workletNode.port.onmessage = (event) => {
-      if (!this.ws || this.ws.readyState !== WebSocket.OPEN || this.state === 'muted') {
-        return;
-      }
-      this.ws.send(event.data);
-    };
+		workletNode.port.onmessage = (event) => {
+			if (!this.canSendMicAudio()) {
+				return;
+			}
+			const ws = this.ws;
+			if (!ws || ws.readyState !== WebSocket.OPEN) {
+				return;
+			}
+			ws.send(event.data);
+		};
 
-    sourceNode.connect(workletNode);
-    workletNode.connect(audioContext.destination);
+		sourceNode.connect(workletNode);
+		workletNode.connect(silentGainNode);
+		silentGainNode.connect(audioContext.destination);
 
-    this.mediaStream = stream;
-    this.audioContext = audioContext;
-    this.sourceNode = sourceNode;
-    this.processorNode = workletNode;
-    this.isStreamingAudio = true;
-  }
+		this.mediaStream = stream;
+		this.audioContext = audioContext;
+		this.sourceNode = sourceNode;
+		this.processorNode = workletNode;
+		this.silentGainNode = silentGainNode;
+		this.isStreamingAudio = true;
+	}
 
-  stopAudioStreaming(): void {
-    this.cleanupAudioStreaming();
-    this.commitTurn();
-  }
+	stopAudioStreaming(): void {
+		this.cleanupAudioStreaming();
+		this.commitTurn();
+	}
 
-  private cleanupAudioStreaming(): void {
-    this.isStreamingAudio = false;
+	private cleanupAudioStreaming(): void {
+		this.isStreamingAudio = false;
 
-    if (this.processorNode) {
-      this.processorNode.disconnect();
-      this.processorNode.port.onmessage = null;
-      this.processorNode = null;
-    }
+		if (this.processorNode) {
+			this.processorNode.disconnect();
+			this.processorNode.port.onmessage = null;
+			this.processorNode = null;
+		}
 
-    if (this.silentGainNode) {
-      this.silentGainNode.disconnect();
-      this.silentGainNode = null;
-    }
+		if (this.silentGainNode) {
+			this.silentGainNode.disconnect();
+			this.silentGainNode = null;
+		}
 
-    if (this.sourceNode) {
-      this.sourceNode.disconnect();
-      this.sourceNode = null;
-    }
+		if (this.sourceNode) {
+			this.sourceNode.disconnect();
+			this.sourceNode = null;
+		}
 
-    if (this.audioContext) {
-      void this.audioContext.close();
-      this.audioContext = null;
-    }
+		if (this.audioContext) {
+			void this.audioContext.close();
+			this.audioContext = null;
+		}
 
-    if (this.mediaStream) {
-      this.mediaStream.getTracks().forEach((track) => track.stop());
-      this.mediaStream = null;
-    }
-  }
+		if (this.mediaStream) {
+			this.mediaStream.getTracks().forEach((track) => track.stop());
+			this.mediaStream = null;
+		}
+	}
 
-  private resolveWebSocketUrl(wsUrl: string): string {
-    const configuredBaseUrl = (
-      (agentAPI as unknown as { baseUrl?: string }).baseUrl || 'http://localhost:3773'
-    ).replace(/^http/, 'ws');
+	private resolveWebSocketUrl(wsUrl: string): string {
+		const configuredBaseUrl = (
+			(agentAPI as unknown as { baseUrl?: string }).baseUrl || "http://localhost:3773"
+		).replace(/^http/, "ws");
 
-    try {
-      const endpointUrl = new URL(wsUrl);
-      const proxyBaseUrl = new URL(configuredBaseUrl);
-      endpointUrl.protocol = proxyBaseUrl.protocol;
-      endpointUrl.host = proxyBaseUrl.host;
-      return endpointUrl.toString();
-    } catch {
-      return wsUrl;
-    }
-  }
+		try {
+			const endpointUrl = new URL(wsUrl);
+			const proxyBaseUrl = new URL(configuredBaseUrl);
+			endpointUrl.protocol = proxyBaseUrl.protocol;
+			endpointUrl.host = proxyBaseUrl.host;
+			return endpointUrl.toString();
+		} catch {
+			return wsUrl;
+		}
+	}
 }
 
 function convertFloat32ToPcm16(input: Float32Array): ArrayBuffer {
-  const pcm = new Int16Array(input.length);
-  for (let index = 0; index < input.length; index += 1) {
-    const sample = Math.max(-1, Math.min(1, input[index] ?? 0));
-    pcm[index] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
-  }
-  return pcm.buffer;
+	const pcm = new Int16Array(input.length);
+	for (let index = 0; index < input.length; index += 1) {
+		const sample = Math.max(-1, Math.min(1, input[index] ?? 0));
+		pcm[index] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+	}
+	return pcm.buffer;
 }

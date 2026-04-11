@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any, Callable, AsyncIterator
 
 from pipecat.frames.frames import (
     Frame,
+    StartFrame,
     TranscriptionFrame,
     TextFrame,
     InterruptionFrame,
@@ -96,23 +97,36 @@ class AgentBridgeProcessor(FrameProcessor):
         """Process incoming pipecat frames."""
         await super().process_frame(frame, direction)
 
+        if isinstance(frame, StartFrame):
+            # TTS and other downstream processors require lifecycle frames.
+            await self.push_frame(frame, direction)
+            return
+
         if isinstance(frame, TranscriptionFrame):
             text = frame.text.strip()
             if text:
                 await self._handle_user_utterance(text)
+            return
         elif isinstance(frame, InterruptionFrame):
             if not self._allow_interruptions:
                 return
             logger.info("Interruption frame received; cancelling current agent task...")
             await self._cancel_current_agent_task()
             # Propagate interruption downstream so TTS/services can stop immediately.
-            await self.push_frame(frame)
+            await self.push_frame(frame, direction)
             self._set_state("listening")
+            return
         elif isinstance(frame, EndFrame):
             # Session is ending, cleanup background tasks
             await self.cleanup_background_tasks()
+            await self.push_frame(frame, direction)
+            return
         elif isinstance(frame, ErrorFrame):
             logger.error(f"Error frame received in pipeline: {frame.error}")
+            await self.push_frame(frame, direction)
+            return
+
+        await self.push_frame(frame, direction)
 
     async def process_transcription(
         self, text: str, *, emit_frames: bool = False
@@ -420,7 +434,7 @@ class AgentBridgeProcessor(FrameProcessor):
         return f"{existing} {delta}".strip()
 
     def _trim_overlap_text(self, previous: str, current: str) -> str:
-        """Remove token overlap when current repeats previous suffix."""
+        """Remove overlap when providers stream cumulative or partial snapshots."""
         prev = previous.strip()
         curr = current.strip()
         if not prev:
@@ -428,13 +442,19 @@ class AgentBridgeProcessor(FrameProcessor):
         if prev == curr:
             return ""
 
-        prev_tokens = prev.split()
-        curr_tokens = curr.split()
+        # Cumulative snapshot mode: emit only newly appended tail.
+        if curr.startswith(prev):
+            return curr[len(prev) :].strip()
 
-        max_overlap = min(len(prev_tokens), len(curr_tokens))
+        # Duplicate short chunk already present at end.
+        if prev.endswith(curr):
+            return ""
+
+        # Character-level overlap to handle punctuation and non-tokenized chunks.
+        max_overlap = min(len(prev), len(curr))
         for overlap in range(max_overlap, 0, -1):
-            if prev_tokens[-overlap:] == curr_tokens[:overlap]:
-                return " ".join(curr_tokens[overlap:]).strip()
+            if prev[-overlap:] == curr[:overlap]:
+                return curr[overlap:].strip()
 
         return curr
 

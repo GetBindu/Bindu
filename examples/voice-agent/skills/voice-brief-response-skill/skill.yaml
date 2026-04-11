@@ -1,0 +1,47 @@
+skill_id: "voice-brief-response-v1"
+name: "Voice Brief Response"
+version: "1.0.0"
+description: "Delivers short, precise, spoken-friendly answers with minimal latency."
+
+capabilities:
+  - concise_answering
+  - voice_response_optimization
+  - low_latency_speaking
+
+tags:
+  - voice
+  - concise
+  - precise
+  - spoken
+
+documentation: |
+  # Voice Brief Response
+
+  This skill optimizes responses for live voice interactions.
+
+  ## Style Rules
+  - Prefer 1-2 short sentences.
+  - Stay precise and avoid filler.
+  - Avoid repeating phrases in the same answer.
+  - Use plain text (no markdown) unless explicitly requested.
+
+input_structure: |
+  {
+    "user_query": "string",
+    "context": "optional recent turns"
+  }
+
+output_format: |
+  {
+    "response": "short spoken-friendly answer"
+  }
+
+assessment:
+  keywords:
+    - short answer
+    - concise
+    - precise
+    - voice response
+  anti_patterns:
+    - long essay
+    - repetitive output

@@ -145,6 +145,7 @@ async def _rate_limit_allow_ip(
 class _VoiceControlState:
     muted: bool = False
     stopped: bool = False
+    suppress_audio_until: float = 0.0
 
 
 class _FilteredWebSocket:
@@ -162,7 +163,13 @@ class _FilteredWebSocket:
         return getattr(self._ws, name)
 
     async def receive(self) -> dict[str, Any]:
-        return await self._queue.get()
+        msg = await self._queue.get()
+        msg_type = msg.get("type", "unknown")
+        data_bytes = msg.get("bytes")
+        logger.info(
+            f"FilteredWebSocket.receive: type={msg_type}, bytes={len(data_bytes) if data_bytes else 0}"
+        )
+        return msg
 
     async def receive_text(self) -> str:
         message = await self.receive()
@@ -176,28 +183,109 @@ class _FilteredWebSocket:
     async def receive_bytes(self) -> bytes:
         message = await self.receive()
         if message.get("type") == "websocket.disconnect":
+            logger.info("FilteredWebSocket.receive_bytes: disconnect received")
             raise WebSocketDisconnect(code=message.get("code", 1000))
         data = message.get("bytes")
+        logger.debug(
+            f"FilteredWebSocket.receive_bytes: got {len(data) if data else 0} bytes"
+        )
         if data is None:
             raise RuntimeError("Expected bytes WebSocket message")
         return data
+
+
+try:
+    from pipecat.serializers.base_serializer import (
+        FrameSerializer as _PipecatFrameSerializer,
+    )
+except Exception:  # pragma: no cover
+    class _PipecatFrameSerializer:  # type: ignore[too-many-ancestors]
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+
+class _RawAudioFrameSerializer(_PipecatFrameSerializer):
+    """Serializer for raw PCM audio over WebSocket.
+
+    Converts inbound binary frames into Pipecat input audio frames and sends
+    outbound audio frames as raw bytes for browser playback.
+    """
+
+    def __init__(self, sample_rate: int, num_channels: int):
+        super().__init__()
+        self._sample_rate = sample_rate
+        self._num_channels = num_channels
+
+    async def setup(self, _frame: Any) -> None:
+        return
+
+    async def serialize(self, frame: Any) -> str | bytes | None:
+        from pipecat.frames.frames import (
+            OutputAudioRawFrame,
+            OutputTransportMessageFrame,
+            OutputTransportMessageUrgentFrame,
+        )
+
+        if isinstance(frame, OutputAudioRawFrame):
+            return frame.audio
+
+        if isinstance(frame, (OutputTransportMessageFrame, OutputTransportMessageUrgentFrame)):
+            return json.dumps(frame.message)
+
+        return None
+
+    async def deserialize(self, data: str | bytes) -> Any | None:
+        from pipecat.frames.frames import InputAudioRawFrame, InputTransportMessageFrame
+
+        if isinstance(data, (bytes, bytearray)):
+            return InputAudioRawFrame(
+                audio=bytes(data),
+                sample_rate=self._sample_rate,
+                num_channels=self._num_channels,
+            )
+
+        if isinstance(data, str):
+            try:
+                payload = json.loads(data)
+            except json.JSONDecodeError:
+                return None
+            return InputTransportMessageFrame(message=payload)
+
+        return None
 
 
 async def _send_json(
     websocket: Any,
     payload: dict[str, Any],
     send_lock: asyncio.Lock | None = None,
-) -> None:
+) -> bool:
     """Send a JSON payload over a WebSocket safely.
 
     If a lock is provided, it is used to serialize concurrent send_text calls.
     """
+    try:
+        client_state = getattr(websocket, "client_state", None)
+        application_state = getattr(websocket, "application_state", None)
+        if (
+            client_state == WebSocketState.DISCONNECTED
+            or application_state == WebSocketState.DISCONNECTED
+        ):
+            return False
+    except Exception:
+        # If state inspection fails, still attempt the send below.
+        pass
+
     data = json.dumps(payload)
-    if send_lock is None:
-        await websocket.send_text(data)
-        return
-    async with send_lock:
-        await websocket.send_text(data)
+    try:
+        if send_lock is None:
+            await websocket.send_text(data)
+            return True
+        async with send_lock:
+            await websocket.send_text(data)
+            return True
+    except (WebSocketDisconnect, RuntimeError):
+        # RuntimeError is raised by Starlette after a close frame is sent.
+        return False
 
 
 def _trim_overlap_text(previous: str, current: str) -> str:
@@ -388,9 +476,13 @@ async def _voice_control_reader(
 
         data = message.get("bytes")
         if data is None:
+            logger.debug("Voice control reader: no bytes in message, skipping")
             continue
 
-        if control.muted:
+        logger.info(f"Voice control reader: received audio frame, {len(data)} bytes")
+
+        now_monotonic = time.monotonic()
+        if control.muted or now_monotonic < float(control.suppress_audio_until):
             continue
 
         if len(data) > max_binary_frame_bytes:
@@ -401,9 +493,8 @@ async def _voice_control_reader(
             )
             return
 
-        now = time.monotonic()
-        if now - window_started_at >= 1.0:
-            window_started_at = now
+        if now_monotonic - window_started_at >= 1.0:
+            window_started_at = now_monotonic
             window_count = 0
         window_count += 1
         if window_count > max_frames_per_second:
@@ -674,6 +765,9 @@ async def voice_websocket(websocket: WebSocket) -> None:
         )
 
     async def _on_agent_response(text: str) -> None:
+        control.suppress_audio_until = max(
+            float(control.suppress_audio_until), time.monotonic() + 0.6
+        )
         await _send_json(
             websocket,
             {"type": "agent_response", "text": text, "task_id": session.task_id},
@@ -681,9 +775,24 @@ async def voice_websocket(websocket: WebSocket) -> None:
         )
 
     async def _on_state_change(state: str) -> None:
+        if state == "agent-speaking":
+            control.suppress_audio_until = max(
+                float(control.suppress_audio_until), time.monotonic() + 1.0
+            )
+        elif state == "listening":
+            control.suppress_audio_until = max(
+                float(control.suppress_audio_until), time.monotonic() + 0.35
+            )
         await _send_json(websocket, {"type": "state", "state": state}, send_lock)
 
     async def _on_agent_transcript(text: str, is_final: bool) -> None:
+        control.suppress_audio_until = max(
+            float(control.suppress_audio_until),
+            time.monotonic() + (0.6 if is_final else 0.9),
+        )
+        logger.info(
+            f"on_agent_transcript: got text='{text[:50]}...' is_final={is_final}"
+        )
         await _send_json(
             websocket,
             {
@@ -721,16 +830,8 @@ async def voice_websocket(websocket: WebSocket) -> None:
         if response:
             await _on_agent_response(response)
 
-    reader_task = asyncio.create_task(
-        _voice_control_reader(
-            websocket,
-            inbound_queue,
-            control,
-            vad_enabled=app_settings.voice.vad_enabled,
-            send_lock=send_lock,
-            on_user_text=_handle_user_text,
-        )
-    )
+    reader_task: asyncio.Task[Any] | None = None
+    runner_task: asyncio.Task[Any] | None = None
 
     try:
         transport = FastAPIWebsocketTransport(
@@ -741,13 +842,26 @@ async def voice_websocket(websocket: WebSocket) -> None:
                 audio_in_sample_rate=app_settings.voice.sample_rate,
                 audio_out_sample_rate=app_settings.voice.sample_rate,
                 add_wav_header=False,
+                serializer=_RawAudioFrameSerializer(
+                    sample_rate=app_settings.voice.sample_rate,
+                    num_channels=app_settings.voice.audio_channels,
+                ),
             ),
+        )
+
+        logger.info(
+            f"Voice pipeline: transport created, sample_rate={app_settings.voice.sample_rate}"
+        )
+        logger.info(
+            f"Voice pipeline: components - STT={type(components['stt']).__name__}, "
+            f"Bridge={type(components['bridge']).__name__}, TTS={type(components['tts']).__name__}"
         )
 
         pipeline_components = [transport.input()]
         if components.get("vad"):
             pipeline_components.append(components["vad"])
-            
+            logger.info("Voice pipeline: VAD enabled and added")
+
         pipeline_components.extend(
             [
                 components["stt"],
@@ -756,14 +870,34 @@ async def voice_websocket(websocket: WebSocket) -> None:
                 transport.output(),
             ]
         )
-        
+        logger.info(
+            f"Voice pipeline: total components in pipeline: {len(pipeline_components)}"
+        )
+
         pipeline = Pipeline(pipeline_components)
+        logger.info("Voice pipeline: Pipeline created successfully")
 
         task = PipelineTask(pipeline)
+        logger.info("Voice pipeline: PipelineTask created, starting runner...")
         runner = PipelineRunner()
 
+        runner_task = asyncio.create_task(runner.run(task))
+
+        # Start reading control/audio only after pipeline runner is live so
+        # user_text cannot emit TTS frames before StartFrame initialization.
+        reader_task = asyncio.create_task(
+            _voice_control_reader(
+                websocket,
+                inbound_queue,
+                control,
+                vad_enabled=app_settings.voice.vad_enabled,
+                send_lock=send_lock,
+                on_user_text=_handle_user_text,
+            )
+        )
+
         async with asyncio.timeout(float(app_settings.voice.session_timeout)):
-            await runner.run(task)
+            await runner_task
     except WebSocketDisconnect:
         logger.info(f"Voice WebSocket disconnected: {session_id}")
     except TimeoutError:
@@ -786,13 +920,23 @@ async def voice_websocket(websocket: WebSocket) -> None:
             except Exception:
                 pass
     finally:
-        reader_task.cancel()
-        try:
-            await reader_task
-        except asyncio.CancelledError:
-            pass
-        except Exception:
-            logger.exception("Voice control reader task failed")
+        if runner_task and not runner_task.done():
+            runner_task.cancel()
+            try:
+                await runner_task
+            except asyncio.CancelledError:
+                pass
+            except Exception:
+                logger.exception("Voice pipeline runner task failed")
+
+        if reader_task and not reader_task.done():
+            reader_task.cancel()
+            try:
+                await reader_task
+            except asyncio.CancelledError:
+                pass
+            except Exception:
+                logger.exception("Voice control reader task failed")
 
         if websocket.client_state == WebSocketState.CONNECTED:
             try:

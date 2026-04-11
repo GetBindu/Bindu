@@ -1026,7 +1026,8 @@ class VoiceSettings(BaseSettings):
     """Voice agent configuration settings.
 
     Configures the real-time voice pipeline powered by Pipecat,
-    including STT (Deepgram), TTS (ElevenLabs), VAD, and session management.
+    including STT (Deepgram), TTS (Piper/ElevenLabs/Azure), VAD,
+    and session management.
     """
 
     model_config = SettingsConfigDict(
@@ -1049,6 +1050,7 @@ class VoiceSettings(BaseSettings):
         default_factory=lambda: {
             "deepgram_listen": "https://api.deepgram.com/v1/listen",
             "elevenlabs_tts": "https://api.elevenlabs.io/v1/text-to-speech",
+            "azure_tts_voices": "https://{region}.tts.speech.microsoft.com/cognitiveservices/voices/list",
         }
     )
 
@@ -1061,12 +1063,18 @@ class VoiceSettings(BaseSettings):
     http_timeout_seconds: float = 30.0
 
     # Text-to-Speech
-    tts_provider: Literal["elevenlabs"] = "elevenlabs"
+    tts_provider: Literal["elevenlabs", "piper", "azure"] = "elevenlabs"
+    tts_fallback_provider: Literal["none", "elevenlabs", "azure"] = "none"
     tts_api_key: str = ""
     tts_voice_id: str = "21m00Tcm4TlvDq8ikWAM"  # ElevenLabs "Rachel"
     tts_model: str = "eleven_turbo_v2_5"
     tts_stability: float = 0.5
     tts_similarity_boost: float = 0.75
+
+    # Azure Text-to-Speech (used when tts_provider=azure or fallback is azure)
+    azure_tts_api_key: str = ""
+    azure_tts_region: str = ""
+    azure_tts_voice: str = "en-US-SaraNeural"
 
     # Audio format
     sample_rate: int = 16000

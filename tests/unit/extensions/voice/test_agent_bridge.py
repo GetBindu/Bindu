@@ -119,6 +119,29 @@ class TestAgentBridgeProcessor:
         assert deltas[-1] == ("hello this is agent", True)
 
     @pytest.mark.asyncio
+    async def test_cumulative_chunks_with_punctuation_do_not_duplicate(self):
+        deltas: list[tuple[str, bool]] = []
+
+        async def run(history):
+            yield "Hello!"
+            yield "Hello! How can I assist"
+            yield "Hello! How can I assist you today?"
+
+        bridge = AgentBridgeProcessor(
+            manifest_run=run,
+            context_id="ctx",
+            on_agent_transcript=lambda text, is_final: deltas.append((text, is_final)),
+        )
+        bridge.push_frame = AsyncMock()
+
+        result = await bridge.process_transcription("Hi", emit_frames=True)
+        assert result == "Hello! How can I assist you today?"
+
+        partials = [text for text, is_final in deltas if not is_final]
+        assert partials == ["Hello!", "How can I assist", "you today?"]
+        assert deltas[-1] == ("Hello! How can I assist you today?", True)
+
+    @pytest.mark.asyncio
     async def test_new_transcription_interrupts_downstream_when_allow_interruptions(
         self,
     ):

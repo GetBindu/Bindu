@@ -2,6 +2,7 @@
 	import LiveTranscript from "$lib/components/voice/LiveTranscript.svelte";
 	import {
 		endVoiceSession,
+		holdVoiceInputFor,
 		isVoiceMuted,
 		latestAgentAudio,
 		startVoiceStreaming,
@@ -18,41 +19,66 @@
 	let isRecording = $state(false);
 	let isStarting = $state(false);
 	let lastAudioChunk: ArrayBuffer | null = $state(null);
+	let playbackContext: AudioContext | null = $state(null);
+	let playbackNextTime = $state(0);
+	let lastAgentAudioAt = $state(0);
+	let lastFallbackSpoken = $state("");
+	let fallbackSpeechTimer: ReturnType<typeof setTimeout> | null = $state(null);
 
-	function pcm16ToWavBuffer(
-		pcmBuffer: ArrayBuffer,
-		sampleRate = 16000,
-		channels = 1
-	): ArrayBuffer {
-		const bytesPerSample = 2;
-		const dataSize = pcmBuffer.byteLength;
-		const blockAlign = channels * bytesPerSample;
-		const byteRate = sampleRate * blockAlign;
-		const wavBuffer = new ArrayBuffer(44 + dataSize);
-		const view = new DataView(wavBuffer);
+	function ensurePlaybackContext(sampleRate = 16000): AudioContext {
+		if (playbackContext) {
+			return playbackContext;
+		}
 
-		const writeString = (offset: number, value: string) => {
-			for (let i = 0; i < value.length; i++) {
-				view.setUint8(offset + i, value.charCodeAt(i));
-			}
-		};
+		const AudioContextCtor =
+			window.AudioContext ||
+			(window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
 
-		writeString(0, "RIFF");
-		view.setUint32(4, 36 + dataSize, true);
-		writeString(8, "WAVE");
-		writeString(12, "fmt ");
-		view.setUint32(16, 16, true);
-		view.setUint16(20, 1, true);
-		view.setUint16(22, channels, true);
-		view.setUint32(24, sampleRate, true);
-		view.setUint32(28, byteRate, true);
-		view.setUint16(32, blockAlign, true);
-		view.setUint16(34, 16, true);
-		writeString(36, "data");
-		view.setUint32(40, dataSize, true);
-		new Uint8Array(wavBuffer, 44).set(new Uint8Array(pcmBuffer));
+		if (!AudioContextCtor) {
+			throw new Error("AudioContext is not supported in this browser");
+		}
 
-		return wavBuffer;
+		playbackContext = new AudioContextCtor({ sampleRate });
+		playbackNextTime = 0;
+		return playbackContext;
+	}
+
+	function pcm16ToFloat32(pcmBuffer: ArrayBuffer): Float32Array {
+		const pcm = new Int16Array(pcmBuffer);
+		const out = new Float32Array(pcm.length);
+		for (let i = 0; i < pcm.length; i++) {
+			out[i] = (pcm[i] ?? 0) / 32768;
+		}
+		return out;
+	}
+
+	async function queueAgentAudio(pcmBuffer: ArrayBuffer, sampleRate = 16000): Promise<void> {
+		const ctx = ensurePlaybackContext(sampleRate);
+		if (ctx.state === "suspended") {
+			await ctx.resume();
+		}
+
+		const samples = pcm16ToFloat32(pcmBuffer);
+		if (!samples.length) {
+			return;
+		}
+
+		const audioBuffer = ctx.createBuffer(1, samples.length, sampleRate);
+		const channelData = new Float32Array(samples);
+		audioBuffer.copyToChannel(channelData, 0);
+
+		const source = ctx.createBufferSource();
+		source.buffer = audioBuffer;
+		source.connect(ctx.destination);
+
+		const startAt = Math.max(ctx.currentTime, playbackNextTime);
+		source.start(startAt);
+		playbackNextTime = startAt + audioBuffer.duration;
+
+		// Keep scheduling stable if there's a long pause between chunks.
+		if (playbackNextTime - ctx.currentTime > 2) {
+			playbackNextTime = ctx.currentTime;
+		}
 	}
 
 	$effect(() => {
@@ -61,37 +87,81 @@
 		}
 
 		lastAudioChunk = $latestAgentAudio;
-		const wavBuffer = pcm16ToWavBuffer($latestAgentAudio);
-		const blob = new Blob([wavBuffer], { type: "audio/wav" });
-		const url = URL.createObjectURL(blob);
-		const audio = new Audio(url);
-
-		const cleanup = () => {
-			audio.onended = null;
-			audio.onerror = null;
-			URL.revokeObjectURL(url);
-		};
-
-		const handleError = () => {
+		lastAgentAudioAt = Date.now();
+		void queueAgentAudio($latestAgentAudio).catch(() => {
 			voiceError.set("Unable to play agent audio response");
-			cleanup();
-		};
-
-		audio.onended = cleanup;
-		audio.onerror = handleError;
-
-		// Start playback and handle failure
-		audio.play().catch(() => {
-			handleError();
 		});
+	});
 
-		// Cleanup function for when effect re-runs or component unmounts
-		return () => {
-			if (!audio.paused) {
-				audio.pause();
+	$effect(() => {
+		const items = $transcripts;
+		if (!items.length || $isVoiceMuted) {
+			return;
+		}
+
+		const last = items[items.length - 1];
+		if (!last || last.role !== "agent" || !last.isFinal) {
+			return;
+		}
+
+		const text = last.text.trim();
+		if (!text || text === lastFallbackSpoken) {
+			return;
+		}
+
+		if (fallbackSpeechTimer) {
+			clearTimeout(fallbackSpeechTimer);
+		}
+
+		fallbackSpeechTimer = setTimeout(() => {
+			const elapsed = Date.now() - lastAgentAudioAt;
+			if (elapsed < 1200) {
+				return;
 			}
-			cleanup();
+
+			if (!("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") {
+				return;
+			}
+
+			const estimatedMs = Math.max(2500, Math.min(12000, text.length * 65));
+			holdVoiceInputFor(estimatedMs + 1500);
+
+			const utterance = new SpeechSynthesisUtterance(text);
+			utterance.rate = 1;
+			utterance.pitch = 1;
+			utterance.volume = 1;
+			window.speechSynthesis.cancel();
+			window.speechSynthesis.speak(utterance);
+			lastFallbackSpoken = text;
+		}, 1300);
+
+		return () => {
+			if (fallbackSpeechTimer) {
+				clearTimeout(fallbackSpeechTimer);
+				fallbackSpeechTimer = null;
+			}
 		};
+	});
+
+	$effect(() => {
+		if (!["idle", "ended", "error"].includes($voiceState)) {
+			return;
+		}
+
+		playbackNextTime = 0;
+		if (playbackContext) {
+			void playbackContext.close();
+			playbackContext = null;
+		}
+
+		if (fallbackSpeechTimer) {
+			clearTimeout(fallbackSpeechTimer);
+			fallbackSpeechTimer = null;
+		}
+		if ("speechSynthesis" in window) {
+			window.speechSynthesis.cancel();
+		}
+		lastFallbackSpoken = "";
 	});
 
 	$effect(() => {
@@ -125,7 +195,9 @@
 	}
 </script>
 
-<div class="fixed inset-x-0 bottom-0 z-20 mx-auto mb-2 w-[min(52rem,95vw)] rounded-xl border border-gray-200 bg-white/95 p-3 shadow-2xl dark:border-gray-700 dark:bg-gray-900/95">
+<div
+	class="fixed inset-x-0 bottom-0 z-20 mx-auto mb-2 w-[min(52rem,95vw)] rounded-xl border border-gray-200 bg-white/95 p-3 shadow-2xl dark:border-gray-700 dark:bg-gray-900/95"
+>
 	<div class="mb-2 flex items-center justify-between">
 		<div>
 			<div class="text-sm font-semibold">Voice Session</div>
@@ -156,7 +228,11 @@
 	</div>
 
 	{#if $voiceError}
-		<p class="mb-2 rounded-md bg-red-50 px-2 py-1 text-xs text-red-700 dark:bg-red-950/40 dark:text-red-300">{$voiceError}</p>
+		<p
+			class="mb-2 rounded-md bg-red-50 px-2 py-1 text-xs text-red-700 dark:bg-red-950/40 dark:text-red-300"
+		>
+			{$voiceError}
+		</p>
 	{/if}
 
 	<LiveTranscript items={$transcripts} />

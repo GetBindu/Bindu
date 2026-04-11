@@ -123,3 +123,78 @@ class TestCreateTTSService:
                 settings=mock_tts_settings.return_value,
             )
             assert result == mock_tts_cls.return_value
+
+    def test_piper_creation_without_api_key(self):
+        ext = VoiceAgentExtension(
+            tts_provider="piper",
+            tts_voice_id="en_US-ryan-high",
+        )
+        mock_tts_cls = MagicMock()
+        mock_tts_settings = MagicMock()
+        with (
+            patch(
+                "bindu.extensions.voice.service_factory.app_settings"
+            ) as mock_settings,
+            patch.dict(
+                "sys.modules",
+                {
+                    "pipecat.services.piper.tts": MagicMock(
+                        PiperTTSService=mock_tts_cls,
+                        PiperTTSSettings=mock_tts_settings,
+                    )
+                },
+            ),
+        ):
+            mock_settings.voice.tts_api_key = ""
+            mock_settings.voice.tts_fallback_provider = "none"
+            result = create_tts_service(ext)
+            mock_tts_settings.assert_called_once_with(voice="en_US-ryan-high")
+            mock_tts_cls.assert_called_once_with(
+                settings=mock_tts_settings.return_value,
+            )
+            assert result == mock_tts_cls.return_value
+
+    def test_azure_fallback_when_elevenlabs_fails(self):
+        ext = VoiceAgentExtension(
+            tts_provider="elevenlabs",
+            tts_voice_id="en-US-SaraNeural",
+        )
+        mock_azure_cls = MagicMock()
+        mock_azure_settings = MagicMock()
+
+        with (
+            patch(
+                "bindu.extensions.voice.service_factory.app_settings"
+            ) as mock_settings,
+            patch.dict(
+                "sys.modules",
+                {
+                    "pipecat.services.elevenlabs.tts": MagicMock(
+                        ElevenLabsTTSService=MagicMock(),
+                        ElevenLabsTTSSettings=MagicMock(),
+                    ),
+                    "pipecat.services.azure.tts": MagicMock(
+                        AzureTTSService=mock_azure_cls,
+                        AzureTTSSettings=mock_azure_settings,
+                    ),
+                },
+            ),
+        ):
+            mock_settings.voice.tts_api_key = ""
+            mock_settings.voice.tts_fallback_provider = "azure"
+            mock_settings.voice.azure_tts_api_key = (
+                "unit-test-azure-token"  # pragma: allowlist secret
+            )
+            mock_settings.voice.azure_tts_region = "eastus"
+            mock_settings.voice.azure_tts_voice = "en-US-SaraNeural"
+
+            result = create_tts_service(ext)
+
+            mock_azure_settings.assert_called_once_with(voice="en-US-SaraNeural")
+            mock_azure_cls.assert_called_once_with(
+                api_key="unit-test-azure-token",  # pragma: allowlist secret
+                region="eastus",
+                settings=mock_azure_settings.return_value,
+                sample_rate=16000,
+            )
+            assert result == mock_azure_cls.return_value
