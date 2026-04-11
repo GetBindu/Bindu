@@ -511,15 +511,11 @@ def _bindufy_core(
             ) from e
         except ValueError as e:
             # Validation errors (e.g., invalid sample_rate)
-            raise ValueError(
-                f"Voice configuration validation failed: {e}"
-            ) from e
+            raise ValueError(f"Voice configuration validation failed: {e}") from e
         except Exception as e:
             # Catch any other unexpected errors
             logger.error(f"Failed to create voice extension: {e}")
-            raise ValueError(
-                f"Unable to initialize voice extension: {e}"
-            ) from e
+            raise ValueError(f"Unable to initialize voice extension: {e}") from e
 
     # Create agent manifest with loaded skills
     _manifest = create_manifest(

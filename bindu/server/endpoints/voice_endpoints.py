@@ -199,6 +199,7 @@ try:
         FrameSerializer as _PipecatFrameSerializer,
     )
 except Exception:  # pragma: no cover
+
     class _PipecatFrameSerializer:  # type: ignore[too-many-ancestors]
         def __init__(self, *args: Any, **kwargs: Any) -> None:
             pass
@@ -229,7 +230,9 @@ class _RawAudioFrameSerializer(_PipecatFrameSerializer):
         if isinstance(frame, OutputAudioRawFrame):
             return frame.audio
 
-        if isinstance(frame, (OutputTransportMessageFrame, OutputTransportMessageUrgentFrame)):
+        if isinstance(
+            frame, (OutputTransportMessageFrame, OutputTransportMessageUrgentFrame)
+        ):
             return json.dumps(frame.message)
 
         return None

@@ -151,6 +151,7 @@ class TestCreateTTSService:
             mock_tts_settings.assert_called_once_with(voice="en_US-ryan-high")
             mock_tts_cls.assert_called_once_with(
                 settings=mock_tts_settings.return_value,
+                sample_rate=16000,
             )
             assert result == mock_tts_cls.return_value
 

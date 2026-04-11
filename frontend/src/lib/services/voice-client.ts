@@ -329,20 +329,20 @@ export class VoiceClient {
           this.buffer = new Float32Array(4096);
           this.bufferIndex = 0;
         }
-        
+
         process(inputs, outputs, parameters) {
           const input = inputs[0];
           if (!input || !input[0]) return true;
-          
+
           const channelData = input[0];
-          
+
           for (let i = 0; i < channelData.length; i++) {
             this.buffer[this.bufferIndex++] = channelData[i];
             if (this.bufferIndex >= this.buffer.length) {
               this.flushBuffer();
             }
           }
-          
+
           return true;
         }
 

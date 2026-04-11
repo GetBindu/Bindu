@@ -17,7 +17,7 @@ uv sync --dev --extra agents --extra voice
 ```bash
 export VOICE__STT_API_KEY="your-deepgram-api-key" # pragma: allowlist secret
 export VOICE__TTS_API_KEY="your-elevenlabs-api-key" # pragma: allowlist secret
-export OPENROUTER_API_KEY="your-openrouter-api-key" # optional, enables full LLM responses
+export OPENROUTER_API_KEY="your-openrouter-api-key" # pragma: allowlist secret # optional, enables full LLM responses
 export OPENROUTER_MODEL="openai/gpt-4o-mini" # optional
 export OPENROUTER_MEMORY_TURNS="4" # optional, recent turns to keep in prompt
 export VOICE_MAX_SENTENCES="2" # optional, hard cap for spoken response length
