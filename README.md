@@ -221,6 +221,27 @@ $env:BINDU_PORT="4000"
 
 Existing examples that use `http://localhost:3773` are automatically overridden when `BINDU_PORT` is set.
 
+## Audit Log (Action Registry)
+
+Minimal audit trail for agent actions (JSONL).
+
+```python
+from action_registry import log_event
+
+log_event(
+    user_id="demo",
+    action_type="bindu_run",
+    tool="bindu",
+    target="local",
+    decision="allow",
+    status="done",
+    tags=["audit"],
+    metadata={"agent": "research_agent"},
+)
+```
+
+Spec: `https://pypi.org/project/action-registry/`
+
 ### Option 2: TypeScript Agent
 
 Same pattern, different language. Create `index.ts`:
