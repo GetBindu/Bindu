@@ -110,23 +110,22 @@ class NotificationService:
         DNS-rebinding window that exists when validation and connection each
         perform independent DNS lookups (TOCTOU SSRF).
         """
-        resolved_ip = self.validate_config(config)
+        self.validate_config(config)
 
         payload = json.dumps(event, separators=(",", ":")).encode("utf-8")
         headers = self._build_headers(config)
 
         # Use unified retry decorator for consistent retry behavior
-        await self._post_with_retry(config["url"], resolved_ip, headers, payload, event)
+        await self._post_with_retry(config["url"], headers, payload, event)
 
-    def validate_config(self, config: PushNotificationConfig) -> str:
+    def validate_config(self, config: PushNotificationConfig) -> None:
         """Validate push notification configuration before use.
 
         In addition to URL structure checks this method resolves the hostname
         and rejects any address that falls within a private, loopback, link-local
         or cloud-metadata range to prevent Server-Side Request Forgery (SSRF).
 
-        Returns the resolved IP address so the caller can connect directly to it,
-        eliminating the DNS-rebinding race between validation and connection.
+        Validates destination safety before any outbound call.
         """
         parsed = urlparse(config["url"])
         if parsed.scheme not in {"http", "https"}:
