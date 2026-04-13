@@ -96,6 +96,17 @@ config = {
 In this configuration, callers can pay **either** 0.1 USDC on Base **or** 0.0001 ETH
 on Ethereum to access the protected methods.
 
+### 🚧 Integration Note: SKALE Network Support (Pending / Upstream Blocker)
+
+While Bindu's `execution_cost` configuration fully supports multi-asset and multi-network arrays, direct support for the **SKALE network** is currently blocked by an upstream dependency. 
+
+Specifically, the underlying [x402 package](https://github.com/coinbase/x402) handles network validation and chain/token mapping using a hardcoded `SupportedNetworks` list. If you attempt to pass a SKALE network (e.g., `"skale-europa"`) in your `execution_cost` array today, the upstream `process_price_to_atomic_amount` function will fail because it does not yet recognize SKALE's chain IDs or token contracts.
+
+**What this means right now:**
+* The Bindu-side structure is ready: You can define `execution_cost` as a list of options.
+* You must currently restrict the `network` values to those natively supported by the upstream `x402` package (e.g., `base`, `base-sepolia`, `ethereum`, `polygon`).
+* We are currently tracking this and deciding whether to wait for upstream `x402` updates or implement a local runtime patch to inject SKALE network definitions directly into the `x402` module footprint.
+
 ## Setup for Testing
 
 ### 1. Create a Crypto Wallet
