@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import asyncio
-import http.client
 import ipaddress
 import json
 import socket
-import ssl
 from dataclasses import dataclass
 from typing import Any
 from urllib import error, request

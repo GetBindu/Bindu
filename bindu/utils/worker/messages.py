@@ -24,13 +24,14 @@ MAX_FILE_SIZE = 10 * 1024 * 1024
 ChatMessage = dict[str, str]
 ProtocolMessage = Message
 
+
 class FileInterceptor:
     """Native pipeline for intercepting and parsing Base64 file parts."""
-    
+
     SUPPORTED_MIME_TYPES = {
         "application/pdf",
         "text/plain",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     }
 
     @staticmethod

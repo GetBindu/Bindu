@@ -138,7 +138,7 @@ dev = [
     "pytest-timeout>=2.2.0",
     "pytest-xdist>=3.0.0",
     "pre-commit>=3.0.0",
-    "ty>=0.0.1a14",
+    "ty==0.0.1a14",
     "types-requests>=2.32.0.20250328",
     "pipreqs>=0.5.0",
     "twine>=6.1.0",
