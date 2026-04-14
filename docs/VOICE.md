@@ -13,8 +13,15 @@ uv sync --dev --extra agents --extra voice
 Minimum:
 
 ```bash
-export VOICE__STT_API_KEY="..."   # Deepgram
-export VOICE__TTS_API_KEY="..."   # ElevenLabs
+export VOICE__STT_API_KEY="..."        # Deepgram (VOICE__STT_PROVIDER=deepgram)
+export VOICE__TTS_PROVIDER="piper"     # Local TTS (no API key required)
+# If using ElevenLabs:
+# export VOICE__TTS_PROVIDER="elevenlabs"
+# export VOICE__TTS_API_KEY="..."
+# If using Azure:
+# export VOICE__TTS_PROVIDER="azure"
+# export VOICE__AZURE_TTS_API_KEY="..."
+# export VOICE__AZURE_TTS_REGION="..."
 ```
 
 Recommended:

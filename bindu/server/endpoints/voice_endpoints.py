@@ -371,11 +371,20 @@ def _voice_preflight_error() -> str | None:
     except Exception:
         return "Voice dependencies are not installed. Install with: pip install 'bindu[voice]'"
 
-    # Ensure provider keys exist (current implementation relies on these env vars).
-    if not app_settings.voice.stt_api_key:
-        return "VOICE__STT_API_KEY is required for voice"
-    if not app_settings.voice.tts_api_key:
-        return "VOICE__TTS_API_KEY is required for voice"
+    # Ensure provider keys exist (provider-dependent).
+    if app_settings.voice.stt_provider == "deepgram" and not app_settings.voice.stt_api_key:
+        return "VOICE__STT_API_KEY is required when VOICE__STT_PROVIDER=deepgram"
+
+    tts_provider = app_settings.voice.tts_provider
+    if tts_provider == "elevenlabs" and not app_settings.voice.tts_api_key:
+        return "VOICE__TTS_API_KEY is required when VOICE__TTS_PROVIDER=elevenlabs"
+    if tts_provider == "azure":
+        if not app_settings.voice.azure_tts_api_key:
+            return "VOICE__AZURE_TTS_API_KEY is required when VOICE__TTS_PROVIDER=azure"
+        if not app_settings.voice.azure_tts_region:
+            return "VOICE__AZURE_TTS_REGION is required when VOICE__TTS_PROVIDER=azure"
+    if tts_provider not in {"elevenlabs", "piper", "azure"}:
+        return f"Unsupported VOICE__TTS_PROVIDER={tts_provider!r}"
 
     return None
 

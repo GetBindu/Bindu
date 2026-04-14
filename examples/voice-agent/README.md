@@ -16,7 +16,11 @@ uv sync --dev --extra agents --extra voice
 
 ```bash
 export VOICE__STT_API_KEY="your-deepgram-api-key" # pragma: allowlist secret
-export VOICE__TTS_API_KEY="your-elevenlabs-api-key" # pragma: allowlist secret
+# TTS depends on provider:
+# - If VOICE__TTS_PROVIDER=elevenlabs: VOICE__TTS_API_KEY is required
+# - If VOICE__TTS_PROVIDER=piper: no API key needed (local)
+# - If VOICE__TTS_PROVIDER=azure: VOICE__AZURE_TTS_API_KEY + VOICE__AZURE_TTS_REGION are required
+export VOICE__TTS_PROVIDER="piper"
 export OPENROUTER_API_KEY="your-openrouter-api-key" # pragma: allowlist secret # optional, enables full LLM responses
 export OPENROUTER_MODEL="openai/gpt-4o-mini" # optional
 export OPENROUTER_MEMORY_TURNS="4" # optional, recent turns to keep in prompt
