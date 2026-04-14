@@ -61,9 +61,20 @@ export async function submitTaskFeedback(
 	return result.result;
 }
 
+
+interface FilePart {
+	kind: 'file';
+	file: {
+		bytes: string | ArrayBuffer | Uint8Array | Blob;
+		mimeType?: string;
+		name?: string;
+	};
+}
+
+
 interface AgentMessage {
 	role: 'user' | 'agent';
-	parts: Array<{ kind: 'text'; text: string }>;
+	parts: Array<{ kind: 'text'; text: string } | FilePart>;
 	kind: 'message';
 	messageId: string;
 	contextId: string;
@@ -161,11 +172,25 @@ function extractTextFromTask(task: AgentTask): string {
 export async function* sendAgentMessage(
 	message: string,
 	contextId?: string,
-	abortSignal?: AbortSignal,
-	currentTaskId?: string,
-	taskState?: string,
-	replyToTaskId?: string
+	options: {
+		abortSignal?: AbortSignal;
+		currentTaskId?: string;
+		taskState?: string;
+		replyToTaskId?: string;
+		fileParts?: Array<{
+			name: string;
+			mime: string;
+			value: string | ArrayBuffer | Uint8Array | Blob;
+		}>;
+	} = {}
 ): AsyncGenerator<MessageUpdate, void, unknown> {
+	const {
+		abortSignal,
+		currentTaskId,
+		taskState,
+		replyToTaskId,
+		fileParts,
+	} = options;
 	const token = typeof window !== 'undefined' ? localStorage.getItem('bindu_oauth_token') : null;
 	const headers: Record<string, string> = {
 		'Content-Type': 'application/json',
@@ -214,14 +239,52 @@ export async function* sendAgentMessage(
 		: generateId();
 
 	// Build message with optional referenceTaskIds
+	const parts: AgentMessage["parts"] = [{ kind: 'text', text: message }];
+	if (fileParts && fileParts.length > 0) {
+		for (const f of fileParts) {
+			const mime = typeof f.mime === 'string' ? f.mime.trim() : '';
+			const name = typeof f.name === 'string' ? f.name.trim() : '';
+			const value = f.value;
+
+			const hasValue =
+				typeof value === 'string'
+					? value.length > 0
+					: value instanceof ArrayBuffer
+						? value.byteLength > 0
+						: value instanceof Uint8Array
+							? value.byteLength > 0
+							: value instanceof Blob
+								? value.size > 0
+								: Boolean(value);
+
+			if (!hasValue || !mime || !name) {
+				console.warn('[agentMessageHandler] Dropping invalid file part', {
+					hasValue,
+					mime,
+					name,
+				});
+				continue;
+			}
+
+			parts.push({
+				kind: 'file',
+				file: {
+					bytes: value,
+					mimeType: mime,
+					name,
+				},
+			});
+		}
+	}
+
 	const agentMessage: AgentMessage = {
 		role: 'user',
-		parts: [{ kind: 'text', text: message }],
+		parts,
 		kind: 'message',
 		messageId,
 		contextId: newContextId,
 		taskId,
-		...(referenceTaskIds.length > 0 && { referenceTaskIds })
+		...(referenceTaskIds.length > 0 && { referenceTaskIds }),
 	};
 
 	// Step 1: Send message

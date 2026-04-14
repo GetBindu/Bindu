@@ -32,7 +32,10 @@
 		children?: import("svelte").Snippet;
 		onPaste?: (e: ClipboardEvent) => void;
 		focused?: boolean;
-		onsubmit?: () => void;
+		onsubmit?: (
+			message: string,
+			fileParts: Array<{ name: string; mime: string; value: string }>
+		) => Promise<void> | void;
 	}
 
 	let {
@@ -155,7 +158,7 @@
 		adjustTextareaHeight();
 	});
 
-	function handleKeydown(event: KeyboardEvent) {
+	async function handleKeydown(event: KeyboardEvent) {
 		if (
 			event.key === "Enter" &&
 			!event.shiftKey &&
@@ -164,9 +167,48 @@
 			value.trim() !== ""
 		) {
 			event.preventDefault();
-			tick();
-			onsubmit?.();
+			await tick();
+			let fileParts = [];
+			try {
+				fileParts = await getFileParts();
+			} catch (err) {
+				console.error("Error reading file parts:", err);
+				// Surface error to user via alert as fallback
+				alert(`Error reading file: ${err instanceof Error ? err.message : String(err)}`);
+				// Reset file input state
+				if (fileInputEl) fileInputEl.value = "";
+				files = [];
+				return;
+			}
+
+			try {
+				if (typeof onsubmit === "function") {
+					await onsubmit(value, fileParts);
+				}
+				// Clear files and input after successful submit
+				files = [];
+				value = "";
+			} catch (err) {
+				console.error("Error submitting message:", err);
+				alert(
+					`Error submitting message: ${err instanceof Error ? err.message : String(err)}`
+				);
+			}
 		}
+	}
+
+	// Helper to convert files to base64 parts for agentMessageHandler
+	async function getFileParts() {
+		if (!files || files.length === 0) return [];
+		const file2base64 = (await import("$lib/utils/file2base64")).default;
+		const fileParts = await Promise.all(
+			files.map(async (file) => ({
+				name: file.name,
+				mime: file.type || "application/octet-stream",
+				value: await file2base64(file),
+			}))
+		);
+		return fileParts;
 	}
 
 	function handleFocus() {

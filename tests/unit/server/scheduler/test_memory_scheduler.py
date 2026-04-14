@@ -106,3 +106,26 @@ class TestInMemoryScheduler:
             assert len(operations) == 2
             assert operations[0]["operation"] == "run"
             assert operations[1]["operation"] == "cancel"
+
+    @pytest.mark.asyncio
+    async def test_send_operation_waits_for_capacity(self, monkeypatch):
+        scheduler = InMemoryScheduler()
+
+        async with scheduler:
+            send_called = False
+
+            async def fake_send(_task_op):
+                nonlocal send_called
+                send_called = True
+
+            monkeypatch.setattr(scheduler._write_stream, "send", fake_send)
+
+            await scheduler.run_task(  # type: ignore[arg-type]
+                {
+                    "task_id": str(uuid4()),
+                    "context_id": str(uuid4()),
+                    "messages": [],
+                }
+            )
+
+            assert send_called is True

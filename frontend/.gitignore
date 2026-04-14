@@ -7,10 +7,11 @@ node_modules
 .env.*
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+tsconfig.tsbuildinfo
 SECRET_CONFIG
 .idea
 !.env.ci
-!.env
+!.env.example
 gcp-*.json
 db
 data

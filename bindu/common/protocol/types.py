@@ -192,11 +192,15 @@ class FilePart(TextPart):
     file: Required[FileWithBytes | FileWithUri]
     """The file of the part."""
 
+    metadata: NotRequired[dict[str, Any]]
+    """Metadata about the file part."""
+
     embeddings: NotRequired[list[float]]
     """The embeddings of File. <NotPartOfA2A>"""
 
 
-class DataPart(TextPart):
+@pydantic.with_config(ConfigDict(alias_generator=to_camel))
+class DataPart(TypedDict):
     """Represents a structured data segment (e.g., JSON) within a message or artifact."""
 
     kind: Required[Literal["data"]]
@@ -204,6 +208,9 @@ class DataPart(TextPart):
 
     data: Required[dict[str, Any]]
     """The data of the part."""
+
+    metadata: NotRequired[dict[str, Any]]
+    """Metadata about the data part."""
 
     embeddings: NotRequired[list[float]]
     """The embeddings of Data. <NotPartOfA2A>"""

@@ -55,3 +55,21 @@ def get_x402_extension_from_capabilities(manifest: Any) -> Optional[Any]:
             return ext
 
     return None
+
+
+def get_voice_extension_from_capabilities(manifest: Any) -> Optional[Any]:
+    """Extract Voice extension from manifest capabilities.
+
+    Args:
+        manifest: Agent manifest with capabilities
+
+    Returns:
+        VoiceAgentExtension instance if configured, None otherwise
+    """
+    from bindu.extensions.voice import VoiceAgentExtension
+
+    for ext in manifest.capabilities.get("extensions", []):
+        if isinstance(ext, VoiceAgentExtension):
+            return ext
+
+    return None

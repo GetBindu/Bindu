@@ -306,9 +306,9 @@
 				<div class="text-sm text-red-600 dark:text-red-400">{agentError}</div>
 			{:else if didId}
 				<div>
-					<label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+					<div class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
 						Client ID
-					</label>
+					</div>
 					<code
 						class="block break-all rounded-lg bg-gray-100 px-4 py-3 font-mono text-xs text-gray-800 dark:bg-gray-700 dark:text-gray-200"
 					>

@@ -23,10 +23,15 @@
 	let justCopied = $state(false);
 
 	async function handleCreate() {
+		const id = page.params.id;
+		if (!id) {
+			errorMsg = "No conversation selected";
+			return;
+		}
 		try {
 			creating = true;
 			errorMsg = null;
-			createdUrl = await createShareLink(page.params.id);
+			createdUrl = await createShareLink(id);
 		} catch (e) {
 			errorMsg = (e as Error).message || "Could not create link";
 		} finally {

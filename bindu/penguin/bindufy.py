@@ -493,6 +493,30 @@ def _bindufy_core(
         # Add x402 extension to capabilities
         capabilities = add_extension_to_capabilities(capabilities, x402_extension)
 
+    # Voice extension (optional)
+    voice_config = validated_config.get("voice")
+    if voice_config and isinstance(voice_config, dict):
+        from bindu.extensions.voice import VoiceAgentExtension
+
+        try:
+            voice_extension = VoiceAgentExtension(**voice_config)
+            capabilities = add_extension_to_capabilities(capabilities, voice_extension)
+            logger.info(f"Voice extension created: {voice_extension}")
+        except TypeError as e:
+            # Invalid or unexpected configuration keys
+            raise ValueError(
+                f"Invalid voice configuration: {e}. "
+                f"Expected keys: stt_provider, stt_model, stt_language, tts_provider, "
+                f"tts_voice_id, tts_model, sample_rate, allow_interruptions, vad_enabled, description"
+            ) from e
+        except ValueError as e:
+            # Validation errors (e.g., invalid sample_rate)
+            raise ValueError(f"Voice configuration validation failed: {e}") from e
+        except Exception as e:
+            # Catch any other unexpected errors
+            logger.error(f"Failed to create voice extension: {e}")
+            raise ValueError(f"Unable to initialize voice extension: {e}") from e
+
     # Create agent manifest with loaded skills
     _manifest = create_manifest(
         agent_function=handler_callable,

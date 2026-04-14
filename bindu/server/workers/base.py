@@ -21,12 +21,18 @@ Workers implement the hybrid pattern by:
 from __future__ import annotations as _annotations
 
 from abc import ABC, abstractmethod
-from contextlib import asynccontextmanager, nullcontext
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any, AsyncIterator
 
 import anyio
 from opentelemetry.trace import get_tracer, use_span
+from opentelemetry.trace.span import (
+    INVALID_SPAN_CONTEXT,
+    NonRecordingSpan,
+    SpanContext,
+    TraceFlags,
+)
 
 from bindu.server.scheduler import TaskOperation
 
@@ -37,6 +43,36 @@ from bindu.utils.logging import get_logger
 
 tracer = get_tracer(__name__)
 logger = get_logger(__name__)
+
+
+def _reconstruct_span(trace_id: str | None, span_id: str | None) -> NonRecordingSpan:
+    """Reconstruct a NonRecordingSpan from serialized trace_id/span_id strings.
+
+    Used to restore OpenTelemetry trace context after the scheduler serializes
+    the span into primitive strings (required for Redis JSON serialization).
+
+    Args:
+        trace_id: Hex-encoded trace ID (32 chars) or None
+        span_id: Hex-encoded span ID (16 chars) or None
+
+    Returns:
+        A NonRecordingSpan that carries the trace context for correlation
+    """
+    if trace_id and span_id:
+        try:
+            ctx = SpanContext(
+                trace_id=int(trace_id, 16),
+                span_id=int(span_id, 16),
+                is_remote=True,
+                trace_flags=TraceFlags(TraceFlags.SAMPLED),
+            )
+            return NonRecordingSpan(ctx)
+        except (ValueError, TypeError):
+            logger.warning(
+                f"Invalid trace context: trace_id={trace_id}, span_id={span_id}"
+            )
+    # Return a no-op span with invalid context as fallback
+    return NonRecordingSpan(INVALID_SPAN_CONTEXT)
 
 
 @dataclass
@@ -106,7 +142,10 @@ class Worker(ABC):
         """Dispatch task operation to appropriate handler.
 
         Args:
-            task_operation: Operation dict with 'operation', 'params', and '_current_span'
+            task_operation: Operation dict with 'operation', 'params', and tracing metadata.
+                Prefer providing _current_span first. It should be a Span-like object or
+                a dict containing the live span context. If _current_span is unavailable,
+                provide trace_id and span_id as strings so the span can be reconstructed.
 
         Supported Operations:
         - run: Execute a task
@@ -126,9 +165,19 @@ class Worker(ABC):
         }
 
         try:
-            # Preserve trace context from scheduler (if available)
+            # Prefer in-memory span when available; otherwise reconstruct
+            # from serialized trace_id/span_id for Redis-backed operations.
             span = task_operation.get("_current_span")
-            ctx_manager = use_span(span) if span else nullcontext()
+            if span is not None:
+                ctx_manager = use_span(span)
+            else:
+                ctx_manager = use_span(
+                    _reconstruct_span(
+                        task_operation.get("trace_id"),
+                        task_operation.get("span_id"),
+                    )
+                )
+
             with ctx_manager:
                 with tracer.start_as_current_span(
                     f"{task_operation['operation']} task",

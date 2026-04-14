@@ -162,6 +162,7 @@ type ExtraConfigKeys =
 	| "HF_TOKEN"
 	| "OLD_MODELS"
 	| "ENABLE_ASSISTANTS"
+	| "ENABLE_DATA_EXPORT"
 	| "METRICS_ENABLED"
 	| "METRICS_PORT";
 
