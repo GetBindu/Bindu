@@ -62,6 +62,8 @@ dependencies = [
     "python-dotenv>=1.1.0",
     "agno>=2.5.2",
     "openai>=2.17.0",
+    "agno>=2.5.2",
+    "openai>=2.17.0",
 ]
 
 [project.optional-dependencies]
@@ -92,7 +94,7 @@ grpc = [
 
 # Voice agent support (use: pip install bindu[voice])
 voice = [
-    "pipecat-ai[deepgram,elevenlabs,piper,silero]~=0.0.105",
+    "pipecat-ai[deepgram,elevenlabs,silero]~=0.0.105",
     "websockets>=14.0",
 ]
 
@@ -131,13 +133,14 @@ include = [
 [dependency-groups]
 dev = [
     "bindu",
-    "pipecat-ai[deepgram,elevenlabs,piper,silero]~=0.0.105",
+    "pipecat-ai[deepgram,elevenlabs,silero]~=0.0.105",
     "pytest>=8.0.0",
     "pytest-asyncio>=0.26.0",
     "pytest-cov>=4.1.0",
     "pytest-timeout>=2.2.0",
     "pytest-xdist>=3.0.0",
     "pre-commit>=3.0.0",
+    "ty==0.0.1a14",
     "ty==0.0.1a14",
     "types-requests>=2.32.0.20250328",
     "pipreqs>=0.5.0",
