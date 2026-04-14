@@ -1,7 +1,7 @@
 # Voice Agent Extension — Implementation Plan
 
-> **Status**: Planning
-> **Date**: 12 March 2026
+> **Status**: Implemented (stacked PR ladder ready)
+> **Last updated**: 14 April 2026
 > **Goal**: Build a real-time voice agent (Vapi/Dograh alternative) into Bindu
 > **Reference repos**: [dograh-hq/dograh](https://github.com/dograh-hq/dograh) · [pipecat-ai/pipecat-examples](https://github.com/pipecat-ai/pipecat-examples)
 
@@ -11,7 +11,15 @@
 
 Add real-time voice conversation capability to Bindu agents. A user clicks a microphone button in the UI, speaks naturally, and hears the agent respond — just like Vapi or Dograh, but built natively into Bindu's A2A protocol and extension system.
 
-Implementation note: the current voice client and session lifecycle already enforce 16 kHz mono PCM on the browser side, surface playback/session errors in the UI, and remove ended sessions from the active session registry. The remaining work in this document focuses on the broader extension, configuration, and provider integration story.
+Implementation note: the current voice client and session lifecycle enforce 16 kHz mono PCM on the browser side, surface playback/session errors in the UI, and remove ended sessions from the active session registry. This document now reflects the implemented state and remaining roadmap items.
+
+### Review / PR Stack (Ladder)
+
+To keep reviews focused, the work should be reviewed as a ladder of dependent PRs:
+
+1. **Code**: `feat(voice-agent)/code-fixes` → base `main`
+2. **Example agent**: `feat(voice-agent)/example-agent` → base `feat(voice-agent)/code-fixes`
+3. **Docs**: `feat(voice-agent)/documentation` → base `feat(voice-agent)/example-agent`
 
 ### Architecture at a Glance
 
@@ -45,7 +53,9 @@ Implementation note: the current voice client and session lifecycle already enfo
 │  │             │    │  WebSocket    └─────┘   └───┬───┘        │   │
 │  │ WS /ws/     │    │  Transport ◄──┌─────┐      │             │   │
 │  │  voice/{id} │    │  (output)     │ TTS │◄─────┘             │   │
-│  └─────────────┘    │               │11Lab│                    │   │
+│  └─────────────┘    │               │Piper│                    │   │
+│                     │               │11Lab│                    │   │
+│                     │               │Azure│                    │   │
 │                     │               └─────┘                    │   │
 │  ┌─────────────┐    └──────────────────────────────────────────┘   │
 │  │ Session     │                                                   │
@@ -66,7 +76,7 @@ Implementation note: the current voice client and session lifecycle already enfo
 | Transport | **WebSocket** | Simpler than WebRTC, no Daily dependency, sufficient for browser voice |
 | Pipeline engine | **Pipecat** | Battle-tested framework; handles VAD, interruptions, turn-taking |
 | STT | **Deepgram (nova-3)** | Best latency/accuracy in pipecat ecosystem |
-| TTS | **ElevenLabs (turbo v2.5)** | Highest voice quality, low latency |
+| TTS | **Piper (local)** + optional **ElevenLabs/Azure** | Local-first dev; optional managed providers |
 | Audio format | **PCM 16-bit, 16kHz mono** | Universal speech format for all providers |
 | Integration | **Bindu extension** | Follows existing x402 pattern; opt-in, discoverable in agent card |
 | Telephony | **Not in v1** | Web-only initially; designed for Twilio addition later |
@@ -155,8 +165,9 @@ voice = [
 ]
 ```
 
-The `silero` extra provides Silero VAD for voice activity detection. All three extras
-(deepgram, elevenlabs, silero) are pipecat plugin packages.
+The `silero` extra provides Silero VAD for voice activity detection. Additional TTS
+providers (like Piper and Azure) may require installing the corresponding pipecat
+extras depending on your environment.
 
 #### Step 1.2 — `VoiceSettings` in `bindu/settings.py`
 
@@ -179,10 +190,16 @@ class VoiceSettings(BaseSettings):
     stt_language: str = "en"
 
     # Text-to-Speech
-    tts_provider: Literal["elevenlabs"] = "elevenlabs"
+    tts_provider: Literal["elevenlabs", "piper", "azure"] = "elevenlabs"
+    tts_fallback_provider: Literal["none", "elevenlabs", "azure"] = "none"
     tts_api_key: str = ""
     tts_voice_id: str = "21m00Tcm4TlvDq8ikWAM"  # ElevenLabs "Rachel"
     tts_model: str = "eleven_turbo_v2_5"
+
+    # Azure Text-to-Speech (used when tts_provider=azure or fallback is azure)
+    azure_tts_api_key: str = ""
+    azure_tts_region: str = ""
+    azure_tts_voice: str = "en-US-SaraNeural"
 
     # Audio
     sample_rate: int = 16000
@@ -193,50 +210,17 @@ class VoiceSettings(BaseSettings):
     vad_enabled: bool = True
     vad_threshold: float = 0.5
 
-    # Security & Authentication
-    session_auth_required: bool = True  # Require session authentication
-    session_token_ttl: int = 300        # Session token time-to-live (seconds); must be <= session_timeout
-    session_auth_provider: str | None = None  # Optional: external auth provider id
-    per_agent_voice_access: dict | str | None = None  # Enforced by PerAgentAccessValidator with canonical policy schema
-    rate_limit_per_user: int = 60       # Max requests per user per minute
-    rate_limit_per_ip: int = 120        # Max requests per IP per minute
-    secret_store: Literal["env", "vault"] = "env"  # Where API keys are stored
-    secret_rotation_policy: str = "manual"  # e.g., "manual", "auto-30d"
-    encrypt_api_keys_at_rest: bool = True  # Enforced by KeyManagerService (KMS-backed key_id + rotation)
-
-    # Privacy & Compliance
-    store_transcripts: bool = False  # Default to False, require explicit opt-in
-    transcript_retention_days: int = 30
-    store_audio: bool = False
-    audio_retention_days: int = 7
-    require_user_consent: bool = True  # Must have user consent before enabling transcripts
-    compliance_guidelines: list[str] = ["gdpr", "ccpa"]
-
-    # Consent Management APIs (planned; not implemented in v1):
-    # - ConsentManager.captureConsent(user_id, session_id, scopes, source)
-    # - ConsentManager.revokeConsent(user_id, scopes, reason)
-    # - ConsentManager.getConsentStatus(user_id) -> status/scopes/timestamps
-    # These should be enforced when require_user_consent=True, before enabling
-    # transcript/audio persistence paths.
-    # Enforcement mechanisms (implementation status):
-    # - Rate limiting: implemented (in-memory/Redis sliding window in voice endpoints).
-    # - KeyManagerService: planned (not implemented in current codebase).
-    # - PerAgentAccessValidator: planned (not implemented in current codebase).
-    # - PIIRedactor: planned (not implemented in current codebase).
-    # - RetentionWorker: planned (not implemented in current codebase).
-    # - AuditLogger: planned (not implemented in current codebase).
-    #
-    # NOTE: Until the planned components are implemented, compliance-related
-    # settings like transcript/audio retention, PII redaction, per-agent access
-    # policy enforcement, and audit logging should be treated as "configured but
-    # not enforced in v1".
-
     # Behavior
     allow_interruptions: bool = True
     session_timeout: int = 300          # seconds (5 min)
     max_concurrent_sessions: int = 10
-    autoscaling_policy: str | None = None  # Reference to autoscaling/capacity profile
-    rationale_note: str = "Defaults chosen for balance of UX, cost, and compliance. Infra may override."
+
+    # WebSocket session authentication
+    session_auth_required: bool = False
+    session_token_ttl: int = 300  # seconds; must be <= session_timeout
+
+    # Rate limiting (0 disables)
+    rate_limit_per_ip_per_minute: int = 120
 
     # Extension metadata
     extension_uri: str = "bindu://voice"
@@ -256,8 +240,8 @@ class VoiceAgentExtension:
         stt_provider: str = "deepgram",
         stt_model: str = "nova-3",
         stt_language: str = "en",
-        tts_provider: str = "elevenlabs",
-        tts_voice_id: str = "21m00Tcm4TlvDq8ikWAM",
+        tts_provider: str = "piper",
+        tts_voice_id: str = "en_US-ryan-high",
         tts_model: str = "eleven_turbo_v2_5",
         sample_rate: int = 16000,
         allow_interruptions: bool = True,
@@ -295,21 +279,23 @@ def create_stt_service(config: VoiceAgentExtension) -> DeepgramSTTService:
         api_key=app_settings.voice.stt_api_key,
         model=config.stt_model,
         language=config.stt_language,
-        sample_rate=config.sample_rate,
     )
 
-def create_tts_service(config: VoiceAgentExtension) -> ElevenLabsTTSService:
-    """Create ElevenLabs TTS service from extension config."""
-    if not app_settings.voice.tts_api_key:
-        # Log operator detail server-side; raise generic message to callers.
-        logger.warning("TTS service configuration incomplete: missing API key")
-        raise ValueError("TTS service configuration incomplete")
-    return ElevenLabsTTSService(
-        api_key=app_settings.voice.tts_api_key,
-        voice_id=config.tts_voice_id,
-        model=config.tts_model,
-        sample_rate=config.sample_rate,
-    )
+def create_tts_service(config: VoiceAgentExtension) -> Any:
+    """Create a TTS service from extension config (provider-dependent)."""
+    if config.tts_provider == "piper":
+        return PiperTTSService(voice_id=config.tts_voice_id, sample_rate=config.sample_rate)
+    if config.tts_provider == "elevenlabs":
+        if not app_settings.voice.tts_api_key:
+            logger.warning("TTS service configuration incomplete: missing API key")
+            raise ValueError("TTS service configuration incomplete")
+        return ElevenLabsTTSService(api_key=app_settings.voice.tts_api_key, voice_id=config.tts_voice_id, model=config.tts_model)
+    if config.tts_provider == "azure":
+        if not app_settings.voice.azure_tts_api_key or not app_settings.voice.azure_tts_region:
+            logger.warning("Azure TTS configuration incomplete")
+            raise ValueError("Azure TTS configuration incomplete")
+        return AzureTTSService(api_key=app_settings.voice.azure_tts_api_key, region=app_settings.voice.azure_tts_region, voice=app_settings.voice.azure_tts_voice or config.tts_voice_id)
+    raise ValueError("Unsupported TTS provider")
 ```
 
 **`pipeline_builder.py`** — assembles the pipecat pipeline:
@@ -838,8 +824,8 @@ config = {
     "voice": {
         "stt_provider": "deepgram",
         "stt_model": "nova-3",
-        "tts_provider": "elevenlabs",
-        "tts_voice_id": "21m00Tcm4TlvDq8ikWAM",
+        "tts_provider": "piper",
+        "tts_voice_id": "en_US-ryan-high",
         "allow_interruptions": True,
     },
 }
@@ -861,9 +847,9 @@ voice:
   stt_provider: deepgram
   stt_model: nova-3
   stt_language: en
-  tts_provider: elevenlabs
-  tts_voice_id: 21m00Tcm4TlvDq8ikWAM
-  tts_model: eleven_turbo_v2_5
+  tts_provider: piper
+  tts_voice_id: en_US-ryan-high
+  tts_model: eleven_turbo_v2_5  # only used when tts_provider=elevenlabs
   allow_interruptions: true
   vad_enabled: true
 ```
@@ -871,7 +857,12 @@ voice:
 Required environment variables:
 ```bash
 VOICE__STT_API_KEY=your-deepgram-key
-VOICE__TTS_API_KEY=your-elevenlabs-key
+VOICE__TTS_PROVIDER=piper
+# If VOICE__TTS_PROVIDER=elevenlabs:
+# VOICE__TTS_API_KEY=your-elevenlabs-key
+# If VOICE__TTS_PROVIDER=azure:
+# VOICE__AZURE_TTS_API_KEY=your-azure-speech-key
+# VOICE__AZURE_TTS_REGION=eastus
 ```
 
 #### Step 4.3 — Documentation (`docs/VOICE.md`)
@@ -909,12 +900,18 @@ Phases 2 and 3 can proceed in parallel once Phase 1 is complete.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `VOICE__ENABLED` | `false` | Enable voice extension globally |
+| `VOICE__STT_PROVIDER` | `deepgram` | STT provider (currently only Deepgram) |
 | `VOICE__STT_API_KEY` | — | Deepgram API key |
 | `VOICE__STT_MODEL` | `nova-3` | Deepgram model |
 | `VOICE__STT_LANGUAGE` | `en` | STT language code |
-| `VOICE__TTS_API_KEY` | — | ElevenLabs API key |
-| `VOICE__TTS_VOICE_ID` | `21m00Tcm4TlvDq8ikWAM` | ElevenLabs voice ID |
+| `VOICE__TTS_PROVIDER` | `elevenlabs` | TTS provider (`piper`, `elevenlabs`, `azure`) |
+| `VOICE__TTS_FALLBACK_PROVIDER` | `none` | Optional fallback (`none`, `elevenlabs`, `azure`) |
+| `VOICE__TTS_API_KEY` | — | ElevenLabs API key (required when provider is `elevenlabs`) |
+| `VOICE__TTS_VOICE_ID` | `21m00Tcm4TlvDq8ikWAM` | Provider voice ID (ElevenLabs) or voice name (Piper) |
 | `VOICE__TTS_MODEL` | `eleven_turbo_v2_5` | ElevenLabs model |
+| `VOICE__AZURE_TTS_API_KEY` | — | Azure Speech key (required when provider/fallback is `azure`) |
+| `VOICE__AZURE_TTS_REGION` | — | Azure Speech region (required when provider/fallback is `azure`) |
+| `VOICE__AZURE_TTS_VOICE` | `en-US-SaraNeural` | Azure voice name |
 | `VOICE__SAMPLE_RATE` | `16000` | Audio sample rate (Hz) |
 | `VOICE__VAD_ENABLED` | `true` | Enable voice activity detection |
 | `VOICE__VAD_THRESHOLD` | `0.5` | VAD sensitivity (0-1) |
@@ -971,12 +968,7 @@ Phases 2 and 3 can proceed in parallel once Phase 1 is complete.
 - [ ] No API key exposure in frontend or logs
 - [ ] Rate limiting/flood protection tested
 - [ ] Input validation for oversized/malformed frames
-- [ ] Transcript retention policy enforced via `VoiceSettings.transcript_retention_days`
-- [ ] Audio retention policy enforced via `VoiceSettings.audio_retention_days`
-- [ ] User consent captured and logged before enabling `VoiceSettings.store_transcripts`
-- [ ] PII redaction applied when `VoiceSettings.store_transcripts` is true
-- [ ] Audit logging records consent events and voice data access
-- [ ] GDPR/CCPA voice data export and deletion flows validated
+- [ ] (Future) Consent, retention, PII redaction, audit logging, and GDPR/CCPA flows
 
 ### Performance
 - [ ] STT, TTS, agent, and roundtrip latency meet targets
