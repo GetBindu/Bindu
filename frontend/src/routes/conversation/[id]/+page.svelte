@@ -249,10 +249,12 @@
 				messageUpdatesIterator = sendAgentMessage(
 					prompt ?? '',
 					page.params.id!,
-					messageUpdatesAbortController.signal,
-					currentTaskId ?? undefined,
-					currentTaskState ?? undefined,
-					replyToTaskId ?? undefined
+					{
+						abortSignal: messageUpdatesAbortController.signal,
+						currentTaskId: currentTaskId ?? undefined,
+						taskState: currentTaskState ?? undefined,
+						replyToTaskId: replyToTaskId ?? undefined,
+					}
 				);
 				// Clear reply after sending
 				clearReply();

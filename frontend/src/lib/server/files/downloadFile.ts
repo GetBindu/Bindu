@@ -25,10 +25,37 @@ export async function downloadFile(
 
 	const buffer = await new Promise<Buffer>((resolve, reject) => {
 		const chunks: Uint8Array[] = [];
-		fileStream.on("data", (chunk) => chunks.push(chunk));
-		fileStream.on("error", reject);
-		fileStream.on("end", () => resolve(Buffer.concat(chunks)));
+		const onData = (chunk: unknown) => {
+			if (chunk instanceof Uint8Array) {
+				chunks.push(chunk);
+				return;
+			}
+			const err = new Error("Unexpected chunk type from fileStream");
+			fileStream.destroy();
+			cleanup();
+			reject(err);
+		};
+
+		const onError = (err: Error | null | undefined) => {
+			cleanup();
+			reject(err ?? new Error("File download failed"));
+		};
+
+		const onEnd = () => {
+			cleanup();
+			resolve(Buffer.concat(chunks));
+		};
+
+		const cleanup = () => {
+			fileStream.off("data", onData);
+			fileStream.off("error", onError);
+			fileStream.off("end", onEnd);
+		};
+
+		fileStream.on("data", onData);
+		fileStream.once("error", onError);
+		fileStream.once("end", onEnd);
 	});
 
-	return { type: "base64", name, value: buffer.toString("base64"), mime };
+	return { type: "base64", name, value: buffer.toString("base64"), mime: String(mime ?? "") };
 }

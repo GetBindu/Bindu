@@ -20,7 +20,7 @@ const migration: Migration = {
 				{
 					$unset: "assistantId",
 				},
-			]
+			] as Array<Record<string, unknown>>
 		);
 		return true;
 	},

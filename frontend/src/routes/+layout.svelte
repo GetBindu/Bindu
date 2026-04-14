@@ -1,12 +1,11 @@
 <script lang="ts">
 	import "../styles/main.css";
 
-	import { onDestroy, onMount, untrack } from "svelte";
+	import { onMount, untrack } from "svelte";
 	import { goto } from "$app/navigation";
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
 
-	import { error } from "$lib/stores/errors";
 	import { createSettingsStore } from "$lib/stores/settings";
 	import { loading } from "$lib/stores/loading";
 
@@ -60,9 +59,10 @@
 				let title = "New Chat";
 				let timestamp = new Date();
 
-				if (ctx.task_ids?.length > 0) {
+				const firstTaskId = ctx.task_ids?.[0];
+				if (firstTaskId) {
 					try {
-						const task = await agentAPI.getTask(ctx.task_ids[0]);
+						const task = await agentAPI.getTask(firstTaskId);
 						const history = task.history || [];
 
 						for (const msg of history) {
@@ -103,12 +103,10 @@
 	}
 
 	let isNavCollapsed = $state(false);
-	let errorToastTimeout: ReturnType<typeof setTimeout>;
 	let currentError: string | undefined = $state();
 
 	const settings = createSettingsStore(data.settings);
 
-	onDestroy(() => clearTimeout(errorToastTimeout));
 </script>
 
 <svelte:head>
@@ -130,7 +128,7 @@
 	</nav>
 
 	<div class="relative flex h-full flex-1 flex-col overflow-hidden bg-[var(--page-bg)]">
-		<MobileNav>
+		<MobileNav title={undefined}>
 			<NavMenu {conversations} user={data.user} />
 		</MobileNav>
 

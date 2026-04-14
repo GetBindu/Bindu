@@ -31,7 +31,7 @@ export const DELETE: RequestHandler = async ({ locals, params }) => {
 		});
 
 	const res = await collections.conversations.updateOne(
-		{ _id: new ObjectId(conversation._id), ...authCondition(locals) },
+		{ _id: conversation._id, ...authCondition(locals) },
 		{ $set: { messages: filteredMessages } }
 	);
 

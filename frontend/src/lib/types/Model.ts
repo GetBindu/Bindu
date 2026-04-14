@@ -15,4 +15,11 @@ export type Model = Pick<
 	| "description"
 	| "preprompt"
 	| "multimodalAcceptedMimetypes"
+	| "websiteUrl"
+	| "modelUrl"
+	| "datasetName"
+	| "datasetUrl"
+	| "logoUrl"
+	| "promptExamples"
+	| "providers"
 >>;

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, cast
 
 from loguru import logger
 from rich.console import Console
@@ -42,8 +42,8 @@ def _get_console() -> Console:
             show_locals=app_settings.logging.show_locals,
             width=app_settings.logging.traceback_width,
         )
-    # Type narrowing: _console is guaranteed to be Console here
-    return _console
+    # Type narrowing: _console is guaranteed to be Console here.
+    return cast(Console, _console)
 
 
 def configure_logger(

@@ -126,8 +126,16 @@ export const GET: RequestHandler = async ({ locals }) => {
 
 								const fileBuffer = await new Promise<Buffer>((resolve, reject) => {
 									const chunks: Uint8Array[] = [];
-									fileStream.on("data", (chunk) => chunks.push(chunk));
-									fileStream.on("error", reject);
+									fileStream.on("data", (chunk) => {
+										if (chunk instanceof Uint8Array) {
+											chunks.push(chunk);
+											return;
+										}
+										reject(new Error("Unexpected chunk type from avatar download stream"));
+									});
+									fileStream.on("error", (err) =>
+										reject(err ?? new Error("Avatar download failed"))
+									);
 									fileStream.on("end", () => resolve(Buffer.concat(chunks)));
 								});
 

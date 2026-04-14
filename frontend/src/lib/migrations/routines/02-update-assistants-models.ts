@@ -17,7 +17,7 @@ const updateAssistantsModels: Migration = {
 		// Find all assistants whose modelId is not in modelIds, and update it
 		const bulkOps = await assistants
 			.find({ modelId: { $nin: modelIds } })
-			.map((assistant) => {
+			.map((assistant: { _id: unknown; modelId?: string }) => {
 				// has an old model
 				let newModelId = defaultModelId;
 
