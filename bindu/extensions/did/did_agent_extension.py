@@ -235,6 +235,7 @@ class DIDAgentExtension:
             os.fchmod(fd, 0o600)
             with os.fdopen(fd, "wb") as f:
                 f.write(private_pem)
+            os.chmod(self.private_key_path, 0o600)
 
             fd = os.open(
                 str(self.public_key_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644
@@ -242,6 +243,7 @@ class DIDAgentExtension:
             os.fchmod(fd, 0o644)
             with os.fdopen(fd, "wb") as f:
                 f.write(public_pem)
+            os.chmod(self.public_key_path, 0o644)
 
         return {
             "private_key_path": str(self.private_key_path),

@@ -160,7 +160,13 @@ class InMemoryCollection<T = Record<string, unknown>> {
 		let count = 0;
 		for (const [id, doc] of this.data.entries()) {
 			if (this.matchesFilter(doc, filter)) {
-				const updated = this.applyUpdate(doc, update);
+				const pipelineUpdate = Array.isArray(update)
+					? update.reduce(
+							(acc, stage) => this.applyUpdate(acc, stage),
+							doc
+					  )
+					: this.applyUpdate(doc, update);
+				const updated = pipelineUpdate;
 				this.data.set(id, updated);
 				count++;
 			}
@@ -457,6 +463,10 @@ class InMemoryBucket {
 				this.files.set(id.toString(), { _id: id.toString(), data, filename, metadata: _options?.metadata });
 			},
 			on: (_event: string, cb: (err?: Error) => void) => {
+				if (_event === "finish") setTimeout(() => cb(), 0);
+				return stream;
+			},
+			once: (_event: string, cb: (err?: Error) => void) => {
 				if (_event === "finish") setTimeout(() => cb(), 0);
 				return stream;
 			},
