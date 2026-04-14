@@ -64,7 +64,7 @@ requirements:
     - "agno>=2.5.2"
     - "mem0ai>=0.1.0"
   system: []
-  min_memory_mb: 256
+  min_memory_mb: 1280
 
 performance:
   avg_processing_time_ms: 2500

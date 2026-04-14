@@ -12,6 +12,11 @@ dotenv.config();
  * LLM Setup (OpenRouter)
  * IMPORTANT: OpenRouter works via baseURL override
  */
+// Validate OPENROUTER_API_KEY is defined before creating the LLM
+if (!process.env.OPENROUTER_API_KEY) {
+  throw new Error("OPENROUTER_API_KEY environment variable is not defined. Please set it before running.");
+}
+
 const llm = new ChatOpenAI({
   model: "openai/gpt-oss-120b", // same as your Python version
   temperature: 0.3,
@@ -59,7 +64,7 @@ D) [Option D]
  */
 bindufy(
   {
-    author: "your.email@example.com",
+    author: "raahul@getbindu.com",
     name: "quiz-generator-agent",
     description: "Educational assessment expert for MCQ generation",
     version: "1.0.0",
@@ -81,11 +86,18 @@ bindufy(
   async (messages: ChatMessage[]) => {
     try {
       if (!messages || messages.length === 0) {
-        return "Error: No input provided.";
+        return JSON.stringify({ error: true, message: "No input provided." });
       }
 
-      // Extract latest user input (better than passing full history blindly)
-      const userInput = messages[messages.length - 1].content;
+      // Extract latest user input with validation
+      const last = messages[messages.length - 1];
+      let userInput = "";
+      if (last && typeof last.content === "string" && last.content.trim().length > 0) {
+        userInput = last.content;
+      } else {
+        // Optionally: return error or fallback
+        return JSON.stringify({ error: true, message: "Invalid or empty user input." });
+      }
 
       // Construct LangChain messages
       const langchainMessages = [
@@ -101,7 +113,10 @@ bindufy(
         ? response.content
         : JSON.stringify(response.content);
     } catch (error: any) {
-      return `Error: ${error instanceof Error ? error.message : String(error)}`;
+      return JSON.stringify({
+        error: true,
+        message: error?.message ?? String(error),
+      });
     }
   }
 );

@@ -1,12 +1,13 @@
 id: pdf-research-skill
 name: PDF Research Skill
 version: 1.0.0
-author: your.email@example.com
+author: raahul@getbindu.com
 description: >
   Processes PDF files and raw document text to produce structured, LLM-generated
   summaries. Identifies the main thesis, extracts key findings, and surfaces
   conclusions or recommendations. Powered by OpenRouter and exposed as a live
-  A2A-compliant Bindu microservice.
+  A2A-compliant Bindu microservice. Security warning: disabling auth can expose
+  document content to unauthorized callers.
 
 features:
   - Accept a local PDF file path or raw document text as input
@@ -60,7 +61,7 @@ capabilities_detail:
   pdf_extraction:
     description: Reads multi-page PDFs page-by-page using pypdf and joins extracted text.
     fallback: If pypdf is not installed, returns a clear installation hint to the caller.
-    max_pages: unlimited  # all pages extracted; very large PDFs may increase latency
+    max_pages: 500  # safety cap to avoid extreme PDFs exhausting memory/CPU
 
   summarisation:
     model: openrouter/openai/gpt-4o-mini
@@ -74,7 +75,21 @@ capabilities_detail:
   transport:
     protocol: A2A (JSON-RPC over HTTP)
     endpoint: POST /
-    port: 3775
-    auth: disabled (configurable via config.auth.enabled)
+    port: 3773
+    auth: enabled (configurable via config.auth.enabled)
     storage: in-memory (configurable — see .env.example for Postgres/Redis options)
     scheduler: in-memory (configurable — see .env.example for Redis options)
+
+security:
+  warning: |
+    Authentication should remain enabled in all non-test environments.
+    If auth is disabled, any reachable client may invoke the skill.
+  config:
+    auth:
+      enabled: true
+      token_env: TOKEN
+      api_key_env: API_KEY # pragma: allowlist secret
+      disable_for_testing: "Set config.auth.enabled=false only in local test setups"
+      notes:
+        - "Primary behavior is token-based auth when config.auth.enabled=true"
+        - "Disable only for local testing by setting config.auth.enabled=false"
