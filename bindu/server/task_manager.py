@@ -85,6 +85,10 @@ from bindu.common.protocol.types import (
     ListTaskPushNotificationConfigResponse,
     ListTasksRequest,
     ListTasksResponse,
+    PauseTaskRequest,
+    PauseTaskResponse,
+    ResumeTaskRequest,
+    ResumeTaskResponse,
     SendMessageRequest,
     SendMessageResponse,
     SetTaskPushNotificationRequest,
@@ -236,6 +240,14 @@ class TaskManager:
     async def cancel_task(self, request: CancelTaskRequest) -> CancelTaskResponse:
         """Cancel a running task."""
         return await self._task_handlers.cancel_task(request)
+
+    async def pause_task(self, request: PauseTaskRequest) -> PauseTaskResponse:
+        """Pause a running task."""
+        return await self._task_handlers.pause_task(request)
+
+    async def resume_task(self, request: ResumeTaskRequest) -> ResumeTaskResponse:
+        """Resume a paused task."""
+        return await self._task_handlers.resume_task(request)
 
     async def task_feedback(self, request: TaskFeedbackRequest) -> TaskFeedbackResponse:
         """Submit feedback for a completed task."""
