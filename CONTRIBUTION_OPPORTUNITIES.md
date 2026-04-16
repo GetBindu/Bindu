@@ -224,4 +224,4 @@ uv run pytest tests/unit/ -v
 
 ---
 
-*Last updated: 2026-04-10*
+*Last updated: 2026-04-10* PROJECT_CONTEXT.md TEST_CONTRIBUTION_PLAN.md
