@@ -236,25 +236,60 @@ class Worker(ABC):
         ...
 
     # -------------------------------------------------------------------------
-    # Future Operations (Not Yet Implemented)
+    # Pause/Resume Operations
     # -------------------------------------------------------------------------
 
     async def _handle_pause(self, params: TaskIdParams) -> None:
         """Handle pause operation.
 
-        TODO: Implement task pause functionality
-        - Save current execution state
-        - Update task to 'suspended' state
-        - Release resources while preserving context
+        Saves task state and updates to 'suspended' state.
+        State validation is done in TaskHandlers before this is called.
         """
-        raise NotImplementedError("Pause operation not yet implemented")
+        task_id = self._normalize_uuid(params["task_id"])
+        logger.info(f"Pausing task {task_id}")
+
+        # Load task
+        task = await self.storage.load_task(task_id)
+        if not task:
+            logger.warning(f"Task {task_id} not found for pause")
+            return
+
+        # Update state to suspended
+        await self.storage.update_task(task_id, state="suspended")
+        logger.info(f"Task {task_id} paused successfully")
 
     async def _handle_resume(self, params: TaskIdParams) -> None:
         """Handle resume operation.
 
-        TODO: Implement task resume functionality
-        - Restore execution state
-        - Update task to 'resumed' state
-        - Continue from last checkpoint
+        Updates task to 'resumed' state and re-queues for execution.
+        State validation is done in TaskHandlers before this is called.
         """
-        raise NotImplementedError("Resume operation not yet implemented")
+        task_id = self._normalize_uuid(params["task_id"])
+        logger.info(f"Resuming task {task_id}")
+
+        # Load task
+        task = await self.storage.load_task(task_id)
+        if not task:
+            logger.warning(f"Task {task_id} not found for resume")
+            return
+
+        # Get original message from history to re-run
+        message = None
+        if task.get("history"):
+            message = task["history"][0]
+
+        # Update state to resumed
+        await self.storage.update_task(task_id, state="resumed")
+
+        # Re-queue task for execution
+        if message:
+            await self.scheduler.run_task(
+                TaskSendParams(
+                    task_id=task_id,
+                    context_id=task["context_id"],
+                    message=message,
+                )
+            )
+            logger.info(f"Task {task_id} resumed and re-queued")
+        else:
+            logger.warning(f"Task {task_id} has no message to resume with")
