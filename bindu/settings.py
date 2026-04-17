@@ -147,6 +147,23 @@ class TunnelSettings(BaseSettings):
     # FRP client version
     frpc_version: str = "0.61.0"
 
+    # Retry configuration
+    max_attempts: int = Field(
+        default=3,
+        validation_alias=AliasChoices("TUNNEL__MAX_ATTEMPTS"),
+        description="Maximum tunnel creation attempts before giving up",
+    )
+    base_backoff_seconds: int = Field(
+        default=1,
+        validation_alias=AliasChoices("TUNNEL__BASE_BACKOFF_SECONDS"),
+        description="Base backoff in seconds; doubles each retry (1s, 2s, 4s)",
+    )
+    health_check_timeout_seconds: int = Field(
+        default=3,
+        validation_alias=AliasChoices("TUNNEL__HEALTH_CHECK_TIMEOUT_SECONDS"),
+        description="Timeout in seconds for the post-creation health check request",
+    )
+
 
 class DeploymentSettings(BaseSettings):
     """Deployment and server configuration settings."""

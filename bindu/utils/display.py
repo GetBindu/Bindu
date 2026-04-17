@@ -20,6 +20,8 @@ def prepare_server_display(
     client_id: str | None = None,
     client_secret: str | None = None,
     tunnel_url: str | None = None,
+    tunnel_requested: bool = False,
+    tunnel_failure_reason: str | None = None,
 ) -> None:
     """Prepare a beautiful display for the server using rich.
 
@@ -31,6 +33,8 @@ def prepare_server_display(
         client_id: OAuth client ID for token retrieval
         client_secret: OAuth client secret for token retrieval
         tunnel_url: Public tunnel URL if tunneling is enabled
+        tunnel_requested: Whether launch=True was passed (used to show failure warning)
+        tunnel_failure_reason: Reason tunnel creation failed, if applicable
     """
     # Force UTF-8 output on Windows to avoid cp1252 UnicodeEncodeError when
     # rich renders emoji (e.g. in Panel titles). reconfigure() changes the
@@ -127,6 +131,33 @@ def prepare_server_display(
             console.print(
                 Text(f"🌐 Public URL: {tunnel_url}", style="bold bright_green"),
                 highlight=False,
+            )
+
+        # Display tunnel failure warning if launch was requested but failed
+        if tunnel_requested and not tunnel_url and tunnel_failure_reason:
+            warning_lines = Text()
+            warning_lines.append("⚠️  TUNNEL FAILED\n", style="bold red")
+            warning_lines.append("Agent is running on LOCAL network only.\n", style="red")
+            warning_lines.append("It is NOT publicly accessible.\n\n", style="red")
+            warning_lines.append("Reason: ", style="bold yellow")
+            warning_lines.append(f"{tunnel_failure_reason}\n\n", style="yellow")
+            warning_lines.append("Fix: ", style="bold white")
+            warning_lines.append(
+                "Check tunnel config/network, or remove launch=True.\n",
+                style="white",
+            )
+            warning_lines.append("Fallback: ", style="bold white")
+            warning_lines.append(
+                "Pass fail_on_tunnel_error=False to bindufy() to continue locally when tunnel fails (instead of raising an error).",
+                style="white",
+            )
+            console.print(
+                Panel(
+                    warning_lines,
+                    title="[bold red]TUNNEL FAILURE[/bold red]",
+                    border_style="red",
+                    padding=(1, 2),
+                )
             )
 
         console.print()
