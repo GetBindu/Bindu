@@ -1,7 +1,7 @@
 id: collaborate-v1
 name: collaborate
 version: 1.0.0
-author: dassubhojit750075@gmail.com
+author: bindu-maintainers
 
 description: |
   Assists users with collaborative writing tasks in English, Hindi, and Bengali.
@@ -64,7 +64,7 @@ requirements:
     - "agno>=2.5.2"
     - "mem0ai>=0.1.0"
   system: []
-  min_memory_mb: 256
+  min_memory_mb: 1280
 
 performance:
   avg_processing_time_ms: 2500

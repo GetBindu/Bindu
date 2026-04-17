@@ -1,5 +1,5 @@
 {
-    "author": "dassubhojit750075@gmail.com",
+    "author": "Bindu Maintainers",
     "name": "multilingual-collab-agent-v2",
     "description": "Identity-aware multilingual research and collaboration agent built on Bindu",
     "version": "1.0.0",
@@ -21,15 +21,15 @@
 
 
     "agent_trust": "low",
-    "debug_mode": true,
-    "debug_level": 2,
+    "debug_mode": false,
+    "debug_level": 0,
 
     "deployment": {
-        "url": "http://0.0.0.0:3773",
-        "expose": true,
+        "url": "http://127.0.0.1:3773",
+        "expose": false,
         "protocol_version": "1.0.0",
-        "proxy_urls": ["0.0.0.0"],
-        "cors_origins": ["*"]
+        "proxy_urls": ["http://127.0.0.1:8080"],
+        "cors_origins": ["http://localhost:5173"]
     },
     "num_history_sessions": 5,
     "environment_variables": [

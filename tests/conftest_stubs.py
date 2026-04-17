@@ -12,7 +12,25 @@ def setup_opentelemetry_stubs():
     """Set up OpenTelemetry stubs for testing."""
     ot_trace = ModuleType("opentelemetry.trace")
 
+    class _TraceFlags(int):
+        """Mock TraceFlags for testing."""
+
+        SAMPLED = 1
+
+    class _SpanContext:
+        """Mock SpanContext for testing."""
+
+        def __init__(self, trace_id=0, span_id=0, is_remote=False, trace_flags=None):
+            self.trace_id = trace_id
+            self.span_id = span_id
+            self.is_remote = is_remote
+            self.trace_flags = trace_flags or _TraceFlags(0)
+            self.is_valid = trace_id != 0 and span_id != 0
+
     class _Span:
+        def __init__(self, context=None):
+            self._context = context or _SpanContext()
+
         def is_recording(self):
             return True
 
@@ -27,6 +45,33 @@ def setup_opentelemetry_stubs():
 
         def set_status(self, *args, **kwargs):
             return None
+
+        def get_span_context(self):
+            return self._context
+
+    class _NonRecordingSpan:
+        """Non-recording span that returns False for is_recording."""
+
+        def __init__(self, context=None):
+            self._context = context or _SpanContext()
+
+        def is_recording(self) -> bool:
+            return False
+
+        def add_event(self, *args, **kwargs):
+            return None
+
+        def set_attributes(self, *args, **kwargs):
+            return None
+
+        def set_attribute(self, *args, **kwargs):
+            return None
+
+        def set_status(self, *args, **kwargs):
+            return None
+
+        def get_span_context(self):
+            return self._context
 
     def get_current_span():
         return _Span()
@@ -59,6 +104,16 @@ def setup_opentelemetry_stubs():
     ot_trace.StatusCode = _StatusCode  # type: ignore[attr-defined]
     ot_trace.Span = _Span  # type: ignore[attr-defined]
     ot_trace.use_span = lambda span: _SpanCtx()  # type: ignore[attr-defined]
+
+    # Setup trace.span submodule symbols imported by worker code.
+    ot_trace_span = ModuleType("opentelemetry.trace.span")
+    ot_trace_span.NonRecordingSpan = _NonRecordingSpan  # type: ignore[attr-defined]
+    ot_trace_span.SpanContext = _SpanContext  # type: ignore[attr-defined]
+    ot_trace_span.TraceFlags = _TraceFlags  # type: ignore[attr-defined]
+    ot_trace_span.INVALID_SPAN_CONTEXT = _SpanContext(  # type: ignore[attr-defined]
+        trace_id=0, span_id=0, is_remote=False
+    )
+    ot_trace.span = ot_trace_span  # type: ignore[attr-defined]
 
     # Setup metrics
     metrics_mod = ModuleType("opentelemetry.metrics")
@@ -97,6 +152,7 @@ def setup_opentelemetry_stubs():
 
     sys.modules["opentelemetry"] = op_root
     sys.modules["opentelemetry.trace"] = ot_trace
+    sys.modules["opentelemetry.trace.span"] = ot_trace_span
     sys.modules["opentelemetry.metrics"] = metrics_mod
 
 

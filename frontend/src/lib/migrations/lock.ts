@@ -1,6 +1,6 @@
 import { collections } from "$lib/server/database";
 import ObjectId from "bson-objectid";
-import type { Semaphores } from "$lib/types/Semaphore";
+import type { Semaphore, Semaphores } from "$lib/types/Semaphore";
 
 /**
  * Returns the lock id if the lock was acquired, false otherwise
@@ -15,7 +15,7 @@ export async function acquireLock(key: Semaphores | string): Promise<ObjectId | 
 			createdAt: new Date(),
 			updatedAt: new Date(),
 			deleteAt: new Date(Date.now() + 1000 * 60 * 3), // 3 minutes
-		});
+		} as Partial<Semaphore>);
 
 		return insert.acknowledged ? id : false; // true if the document was inserted
 	} catch (e) {

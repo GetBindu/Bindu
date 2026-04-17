@@ -67,6 +67,22 @@
 		}
 	}
 
+	function handleMessageClick(e: MouseEvent) {
+		const target = e.target as HTMLElement | null;
+		if (
+			target &&
+			target.closest(
+				"button, a, input, textarea, select, [role='button'], [data-no-toggle]"
+			)
+		) {
+			return;
+		}
+		handleContentClick(e);
+		if (!(e.target instanceof HTMLImageElement)) {
+			isTapped = !isTapped;
+		}
+	}
+
 	$effect(() => {
 		// referenced to appease linter for currently-unused props
 		void _isAuthor;
@@ -252,9 +268,15 @@
 			: ''}"
 		data-message-id={message.id}
 		data-message-role="assistant"
-		role="presentation"
-		onclick={() => (isTapped = !isTapped)}
-		onkeydown={() => (isTapped = !isTapped)}
+		role="button"
+		tabindex="0"
+		onclick={handleMessageClick}
+		onkeydown={(event) => {
+			if (event.key === "Enter" || event.key === " ") {
+				event.preventDefault();
+				isTapped = !isTapped;
+			}
+		}}
 	>
 		<MessageAvatar
 			classNames="mt-5 size-3.5 flex-none select-none rounded-full shadow-lg max-sm:hidden"
@@ -272,7 +294,10 @@
 			{/if}
 
 			<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-			<div bind:this={contentEl} oncopy={handleCopy} onclick={handleContentClick}>
+			<div
+				bind:this={contentEl}
+				oncopy={handleCopy}
+			>
 				{#if isLast && loading && blocks.length === 0}
 					<IconLoading classNames="loading inline ml-2 first:ml-0" />
 				{/if}

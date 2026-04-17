@@ -34,6 +34,12 @@ Enables autonomous agent-to-agent payments and economic interactions. Agents can
 negotiate prices, request payments, and execute transactions based on cryptographic
 mandates, creating a true agent economy.
 
+**Voice (Real-time Voice Conversations)**
+Adds Vapi-like real-time voice capability to Bindu agents via WebSocket.
+The pipeline uses Pipecat with Deepgram STT and ElevenLabs TTS to provide
+bidirectional voice conversations. Enabled by adding ``voice`` config to
+``bindufy()`` or setting ``VOICE__ENABLED=true`` in the environment.
+
 
 Each extension follows the A2A protocol specification for extensions:
 https://a2a-protocol.org/v0.3.0/topics/extensions/

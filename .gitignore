@@ -219,3 +219,22 @@ sdks/typescript/node_modules/
 sdks/kotlin/build/
 sdks/kotlin/.gradle/
 sdks/kotlin/bin/
+
+# Frontend build/cache artifacts
+frontend/.svelte-kit/
+frontend/build/
+frontend/.vite/
+frontend/.vercel/
+
+# Voice model artifacts downloaded at runtime (Piper)
+en_US-*.onnx
+en_US-*.onnx.json
+examples/voice-agent/en_US-*.onnx
+examples/voice-agent/en_US-*.onnx.json
+
+# Runtime logs and provider test outputs
+logs/
+
+# Local tooling/worktree manager state
+.kilo/
+.idea/

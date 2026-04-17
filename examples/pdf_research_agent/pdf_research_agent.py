@@ -15,41 +15,81 @@ Usage
     export OPENROUTER_API_KEY="your_api_key_here"  # pragma: allowlist secret
     python pdf_research_agent.py
 
-The agent will be live at http://localhost:3775
+The agent will be live at http://localhost:3773
 Send it a message like:
     {"role": "user", "content": "/path/to/paper.pdf"}
 or paste raw text directly as the message content.
 """
+
 from bindu.penguin.bindufy import bindufy
 from agno.agent import Agent
 from agno.models.openrouter import OpenRouter
 from dotenv import load_dotenv
 import os
+from pathlib import Path
 
 load_dotenv()
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+if not OPENROUTER_API_KEY:
+    raise ValueError(
+        "Missing OPENROUTER_API_KEY for OpenRouter model construction in pdf_research_agent.py"
+    )
+
+ALLOWED_BASE_DIR = Path(__file__).parent.resolve()
+
+
+class DocumentReadError(ValueError):
+    """Raised when a document source cannot be read safely."""
+
 
 # ---------------------------------------------------------------------------
 # 1. Helper — extract text from a PDF path or pass raw text straight through
 # ---------------------------------------------------------------------------
 
+
 def _read_content(source: str) -> str:
     """Return plain text from a PDF file path, or the source string itself."""
-    if source.strip().endswith(".pdf") and os.path.isfile(source.strip()):
+    source_text = source.strip()
+    if source_text.endswith(".pdf"):
+        resolved_path = Path(os.path.realpath(os.path.expanduser(source_text)))
+
+        try:
+            common = Path(
+                os.path.commonpath([str(ALLOWED_BASE_DIR), str(resolved_path)])
+            )
+        except ValueError as exc:
+            raise DocumentReadError(
+                "PDF path is outside the allowed document directory"
+            ) from exc
+
+        if common != ALLOWED_BASE_DIR:
+            raise DocumentReadError(
+                "PDF path is outside the allowed document directory"
+            )
+        if not resolved_path.is_file():
+            raise DocumentReadError(f"PDF file does not exist: {resolved_path}")
+
         try:
             from pypdf import PdfReader  # optional dependency
-            reader = PdfReader(source.strip())
+
+            reader = PdfReader(str(resolved_path))
             pages = [page.extract_text() or "" for page in reader.pages]
             text = "\n\n".join(pages)
             if len(text.strip()) < 100:
-                return f"PDF file '{source.strip()}' appears to be empty or contains very little text."
+                raise DocumentReadError(
+                    f"PDF file '{resolved_path}' appears to be empty or contains very little text."
+                )
             return text
         except ImportError:
-            return (
-                f"[pypdf not installed — cannot read '{source.strip()}'. "
-                "Run: uv add pypdf]"
+            raise DocumentReadError(
+                f"pypdf not installed and cannot read '{resolved_path}'. Run: uv add pypdf"
             )
         except Exception as e:
-            return f"Error reading PDF '{source.strip()}': {str(e)}"
+            if isinstance(e, DocumentReadError):
+                raise
+            raise DocumentReadError(
+                f"Error reading PDF '{resolved_path}': {str(e)}"
+            ) from e
     return source  # treat as raw document text
 
 
@@ -68,7 +108,7 @@ agent = Agent(
     ),
     model=OpenRouter(
         id="openai/gpt-4o-mini",
-        api_key=os.getenv("OPENROUTER_API_KEY")
+        api_key=OPENROUTER_API_KEY,
     ),
     markdown=True,  # Enable markdown formatting for better output
 )
@@ -86,9 +126,9 @@ config = {
     "capabilities": {
         "file_processing": ["pdf"],
         "text_analysis": ["summarization", "research"],
-        "streaming": False
+        "streaming": False,
     },
-     "skills": ["skills/pdf-research-skill"],
+    "skills": ["skills/pdf-research-skill"],
     "auth": {"enabled": False},
     "storage": {"type": "memory"},
     "scheduler": {"type": "memory"},
@@ -103,6 +143,7 @@ config = {
 # ---------------------------------------------------------------------------
 # 4. Handler — the bridge between Bindu messages and the agent
 # ---------------------------------------------------------------------------
+
 
 def handler(messages: list[dict[str, str]]):
     """
@@ -120,31 +161,44 @@ def handler(messages: list[dict[str, str]]):
         # Grab the most recent user message
         user_messages = [m for m in messages if m.get("role") == "user"]
         if not user_messages:
-            return "No user message found. Please send a PDF path or document text."
+            return {
+                "success": False,
+                "data": None,
+                "error": "No user message found. Please send a PDF path or document text.",
+            }
 
         user_input = user_messages[-1].get("content", "").strip()
         if not user_input:
-            return "Empty message received. Please provide a PDF path or document text."
+            return {
+                "success": False,
+                "data": None,
+                "error": "Empty message received. Please provide a PDF path or document text.",
+            }
 
-        document_text = _read_content(user_input)
-
-        # Check if document processing failed
-        if document_text.startswith("[") or document_text.startswith("Error"):
-            return document_text
+        try:
+            document_text = _read_content(user_input)
+        except DocumentReadError as exc:
+            return {"success": False, "data": None, "error": str(exc)}
 
         # Limit document size to prevent token overflow
         if len(document_text) > 50000:
-            document_text = document_text[:50000] + "\n\n[Document truncated for processing...]"
+            document_text = (
+                document_text[:50000] + "\n\n[Document truncated for processing...]"
+            )
 
         # Build a prompt that includes the full document text
         prompt = f"Summarize the following document and highlight the key insights:\n\n{document_text}"
         enriched_messages = [{"role": "user", "content": prompt}]
 
         result = agent.run(input=enriched_messages)
-        return result
+        return {"success": True, "data": result, "error": None}
 
     except Exception as e:
-        return f"Error processing request: {str(e)}"
+        return {
+            "success": False,
+            "data": None,
+            "error": f"Error processing request: {e}",
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -154,5 +208,5 @@ def handler(messages: list[dict[str, str]]):
 if __name__ == "__main__":
     print("🚀 PDF Research Agent running at http://localhost:3773")
     print("📄 Send PDF paths or paste document text to get summaries")
-    print("🔧 Example: {\"role\": \"user\", \"content\": \"/path/to/paper.pdf\"}")
+    print('🔧 Example: {"role": "user", "content": "/path/to/paper.pdf"}')
     bindufy(config, handler)

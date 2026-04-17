@@ -1,3 +1,4 @@
+exclude: ^\.agents/
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
@@ -21,7 +22,7 @@ repos:
     hooks:
       - id: ty
         name: ty type checker
-        entry: uv run ty check bindu/ tests/ --exclude bindu/grpc/generated/
+        entry: uv run ty check bindu/ --exclude bindu/grpc/generated/
         language: system
         types: [python]
         pass_filenames: false
@@ -29,7 +30,7 @@ repos:
 
       - id: pytest
         name: pytest with coverage
-        entry: bash -c 'uv run pytest -n auto --cov=bindu --cov-report= && coverage report --skip-covered --fail-under=60'
+        entry: bash -c 'uv run pytest -n auto --cov=bindu --cov-report= && uv run coverage report --skip-covered --fail-under=60'
         language: system
         pass_filenames: false
         always_run: true

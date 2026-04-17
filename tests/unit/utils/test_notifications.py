@@ -1,8 +1,10 @@
 """Minimal tests for notification service."""
 
+from io import BytesIO
 import socket
 from typing import cast
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
+from urllib import error
 from uuid import uuid4
 import pytest
 
@@ -117,7 +119,7 @@ class TestNotificationService:
         with patch(
             "socket.getaddrinfo", side_effect=socket.gaierror("Name resolution failed")
         ):
-            with pytest.raises(ValueError, match="could not be resolved"):
+            with pytest.raises(ValueError, match="hostname could not be resolved"):
                 service.validate_config(config)
 
     def test_build_headers_basic(self):
@@ -214,3 +216,78 @@ class TestNotificationService:
 
         assert error.status is None
         assert str(error) == "Network error"
+
+    def test_post_once_rejects_invalid_destination(self):
+        """Test _post_once wraps destination validation failures."""
+        service = NotificationService()
+
+        with patch.object(
+            service,
+            "_resolve_and_validate_destination",
+            side_effect=ValueError("blocked"),
+        ):
+            with pytest.raises(NotificationDeliveryError, match="blocked") as exc_info:
+                service._post_once("http://example.com/webhook", {}, b"{}")
+
+        assert exc_info.value.status is None
+
+    def test_post_once_raises_on_unexpected_status(self):
+        """Test _post_once raises when HTTP status is not 2xx."""
+        service = NotificationService()
+        response = MagicMock()
+        response.getcode.return_value = 500
+
+        context_manager = MagicMock()
+        context_manager.__enter__.return_value = response
+        context_manager.__exit__.return_value = False
+
+        with patch.object(service, "_resolve_and_validate_destination"):
+            with patch(
+                "bindu.utils.notifications.request.urlopen",
+                return_value=context_manager,
+            ):
+                with pytest.raises(
+                    NotificationDeliveryError, match="Unexpected status code: 500"
+                ) as exc_info:
+                    service._post_once("http://example.com/webhook", {}, b"{}")
+
+        assert exc_info.value.status == 500
+
+    def test_post_once_http_error_uses_response_body(self):
+        """Test _post_once surfaces HTTP error body messages."""
+        service = NotificationService()
+        http_error = error.HTTPError(
+            "http://example.com/webhook",
+            400,
+            "Bad Request",
+            hdrs=None,
+            fp=BytesIO(b"invalid payload"),
+        )
+
+        with patch.object(service, "_resolve_and_validate_destination"):
+            with patch(
+                "bindu.utils.notifications.request.urlopen",
+                side_effect=http_error,
+            ):
+                with pytest.raises(
+                    NotificationDeliveryError, match="invalid payload"
+                ) as exc_info:
+                    service._post_once("http://example.com/webhook", {}, b"{}")
+
+        assert exc_info.value.status == 400
+
+    def test_post_once_url_error_is_wrapped(self):
+        """Test _post_once wraps URL errors into delivery errors."""
+        service = NotificationService()
+
+        with patch.object(service, "_resolve_and_validate_destination"):
+            with patch(
+                "bindu.utils.notifications.request.urlopen",
+                side_effect=error.URLError("unreachable"),
+            ):
+                with pytest.raises(
+                    NotificationDeliveryError, match="Connection error: unreachable"
+                ) as exc_info:
+                    service._post_once("http://example.com/webhook", {}, b"{}")
+
+        assert exc_info.value.status is None

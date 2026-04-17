@@ -74,7 +74,7 @@
 	);
 
 	// Results section ref for auto-scroll
-	let resultsSection: HTMLDivElement | null = null;
+	let resultsSection = $state<HTMLDivElement | null>(null);
 
 	async function testNegotiation() {
 		if (!authToken) {

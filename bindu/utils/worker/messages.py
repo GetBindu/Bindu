@@ -18,6 +18,8 @@ from .parts import PartConverter
 
 logger = get_logger("bindu.utils.worker.messages")
 
+MAX_FILE_SIZE = 10 * 1024 * 1024
+
 # Type aliases for better readability
 ChatMessage = dict[str, str]
 ProtocolMessage = Message
@@ -52,6 +54,22 @@ class FileInterceptor:
             logger.error(f"Failed to parse DOCX: {e}")
             return "[Error: Could not parse DOCX content]"
 
+    @staticmethod
+    def _decode_plain_text(file_bytes: bytes) -> str:
+        """Decode plain text with UTF-8 first and safe fallbacks."""
+        for encoding in ("utf-8", "cp1252", "latin-1"):
+            try:
+                if encoding == "utf-8":
+                    return file_bytes.decode(encoding)
+                text = file_bytes.decode(encoding)
+                logger.info(f"Decoded plain text file using {encoding}")
+                return text
+            except UnicodeDecodeError:
+                continue
+
+        logger.warning("Falling back to replacement decoding for plain text file")
+        return file_bytes.decode("utf-8", errors="replace")
+
     @classmethod
     def intercept_and_parse(cls, parts: list[Part]) -> list[dict[str, Any]]:
         """Intercept file parts, extract text, and replace with text parts."""
@@ -62,29 +80,51 @@ class FileInterceptor:
                 processed_parts.append(part)
                 continue
 
-            mime_type = part.get("mimeType", "")
-            base64_data = str(part.get("data", ""))
+            file_info = part.get("file") or {}
+            mime_type = file_info.get("mimeType", "")
+            file_name = file_info.get("name", "uploaded file")
+            base64_data = file_info.get("bytes") or file_info.get("data", "")
 
             if mime_type not in cls.SUPPORTED_MIME_TYPES:
                 logger.warning(f"Unsupported MIME type rejected: {mime_type}")
                 processed_parts.append(
                     {
                         "kind": "text",
-                        "text": f"[Unsupported file type: {mime_type}]",
+                        "text": (
+                            f"[System: User uploaded an unsupported file format "
+                            f"({mime_type or 'unknown'}) for {file_name}]"
+                        ),
                     }
                 )
                 continue
 
             try:
                 # Decode the Base64 payload
+                if not base64_data:
+                    raise ValueError("Missing file bytes")
+
+                padding = (
+                    2
+                    if base64_data.endswith("==")
+                    else 1
+                    if base64_data.endswith("=")
+                    else 0
+                )
+                estimated_size = (len(base64_data) * 3) // 4 - padding
+                if estimated_size > MAX_FILE_SIZE:
+                    raise ValueError("File too large")
+
                 file_bytes = base64.b64decode(base64_data)
+                if len(file_bytes) > MAX_FILE_SIZE:
+                    raise ValueError("File too large")
+
                 extracted_text = ""
 
                 # Route to specific parser based on MIME type
                 if mime_type == "application/pdf":
                     extracted_text = cls._extract_pdf(file_bytes)
                 elif mime_type == "text/plain":
-                    extracted_text = file_bytes.decode("utf-8")
+                    extracted_text = cls._decode_plain_text(file_bytes)
                 elif (
                     mime_type
                     == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -95,12 +135,16 @@ class FileInterceptor:
                 processed_parts.append(
                     {
                         "kind": "text",
-                        "text": f"--- Document Uploaded ---\n{extracted_text}\n--- End of Document ---",
+                        "text": (
+                            f"--- Document Uploaded: {file_name} ({mime_type}) ---\n"
+                            f"{extracted_text}\n"
+                            f"--- End of Document ---"
+                        ),
                     }
                 )
 
             except Exception as e:
-                logger.error(f"Base64 decoding or routing failed: {e}")
+                logger.exception(f"Base64 decoding or routing failed: {e}")
                 processed_parts.append(
                     {
                         "kind": "text",

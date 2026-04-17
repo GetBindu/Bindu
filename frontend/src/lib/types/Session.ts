@@ -1,4 +1,4 @@
-import type { ObjectId } from "bson";
+import type ObjectId from "bson-objectid";
 import type { Timestamps } from "./Timestamps";
 import type { User } from "./User";
 

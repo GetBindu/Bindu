@@ -139,8 +139,9 @@ def create_retry_decorator(
                 reraise=True,
             ):
                 with attempt:
+                    func_name = getattr(func, "__name__", func.__class__.__name__)
                     logger.debug(
-                        f"Executing {operation_type} operation {func.__name__} "
+                        f"Executing {operation_type} operation {func_name} "
                         f"(attempt {attempt.retry_state.attempt_number}/{_max_attempts})"
                     )
                     return await func(*args, **kwargs)

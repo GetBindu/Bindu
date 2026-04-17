@@ -35,6 +35,8 @@ load_dotenv()
 agent: Agent | None = None
 _initialized = False
 _init_lock = asyncio.Lock()
+DEFAULT_MODEL = "openai/gpt-oss-120b"
+_mem0_enabled = False
 
 
 def load_config() -> dict:
@@ -46,23 +48,25 @@ def load_config() -> dict:
 
 def build_agent() -> Agent:
     """Build and return the multilingual agent instance."""
+    global _mem0_enabled
+
     openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
     mem0_api_key = os.getenv("MEM0_API_KEY")
-    model_name = os.getenv("MODEL_NAME", "openai/gpt-oss-120b")
+    model_name = os.getenv("MODEL_NAME", DEFAULT_MODEL)
 
     if not openrouter_api_key:
         raise ValueError("OPENROUTER_API_KEY environment variable is required.")
-    if not mem0_api_key:
-        raise ValueError(
-            "MEM0_API_KEY environment variable is required. "
-            "Get your key from: https://app.mem0.ai/dashboard/api-keys"
-        )
-
     tools = [DuckDuckGoTools()]
-    try:
-        tools.append(Mem0Tools(api_key=mem0_api_key))
-    except Exception as e:
-        print(f"⚠️  Mem0 tools unavailable: {e}. Continuing without memory.")
+    if mem0_api_key:
+        try:
+            tools.append(Mem0Tools(api_key=mem0_api_key))
+            _mem0_enabled = True
+        except Exception as e:
+            _mem0_enabled = False
+            print(f"⚠️  Mem0 tools unavailable: {e}. Continuing without memory.")
+    else:
+        _mem0_enabled = False
+        print("⚠️  MEM0_API_KEY not set. Continuing without memory.")
 
     return Agent(
         name="multilingual-collab-agent-v2",
@@ -160,6 +164,8 @@ async def handler(messages: list[dict[str, str]]) -> Any:
             print("🔧 Initializing multilingual agent...")
             agent = build_agent()
             _initialized = True
+            if _mem0_enabled:
+                print("   Memory: Mem0 persistent memory enabled")
             print("✅ Agent initialized")
 
     response = await agent.arun(messages)
@@ -170,9 +176,8 @@ def main() -> None:
     """Start the Bindu agent server."""
     config = load_config()
     print("🌍 Starting Multilingual Collaborative Agent...")
-    print(f"   Supported languages: English, Hindi (हिन्दी), Bengali (বাংলা)")
-    print(f"   Model: {os.getenv('MODEL_NAME', 'openai/gpt-4o-mini')}")
-    print(f"   Memory: Mem0 persistent memory enabled")
+    print("   Supported languages: English, Hindi (हिन्दी), Bengali (বাংলা)")
+    print(f"   Model: {os.getenv('MODEL_NAME', DEFAULT_MODEL)}")
     bindufy(config, handler)
 
 

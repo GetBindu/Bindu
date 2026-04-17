@@ -28,6 +28,10 @@ DEFAULT_RETRY_ATTEMPTS = 3
 DEFAULT_RETRY_MIN_WAIT = 0.1
 DEFAULT_RETRY_MAX_WAIT = 1.0
 
+# Bounded buffer prevents unbounded memory growth while allowing the API
+# handler to enqueue a task before the worker loop is ready to receive.
+_TASK_QUEUE_BUFFER_SIZE = 100
+
 
 class InMemoryScheduler(Scheduler):
     """A scheduler that schedules tasks in memory."""
@@ -37,12 +41,11 @@ class InMemoryScheduler(Scheduler):
         self.aexit_stack = AsyncExitStack()
         await self.aexit_stack.__aenter__()
 
-        # Buffer of 100 prevents deadlock: without buffering the sender blocks
-        # until a worker is ready to receive, which stalls the API server.
-        # math.inf was previously used here but removed to restore backpressure.
+        # Bounded buffer allows the API handler to enqueue tasks before the
+        # worker loop is ready while preventing unbounded memory growth.
         self._write_stream, self._read_stream = anyio.create_memory_object_stream[
             TaskOperation
-        ](100)
+        ](_TASK_QUEUE_BUFFER_SIZE)
         await self.aexit_stack.enter_async_context(self._read_stream)
         await self.aexit_stack.enter_async_context(self._write_stream)
 
@@ -60,15 +63,22 @@ class InMemoryScheduler(Scheduler):
     ) -> None:
         """Send task operation with live span for trace context.
 
+        Uses bounded backpressure with a timeout so brief spikes wait for
+        worker capacity instead of failing immediately.
+
         Args:
             operation_class: The operation class to instantiate
             operation: Operation type string
             params: Task parameters
+
+        Raises:
+            TimeoutError: If the queue stays blocked past the timeout window.
         """
         task_op = operation_class(
             operation=operation, params=params, _current_span=get_current_span()
         )
-        await self._write_stream.send(task_op)
+        with anyio.fail_after(5.0):
+            await self._write_stream.send(task_op)
 
     @retry_scheduler_operation(
         max_attempts=DEFAULT_RETRY_ATTEMPTS,

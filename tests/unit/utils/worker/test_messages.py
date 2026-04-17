@@ -1,5 +1,6 @@
 """Tests for worker message utilities."""
 
+import base64
 from typing import cast
 
 from bindu.common.protocol.types import Message
@@ -95,3 +96,33 @@ class TestMessageConverter:
         result = MessageConverter.to_chat_format(messages)
 
         assert result == []
+
+    def test_to_chat_format_extracts_nested_file_bytes(self):
+        """Test that nested A2A file parts are converted into text content."""
+        messages = [
+            cast(
+                Message,
+                {
+                    "role": "user",
+                    "parts": [
+                        {"kind": "text", "text": "Analyze this document"},
+                        {
+                            "kind": "file",
+                            "file": {
+                                "name": "notes.txt",
+                                "mimeType": "text/plain",
+                                "bytes": base64.b64encode(b"hello from file").decode(),
+                            },
+                        },
+                    ],
+                },
+            )
+        ]
+
+        result = MessageConverter.to_chat_format(messages)
+
+        assert len(result) == 1
+        assert result[0]["role"] == "user"
+        assert "Analyze this document" in result[0]["content"]
+        assert "hello from file" in result[0]["content"]
+        assert "notes.txt" in result[0]["content"]

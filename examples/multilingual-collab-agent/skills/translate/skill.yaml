@@ -1,7 +1,7 @@
 id: translate-v1
 name: translate
 version: 1.0.0
-author: dassubhojit750075@gmail.com
+author: bindu-maintainers
 
 description: |
   Translates text between English, Hindi, and Bengali while preserving
@@ -76,6 +76,9 @@ documentation:
     Particularly useful for technical content about Bindu and AI agents where
     standard translators produce poor results for domain-specific terms.
 
+    Configuration: requires `OPENROUTER_API_KEY` in the environment (and optionally
+    `OPENROUTER_API_BASE` / `OPENROUTER_API_URL` if using a non-default endpoint).
+
   use_cases:
     when_to_use:
       - "User provides text and asks to translate to a specific language"
@@ -89,7 +92,7 @@ documentation:
       - "Real-time speech translation (text only)"
 
   input_structure: |
-    Text with explicit translation instruction.
+    Text with explicit translation instruction (text/plain) OR JSON (application/json).
 
     Examples:
       "Translate to Hindi: [text]"
@@ -97,10 +100,24 @@ documentation:
       "বাংলায় অনুবাদ করুন: [text]"
       "Translate this to English: [text in any language]"
 
+    JSON schema (application/json):
+      {
+        "text": "string",
+        "target_language": "string",
+        "source_language": "string (optional)"
+      }
+
   output_format: |
-    Translated text in the target language.
+    Translated text in the target language (text/plain) OR JSON (application/json).
     For technical terms without direct translation:
       Original term kept + brief explanation in target language.
+
+    JSON schema (application/json):
+      {
+        "translated_text": "string",
+        "source_language": "string",
+        "target_language": "string"
+      }
 
   error_handling:
     - "Unsupported language requested: informs user of supported languages (EN/HI/BN)"

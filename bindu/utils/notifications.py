@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import asyncio
-import http.client
 import ipaddress
 import json
 import socket
-import ssl
 from dataclasses import dataclass
 from typing import Any
+from urllib import error, request
 from urllib.parse import urlparse
 
 from bindu.common.protocol.types import PushNotificationConfig
@@ -109,23 +108,22 @@ class NotificationService:
         DNS-rebinding window that exists when validation and connection each
         perform independent DNS lookups (TOCTOU SSRF).
         """
-        resolved_ip = self.validate_config(config)
+        self.validate_config(config)
 
         payload = json.dumps(event, separators=(",", ":")).encode("utf-8")
         headers = self._build_headers(config)
 
         # Use unified retry decorator for consistent retry behavior
-        await self._post_with_retry(config["url"], resolved_ip, headers, payload, event)
+        await self._post_with_retry(config["url"], headers, payload, event)
 
-    def validate_config(self, config: PushNotificationConfig) -> str:
+    def validate_config(self, config: PushNotificationConfig) -> None:
         """Validate push notification configuration before use.
 
         In addition to URL structure checks this method resolves the hostname
         and rejects any address that falls within a private, loopback, link-local
         or cloud-metadata range to prevent Server-Side Request Forgery (SSRF).
 
-        Returns the resolved IP address so the caller can connect directly to it,
-        eliminating the DNS-rebinding race between validation and connection.
+        Validates destination safety before any outbound call.
         """
         parsed = urlparse(config["url"])
         if parsed.scheme not in {"http", "https"}:
@@ -136,29 +134,52 @@ class NotificationService:
         # SSRF defence: resolve the hostname and reject internal/private addresses.
         # The returned IP is used directly for the connection so that no second
         # DNS lookup can return a different (internal) address.
+        self._resolve_and_validate_destination(config["url"])
+
+    @staticmethod
+    def _resolve_and_validate_destination(url: str) -> None:
+        parsed = urlparse(url)
         hostname = parsed.hostname
         if not hostname:
             raise ValueError("Push notification URL must include a valid hostname.")
 
-        return _resolve_and_check_ip(hostname)
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+
+        # If hostname is an IP literal, validate without DNS.
+        try:
+            addrs = [ipaddress.ip_address(hostname)]
+        except ValueError:
+            try:
+                infos = socket.getaddrinfo(hostname, port, type=socket.SOCK_STREAM)
+                addrs = [ipaddress.ip_address(info[4][0]) for info in infos]
+            except (socket.gaierror, ValueError) as exc:
+                logger.warning(
+                    "Push notification hostname resolution failed; blocking registration",
+                    hostname=hostname,
+                    error=str(exc),
+                )
+                raise ValueError(
+                    "Push notification URL hostname could not be resolved."
+                ) from exc
+
+        for addr in addrs:
+            for blocked in _BLOCKED_NETWORKS:
+                if addr in blocked:
+                    raise ValueError(
+                        f"Push notification URL resolves to a blocked address range "
+                        f"({addr} is in {blocked}). Internal addresses are not allowed."
+                    )
 
     @create_retry_decorator("api", max_attempts=3, min_wait=0.5, max_wait=5.0)
     async def _post_with_retry(
-        self,
-        url: str,
-        resolved_ip: str,
-        headers: dict[str, str],
-        payload: bytes,
-        event: dict[str, Any],
+        self, url: str, headers: dict[str, str], payload: bytes, event: dict[str, Any]
     ) -> None:
         """Send POST request with automatic retry via unified retry decorator."""
         # --- Metrics: count total attempts to send ---
         self.total_sent += 1
 
         try:
-            status = await asyncio.to_thread(
-                self._post_once, url, resolved_ip, headers, payload
-            )
+            status = await asyncio.to_thread(self._post_once, url, headers, payload)
             logger.debug(
                 "Delivered push notification",
                 event_id=event.get("event_id"),
@@ -190,70 +211,40 @@ class NotificationService:
             self.total_failures += 1
             raise
 
-    def _post_once(
-        self, url: str, resolved_ip: str, headers: dict[str, str], payload: bytes
-    ) -> int:
-        """POST *payload* to *url*, connecting directly to *resolved_ip*.
+    def _post_once(self, url: str, headers: dict[str, str], payload: bytes) -> int:
+        try:
+            self._resolve_and_validate_destination(url)
+        except ValueError as exc:
+            raise NotificationDeliveryError(None, str(exc)) from exc
 
-        Bypassing a second DNS lookup closes the DNS-rebinding window: the IP
-        has already been validated in validate_config() and we re-use it here so
-        that no attacker-controlled DNS TTL change can redirect the connection to
-        an internal address between validation and delivery.
-
-        For HTTPS, a raw TCP socket is opened to *resolved_ip* and then wrapped
-        with TLS using *hostname* as the SNI server_hostname, so certificate
-        validation still uses the original domain name rather than the IP.
-        """
-        parsed = urlparse(url)
-        hostname = parsed.hostname or ""
-        port = parsed.port or (443 if parsed.scheme == "https" else 80)
-        path = parsed.path or "/"
-        if parsed.query:
-            path = f"{path}?{parsed.query}"
-
-        # Set the Host header explicitly so virtual-host routing works correctly
-        # even though we are connecting to a raw IP.
-        host_header = f"{hostname}:{port}" if parsed.port else hostname
+        req = request.Request(url, data=payload, method="POST")
+        for key, value in headers.items():
+            req.add_header(key, value)
 
         try:
-            if parsed.scheme == "https":
-                # Open a plain TCP socket to the pre-validated IP, then wrap it
-                # with TLS using the original hostname for SNI and cert validation.
-                # This avoids a second DNS lookup while keeping TLS correct.
-                ctx = ssl.create_default_context()
-                raw_sock = socket.create_connection(
-                    (resolved_ip, port), timeout=self.timeout
+            # URL scheme is validated in validate_config() to only allow http/https
+            with request.urlopen(req, timeout=self.timeout) as response:  # nosec B310
+                status = response.getcode()
+                if 200 <= status < 300:
+                    return status
+                raise NotificationDeliveryError(
+                    status, f"Unexpected status code: {status}"
                 )
-                tls_sock = ctx.wrap_socket(raw_sock, server_hostname=hostname)
-                conn = http.client.HTTPSConnection(
-                    resolved_ip, port, timeout=self.timeout, context=ctx
-                )
-                conn.sock = tls_sock
-            else:
-                conn = http.client.HTTPConnection(
-                    resolved_ip, port, timeout=self.timeout
-                )
-
-            request_headers = dict(headers)
-            request_headers["Host"] = host_header
-
-            conn.request("POST", path, body=payload, headers=request_headers)
-            response = conn.getresponse()
-            status = response.status
-            if 200 <= status < 300:
-                return status
-
+        except error.HTTPError as exc:
+            status = exc.code
             body = b""
             try:
-                body = response.read() or b""
+                body = exc.read() or b""
             except OSError:
                 body = b""
             message = body.decode("utf-8", errors="ignore").strip()
-            raise NotificationDeliveryError(status, message or f"HTTP error {status}")
-        except NotificationDeliveryError:
-            raise
-        except (OSError, http.client.HTTPException) as exc:
-            raise NotificationDeliveryError(None, f"Connection error: {exc}") from exc
+            raise NotificationDeliveryError(
+                status, message or f"HTTP error {status}"
+            ) from exc
+        except error.URLError as exc:
+            raise NotificationDeliveryError(
+                None, f"Connection error: {exc.reason}"
+            ) from exc
 
     def _build_headers(self, config: PushNotificationConfig) -> dict[str, str]:
         headers = {"Content-Type": "application/json"}
