@@ -14,7 +14,6 @@ import asyncio
 import importlib
 import secrets
 import time
-import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
@@ -55,11 +54,10 @@ _RATE_LIMIT_LUA = """
 -- ARGV[2] = cutoff (seconds)
 -- ARGV[3] = member (unique)
 -- ARGV[4] = limit (int)
--- ARGV[5] = ttl (seconds)
 redis.call('ZREMRANGEBYSCORE', KEYS[1], 0, tonumber(ARGV[2]))
 redis.call('ZADD', KEYS[1], tonumber(ARGV[1]), ARGV[3])
 local count = redis.call('ZCARD', KEYS[1])
-redis.call('EXPIRE', KEYS[1], tonumber(ARGV[5]))
+redis.call('EXPIRE', KEYS[1], 120)
 if count > tonumber(ARGV[4]) then
   return 0
 end
@@ -122,7 +120,6 @@ async def _rate_limit_allow_ip(
                     cutoff,
                     member,
                     int(limit_per_minute),
-                    int(app_settings.voice.rate_limit_window_secs),
                 )
                 return bool(allowed)
             except Exception:
@@ -197,22 +194,18 @@ class _FilteredWebSocket:
         return data
 
 
-if TYPE_CHECKING:
-    pass
-
-
 try:
     from pipecat.serializers.base_serializer import (
-        FrameSerializer as _FrameSerializerBase,
+        FrameSerializer as _PipecatFrameSerializer,
     )
-except ImportError:  # pragma: no cover
+except Exception:  # pragma: no cover
 
-    class _FrameSerializerBase:
+    class _PipecatFrameSerializer:  # type: ignore[too-many-ancestors]
         def __init__(self, *args: Any, **kwargs: Any) -> None:
             pass
 
 
-class _RawAudioFrameSerializer(_FrameSerializerBase):
+class _RawAudioFrameSerializer(_PipecatFrameSerializer):
     """Serializer for raw PCM audio over WebSocket.
 
     Converts inbound binary frames into Pipecat input audio frames and sends
@@ -425,9 +418,9 @@ async def _voice_control_reader(
     on_user_text: Any | None = None,
 ) -> None:
     """Read from the real WebSocket and push only audio frames to the queue."""
-    max_binary_frame_bytes = int(app_settings.voice.ws_max_audio_frame_bytes)
-    max_frames_per_second = int(app_settings.voice.ws_max_frames_per_second)
-    max_frames_in_flight = int(app_settings.voice.ws_max_frames_in_flight)
+    max_binary_frame_bytes = 64 * 1024
+    max_frames_per_second = 50
+    max_frames_in_flight = 10
 
     window_started_at = time.monotonic()
     window_count = 0
@@ -588,19 +581,7 @@ async def voice_session_start(app: BinduApplication, request: Request) -> Respon
             ) from exc
 
         if isinstance(body, dict) and "context_id" in body:
-            raw_context_id = body["context_id"]
-            if not isinstance(raw_context_id, str) or not raw_context_id.strip():
-                raise HTTPException(
-                    status_code=400,
-                    detail="context_id must be a non-empty string",
-                )
-            try:
-                parsed_context_id = uuid.UUID(raw_context_id.strip())
-            except (ValueError, AttributeError, TypeError) as exc:
-                raise HTTPException(
-                    status_code=400, detail="context_id must be a valid UUID"
-                ) from exc
-            context_id = str(parsed_context_id).lower()
+            context_id = str(body["context_id"])
 
     session_token: str | None = None
     session_token_expires_at: float | None = None
@@ -608,16 +589,6 @@ async def voice_session_start(app: BinduApplication, request: Request) -> Respon
         session_token = secrets.token_urlsafe(32)
         session_token_expires_at = time.time() + max(
             1, int(app_settings.voice.session_token_ttl)
-        )
-
-    # Build WebSocket URL components from request before creating a session.
-    # This prevents creating sessions when host resolution is not possible.
-    scheme = "wss" if request.url.scheme == "https" else "ws"
-    host = request.url.hostname or (request.client.host if request.client else None)
-    if not host:
-        return JSONResponse(
-            {"error": "Unable to determine host for WebSocket URL"},
-            status_code=400,
         )
 
     try:
@@ -630,6 +601,14 @@ async def voice_session_start(app: BinduApplication, request: Request) -> Respon
         return JSONResponse({"error": str(exc)}, status_code=429)
 
     # Build WebSocket URL from request
+    scheme = "wss" if request.url.scheme == "https" else "ws"
+    # Use hostname from request, fallback to client host, or raise error if unavailable
+    host = request.url.hostname or (request.client.host if request.client else None)
+    if not host:
+        return JSONResponse(
+            {"error": "Unable to determine host for WebSocket URL"},
+            status_code=400,
+        )
     ws_url = f"{scheme}://{host}"
     if request.url.port:
         ws_url += f":{request.url.port}"
@@ -755,15 +734,7 @@ async def voice_websocket(websocket: WebSocket) -> None:
             await websocket.accept()
         if not provided:
             try:
-                provided = (
-                    await asyncio.wait_for(
-                        websocket.receive_text(),
-                        timeout=float(app_settings.voice.ws_token_read_timeout_secs),
-                    )
-                ).strip()
-            except asyncio.TimeoutError:
-                await websocket.close(code=1008, reason="Missing session token")
-                return
+                provided = (await websocket.receive_text()).strip()
             except Exception:
                 await websocket.close(code=1008, reason="Missing session token")
                 return
@@ -777,8 +748,29 @@ async def voice_websocket(websocket: WebSocket) -> None:
     else:
         await websocket.accept()
 
+    await session_manager.update_state(session_id, "active")
+
+    voice_ext = getattr(app, "_voice_ext", None)
+    manifest = getattr(app, "manifest", None)
+    if voice_ext is None or manifest is None or not hasattr(manifest, "run"):
+        await websocket.send_text(
+            json.dumps({"type": "error", "message": "Agent not configured for voice"})
+        )
+        await websocket.close(code=1011)
+        return
+
+    from bindu.extensions.voice.pipeline_builder import build_voice_pipeline
+    from pipecat.transports.websocket.fastapi import (
+        FastAPIWebsocketTransport,
+        FastAPIWebsocketParams,
+    )
+    from pipecat.pipeline.pipeline import Pipeline
+    from pipecat.pipeline.task import PipelineTask
+    from pipecat.pipeline.runner import PipelineRunner
+
+    # Notify UI we are listening
     send_lock = asyncio.Lock()
-    components: dict[str, Any] | None = None
+    await _send_json(websocket, {"type": "state", "state": "listening"}, send_lock)
 
     async def _on_user_transcript(text: str) -> None:
         await _send_json(
@@ -789,8 +781,7 @@ async def voice_websocket(websocket: WebSocket) -> None:
 
     async def _on_agent_response(text: str) -> None:
         control.suppress_audio_until = max(
-            float(control.suppress_audio_until),
-            time.monotonic() + app_settings.voice.echo_suppression_agent_response_secs,
+            float(control.suppress_audio_until), time.monotonic() + 0.6
         )
         await _send_json(
             websocket,
@@ -801,32 +792,21 @@ async def voice_websocket(websocket: WebSocket) -> None:
     async def _on_state_change(state: str) -> None:
         if state == "agent-speaking":
             control.suppress_audio_until = max(
-                float(control.suppress_audio_until),
-                time.monotonic()
-                + app_settings.voice.echo_suppression_agent_speaking_secs,
+                float(control.suppress_audio_until), time.monotonic() + 1.0
             )
         elif state == "listening":
             control.suppress_audio_until = max(
-                float(control.suppress_audio_until),
-                time.monotonic() + app_settings.voice.echo_suppression_listening_secs,
+                float(control.suppress_audio_until), time.monotonic() + 0.35
             )
         await _send_json(websocket, {"type": "state", "state": state}, send_lock)
 
     async def _on_agent_transcript(text: str, is_final: bool) -> None:
         control.suppress_audio_until = max(
             float(control.suppress_audio_until),
-            time.monotonic()
-            + (
-                app_settings.voice.echo_suppression_agent_transcript_final_secs
-                if is_final
-                else app_settings.voice.echo_suppression_agent_transcript_partial_secs
-            ),
+            time.monotonic() + (0.6 if is_final else 0.9),
         )
         logger.info(
-            "on_agent_transcript: session_id=%s length=%s is_final=%s",
-            session_id,
-            len(text),
-            is_final,
+            f"on_agent_transcript: got text='{text[:50]}...' is_final={is_final}"
         )
         await _send_json(
             websocket,
@@ -839,62 +819,36 @@ async def voice_websocket(websocket: WebSocket) -> None:
             send_lock,
         )
 
-    control = _VoiceControlState()
-    inbound_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(
-        maxsize=app_settings.voice.ws_max_frames_in_flight
+    components = build_voice_pipeline(
+        voice_ext=voice_ext,
+        manifest_run=manifest.run,
+        context_id=session.context_id,
+        on_state_change=_on_state_change,
+        on_user_transcript=_on_user_transcript,
+        on_agent_response=_on_agent_response,
+        on_agent_transcript=_on_agent_transcript,
     )
+
+    control = _VoiceControlState()
+    inbound_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=10)
     filtered_ws = _FilteredWebSocket(websocket, inbound_queue)
+
+    async def _handle_user_text(text: str) -> None:
+        await _send_json(
+            websocket,
+            {"type": "transcript", "role": "user", "text": text, "is_final": True},
+            send_lock,
+        )
+        response = await components["bridge"].process_transcription(
+            text, emit_frames=True
+        )
+        if response:
+            await _on_agent_response(response)
 
     reader_task: asyncio.Task[Any] | None = None
     runner_task: asyncio.Task[Any] | None = None
 
     try:
-        await session_manager.update_state(session_id, "active")
-
-        voice_ext = getattr(app, "_voice_ext", None)
-        manifest = getattr(app, "manifest", None)
-        if voice_ext is None or manifest is None or not hasattr(manifest, "run"):
-            await websocket.send_text(
-                json.dumps(
-                    {"type": "error", "message": "Agent not configured for voice"}
-                )
-            )
-            await websocket.close(code=1011)
-            return
-
-        from bindu.extensions.voice.pipeline_builder import build_voice_pipeline
-        from pipecat.transports.websocket.fastapi import (
-            FastAPIWebsocketTransport,
-            FastAPIWebsocketParams,
-        )
-        from pipecat.pipeline.pipeline import Pipeline
-        from pipecat.pipeline.task import PipelineTask
-        from pipecat.pipeline.runner import PipelineRunner
-
-        components = build_voice_pipeline(
-            voice_ext=voice_ext,
-            manifest_run=manifest.run,
-            context_id=session.context_id,
-            on_state_change=_on_state_change,
-            on_user_transcript=_on_user_transcript,
-            on_agent_response=_on_agent_response,
-            on_agent_transcript=_on_agent_transcript,
-        )
-
-        # Notify UI we are listening
-        await _send_json(websocket, {"type": "state", "state": "listening"}, send_lock)
-        bridge = components["bridge"]
-
-        async def _handle_user_text(text: str) -> None:
-            await _send_json(
-                websocket,
-                {"type": "transcript", "role": "user", "text": text, "is_final": True},
-                send_lock,
-            )
-            response = await bridge.process_transcription(text, emit_frames=True)
-            if response:
-                await _on_agent_response(response)
-
         transport = FastAPIWebsocketTransport(
             websocket=filtered_ws,  # type: ignore[arg-type]
             params=FastAPIWebsocketParams(
@@ -958,27 +912,7 @@ async def voice_websocket(websocket: WebSocket) -> None:
         )
 
         async with asyncio.timeout(float(app_settings.voice.session_timeout)):
-            done, pending = await asyncio.wait(
-                {runner_task, reader_task},
-                return_when=asyncio.FIRST_EXCEPTION,
-            )
-
-            if reader_task in done:
-                reader_exc = reader_task.exception()
-                if runner_task and not runner_task.done():
-                    runner_task.cancel()
-                if reader_exc:
-                    raise reader_exc
-
-            if runner_task in done:
-                runner_exc = runner_task.exception()
-                if reader_task and not reader_task.done():
-                    reader_task.cancel()
-                if runner_exc:
-                    raise runner_exc
-
-            if pending:
-                await asyncio.gather(*pending, return_exceptions=True)
+            await runner_task
     except WebSocketDisconnect:
         logger.info(f"Voice WebSocket disconnected: {session_id}")
     except TimeoutError:
@@ -1025,31 +959,22 @@ async def voice_websocket(websocket: WebSocket) -> None:
                     websocket, {"type": "state", "state": "ended"}, send_lock
                 )
             except Exception:
-                logger.exception(
-                    "Failed to send final voice state", session_id=session_id
-                )
+                pass
 
         try:
             await session_manager.update_state(session_id, "ending")
         except Exception:
-            logger.exception(
-                "Failed to update voice session state", session_id=session_id
-            )
+            pass
         try:
-            if components is not None:
-                await components["bridge"].cleanup_background_tasks()
+            await components["bridge"].cleanup_background_tasks()
         except Exception:
-            logger.exception(
-                "Failed to cleanup voice bridge tasks", session_id=session_id
-            )
+            pass
         try:
             await session_manager.end_session(session_id)
         except Exception:
-            logger.exception("Failed to end voice session", session_id=session_id)
+            pass
         if websocket.client_state == WebSocketState.CONNECTED:
             try:
                 await websocket.close()
             except Exception:
-                logger.exception(
-                    "Failed to close voice WebSocket", session_id=session_id
-                )
+                pass

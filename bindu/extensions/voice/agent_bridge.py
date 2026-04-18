@@ -22,7 +22,6 @@ from pipecat.frames.frames import (
 )
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 
-from bindu.settings import app_settings
 from bindu.server.workers.helpers.result_processor import ResultProcessor
 from bindu.utils.logging import get_logger
 
@@ -36,7 +35,7 @@ DEFAULT_FIRST_TOKEN_TIMEOUT_SECONDS = 10.0
 DEFAULT_TOTAL_RESPONSE_TIMEOUT_SECONDS = 30.0
 DEFAULT_CANCELLATION_GRACE_SECONDS = 0.5
 DEFAULT_THINKING_TEXT = "One moment."
-DEFAULT_TIMEOUT_FALLBACK_TEXT = "Sorry - I'm having trouble responding right now."
+DEFAULT_TIMEOUT_FALLBACK_TEXT = "Sorry — I’m having trouble responding right now."
 
 
 class AgentBridgeProcessor(FrameProcessor):
@@ -58,8 +57,8 @@ class AgentBridgeProcessor(FrameProcessor):
         *,
         voice_settings: "VoiceSettings | None" = None,
         allow_interruptions: bool = True,
-        first_token_timeout_seconds: float | None = None,
-        total_response_timeout_seconds: float | None = None,
+        first_token_timeout_seconds: float = DEFAULT_FIRST_TOKEN_TIMEOUT_SECONDS,
+        total_response_timeout_seconds: float = DEFAULT_TOTAL_RESPONSE_TIMEOUT_SECONDS,
         on_state_change: Callable[[str], Any] | None = None,
         on_user_transcript: Callable[[str], Any] | None = None,
         on_agent_response: Callable[[str], Any] | None = None,
@@ -80,39 +79,10 @@ class AgentBridgeProcessor(FrameProcessor):
             )
             self._max_history_messages = int(voice_settings.conversation_history_limit)
         else:
-            voice_defaults = app_settings.voice
-            self._first_token_timeout_seconds = float(
-                first_token_timeout_seconds
-                if first_token_timeout_seconds is not None
-                else getattr(
-                    voice_defaults,
-                    "agent_timeout_secs",
-                    DEFAULT_FIRST_TOKEN_TIMEOUT_SECONDS,
-                )
-            )
-            self._total_response_timeout_seconds = float(
-                total_response_timeout_seconds
-                if total_response_timeout_seconds is not None
-                else getattr(
-                    voice_defaults,
-                    "utterance_timeout_secs",
-                    DEFAULT_TOTAL_RESPONSE_TIMEOUT_SECONDS,
-                )
-            )
-            self._cancellation_grace_seconds = float(
-                getattr(
-                    voice_defaults,
-                    "cancellation_grace_secs",
-                    DEFAULT_CANCELLATION_GRACE_SECONDS,
-                )
-            )
-            self._max_history_messages = int(
-                getattr(
-                    voice_defaults,
-                    "conversation_history_limit",
-                    MAX_HISTORY_TURNS * 2,
-                )
-            )
+            self._first_token_timeout_seconds = float(first_token_timeout_seconds)
+            self._total_response_timeout_seconds = float(total_response_timeout_seconds)
+            self._cancellation_grace_seconds = float(DEFAULT_CANCELLATION_GRACE_SECONDS)
+            self._max_history_messages = MAX_HISTORY_TURNS * 2
 
         self._on_state_change = on_state_change
         self._on_user_transcript = on_user_transcript
@@ -216,7 +186,9 @@ class AgentBridgeProcessor(FrameProcessor):
         # Add user message to history
         self._conversation_history.append({"role": "user", "content": text})
         self._trim_history()
-        logger.debug("Voice user (%s): %s chars", self._context_id, len(text))
+        logger.debug(
+            f"Voice user ({self._context_id}): {text[:80]}{'...' if len(text) > 80 else ''}"
+        )
 
         # Start a new task to invoke the agent
         self._current_agent_task = asyncio.create_task(self._invoke_and_emit(text))
@@ -249,9 +221,7 @@ class AgentBridgeProcessor(FrameProcessor):
                 )
                 self._trim_history()
                 logger.debug(
-                    "Voice agent (%s): %s chars",
-                    self._context_id,
-                    len(response_text),
+                    f"Voice agent ({self._context_id}): {response_text[:80]}{'...' if len(response_text) > 80 else ''}"
                 )
 
                 if self._on_agent_response:
@@ -522,8 +492,7 @@ class AgentBridgeProcessor(FrameProcessor):
         overflow = len(self._conversation_history) - self._max_history_messages
         if overflow > 0:
             turns_to_drop = max(1, (overflow + 1) // 2)
-            items_to_drop = min(turns_to_drop * 2, overflow)
-            del self._conversation_history[:items_to_drop]
+            del self._conversation_history[: turns_to_drop * 2]
 
     def _safe_callback(self, fn: Callable[..., Any], *args: Any) -> None:
         """Call a callback, tracking async tasks so they are not GC'd early."""

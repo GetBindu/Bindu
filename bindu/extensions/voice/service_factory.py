@@ -81,16 +81,17 @@ def create_tts_service(config: VoiceAgentExtension) -> Any:
     fallback_provider = (
         fallback_provider_raw if isinstance(fallback_provider_raw, str) else "none"
     )
+    if fallback_provider not in {"none", "elevenlabs", "azure"}:
+        fallback_provider = "none"
 
     try:
         return _create_tts_service_for_provider(provider, config)
-    except (ImportError, ValueError) as primary_error:
+    except Exception as primary_error:
         if fallback_provider not in {"", "none", provider}:
             logger.warning(
                 "Primary TTS provider failed; attempting fallback",
                 provider=provider,
                 fallback_provider=fallback_provider,
-                error_type=type(primary_error).__name__,
                 error=str(primary_error),
             )
             try:
