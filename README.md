@@ -55,7 +55,7 @@
 
 ---
 
-**Bindu** (read: _binduu_) turns any AI agent into a production microservice. Build your agent in any framework — Agno, LangChain, OpenAI SDK, even plain TypeScript — call `bindufy()`, and get a service with DID identity, A2A protocol, OAuth2 auth, and crypto payments. No infrastructure code. No rewriting.
+**Bindu** (read: _binduu_) turns any AI agent into a production microservice. Build your agent in any framework — Agno, LangChain, OpenAI SDK, even plain TypeScript — call `bindufy()`, and get a service with DID identity, A2A protocol, OAuth2 auth, crypto payments, and verifiable authorization receipts. No infrastructure code. No rewriting.
 
 Works with Python, TypeScript, and Kotlin. Built on open protocols: **A2A**, **AP2**, and **X402**.
 
@@ -472,6 +472,7 @@ Output:
 | 📊 **Observability & Monitoring** | Track performance and debug issues with OpenTelemetry and Sentry | [Guide →](docs/OBSERVABILITY.md) |
 | 🔄 **Retry Mechanism** | Automatic retry with exponential backoff for resilient agents | [Guide →](https://docs.getbindu.com/bindu/learn/retry/overview) |
 | 🔑 **Decentralized Identifiers (DIDs)** | Cryptographic identity for verifiable, secure agent interactions and payment integration | [Guide →](docs/DID.md) |
+| 🧾 **ScopeBlind Receipts** | Cedar-backed authorization receipts for verifiable agent actions | [Guide →](docs/SCOPEBLIND.md) |
 | 🏥 **Health Check & Metrics** | Monitor agent health and performance with built-in endpoints | [Guide →](docs/HEALTH_METRICS.md) |
 | 🌍 **Language-Agnostic (gRPC)** | Bindufy agents written in TypeScript, Kotlin, Rust, or any language via gRPC adapter | [Guide →](docs/GRPC_LANGUAGE_AGNOSTIC.md) |
 

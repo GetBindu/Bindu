@@ -6,6 +6,7 @@ from uuid import uuid4
 import pytest
 
 from bindu.common.protocol.types import Task, TaskSendParams
+from bindu.extensions.scopeblind import ScopeBlindExtension
 from bindu.server.workers.manifest_worker import ManifestWorker
 
 
@@ -390,6 +391,77 @@ class TestManifestWorker:
         )
 
         mock_storage.update_task.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_handle_terminal_state_attaches_scopeblind_receipt(self, tmp_path):
+        """Completed tasks should persist ScopeBlind receipt metadata on tasks and artifacts."""
+        policy_dir = tmp_path / "policies"
+        policy_dir.mkdir(parents=True, exist_ok=True)
+        (policy_dir / "policy.cedar").write_text(
+            'permit(principal, action == Action::"message/send", resource);',
+            encoding="utf-8",
+        )
+        scopeblind_ext = ScopeBlindExtension(
+            mode="shadow",
+            cedar_policies=str(policy_dir),
+            key_dir=tmp_path / "keys",
+        )
+
+        mock_manifest = Mock()
+        mock_manifest.did_extension = Mock()
+        mock_manifest.did_extension.did = "did:example:123"
+        mock_manifest.did_extension.sign_text = Mock(return_value="did-signature")
+        mock_manifest.capabilities = {"extensions": [scopeblind_ext]}
+        mock_scheduler = Mock()
+        mock_storage = AsyncMock()
+
+        task_id = uuid4()
+        context_id = uuid4()
+        task = cast(
+            Task,
+            {
+                "id": task_id,
+                "context_id": context_id,
+                "status": {"state": "working", "timestamp": "2024-01-01T00:00:00Z"},
+            },
+        )
+
+        worker = ManifestWorker(
+            manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage
+        )
+
+        scopeblind_context = {
+            "mode": "shadow",
+            "allowed": False,
+            "decision": "Deny",
+            "policy_hash": scopeblind_ext.policy_hash,
+            "policy_ids": [],
+            "errors": [],
+            "principal": {"entity_type": "User", "entity_id": "alice"},
+            "action": {"entity_type": "Action", "entity_id": "message/send"},
+            "resource": {"entity_type": "Route", "entity_id": "/"},
+            "context": {"jsonrpc_method": "message/send"},
+            "verification_key": scopeblind_ext.public_key_base58,
+            "issuer": scopeblind_ext.issuer,
+        }
+
+        await worker._handle_terminal_state(
+            task,
+            "Task completed",
+            "completed",
+            scopeblind_context=scopeblind_context,
+        )
+
+        call_kwargs = mock_storage.update_task.call_args.kwargs
+        assert call_kwargs["state"] == "completed"
+        assert "scopeblind.receipts" in call_kwargs["metadata"]
+        assert call_kwargs["metadata"]["scopeblind.decision"] == "deny"
+        receipt = call_kwargs["metadata"]["scopeblind.receipts"][0]
+        artifact = call_kwargs["new_artifacts"][0]
+        assert (
+            artifact["metadata"]["scopeblind.receipts"][0]["payload_hash"]
+            == receipt["payload_hash"]
+        )
 
     def test_add_state_change_event_with_error(self):
         """Test adding state change event with error."""

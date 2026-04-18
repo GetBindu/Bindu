@@ -86,6 +86,23 @@ def _attach_payment_context(request: Request, a2a_request: Any, method: str) -> 
         )
 
 
+def _attach_scopeblind_context(request: Request, a2a_request: Any, method: str) -> None:
+    """Attach ScopeBlind authorization context to message metadata if available."""
+    if method not in ("message/send", "message/stream"):
+        return
+
+    scopeblind_context = getattr(request.state, "scopeblind_context", None)
+    if scopeblind_context is None:
+        return
+
+    if "params" not in a2a_request or "message" not in a2a_request["params"]:
+        return
+
+    msg_obj = a2a_request["params"]["message"]
+    msg_obj.setdefault("metadata", {})
+    msg_obj["metadata"]["_scopeblind_context"] = scopeblind_context
+
+
 def _serialize_state_obj(obj: Any) -> dict:
     """Safely serialize a payment state object to a plain dict.
 
@@ -185,6 +202,7 @@ async def agent_run_endpoint(app: BinduApplication, request: Request) -> Respons
 
         # Attach payment context to message metadata if available
         _attach_payment_context(request, a2a_request, method)
+        _attach_scopeblind_context(request, a2a_request, method)
 
         jsonrpc_response = await handler(a2a_request)
 

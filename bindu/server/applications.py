@@ -31,13 +31,16 @@ from starlette.types import Lifespan, Receive, Scope, Send
 
 from bindu.common.models import (
     AgentManifest,
-    TelemetryConfig,
-    StorageConfig,
     SchedulerConfig,
     SentryConfig,
+    StorageConfig,
+    TelemetryConfig,
 )
 from bindu.settings import app_settings
-from bindu.utils import get_x402_extension_from_capabilities
+from bindu.utils import (
+    get_scopeblind_extension_from_capabilities,
+    get_x402_extension_from_capabilities,
+)
 from bindu.utils.retry import execute_with_retry
 
 from .scheduler.base import Scheduler
@@ -110,6 +113,7 @@ class BinduApplication(Starlette):
 
         # Setup middleware chain
         x402_ext = get_x402_extension_from_capabilities(manifest)
+        scopeblind_ext = get_scopeblind_extension_from_capabilities(manifest)
         payment_requirements_for_middleware = None
         if x402_ext:
             # Type narrowing: if x402_ext exists, manifest must exist
@@ -123,6 +127,7 @@ class BinduApplication(Starlette):
         middleware_list = self._setup_middleware(
             middleware,
             x402_ext,
+            scopeblind_ext,
             payment_requirements_for_middleware,
             manifest,
             auth_enabled,
@@ -147,6 +152,7 @@ class BinduApplication(Starlette):
         self._scheduler: Scheduler | None = None
         self._agent_card_json_schema: bytes | None = None
         self._x402_ext = x402_ext
+        self._scopeblind_ext = scopeblind_ext
         self._payment_session_manager = None
         self._payment_requirements = None
         self._paywall_config = None
@@ -539,6 +545,7 @@ class BinduApplication(Starlette):
         self,
         middleware: Sequence[Middleware] | None,
         x402_ext: Any,
+        scopeblind_ext: Any,
         payment_requirements: list[Any] | None,
         manifest: AgentManifest,
         auth_enabled: bool,
@@ -549,6 +556,7 @@ class BinduApplication(Starlette):
         Args:
             middleware: Custom middleware to include
             x402_ext: X402 extension instance
+            scopeblind_ext: ScopeBlind extension instance
             payment_requirements: Payment requirements for X402
             manifest: Agent manifest
             auth_enabled: Whether authentication is enabled
@@ -605,6 +613,20 @@ class BinduApplication(Starlette):
             auth_middleware = self._create_auth_middleware()
             # Add auth middleware after CORS and X402
             middleware_list.append(auth_middleware)
+
+        if scopeblind_ext:
+            from .middleware import ScopeBlindMiddleware
+
+            logger.info(
+                "ScopeBlind authorization middleware enabled",
+                mode=scopeblind_ext.mode,
+                policy_hash=scopeblind_ext.policy_hash,
+            )
+            scopeblind_middleware = Middleware(
+                ScopeBlindMiddleware,  # type: ignore[arg-type]
+                scopeblind_ext=scopeblind_ext,
+            )
+            middleware_list.append(scopeblind_middleware)
 
         # Add metrics middleware (should be last to capture all requests)
         from .middleware import MetricsMiddleware

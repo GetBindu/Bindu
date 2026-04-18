@@ -573,6 +573,9 @@ class TaskSendParams(TypedDict):
     payment_context: NotRequired[dict[str, Any]]
     """Payment context for X402 extension (optional)."""
 
+    scopeblind_context: NotRequired[dict[str, Any]]
+    """Authorization context for ScopeBlind extension (optional)."""
+
 
 @pydantic.with_config(ConfigDict(alias_generator=to_camel))
 class TaskIdParams(TypedDict):

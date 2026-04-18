@@ -22,6 +22,7 @@ from bindu.common.models import (
     DeploymentConfig,
     TelemetryConfig,
 )
+from bindu.extensions.scopeblind import ScopeBlindExtension
 from bindu.extensions.x402 import X402AgentExtension
 from bindu.penguin.did_setup import initialize_did_extension
 from bindu.penguin.manifest import create_manifest, validate_agent_function
@@ -150,6 +151,26 @@ def _setup_x402_extension(normalized_costs: list[dict[str, Any]]) -> X402AgentEx
 
     logger.info(f"X402 extension created: {x402_extension}")
     return x402_extension
+
+
+def _setup_scopeblind_extension(
+    scopeblind_config: dict[str, Any],
+    caller_dir: Path | None = None,
+) -> ScopeBlindExtension:
+    """Create ScopeBlind extension from config."""
+    cedar_policies = scopeblind_config["cedar_policies"]
+    policy_path = Path(os.path.expanduser(cedar_policies))
+    if not policy_path.is_absolute() and caller_dir is not None:
+        policy_path = (caller_dir / policy_path).resolve()
+
+    key_dir = ((caller_dir or Path.cwd()) / app_settings.scopeblind.pki_dir).resolve()
+    extension = ScopeBlindExtension(
+        mode=scopeblind_config.get("mode", "enforce"),
+        cedar_policies=str(policy_path),
+        key_dir=key_dir,
+    )
+    logger.info(f"ScopeBlind extension created: {extension}")
+    return extension
 
 
 def _register_in_hydra(
@@ -481,6 +502,22 @@ def _bindufy_core(
     capabilities = add_extension_to_capabilities(
         validated_config.get("capabilities", {}), did_extension
     )
+
+    scopeblind_extension = next(
+        (
+            ext
+            for ext in capabilities.get("extensions", [])
+            if isinstance(ext, ScopeBlindExtension)
+        ),
+        None,
+    )
+
+    if scopeblind_extension is None and validated_config.get("scopeblind"):
+        scopeblind_extension = _setup_scopeblind_extension(
+            validated_config["scopeblind"],
+            caller_dir=caller_dir,
+        )
+        capabilities = add_extension_to_capabilities(capabilities, scopeblind_extension)
 
     # Only add x402 extension if execution_cost is configured
     execution_cost = validated_config.get("execution_cost")

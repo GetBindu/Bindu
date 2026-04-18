@@ -7,6 +7,7 @@ from uuid import UUID
 from bindu.penguin.bindufy import (
     _generate_agent_id,
     _normalize_execution_costs,
+    _setup_scopeblind_extension,
     _setup_x402_extension,
     _parse_deployment_url,
     bindufy,
@@ -180,6 +181,26 @@ class TestBindufyUtilities:
         extension = _setup_x402_extension(costs)
 
         assert extension.pay_to_address == "0x123"
+
+    def test_setup_scopeblind_extension(self, tmp_path):
+        """Test creating ScopeBlind extension from config."""
+        policy_dir = tmp_path / "policies"
+        policy_dir.mkdir(parents=True, exist_ok=True)
+        (policy_dir / "policy.cedar").write_text(
+            'permit(principal, action == Action::"message/send", resource);',
+            encoding="utf-8",
+        )
+
+        extension = _setup_scopeblind_extension(
+            {
+                "mode": "shadow",
+                "cedar_policies": str(policy_dir),
+            },
+            caller_dir=tmp_path,
+        )
+
+        assert extension.mode == "shadow"
+        assert extension.cedar_policies == str(policy_dir)
 
 
 def test_bindufy_non_callable_handler_raises_clear_error():

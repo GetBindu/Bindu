@@ -35,6 +35,7 @@ from uuid import UUID
 from opentelemetry.trace import Status, StatusCode, get_current_span, get_tracer
 from x402.facilitator import FacilitatorClient, FacilitatorConfig
 
+from bindu.extensions.scopeblind import attach_receipt_to_artifacts
 from bindu.settings import app_settings
 
 from bindu.common.protocol.types import (
@@ -48,6 +49,7 @@ from bindu.common.protocol.types import (
 from bindu.penguin.manifest import AgentManifest
 from bindu.server.workers.base import Worker
 from bindu.server.workers.helpers import ResponseDetector, ResultProcessor
+from bindu.utils.capabilities import get_scopeblind_extension_from_capabilities
 from bindu.utils.logging import get_logger
 from bindu.utils.retry import retry_worker_operation
 from bindu.utils.worker import ArtifactBuilder, MessageConverter, TaskStateManager
@@ -123,6 +125,7 @@ class ManifestWorker(Worker):
 
         # Extract payment context if available (from x402 middleware)
         payment_context = params.get("payment_context")
+        scopeblind_context = params.get("scopeblind_context")
 
         await TaskStateManager.validate_task_state(task)
 
@@ -216,7 +219,11 @@ class ManifestWorker(Worker):
                 # Add span event for state transition
                 self._add_state_change_event(from_state="working", to_state=state)
                 await self._handle_terminal_state(
-                    task, results, state, payment_context=payment_context
+                    task,
+                    results,
+                    state,
+                    payment_context=payment_context,
+                    scopeblind_context=scopeblind_context,
                 )
 
         except Exception as e:
@@ -428,6 +435,7 @@ class ManifestWorker(Worker):
         state: TaskState = "completed",
         additional_metadata: dict[str, Any] | None = None,
         payment_context: dict[str, Any] | None = None,
+        scopeblind_context: dict[str, Any] | None = None,
     ) -> None:
         """Handle terminal task states (completed/failed).
 
@@ -451,6 +459,7 @@ class ManifestWorker(Worker):
             state: Terminal state (completed or failed)
             additional_metadata: Optional metadata to attach to task
             payment_context: Optional payment details from x402 middleware
+            scopeblind_context: Optional authorization details from ScopeBlind middleware
 
         Raises:
             ValueError: If state is not a terminal state
@@ -479,6 +488,14 @@ class ManifestWorker(Worker):
                 else:
                     additional_metadata = settlement_metadata
 
+            additional_metadata = self._apply_scopeblind_receipt(
+                task=task,
+                state=state,
+                artifacts=artifacts,
+                additional_metadata=additional_metadata,
+                scopeblind_context=scopeblind_context,
+            )
+
             # Persist task state BEFORE sending any notifications (outbox pattern).
             # If a notification fires before the DB write and then the process crashes,
             # clients receive an artifact webhook but the task is still "working" in the
@@ -502,6 +519,13 @@ class ManifestWorker(Worker):
             error_message = MessageConverter.to_protocol_messages(
                 results, task["id"], task["context_id"]
             )
+            additional_metadata = self._apply_scopeblind_receipt(
+                task=task,
+                state=state,
+                artifacts=[],
+                additional_metadata=additional_metadata,
+                scopeblind_context=scopeblind_context,
+            )
             await self.storage.update_task(
                 task["id"],
                 state=state,
@@ -514,6 +538,61 @@ class ManifestWorker(Worker):
             # Canceled: State change only, NO new content
             await self.storage.update_task(task["id"], state=state)
             await self._notify_lifecycle(task["id"], task["context_id"], state, True)
+
+    def _apply_scopeblind_receipt(
+        self,
+        *,
+        task: Task,
+        state: str,
+        artifacts: list[Artifact],
+        additional_metadata: dict[str, Any] | None,
+        scopeblind_context: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        """Create and attach ScopeBlind receipt metadata when present."""
+        if scopeblind_context is None:
+            return additional_metadata
+
+        scopeblind_ext = get_scopeblind_extension_from_capabilities(self.manifest)
+        if scopeblind_ext is None:
+            return additional_metadata
+
+        receipt = scopeblind_ext.create_receipt(
+            authorization_context=scopeblind_context,
+            artifacts=artifacts,
+            task_id=task["id"],
+            context_id=task["context_id"],
+            state=state,
+        )
+        if artifacts:
+            attach_receipt_to_artifacts(artifacts, receipt)
+
+        receipt_metadata = scopeblind_ext.build_task_metadata(receipt)
+        merged_metadata = dict(additional_metadata or {})
+        merged_metadata.update(receipt_metadata)
+        self._set_scopeblind_span_attributes(receipt)
+        return merged_metadata
+
+    @staticmethod
+    def _set_scopeblind_span_attributes(receipt: Any) -> None:
+        """Attach ScopeBlind receipt metadata to the current span."""
+        current_span = get_current_span()
+        if current_span.is_recording():
+            current_span.set_attribute(
+                "bindu.scopeblind.decision",
+                receipt.payload.decision,
+            )
+            current_span.set_attribute(
+                "bindu.scopeblind.mode",
+                receipt.payload.mode,
+            )
+            current_span.set_attribute(
+                "bindu.scopeblind.policy_hash",
+                receipt.payload.policy_hash,
+            )
+            current_span.set_attribute(
+                "bindu.scopeblind.payload_hash",
+                receipt.payload_hash,
+            )
 
     async def _handle_task_failure(self, task: Task, error: str) -> None:
         """Handle task execution failure.

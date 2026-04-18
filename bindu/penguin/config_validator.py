@@ -49,6 +49,7 @@ class ConfigValidator:
         "extra_metadata": {},
         "agent_trust": None,
         "key_password": None,
+        "scopeblind": None,
         "auth": None,
         "oltp_endpoint": None,
         "oltp_service_name": None,
@@ -270,6 +271,20 @@ class ConfigValidator:
                 # Any other type is invalid
                 raise ValueError(
                     "Field 'execution_cost' must be a dict or a list of dicts"
+                )
+
+        if "scopeblind" in config and config["scopeblind"] is not None:
+            if not isinstance(config["scopeblind"], dict):
+                raise ValueError("Field 'scopeblind' must be a dictionary")
+            mode = config["scopeblind"].get("mode", "enforce")
+            if mode not in ["enforce", "shadow"]:
+                raise ValueError(
+                    "Field 'scopeblind.mode' must be 'enforce' or 'shadow'"
+                )
+            cedar_policies = config["scopeblind"].get("cedar_policies")
+            if not isinstance(cedar_policies, str) or not cedar_policies.strip():
+                raise ValueError(
+                    "Field 'scopeblind.cedar_policies' must be a non-empty string"
                 )
 
     # ------------------------------------------------------------------

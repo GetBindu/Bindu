@@ -2,6 +2,7 @@
 
 from bindu.utils.capabilities import (
     add_extension_to_capabilities,
+    get_scopeblind_extension_from_capabilities,
     get_x402_extension_from_capabilities,
 )
 
@@ -64,3 +65,21 @@ class TestCapabilityUtilities:
         result = get_x402_extension_from_capabilities(manifest)
 
         assert result is None
+
+    def test_get_scopeblind_extension_found(self, tmp_path):
+        """Test retrieving scopeblind extension when present."""
+        from unittest.mock import Mock
+
+        from bindu.extensions.scopeblind import ScopeBlindExtension
+
+        ext = ScopeBlindExtension(
+            mode="enforce",
+            cedar_policies="permit(principal, action, resource);",
+            key_dir=tmp_path / "scopeblind-keys",
+        )
+        manifest = Mock()
+        manifest.capabilities = {"extensions": ["other-ext", ext]}
+
+        result = get_scopeblind_extension_from_capabilities(manifest)
+
+        assert result == ext

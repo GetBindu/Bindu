@@ -44,6 +44,10 @@ def _serialize_extension(ext: Any) -> dict | None:
                 "agent_id": ext.agent_id,
             },
         }
+    elif hasattr(ext, "agent_extension"):
+        serialized = getattr(ext, "agent_extension")
+        if isinstance(serialized, dict):
+            return serialized
     elif isinstance(ext, dict):
         # Already in correct format
         return ext

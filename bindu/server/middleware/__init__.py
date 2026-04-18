@@ -10,7 +10,7 @@
 """MIDDLEWARE MODULE EXPORTS.
 
 This module provides middleware layers for the bindu framework including
-authentication and payment protocol enforcement.
+authentication, payment protocol enforcement, and authorization receipts.
 
 MIDDLEWARE STRUCTURE:
 
@@ -22,6 +22,9 @@ MIDDLEWARE STRUCTURE:
    - X402Middleware: x402 payment protocol enforcement
      Automatically handles payment verification and settlement for agents
      with execution_cost configured.
+
+3. AUTHORIZATION MIDDLEWARE:
+   - ScopeBlindMiddleware: Cedar policy enforcement with signed receipts
 """
 
 from __future__ import annotations as _annotations
@@ -31,6 +34,7 @@ from .auth import HydraMiddleware
 
 # Export payment middleware from x402/ subdirectory
 from .x402 import X402Middleware
+from .scopeblind import ScopeBlindMiddleware
 
 # Export metrics middleware
 from .metrics import MetricsMiddleware
@@ -40,6 +44,8 @@ __all__ = [
     "HydraMiddleware",
     # Payment middleware
     "X402Middleware",
+    # Authorization middleware
+    "ScopeBlindMiddleware",
     # Metrics middleware
     "MetricsMiddleware",
 ]

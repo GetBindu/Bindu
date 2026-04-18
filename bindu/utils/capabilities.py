@@ -55,3 +55,14 @@ def get_x402_extension_from_capabilities(manifest: Any) -> Optional[Any]:
             return ext
 
     return None
+
+
+def get_scopeblind_extension_from_capabilities(manifest: Any) -> Optional[Any]:
+    """Extract ScopeBlind extension from manifest capabilities."""
+    from bindu.extensions.scopeblind import ScopeBlindExtension
+
+    for ext in manifest.capabilities.get("extensions", []):
+        if isinstance(ext, ScopeBlindExtension):
+            return ext
+
+    return None

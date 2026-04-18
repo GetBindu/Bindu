@@ -156,6 +156,9 @@ class MessageHandlers:
         payment_context = message_metadata.pop("_payment_context", None)
         if payment_context is not None:
             scheduler_params["payment_context"] = payment_context
+        scopeblind_context = message_metadata.pop("_scopeblind_context", None)
+        if scopeblind_context is not None:
+            scheduler_params["scopeblind_context"] = scopeblind_context
         await self.scheduler.run_task(scheduler_params)
         return task, context_id
 

@@ -40,6 +40,20 @@ class TestAgentCardUtilities:
 
         assert result is None
 
+    def test_serialize_extension_agent_extension_type(self):
+        """Test serializing extensions that expose agent_extension metadata."""
+
+        class MockExtension:
+            agent_extension = {
+                "uri": "https://example.com/scopeblind",
+                "required": True,
+                "params": {"mode": "enforce"},
+            }
+
+        result = _serialize_extension(MockExtension())
+
+        assert result == MockExtension.agent_extension
+
     def test_serialize_extensions_in_place(self):
         """Test serializing extensions list in capabilities."""
         mock_ext = Mock()

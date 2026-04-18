@@ -343,6 +343,30 @@ class X402Settings(BaseSettings):
     }
 
 
+class ScopeBlindSettings(BaseSettings):
+    """ScopeBlind authorization receipt configuration settings."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="SCOPEBLIND__",
+        extra="allow",
+    )
+
+    extension_uri: str = "https://github.com/getbindu/bindu/extensions/scopeblind/v0.1"
+    extension_description: str = (
+        "Cedar-backed authorization receipts for verifiable agent actions"
+    )
+    protected_methods: list[str] = ["message/send", "message/stream"]
+    receipt_version: str = "1"
+    pki_dir: str = ".scopeblind"
+    private_key_filename: str = "scopeblind_private.pem"
+    public_key_filename: str = "scopeblind_public.pem"
+    meta_receipts_key: str = "scopeblind.receipts"
+    meta_decision_key: str = "scopeblind.decision"
+    meta_mode_key: str = "scopeblind.mode"
+    meta_policy_hash_key: str = "scopeblind.policy_hash"
+
+
 class AgentSettings(BaseSettings):
     """Agent behavior and protocol configuration settings."""
 
@@ -1033,6 +1057,7 @@ class Settings(BaseSettings):
     logging: LoggingSettings = LoggingSettings()
     observability: ObservabilitySettings = ObservabilitySettings()
     x402: X402Settings = X402Settings()
+    scopeblind: ScopeBlindSettings = ScopeBlindSettings()
     agent: AgentSettings = AgentSettings()
     auth: AuthSettings = AuthSettings()
     hydra: HydraSettings = HydraSettings()
