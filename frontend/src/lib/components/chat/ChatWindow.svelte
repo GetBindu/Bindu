@@ -172,7 +172,7 @@
 		let success = false;
 		try {
 			for await (const _update of sendAgentMessage(message, contextId, { fileParts })) {
-				// Process updates if needed
+				// Deliberately fire-and-forget consume the stream to completion so side-effects run; yielded updates are intentionally ignored.
 			}
 			success = true;
 		} catch (err) {
