@@ -216,5 +216,5 @@ export class AgentAPI {
 export const agentAPI = new AgentAPI();
 
 export function getAgentBaseUrl(): string {
-  return agentAPI.getBaseUrl() ?? 'http://localhost:3773';
+  return agentAPI.getBaseUrl();
 }

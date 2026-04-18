@@ -3,10 +3,14 @@
 This module defines the configuration settings for the application using pydantic models.
 """
 
+import logging
+
 from pydantic import BaseModel, Field, HttpUrl, computed_field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import AliasChoices
-from typing import Literal, Optional
+from typing import Literal
+
+logger = logging.getLogger(__name__)
 
 
 class ProjectSettings(BaseSettings):
@@ -739,6 +743,18 @@ class RetrySettings(BaseSettings):
     api_max_wait: float = 15.0  # seconds
 
 
+class WorkerSettings(BaseSettings):
+    """Worker task settings."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="WORKER__",
+        extra="allow",
+    )
+
+    max_file_size: int = 10 * 1024 * 1024
+
+
 class NegotiationSettings(BaseSettings):
     """Negotiation and capability assessment configuration settings.
 
@@ -1106,7 +1122,7 @@ class VoiceSettings(BaseSettings):
 
     # Session storage backend (for multi-worker compatibility)
     session_backend: Literal["memory", "redis"] = "memory"
-    redis_url: Optional[str] = None  # e.g., "redis://localhost:6379/0"
+    redis_url: str | None = None  # e.g., "redis://localhost:6379/0"
     redis_session_ttl: int = 300  # seconds, TTL for session keys in Redis
 
     # WebSocket session authentication
@@ -1117,6 +1133,19 @@ class VoiceSettings(BaseSettings):
     # Rate limiting (0 disables)
     rate_limit_per_ip_per_minute: int = 120
     rate_limit_backend: Literal["memory", "redis"] = "memory"
+    rate_limit_window_secs: int = 120
+
+    # WebSocket audio throttling
+    ws_max_audio_frame_bytes: int = 64 * 1024
+    ws_max_frames_per_second: int = 50
+    ws_max_frames_in_flight: int = 10
+
+    # Echo suppression (seconds)
+    echo_suppression_agent_response_secs: float = 0.6
+    echo_suppression_agent_transcript_final_secs: float = 0.6
+    echo_suppression_agent_transcript_partial_secs: float = 0.9
+    echo_suppression_agent_speaking_secs: float = 1.0
+    echo_suppression_listening_secs: float = 0.35
 
     # Extension metadata
     # Note: bindu:// is an internal routing scheme used by the voice agent extension.
@@ -1130,6 +1159,11 @@ class VoiceSettings(BaseSettings):
         # If misconfigured via env (e.g. TTL > timeout), clamp TTL to timeout
         # to fail safe without preventing the server from starting.
         if self.session_token_ttl > self.session_timeout:
+            logger.warning(
+                "VOICE__SESSION_TOKEN_TTL exceeds session_timeout; clamping (ttl=%s, timeout=%s)",
+                self.session_token_ttl,
+                self.session_timeout,
+            )
             self.session_token_ttl = self.session_timeout
         return self
 
@@ -1158,6 +1192,7 @@ class Settings(BaseSettings):
     oauth: OAuthSettings = OAuthSettings()
     storage: StorageSettings = StorageSettings()
     scheduler: SchedulerSettings = SchedulerSettings()
+    worker: WorkerSettings = WorkerSettings()
     retry: RetrySettings = RetrySettings()
     negotiation: NegotiationSettings = NegotiationSettings()
     sentry: SentrySettings = SentrySettings()

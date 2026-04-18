@@ -22,6 +22,7 @@ from pipecat.frames.frames import (
 )
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 
+from bindu.settings import app_settings
 from bindu.server.workers.helpers.result_processor import ResultProcessor
 from bindu.utils.logging import get_logger
 
@@ -79,18 +80,39 @@ class AgentBridgeProcessor(FrameProcessor):
             )
             self._max_history_messages = int(voice_settings.conversation_history_limit)
         else:
+            voice_defaults = app_settings.voice
             self._first_token_timeout_seconds = float(
                 first_token_timeout_seconds
                 if first_token_timeout_seconds is not None
-                else DEFAULT_FIRST_TOKEN_TIMEOUT_SECONDS
+                else getattr(
+                    voice_defaults,
+                    "agent_timeout_secs",
+                    DEFAULT_FIRST_TOKEN_TIMEOUT_SECONDS,
+                )
             )
             self._total_response_timeout_seconds = float(
                 total_response_timeout_seconds
                 if total_response_timeout_seconds is not None
-                else DEFAULT_TOTAL_RESPONSE_TIMEOUT_SECONDS
+                else getattr(
+                    voice_defaults,
+                    "utterance_timeout_secs",
+                    DEFAULT_TOTAL_RESPONSE_TIMEOUT_SECONDS,
+                )
             )
-            self._cancellation_grace_seconds = float(DEFAULT_CANCELLATION_GRACE_SECONDS)
-            self._max_history_messages = MAX_HISTORY_TURNS * 2
+            self._cancellation_grace_seconds = float(
+                getattr(
+                    voice_defaults,
+                    "cancellation_grace_secs",
+                    DEFAULT_CANCELLATION_GRACE_SECONDS,
+                )
+            )
+            self._max_history_messages = int(
+                getattr(
+                    voice_defaults,
+                    "conversation_history_limit",
+                    MAX_HISTORY_TURNS * 2,
+                )
+            )
 
         self._on_state_change = on_state_change
         self._on_user_transcript = on_user_transcript
@@ -194,9 +216,7 @@ class AgentBridgeProcessor(FrameProcessor):
         # Add user message to history
         self._conversation_history.append({"role": "user", "content": text})
         self._trim_history()
-        logger.debug(
-            f"Voice user ({self._context_id}): {text[:80]}{'...' if len(text) > 80 else ''}"
-        )
+        logger.debug("Voice user (%s): %s chars", self._context_id, len(text))
 
         # Start a new task to invoke the agent
         self._current_agent_task = asyncio.create_task(self._invoke_and_emit(text))
@@ -229,7 +249,9 @@ class AgentBridgeProcessor(FrameProcessor):
                 )
                 self._trim_history()
                 logger.debug(
-                    f"Voice agent ({self._context_id}): {response_text[:80]}{'...' if len(response_text) > 80 else ''}"
+                    "Voice agent (%s): %s chars",
+                    self._context_id,
+                    len(response_text),
                 )
 
                 if self._on_agent_response:

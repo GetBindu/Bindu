@@ -36,7 +36,7 @@
 		onsubmit?: (
 			message: string,
 			fileParts: Array<{ name: string; mime: string; value: string }>
-		) => Promise<void> | void;
+		) => Promise<boolean> | boolean;
 	}
 
 	let {
@@ -183,11 +183,13 @@
 
 			try {
 				if (typeof onsubmit === "function") {
-					await onsubmit(value, fileParts);
+					const submitted = await onsubmit(value, fileParts);
+					if (submitted) {
+						// Clear files and input after successful submit
+						files = [];
+						value = "";
+					}
 				}
-				// Clear files and input after successful submit
-				files = [];
-				value = "";
 			} catch (err) {
 				console.error("Error submitting message:", err);
 				alert(

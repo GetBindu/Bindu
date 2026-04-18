@@ -7,6 +7,7 @@ import http.client
 import ipaddress
 import json
 import socket
+import ssl
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
@@ -130,11 +131,14 @@ class NotificationService:
     @staticmethod
     def _resolve_and_validate_destination(url: str) -> str:
         parsed = urlparse(url)
+        scheme = (parsed.scheme or "").lower()
+        if scheme not in {"http", "https"}:
+            raise ValueError("Push notification URL must use http or https scheme.")
         hostname = parsed.hostname
         if not hostname:
             raise ValueError("Push notification URL must include a valid hostname.")
 
-        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        port = parsed.port or (443 if scheme == "https" else 80)
 
         # If hostname is an IP literal, validate without DNS.
         try:
@@ -218,23 +222,79 @@ class NotificationService:
         resolved_ip: str | None = None,
     ) -> int:
         parsed = urlparse(url)
+        scheme = (parsed.scheme or "").lower()
+        hostname = parsed.hostname
+        if scheme not in {"http", "https"}:
+            raise NotificationDeliveryError(
+                None, "Push notification URL must use http or https scheme."
+            )
+        if not hostname:
+            raise NotificationDeliveryError(
+                None, "Push notification URL must include a valid hostname."
+            )
         try:
             destination_ip = resolved_ip or self._resolve_and_validate_destination(url)
         except ValueError as exc:
             raise NotificationDeliveryError(None, str(exc)) from exc
 
+        default_port = 443 if scheme == "https" else 80
+        port = parsed.port or default_port
+        host_header = f"[{hostname}]" if ":" in hostname else hostname
+        if parsed.port is not None and parsed.port != default_port:
+            host_header = f"{host_header}:{parsed.port}"
+
+        if scheme == "https":
+            path = parsed.path or "/"
+            if parsed.query:
+                path = f"{path}?{parsed.query}"
+
+            context = ssl.create_default_context()
+            request_headers = {"Host": host_header, "Connection": "close", **headers}
+            request_headers["Content-Length"] = str(len(payload))
+            try:
+                request_lines = [f"POST {path} HTTP/1.1\r\n"]
+                request_lines.extend(
+                    f"{key}: {value}\r\n" for key, value in request_headers.items()
+                )
+                request_lines.append("\r\n")
+                request_bytes = "".join(request_lines).encode("latin-1") + payload
+
+                with socket.create_connection(
+                    (destination_ip, port), timeout=self.timeout
+                ) as sock:
+                    with context.wrap_socket(
+                        sock, server_hostname=hostname
+                    ) as tls_socket:
+                        tls_socket.sendall(request_bytes)
+                        response = http.client.HTTPResponse(tls_socket)
+                        response.begin()
+                        status = response.status
+                        body = response.read() or b""
+                        if 200 <= status < 300:
+                            return status
+                        message = body.decode("utf-8", errors="ignore").strip()
+                        raise NotificationDeliveryError(
+                            status, message or f"HTTP error {status}"
+                        )
+            except (OSError, http.client.HTTPException, ssl.SSLError) as exc:
+                raise NotificationDeliveryError(
+                    None, f"Connection error: {exc}"
+                ) from exc
+
         target_url = url
         if isinstance(destination_ip, str) and destination_ip:
+            destination_host = (
+                f"[{destination_ip}]" if ":" in destination_ip else destination_ip
+            )
             netloc = (
-                f"{destination_ip}:{parsed.port}"
+                f"{destination_host}:{parsed.port}"
                 if parsed.port is not None
-                else destination_ip
+                else destination_host
             )
             target_url = parsed._replace(netloc=netloc).geturl()
 
         req = request.Request(target_url, data=payload, method="POST")
-        if parsed.netloc:
-            req.add_header("Host", parsed.netloc)
+        req.add_header("Host", host_header)
         for key, value in headers.items():
             req.add_header(key, value)
 
@@ -255,7 +315,9 @@ class NotificationService:
             except OSError:
                 body = b""
             message = body.decode("utf-8", errors="ignore").strip()
-            raise NotificationDeliveryError(status, message or f"HTTP error {status}")
+            raise NotificationDeliveryError(
+                status, message or f"HTTP error {status}"
+            ) from exc
         except NotificationDeliveryError:
             raise
         except error.URLError as exc:

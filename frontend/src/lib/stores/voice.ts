@@ -67,7 +67,7 @@ function appendTranscript(event: TranscriptEvent): void {
 	transcripts.update((items) => {
 		const last = items[items.length - 1];
 
-		if (last && last.role === event.role) {
+		if (last && last.role === event.role && !last.isFinal) {
 			const mergedText = mergeTranscriptText(last.text, event.text);
 			const merged = {
 				...last,

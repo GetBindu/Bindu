@@ -11,14 +11,13 @@ from pypdf import PdfReader
 from docx import Document
 
 from bindu.common.protocol.types import Message, Part
+from bindu.settings import app_settings
 from bindu.utils.logging import get_logger
 
 # Import PartConverter from same package
 from .parts import PartConverter
 
 logger = get_logger("bindu.utils.worker.messages")
-
-MAX_FILE_SIZE = 10 * 1024 * 1024
 
 # Type aliases for better readability
 ChatMessage = dict[str, str]
@@ -57,7 +56,7 @@ class FileInterceptor:
     @staticmethod
     def _decode_plain_text(file_bytes: bytes) -> str:
         """Decode plain text with UTF-8 first and safe fallbacks."""
-        for encoding in ("utf-8", "cp1252", "latin-1"):
+        for encoding in ("utf-8", "latin-1", "cp1252"):
             try:
                 if encoding == "utf-8":
                     return file_bytes.decode(encoding)
@@ -74,6 +73,7 @@ class FileInterceptor:
     def intercept_and_parse(cls, parts: list[Part]) -> list[dict[str, Any]]:
         """Intercept file parts, extract text, and replace with text parts."""
         processed_parts = []
+        max_file_size = int(app_settings.worker.max_file_size)
 
         for part in parts:
             if part.get("kind") != "file":
@@ -90,12 +90,12 @@ class FileInterceptor:
 
             mime_type = file_info.get("mimeType", "")
             file_name = file_info.get("name", "uploaded file")
-            base64_data = file_info.get("bytes") or file_info.get("data", "")
+            base64_data = file_info.get("bytes")
 
             if not base64_data or not mime_type:
                 logger.warning(
                     f"Malformed file part skipped: file_name={file_name}, "
-                    f"missing={'bytes/data' if not base64_data else ''}{' and ' if (not base64_data and not mime_type) else ''}{'mimeType' if not mime_type else ''}"
+                    f"missing={'bytes' if not base64_data else ''}{' and ' if (not base64_data and not mime_type) else ''}{'mimeType' if not mime_type else ''}"
                 )
                 continue
 
@@ -113,10 +113,6 @@ class FileInterceptor:
                 continue
 
             try:
-                # Decode the Base64 payload
-                if not base64_data:
-                    raise ValueError("Missing file bytes")
-
                 padding = (
                     2
                     if base64_data.endswith("==")
@@ -125,11 +121,11 @@ class FileInterceptor:
                     else 0
                 )
                 estimated_size = (len(base64_data) * 3) // 4 - padding
-                if estimated_size > MAX_FILE_SIZE:
+                if estimated_size > max_file_size:
                     raise ValueError("File too large")
 
                 file_bytes = base64.b64decode(base64_data)
-                if len(file_bytes) > MAX_FILE_SIZE:
+                if len(file_bytes) > max_file_size:
                     raise ValueError("File too large")
 
                 extracted_text = ""

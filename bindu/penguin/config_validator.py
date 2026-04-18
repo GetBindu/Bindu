@@ -152,6 +152,7 @@ class ConfigValidator:
             )
 
         deployment_url = deployment_url.strip()
+        deployment_config["url"] = deployment_url
 
         parsed = urlparse(deployment_url)
         if parsed.scheme not in {"http", "https"} or not parsed.hostname:
