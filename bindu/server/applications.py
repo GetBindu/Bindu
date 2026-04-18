@@ -19,7 +19,7 @@ from __future__ import annotations as _annotations
 
 from contextlib import asynccontextmanager
 from functools import partial
-from typing import Any, AsyncIterator, Callable, Sequence
+from typing import TYPE_CHECKING, Any, AsyncIterator, Callable, Sequence
 from uuid import UUID, uuid4
 
 from starlette.applications import Starlette
@@ -37,7 +37,10 @@ from bindu.common.models import (
     SentryConfig,
 )
 from bindu.settings import app_settings
-from bindu.utils import get_x402_extension_from_capabilities
+from bindu.utils import (
+    get_voice_extension_from_capabilities,
+    get_x402_extension_from_capabilities,
+)
 from bindu.utils.retry import execute_with_retry
 
 from .scheduler.base import Scheduler
@@ -46,6 +49,9 @@ from .task_manager import TaskManager
 from bindu.utils.logging import get_logger
 
 logger = get_logger("bindu.server.applications")
+
+if TYPE_CHECKING:
+    from bindu.extensions.voice.session_factory import SessionManagerBackend
 
 # Constants
 UNKNOWN_AUTH_PROVIDER_ERROR = (
@@ -110,8 +116,6 @@ class BinduApplication(Starlette):
 
         # Setup middleware chain
         x402_ext = get_x402_extension_from_capabilities(manifest)
-        from bindu.utils import get_voice_extension_from_capabilities
-
         voice_ext = get_voice_extension_from_capabilities(manifest)
         payment_requirements_for_middleware = None
         if x402_ext:
@@ -151,7 +155,7 @@ class BinduApplication(Starlette):
         self._agent_card_json_schema: bytes | None = None
         self._x402_ext = x402_ext
         self._voice_ext = voice_ext
-        self._voice_session_manager = None
+        self._voice_session_manager: SessionManagerBackend | None = None
         self._payment_session_manager = None
         self._payment_requirements = None
         self._paywall_config = None
