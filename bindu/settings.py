@@ -6,7 +6,7 @@ This module defines the configuration settings for the application using pydanti
 from pydantic import BaseModel, Field, HttpUrl, computed_field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import AliasChoices
-from typing import Literal
+from typing import Literal, Optional
 
 
 class ProjectSettings(BaseSettings):
@@ -1106,12 +1106,13 @@ class VoiceSettings(BaseSettings):
 
     # Session storage backend (for multi-worker compatibility)
     session_backend: Literal["memory", "redis"] = "memory"
-    redis_url: str = ""  # e.g., "redis://localhost:6379/0"
+    redis_url: Optional[str] = None  # e.g., "redis://localhost:6379/0"
     redis_session_ttl: int = 300  # seconds, TTL for session keys in Redis
 
     # WebSocket session authentication
     session_auth_required: bool = False
     session_token_ttl: int = 300  # seconds; must be <= session_timeout
+    ws_token_read_timeout_secs: float = 5.0
 
     # Rate limiting (0 disables)
     rate_limit_per_ip_per_minute: int = 120
