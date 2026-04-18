@@ -158,15 +158,22 @@ def _setup_scopeblind_extension(
     caller_dir: Path | None = None,
 ) -> ScopeBlindExtension:
     """Create ScopeBlind extension from config."""
-    cedar_policies = scopeblind_config["cedar_policies"]
-    policy_path = Path(os.path.expanduser(cedar_policies))
-    if not policy_path.is_absolute() and caller_dir is not None:
-        policy_path = (caller_dir / policy_path).resolve()
+    raw_cedar_policies = scopeblind_config["cedar_policies"].strip()
+    policy_path = Path(os.path.expanduser(raw_cedar_policies))
+    resolved_policy_path = policy_path
+    if not resolved_policy_path.is_absolute() and caller_dir is not None:
+        resolved_policy_path = (caller_dir / resolved_policy_path).resolve()
+
+    cedar_policies = (
+        str(resolved_policy_path)
+        if resolved_policy_path.exists()
+        else raw_cedar_policies
+    )
 
     key_dir = ((caller_dir or Path.cwd()) / app_settings.scopeblind.pki_dir).resolve()
     extension = ScopeBlindExtension(
         mode=scopeblind_config.get("mode", "enforce"),
-        cedar_policies=str(policy_path),
+        cedar_policies=cedar_policies,
         key_dir=key_dir,
     )
     logger.info(f"ScopeBlind extension created: {extension}")
