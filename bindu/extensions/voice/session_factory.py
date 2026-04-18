@@ -114,13 +114,9 @@ async def create_session_manager(
             redis_session_ttl=voice_settings.redis_session_ttl,
         )
 
-        # Enter async context to initialize Redis connection
-        try:
-            await manager.__aenter__()
-        except Exception:
-            # Ensure cleanup on initialization failure
-            await manager.__aexit__(None, None, None)
-            raise
+        # Enter async context to initialize Redis connection.
+        # RedisVoiceSessionManager.__aenter__ handles its own cleanup on failure.
+        await manager.__aenter__()
         return manager
 
     raise ValueError(
