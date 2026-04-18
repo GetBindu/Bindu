@@ -15,7 +15,7 @@ export async function acquireLock(key: Semaphores | string): Promise<ObjectId | 
 			createdAt: new Date(),
 			updatedAt: new Date(),
 			deleteAt: new Date(Date.now() + 1000 * 60 * 3), // 3 minutes
-		} as Partial<Semaphore>);
+		} satisfies Semaphore);
 
 		return insert.acknowledged ? id : false; // true if the document was inserted
 	} catch (e) {
