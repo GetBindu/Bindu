@@ -245,6 +245,8 @@ class Worker(ABC):
         Saves task state and updates to 'suspended' state.
         State validation is done in TaskHandlers before this is called.
         """
+        import datetime
+
         task_id = self._normalize_uuid(params["task_id"])
         logger.info(f"Pausing task {task_id}")
 
@@ -254,8 +256,16 @@ class Worker(ABC):
             logger.warning(f"Task {task_id} not found for pause")
             return
 
-        # Update state to suspended
-        await self.storage.update_task(task_id, state="suspended")
+        # Update state to suspended with pause metadata
+        await self.storage.update_task(
+            task_id,
+            state="suspended",
+            metadata={
+                **task.get("metadata", {}),
+                "paused_at": datetime.datetime.utcnow().isoformat(),
+                "pause_checkpoint": task.get("status", {}).get("checkpoint", None),
+            },
+        )
         logger.info(f"Task {task_id} paused successfully")
 
     async def _handle_resume(self, params: TaskIdParams) -> None:
@@ -264,6 +274,8 @@ class Worker(ABC):
         Updates task to 'resumed' state and re-queues for execution.
         State validation is done in TaskHandlers before this is called.
         """
+        import datetime
+
         task_id = self._normalize_uuid(params["task_id"])
         logger.info(f"Resuming task {task_id}")
 
@@ -278,18 +290,22 @@ class Worker(ABC):
         if task.get("history"):
             message = task["history"][0]
 
-        # Update state to resumed
-        await self.storage.update_task(task_id, state="resumed")
+        # Update state to resumed with resume metadata
+        await self.storage.update_task(
+            task_id,
+            state="resumed",
+            metadata={
+                **task.get("metadata", {}),
+                "resumed_at": datetime.datetime.utcnow().isoformat(),
+            },
+        )
 
         # Re-queue task for execution
-        if message:
-            await self.scheduler.run_task(
-                TaskSendParams(
-                    task_id=task_id,
-                    context_id=task["context_id"],
-                    message=message,
-                )
+        await self.scheduler.run_task(
+            TaskSendParams(
+                task_id=task_id,
+                context_id=task["context_id"],
+                message=message,
             )
-            logger.info(f"Task {task_id} resumed and re-queued")
-        else:
-            logger.warning(f"Task {task_id} has no message to resume with")
+        )
+        logger.info(f"Task {task_id} resumed and re-queued")

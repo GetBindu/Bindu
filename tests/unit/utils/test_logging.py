@@ -38,3 +38,20 @@ class TestLogging:
         """Test logger configuration with custom log level."""
         # Should not raise error
         configure_logger(log_level="DEBUG")
+
+    def test_set_log_level(self):
+        """Test setting log level at runtime."""
+        from bindu.utils.logging import set_log_level
+
+        # Should not raise error
+        set_log_level("INFO")
+        set_log_level("DEBUG")
+        set_log_level("WARNING")
+
+    def test_pre_configured_logger(self):
+        """Test the pre-configured logger."""
+        from bindu.utils.logging import log
+
+        assert hasattr(log, "info")
+        assert hasattr(log, "debug")
+        log.info("Test message")

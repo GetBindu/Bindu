@@ -95,8 +95,11 @@ class TaskHandlers:
         await self.scheduler.cancel_task(request["params"])
         task = await self.storage.load_task(task_id)
 
-        # Type narrowing: task should exist since we already validated it above
-        assert task is not None
+        # Task may have been deleted between scheduling and reload
+        if task is None:
+            return self.error_response_creator(
+                CancelTaskResponse, request["id"], TaskNotFoundError, "Task not found"
+            )
 
         return CancelTaskResponse(jsonrpc="2.0", id=request["id"], result=task)
 
@@ -131,7 +134,11 @@ class TaskHandlers:
         await self.scheduler.pause_task(request["params"])
         task = await self.storage.load_task(task_id)
 
-        assert task is not None
+        # Task may have been deleted between scheduling and reload
+        if task is None:
+            return self.error_response_creator(
+                PauseTaskResponse, request["id"], TaskNotFoundError, "Task not found"
+            )
 
         return PauseTaskResponse(jsonrpc="2.0", id=request["id"], result=task)
 
@@ -166,7 +173,11 @@ class TaskHandlers:
         await self.scheduler.resume_task(request["params"])
         task = await self.storage.load_task(task_id)
 
-        assert task is not None
+        # Task may have been deleted between scheduling and reload
+        if task is None:
+            return self.error_response_creator(
+                ResumeTaskResponse, request["id"], TaskNotFoundError, "Task not found"
+            )
 
         return ResumeTaskResponse(jsonrpc="2.0", id=request["id"], result=task)
 

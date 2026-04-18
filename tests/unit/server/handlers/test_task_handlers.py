@@ -133,6 +133,50 @@ class TestTaskHandlers:
         mock_scheduler.cancel_task.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_cancel_task_deleted_between(self):
+        """Test cancel when task is deleted between check and reload."""
+        mock_storage = AsyncMock()
+        # First load returns task (so we proceed to cancel)
+        # Second load (after cancel) returns None
+        mock_storage.load_task.side_effect = [
+            {"id": "task123", "status": {"state": "working"}},
+            None,  # Task deleted between scheduling and reload
+        ]
+        mock_scheduler = AsyncMock()
+
+        mock_error_creator = Mock(return_value={"error": "not found"})
+        handler = TaskHandlers(
+            scheduler=mock_scheduler,
+            storage=mock_storage,
+            error_response_creator=mock_error_creator,
+        )
+        request = {
+            "jsonrpc": "2.0",
+            "id": "11",
+            "params": {"task_id": "task123"},
+        }
+
+        response = await handler.cancel_task(request)
+
+        assert "error" in response
+
+    @pytest.mark.asyncio
+    async def test_cancel_task_success(self):
+        """Test canceling task in working state."""
+        mock_storage = AsyncMock()
+        mock_task = {"id": "task123", "status": {"state": "working"}}
+        mock_storage.load_task.return_value = mock_task
+        mock_scheduler = AsyncMock()
+
+        handler = TaskHandlers(scheduler=mock_scheduler, storage=mock_storage)
+        request = {"jsonrpc": "2.0", "id": "10", "params": {"task_id": "task123"}}
+
+        response = await handler.cancel_task(request)
+
+        assert response["jsonrpc"] == "2.0"
+        mock_scheduler.cancel_task.assert_called_once()
+
+    @pytest.mark.asyncio
     async def test_pause_task_success(self):
         """Test pausing task in working state."""
         mock_storage = AsyncMock()
@@ -147,6 +191,32 @@ class TestTaskHandlers:
 
         assert response["jsonrpc"] == "2.0"
         mock_scheduler.pause_task.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_pause_task_deleted_between(self):
+        """Test pause when task is deleted between check and reload."""
+        mock_storage = AsyncMock()
+        mock_storage.load_task.side_effect = [
+            {"id": "task123", "status": {"state": "working"}},
+            None,
+        ]
+        mock_scheduler = AsyncMock()
+
+        mock_error_creator = Mock(return_value={"error": "not found"})
+        handler = TaskHandlers(
+            scheduler=mock_scheduler,
+            storage=mock_storage,
+            error_response_creator=mock_error_creator,
+        )
+        request = {
+            "jsonrpc": "2.0",
+            "id": "12",
+            "params": {"task_id": "task123"},
+        }
+
+        response = await handler.pause_task(request)
+
+        assert "error" in response
 
     @pytest.mark.asyncio
     async def test_pause_task_not_working_state(self):
@@ -204,6 +274,32 @@ class TestTaskHandlers:
 
         assert response["jsonrpc"] == "2.0"
         mock_scheduler.resume_task.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_resume_task_deleted_between(self):
+        """Test resume when task is deleted between check and reload."""
+        mock_storage = AsyncMock()
+        mock_storage.load_task.side_effect = [
+            {"id": "task123", "status": {"state": "suspended"}},
+            None,
+        ]
+        mock_scheduler = AsyncMock()
+
+        mock_error_creator = Mock(return_value={"error": "not found"})
+        handler = TaskHandlers(
+            scheduler=mock_scheduler,
+            storage=mock_storage,
+            error_response_creator=mock_error_creator,
+        )
+        request = {
+            "jsonrpc": "2.0",
+            "id": "13",
+            "params": {"task_id": "task123"},
+        }
+
+        response = await handler.resume_task(request)
+
+        assert "error" in response
 
     @pytest.mark.asyncio
     async def test_resume_task_not_suspended_state(self):

@@ -1372,15 +1372,17 @@ TaskNotCancelableError = JSONRPCError[
         "See task lifecycle: /docs/tasks"
     ],
 ]
+# Task errors (-32014 to -32019)
+# Bindu-specific task management extensions
 TaskNotPausableError = JSONRPCError[
-    Literal[-32007],
+    Literal[-32014],
     Literal[
         "This task cannot be paused in its current state. Tasks can only be paused while in 'working' state. "
         "See task lifecycle: /docs/tasks"
     ],
 ]
 TaskNotResumableError = JSONRPCError[
-    Literal[-32008],
+    Literal[-32015],
     Literal[
         "This task cannot be resumed in its current state. Tasks can only be resumed while in 'suspended' state. "
         "See task lifecycle: /docs/tasks"
