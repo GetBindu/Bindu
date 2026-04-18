@@ -35,7 +35,7 @@ DEFAULT_FIRST_TOKEN_TIMEOUT_SECONDS = 10.0
 DEFAULT_TOTAL_RESPONSE_TIMEOUT_SECONDS = 30.0
 DEFAULT_CANCELLATION_GRACE_SECONDS = 0.5
 DEFAULT_THINKING_TEXT = "One moment."
-DEFAULT_TIMEOUT_FALLBACK_TEXT = "Sorry — I’m having trouble responding right now."
+DEFAULT_TIMEOUT_FALLBACK_TEXT = "Sorry - I'm having trouble responding right now."
 
 
 class AgentBridgeProcessor(FrameProcessor):
@@ -57,8 +57,8 @@ class AgentBridgeProcessor(FrameProcessor):
         *,
         voice_settings: "VoiceSettings | None" = None,
         allow_interruptions: bool = True,
-        first_token_timeout_seconds: float = DEFAULT_FIRST_TOKEN_TIMEOUT_SECONDS,
-        total_response_timeout_seconds: float = DEFAULT_TOTAL_RESPONSE_TIMEOUT_SECONDS,
+        first_token_timeout_seconds: float | None = None,
+        total_response_timeout_seconds: float | None = None,
         on_state_change: Callable[[str], Any] | None = None,
         on_user_transcript: Callable[[str], Any] | None = None,
         on_agent_response: Callable[[str], Any] | None = None,
@@ -79,8 +79,16 @@ class AgentBridgeProcessor(FrameProcessor):
             )
             self._max_history_messages = int(voice_settings.conversation_history_limit)
         else:
-            self._first_token_timeout_seconds = float(first_token_timeout_seconds)
-            self._total_response_timeout_seconds = float(total_response_timeout_seconds)
+            self._first_token_timeout_seconds = float(
+                first_token_timeout_seconds
+                if first_token_timeout_seconds is not None
+                else DEFAULT_FIRST_TOKEN_TIMEOUT_SECONDS
+            )
+            self._total_response_timeout_seconds = float(
+                total_response_timeout_seconds
+                if total_response_timeout_seconds is not None
+                else DEFAULT_TOTAL_RESPONSE_TIMEOUT_SECONDS
+            )
             self._cancellation_grace_seconds = float(DEFAULT_CANCELLATION_GRACE_SECONDS)
             self._max_history_messages = MAX_HISTORY_TURNS * 2
 
@@ -492,7 +500,8 @@ class AgentBridgeProcessor(FrameProcessor):
         overflow = len(self._conversation_history) - self._max_history_messages
         if overflow > 0:
             turns_to_drop = max(1, (overflow + 1) // 2)
-            del self._conversation_history[: turns_to_drop * 2]
+            items_to_drop = min(turns_to_drop * 2, overflow)
+            del self._conversation_history[:items_to_drop]
 
     def _safe_callback(self, fn: Callable[..., Any], *args: Any) -> None:
         """Call a callback, tracking async tasks so they are not GC'd early."""
