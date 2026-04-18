@@ -578,7 +578,13 @@ async def voice_session_start(app: BinduApplication, request: Request) -> Respon
             ) from exc
 
         if isinstance(body, dict) and "context_id" in body:
-            context_id = str(body["context_id"])
+            raw_context_id = body["context_id"]
+            if not isinstance(raw_context_id, str) or not raw_context_id.strip():
+                raise HTTPException(
+                    status_code=400,
+                    detail="context_id must be a non-empty string",
+                )
+            context_id = raw_context_id.strip()
 
     session_token: str | None = None
     session_token_expires_at: float | None = None
@@ -731,7 +737,15 @@ async def voice_websocket(websocket: WebSocket) -> None:
             await websocket.accept()
         if not provided:
             try:
-                provided = (await websocket.receive_text()).strip()
+                provided = (
+                    await asyncio.wait_for(
+                        websocket.receive_text(),
+                        timeout=float(app_settings.voice.ws_token_read_timeout_secs),
+                    )
+                ).strip()
+            except asyncio.TimeoutError:
+                await websocket.close(code=1008, reason="Missing session token")
+                return
             except Exception:
                 await websocket.close(code=1008, reason="Missing session token")
                 return
@@ -745,29 +759,8 @@ async def voice_websocket(websocket: WebSocket) -> None:
     else:
         await websocket.accept()
 
-    await session_manager.update_state(session_id, "active")
-
-    voice_ext = getattr(app, "_voice_ext", None)
-    manifest = getattr(app, "manifest", None)
-    if voice_ext is None or manifest is None or not hasattr(manifest, "run"):
-        await websocket.send_text(
-            json.dumps({"type": "error", "message": "Agent not configured for voice"})
-        )
-        await websocket.close(code=1011)
-        return
-
-    from bindu.extensions.voice.pipeline_builder import build_voice_pipeline
-    from pipecat.transports.websocket.fastapi import (
-        FastAPIWebsocketTransport,
-        FastAPIWebsocketParams,
-    )
-    from pipecat.pipeline.pipeline import Pipeline
-    from pipecat.pipeline.task import PipelineTask
-    from pipecat.pipeline.runner import PipelineRunner
-
-    # Notify UI we are listening
     send_lock = asyncio.Lock()
-    await _send_json(websocket, {"type": "state", "state": "listening"}, send_lock)
+    components: dict[str, Any] | None = None
 
     async def _on_user_transcript(text: str) -> None:
         await _send_json(
@@ -816,16 +809,6 @@ async def voice_websocket(websocket: WebSocket) -> None:
             send_lock,
         )
 
-    components = build_voice_pipeline(
-        voice_ext=voice_ext,
-        manifest_run=manifest.run,
-        context_id=session.context_id,
-        on_state_change=_on_state_change,
-        on_user_transcript=_on_user_transcript,
-        on_agent_response=_on_agent_response,
-        on_agent_transcript=_on_agent_transcript,
-    )
-
     control = _VoiceControlState()
     inbound_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=10)
     filtered_ws = _FilteredWebSocket(websocket, inbound_queue)
@@ -846,6 +829,39 @@ async def voice_websocket(websocket: WebSocket) -> None:
     runner_task: asyncio.Task[Any] | None = None
 
     try:
+        await session_manager.update_state(session_id, "active")
+
+        voice_ext = getattr(app, "_voice_ext", None)
+        manifest = getattr(app, "manifest", None)
+        if voice_ext is None or manifest is None or not hasattr(manifest, "run"):
+            await websocket.send_text(
+                json.dumps({"type": "error", "message": "Agent not configured for voice"})
+            )
+            await websocket.close(code=1011)
+            return
+
+        from bindu.extensions.voice.pipeline_builder import build_voice_pipeline
+        from pipecat.transports.websocket.fastapi import (
+            FastAPIWebsocketTransport,
+            FastAPIWebsocketParams,
+        )
+        from pipecat.pipeline.pipeline import Pipeline
+        from pipecat.pipeline.task import PipelineTask
+        from pipecat.pipeline.runner import PipelineRunner
+
+        components = build_voice_pipeline(
+            voice_ext=voice_ext,
+            manifest_run=manifest.run,
+            context_id=session.context_id,
+            on_state_change=_on_state_change,
+            on_user_transcript=_on_user_transcript,
+            on_agent_response=_on_agent_response,
+            on_agent_transcript=_on_agent_transcript,
+        )
+
+        # Notify UI we are listening
+        await _send_json(websocket, {"type": "state", "state": "listening"}, send_lock)
+
         transport = FastAPIWebsocketTransport(
             websocket=filtered_ws,  # type: ignore[arg-type]
             params=FastAPIWebsocketParams(
@@ -963,7 +979,8 @@ async def voice_websocket(websocket: WebSocket) -> None:
         except Exception:
             pass
         try:
-            await components["bridge"].cleanup_background_tasks()
+            if components is not None:
+                await components["bridge"].cleanup_background_tasks()
         except Exception:
             pass
         try:
