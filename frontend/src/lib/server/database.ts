@@ -78,12 +78,7 @@ class InMemoryCollection<T = Record<string, unknown>> {
 				});
 			}
 		}
-		for (const doc of matched) {
-			if (this.matchesFilter(doc, filter)) {
-				return doc;
-			}
-		}
-		return null;
+		return matched[0] ?? null;
 	}
 
 	find(filter: Record<string, unknown> = {}): InMemoryCursor<T> {
@@ -146,16 +141,13 @@ class InMemoryCollection<T = Record<string, unknown>> {
 		filter: Record<string, unknown>,
 		update: Record<string, unknown> | Array<Record<string, unknown>>
 	): Promise<{ matchedCount: number; modifiedCount: number }> {
+		if (Array.isArray(update)) {
+			throw new Error("Pipeline-style updates are unsupported in InMemoryCollection.updateMany");
+		}
 		let count = 0;
 		for (const [id, doc] of this.data.entries()) {
 			if (this.matchesFilter(doc, filter)) {
-				const pipelineUpdate = Array.isArray(update)
-					? update.reduce(
-							(acc, stage) => this.applyUpdate(acc, stage),
-							doc
-					  )
-					: this.applyUpdate(doc, update);
-				const updated = pipelineUpdate;
+				const updated = this.applyUpdate(doc, update);
 				this.data.set(id, updated);
 				count++;
 			}
@@ -467,6 +459,11 @@ class InMemoryBucket {
 		const file = this.files.get(id.toString());
 		const listeners = new Map<string, Set<(arg?: Error | Uint8Array) => void>>();
 		let destroyed = false;
+		const scheduled = {
+			error: false,
+			data: false,
+			end: false,
+		};
 
 		const emit = (event: string, arg?: Error | Uint8Array) => {
 			if (destroyed) return;
@@ -487,6 +484,21 @@ class InMemoryBucket {
 			listeners.get(event)?.add(handler);
 		};
 
+		const scheduleInitialEmit = (event: string) => {
+			if (event === "error" && !scheduled.error && !file) {
+				scheduled.error = true;
+				setTimeout(() => emit("error", new Error("File not found")), 0);
+			}
+			if (event === "data" && !scheduled.data && file) {
+				scheduled.data = true;
+				setTimeout(() => emit("data", file.data), 0);
+			}
+			if (event === "end" && !scheduled.end && file) {
+				scheduled.end = true;
+				setTimeout(() => emit("end"), 0);
+			}
+		};
+
 		const downloadStream = {
 			pipe<T extends { write: (d: Buffer) => void; end: () => void }>(dest: T): T {
 				if (file) dest.write(file.data);
@@ -495,9 +507,7 @@ class InMemoryBucket {
 			},
 			on(_event: string, cb: (arg?: Error | Uint8Array) => void) {
 				addListener(_event, cb);
-				if (_event === "error" && !file) setTimeout(() => emit("error", new Error("File not found")), 0);
-				if (_event === "data" && file) setTimeout(() => emit("data", file.data), 0);
-				if (_event === "end" && file) setTimeout(() => emit("end"), 0);
+				scheduleInitialEmit(_event);
 				return downloadStream;
 			},
 			once(event: string, cb: (arg?: Error | Uint8Array) => void) {
@@ -506,9 +516,7 @@ class InMemoryBucket {
 					cb(arg);
 				};
 				addListener(event, wrapped);
-				if (event === "error" && !file) setTimeout(() => emit("error", new Error("File not found")), 0);
-				if (event === "data" && file) setTimeout(() => emit("data", file.data), 0);
-				if (event === "end" && file) setTimeout(() => emit("end"), 0);
+				scheduleInitialEmit(event);
 				return downloadStream;
 			},
 			off(event: string, cb: (arg?: Error | Uint8Array) => void) {
