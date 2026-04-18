@@ -7,8 +7,9 @@
 import type { MessageUpdate } from '$lib/types/MessageUpdate';
 import { MessageUpdateType, MessageUpdateStatus } from '$lib/types/MessageUpdate';
 import { handlePaymentRequired, getPaymentHeaders, clearPaymentToken } from './paymentHandler';
+import { env as publicEnv } from '$env/dynamic/public';
 
-const AGENT_BASE_URL = 'http://localhost:3773';
+const AGENT_BASE_URL = publicEnv.PUBLIC_AGENT_BASE_URL || 'http://localhost:3773';
 
 /**
  * Submit feedback for a task
