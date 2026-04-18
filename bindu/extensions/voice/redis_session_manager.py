@@ -113,9 +113,9 @@ class RedisVoiceSessionManager:
         self._redis_session_ttl = redis_session_ttl
         self._redis_client: redis.Redis | None = None
         self._cleanup_task: asyncio.Task[None] | None = None
-        self._create_session_script: Any | None = None
-        self._update_session_script: Any | None = None
-        self._delete_session_script: Any | None = None
+        self._create_session_script_sha: str | None = None
+        self._update_session_script_sha: str | None = None
+        self._delete_session_script_sha: str | None = None
 
     async def __aenter__(self) -> RedisVoiceSessionManager:
         """Enter async context manager and initialize Redis connection."""
@@ -129,13 +129,13 @@ class RedisVoiceSessionManager:
             logger.info(
                 f"Redis session manager connected to {self._safe_redis_target()}"
             )
-            self._create_session_script = self._redis_client.register_script(
+            self._create_session_script_sha = await self._redis_client.script_load(
                 _CREATE_SESSION_LUA
             )
-            self._update_session_script = self._redis_client.register_script(
+            self._update_session_script_sha = await self._redis_client.script_load(
                 _UPDATE_SESSION_LUA
             )
-            self._delete_session_script = self._redis_client.register_script(
+            self._delete_session_script_sha = await self._redis_client.script_load(
                 _DELETE_SESSION_LUA
             )
         except redis.RedisError as e:
@@ -210,7 +210,7 @@ class RedisVoiceSessionManager:
             RuntimeError: If the maximum number of concurrent sessions is reached.
             RuntimeError: If Redis client is not initialized.
         """
-        if not self._redis_client or not self._create_session_script:
+        if not self._redis_client or not self._create_session_script_sha:
             raise RuntimeError(
                 "Redis client not initialized. Use async context manager."
             )
@@ -227,9 +227,14 @@ class RedisVoiceSessionManager:
 
         # Atomically check session count and create the new session using a Lua script.
         # This prevents a race condition across multiple workers.
-        success = await self._create_session_script(
-            keys=[REDIS_ACTIVE_SET_KEY, key],
-            args=[self._max_sessions, serialized_session, self._redis_session_ttl],
+        success = await self._redis_client.evalsha(
+            self._create_session_script_sha,
+            2,
+            REDIS_ACTIVE_SET_KEY,
+            key,
+            self._max_sessions,
+            serialized_session,
+            self._redis_session_ttl,
         )
 
         if not success:
@@ -279,7 +284,7 @@ class RedisVoiceSessionManager:
                 "Redis client not initialized. Use async context manager."
             )
 
-        if not self._delete_session_script:
+        if not self._delete_session_script_sha:
             raise RuntimeError(
                 "Redis delete script not initialized. Use async context manager."
             )
@@ -292,7 +297,12 @@ class RedisVoiceSessionManager:
             duration = session.duration_seconds
             logger.info(f"Voice session ended: {session_id} (duration={duration:.1f}s)")
 
-        await self._delete_session_script(keys=[REDIS_ACTIVE_SET_KEY, key], args=[])
+        await self._redis_client.evalsha(
+            self._delete_session_script_sha,
+            2,
+            REDIS_ACTIVE_SET_KEY,
+            key,
+        )
         logger.debug(f"Voice session removed from Redis: {session_id}")
 
     async def update_state(
@@ -312,14 +322,17 @@ class RedisVoiceSessionManager:
             )
 
         key = self._session_key(session_id)
-        if not self._update_session_script:
+        if not self._update_session_script_sha:
             raise RuntimeError(
                 "Redis update script not initialized. Use async context manager."
             )
 
-        success = await self._update_session_script(
-            keys=[key],
-            args=[state, self._redis_session_ttl],
+        success = await self._redis_client.evalsha(
+            self._update_session_script_sha,
+            1,
+            key,
+            state,
+            self._redis_session_ttl,
         )
         if not success:
             logger.debug(f"Session missing during update_state: {session_id}")
@@ -334,15 +347,10 @@ class RedisVoiceSessionManager:
             if not members:
                 return 0
 
-            pipeline = self._redis_client.pipeline()
-            member_list = list(members)
-            for key in member_list:
-                pipeline.get(key)
-            values = await pipeline.execute()
-
             count = 0
             stale_members: list[str] = []
-            for key, data in zip(member_list, values, strict=True):
+            for key in members:
+                data = await self._redis_client.get(key)
                 if data:
                     session = self._deserialize_session(key.split(":")[-1], data)
                     if session.state != "ended":
@@ -383,8 +391,7 @@ class RedisVoiceSessionManager:
         """Periodically expire sessions that exceed the timeout."""
         while True:
             try:
-                interval = min(30, max(1, int(self._session_timeout // 2)))
-                await asyncio.sleep(interval)
+                await asyncio.sleep(30)  # check every 30s
                 await self._expire_timed_out_sessions()
             except asyncio.CancelledError:
                 break
@@ -399,16 +406,9 @@ class RedisVoiceSessionManager:
         try:
             expired: list[str] = []
             members = await self._redis_client.smembers(REDIS_ACTIVE_SET_KEY)
-            if not members:
-                return
 
-            member_list = list(members)
-            pipeline = self._redis_client.pipeline()
-            for key in member_list:
-                pipeline.get(key)
-            values = await pipeline.execute()
-
-            for key, data in zip(member_list, values, strict=True):
+            for key in members:
+                data = await self._redis_client.get(key)
                 if not data:
                     expired.append(key)
                     continue
@@ -426,14 +426,17 @@ class RedisVoiceSessionManager:
                         f"limit={self._session_timeout}s)"
                     )
 
-            if not expired:
-                return
-
-            removal_pipeline = self._redis_client.pipeline()
             for key in expired:
-                removal_pipeline.delete(key)
-                removal_pipeline.srem(REDIS_ACTIVE_SET_KEY, key)
-            await removal_pipeline.execute()
+                if self._delete_session_script_sha:
+                    await self._redis_client.evalsha(
+                        self._delete_session_script_sha,
+                        2,
+                        REDIS_ACTIVE_SET_KEY,
+                        key,
+                    )
+                else:
+                    await self._redis_client.delete(key)
+                    await self._redis_client.srem(REDIS_ACTIVE_SET_KEY, key)
 
         except redis.RedisError as e:
             logger.error(f"Error expiring timed out sessions: {e}")

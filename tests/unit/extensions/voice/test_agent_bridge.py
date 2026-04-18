@@ -252,13 +252,11 @@ class TestAgentBridgeProcessor:
             await bridge.process_transcription(f"message {index}")
 
         history = bridge.history
-        from bindu.settings import app_settings
-
-        max_messages = app_settings.voice.conversation_history_limit
         total_messages = 50
-        expected_len = min(max_messages, total_messages)
-        trimmed_count = total_messages - expected_len
-        expected_first_index = max(0, trimmed_count // 2)
+        overflow = max(0, total_messages - bridge._max_history_messages)
+        turns_to_drop = max(1, (overflow + 1) // 2) if overflow else 0
+        expected_len = total_messages - (turns_to_drop * 2)
+        expected_first_index = turns_to_drop
         assert len(history) == expected_len
         assert history[0]["content"] == f"message {expected_first_index}"
         assert history[-1]["content"] == "Echo: message 24"
