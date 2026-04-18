@@ -40,8 +40,16 @@ def build_voice_pipeline(
         voice_ext: Voice agent extension with STT/TTS config.
         manifest_run: The agent manifest's ``run`` callable.
         context_id: A2A context ID for this session.
-        on_user_transcript: Optional callback for user transcript events.
-        on_agent_response: Optional callback for agent response events.
+        on_state_change: Optional callback ``Callable[[str], Any]`` invoked when
+            the voice session state changes (for example: connecting, listening,
+            speaking, ended).
+        on_user_transcript: Optional callback ``Callable[[str], Any]`` invoked
+            when user speech is transcribed by STT.
+        on_agent_transcript: Optional callback ``Callable[[str, bool], Any]``
+            invoked during agent TTS/transcript emission with transcript text and
+            completion flag.
+        on_agent_response: Optional callback ``Callable[[str], Any]`` invoked
+            when the agent produces a final text response.
 
     Returns:
         Dictionary with ``stt``, ``tts``, ``bridge``, and ``vad`` components.
