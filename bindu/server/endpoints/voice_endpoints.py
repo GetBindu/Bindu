@@ -854,6 +854,7 @@ async def voice_websocket(websocket: WebSocket) -> None:
 
         # Notify UI we are listening
         await _send_json(websocket, {"type": "state", "state": "listening"}, send_lock)
+        bridge = components["bridge"]
 
         async def _handle_user_text(text: str) -> None:
             await _send_json(
@@ -861,9 +862,7 @@ async def voice_websocket(websocket: WebSocket) -> None:
                 {"type": "transcript", "role": "user", "text": text, "is_final": True},
                 send_lock,
             )
-            response = await components["bridge"].process_transcription(
-                text, emit_frames=True
-            )
+            response = await bridge.process_transcription(text, emit_frames=True)
             if response:
                 await _on_agent_response(response)
 
