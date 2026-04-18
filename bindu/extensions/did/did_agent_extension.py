@@ -21,6 +21,7 @@ from __future__ import annotations
 import os
 import platform
 import subprocess
+import getpass
 
 from datetime import datetime, timezone
 from functools import cached_property
@@ -214,8 +215,18 @@ class DIDAgentExtension:
             # Windows does not enforce POSIX permissions — write directly
             self.private_key_path.write_bytes(private_pem)
             self.public_key_path.write_bytes(public_pem)
-            self._harden_windows_key_file_acl(self.private_key_path)
-            self._harden_windows_key_file_acl(self.public_key_path)
+            try:
+                self._harden_windows_key_file_acl(self.private_key_path)
+                self._harden_windows_key_file_acl(self.public_key_path)
+            except RuntimeError:
+                for key_path in (self.private_key_path, self.public_key_path):
+                    try:
+                        key_path.unlink(missing_ok=True)
+                    except OSError:
+                        logger.warning(
+                            f"Failed to remove key file during ACL hardening rollback: {key_path}"
+                        )
+                raise
         else:
             # POSIX: use os.open to set permissions atomically on creation
             fd = os.open(
@@ -240,8 +251,22 @@ class DIDAgentExtension:
     @staticmethod
     def _harden_windows_key_file_acl(path: Path) -> None:
         """Restrict Windows ACLs to current user for key file confidentiality."""
-        username = os.getenv("USERNAME")
+        username = (os.getenv("USERNAME") or "").strip()
         if not username:
+            try:
+                username = os.getlogin().strip()
+            except OSError:
+                username = ""
+        if not username:
+            username = (getpass.getuser() or "").strip()
+        if not username:
+            username = (os.getenv("USER") or os.getenv("COMPUTERNAME") or "").strip()
+        if not username:
+            username = "unknown_user"
+            logger.warning(
+                "Falling back to 'unknown_user' principal for Windows ACL hardening step"
+            )
+        if not isinstance(username, str) or not username.strip():
             raise RuntimeError(
                 "Unable to determine Windows username for key ACL hardening"
             )
