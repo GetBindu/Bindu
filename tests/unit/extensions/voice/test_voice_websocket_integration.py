@@ -19,9 +19,11 @@ from bindu.extensions.voice.session_manager import VoiceSessionManager
 from bindu.server.endpoints.voice_endpoints import voice_websocket
 
 
-@pytest.mark.asyncio
-async def test_voice_websocket_accepts_subprotocol_session_token(monkeypatch):
-    # Stub Pipecat imports used by the endpoint.
+@pytest.fixture
+def mock_pipecat_modules(monkeypatch, request):
+    """Stub Pipecat modules used by the voice websocket endpoint."""
+    runner_delay = getattr(request, "param", 0)
+
     fastapi_mod = types.ModuleType("pipecat.transports.websocket.fastapi")
 
     class FastAPIWebsocketParams:
@@ -62,7 +64,7 @@ async def test_voice_websocket_accepts_subprotocol_session_token(monkeypatch):
 
     class PipelineRunner:
         async def run(self, task):
-            await asyncio.sleep(0)
+            await asyncio.sleep(runner_delay)
 
     runner_mod.PipelineRunner = PipelineRunner
 
@@ -72,6 +74,12 @@ async def test_voice_websocket_accepts_subprotocol_session_token(monkeypatch):
     monkeypatch.setitem(sys.modules, "pipecat.pipeline.pipeline", pipeline_mod)
     monkeypatch.setitem(sys.modules, "pipecat.pipeline.task", task_mod)
     monkeypatch.setitem(sys.modules, "pipecat.pipeline.runner", runner_mod)
+
+
+@pytest.mark.asyncio
+async def test_voice_websocket_accepts_subprotocol_session_token(
+    monkeypatch, mock_pipecat_modules
+):
 
     # Stub build_voice_pipeline to avoid creating real provider clients.
     pipeline_builder = __import__(
@@ -114,7 +122,7 @@ async def test_voice_websocket_accepts_subprotocol_session_token(monkeypatch):
         manager = VoiceSessionManager(max_sessions=5, session_timeout=300)
         session = await manager.create_session(
             "ctx",
-            session_token="token-abc",
+            session_token="token-abc",  # pragma: allowlist secret
             session_token_expires_at=1e12,
         )
 
@@ -164,57 +172,10 @@ async def test_voice_websocket_accepts_subprotocol_session_token(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_voice_websocket_times_out_and_sends_error(monkeypatch):
-    fastapi_mod = types.ModuleType("pipecat.transports.websocket.fastapi")
-
-    class FastAPIWebsocketParams:
-        def __init__(self, **kwargs):
-            self.kwargs = kwargs
-
-    class FastAPIWebsocketTransport:
-        def __init__(self, websocket, params):
-            self._ws = websocket
-            self._params = params
-
-        def input(self):
-            return object()
-
-        def output(self):
-            return object()
-
-    fastapi_mod.FastAPIWebsocketTransport = FastAPIWebsocketTransport
-    fastapi_mod.FastAPIWebsocketParams = FastAPIWebsocketParams
-
-    pipeline_mod = types.ModuleType("pipecat.pipeline.pipeline")
-
-    class Pipeline:
-        def __init__(self, items):
-            self.items = items
-
-    pipeline_mod.Pipeline = Pipeline
-
-    task_mod = types.ModuleType("pipecat.pipeline.task")
-
-    class PipelineTask:
-        def __init__(self, pipeline):
-            self.pipeline = pipeline
-
-    task_mod.PipelineTask = PipelineTask
-
-    runner_mod = types.ModuleType("pipecat.pipeline.runner")
-
-    class PipelineRunner:
-        async def run(self, task):
-            await asyncio.sleep(0.05)
-
-    runner_mod.PipelineRunner = PipelineRunner
-
-    monkeypatch.setitem(
-        sys.modules, "pipecat.transports.websocket.fastapi", fastapi_mod
-    )
-    monkeypatch.setitem(sys.modules, "pipecat.pipeline.pipeline", pipeline_mod)
-    monkeypatch.setitem(sys.modules, "pipecat.pipeline.task", task_mod)
-    monkeypatch.setitem(sys.modules, "pipecat.pipeline.runner", runner_mod)
+@pytest.mark.parametrize("mock_pipecat_modules", [0.05], indirect=True)
+async def test_voice_websocket_times_out_and_sends_error(
+    monkeypatch, mock_pipecat_modules
+):
 
     pipeline_builder = __import__(
         "bindu.extensions.voice.pipeline_builder", fromlist=["build_voice_pipeline"]
