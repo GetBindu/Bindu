@@ -232,8 +232,6 @@ frontend/.vercel/
 # Voice model artifacts downloaded at runtime (Piper)
 en_US-*.onnx
 en_US-*.onnx.json
-examples/voice-agent/en_US-*.onnx
-examples/voice-agent/en_US-*.onnx.json
 
 # Runtime logs and provider test outputs
 logs/
