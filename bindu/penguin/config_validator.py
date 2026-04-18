@@ -151,8 +151,10 @@ class ConfigValidator:
                 "ConfigError: 'deployment.url' is a required field in the agent configuration."
             )
 
+        deployment_url = deployment_url.strip()
+
         parsed = urlparse(deployment_url)
-        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
             raise ConfigError(
                 f"ConfigError: 'deployment.url' must be a valid http(s) URL, got '{deployment_url}'."
             )
