@@ -36,9 +36,10 @@ mandates, creating a true agent economy.
 
 **Voice (Real-time Voice Conversations)**
 Adds Vapi-like real-time voice capability to Bindu agents via WebSocket.
-The pipeline uses Pipecat with Deepgram STT and ElevenLabs TTS to provide
-bidirectional voice conversations. Enabled by adding ``voice`` config to
-``bindufy()`` or setting ``VOICE__ENABLED=true`` in the environment.
+The pipeline uses Pipecat with configurable provider-based STT and TTS to provide
+bidirectional voice conversations. Providers can be selected via the ``voice``
+config passed to ``bindufy()`` or through ``VOICE__ENABLED``-based environment
+settings.
 
 
 Each extension follows the A2A protocol specification for extensions:
