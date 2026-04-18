@@ -43,9 +43,11 @@
 		return playbackContext;
 	}
 
-	function pcm16ToFloat32(pcmBuffer: ArrayBuffer): Float32Array {
+	function pcm16ToFloat32(pcmBuffer: ArrayBuffer): Float32Array<ArrayBuffer> {
 		const pcm = new Int16Array(pcmBuffer);
-		const out = new Float32Array(pcm.length);
+		const out: Float32Array<ArrayBuffer> = new Float32Array(
+			new ArrayBuffer(pcm.length * Float32Array.BYTES_PER_ELEMENT)
+		);
 		for (let i = 0; i < pcm.length; i++) {
 			out[i] = (pcm[i] ?? 0) / 32768;
 		}
@@ -64,8 +66,7 @@
 		}
 
 		const audioBuffer = ctx.createBuffer(1, samples.length, sampleRate);
-		const channelData = new Float32Array(samples);
-		audioBuffer.copyToChannel(channelData, 0);
+		audioBuffer.copyToChannel(samples, 0);
 
 		const source = ctx.createBufferSource();
 		source.buffer = audioBuffer;
