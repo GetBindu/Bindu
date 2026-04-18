@@ -92,7 +92,7 @@ grpc = [
 
 # Voice agent support (use: pip install bindu[voice])
 voice = [
-    "pipecat-ai[deepgram,elevenlabs,silero]~=0.0.105",
+    "pipecat-ai[deepgram,elevenlabs,piper,silero]~=0.0.105",
     "websockets>=14.0",
 ]
 
@@ -131,7 +131,7 @@ include = [
 [dependency-groups]
 dev = [
     "bindu",
-    "pipecat-ai[deepgram,elevenlabs,silero]~=0.0.105",
+    "pipecat-ai[deepgram,elevenlabs,piper,silero]~=0.0.105",
     "pytest>=8.0.0",
     "pytest-asyncio>=0.26.0",
     "pytest-cov>=4.1.0",
