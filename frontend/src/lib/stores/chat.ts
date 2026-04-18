@@ -12,6 +12,25 @@ export interface DisplayMessage {
   timestamp: number;
 }
 
+type TextPart = {
+  kind: 'text';
+  text: string;
+  metadata?: Record<string, unknown>;
+};
+
+type FilePart = {
+  kind: 'file';
+  fileId?: string;
+  file?: {
+    bytes?: string | ArrayBuffer | Uint8Array | Blob;
+    mimeType?: string;
+    name?: string;
+  };
+  metadata?: Record<string, unknown>;
+};
+
+type Part = TextPart | FilePart;
+
 export const currentTaskId = writable<string | null>(null);
 export const currentTaskState = writable<TaskState | null>(null);
 export const contextId = writable<string | null>(null);
@@ -226,7 +245,7 @@ export async function clearContext(ctxId: string) {
   }
 }
 
-export async function sendMessage(parts: any[]) {
+export async function sendMessage(parts: Part[]) {
   const currentState = get(currentTaskState);
   const currentTask = get(currentTaskId);
   const currentContext = get(contextId);
@@ -256,11 +275,16 @@ export async function sendMessage(parts: any[]) {
   const useContextId = currentContext || generateUUID();
 
   try {
-    // Add user message immediately (text part only for display)
-    const textPart = parts.find((p) => p.kind === 'text');
-    // Only add message if text part exists and has non-empty text
-    if (textPart?.text) {
-      addMessage(textPart.text, 'user', taskId);
+    // Add user message immediately (combine all text parts for display)
+    const text = (parts || [])
+      .filter(
+        (p): p is TextPart =>
+          p.kind === 'text' && typeof p.text === 'string' && p.text.trim().length > 0
+      )
+      .map((p) => p.text)
+      .join('\n');
+    if (text) {
+      addMessage(text, 'user', taskId);
     }
     replyToTaskId.set(null);
     isThinking.set(true);
