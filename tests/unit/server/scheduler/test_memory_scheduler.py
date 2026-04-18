@@ -1,5 +1,6 @@
 """Minimal tests for in-memory scheduler."""
 
+import asyncio
 import pytest
 from uuid import uuid4
 
@@ -112,20 +113,46 @@ class TestInMemoryScheduler:
         scheduler = InMemoryScheduler()
 
         async with scheduler:
-            send_called = False
+            release_send = asyncio.Event()
+            first_send_started = asyncio.Event()
+            second_send_started = asyncio.Event()
+            send_call_count = 0
 
             async def fake_send(_task_op):
-                nonlocal send_called
-                send_called = True
+                nonlocal send_call_count
+                send_call_count += 1
+                if send_call_count == 1:
+                    first_send_started.set()
+                elif send_call_count == 2:
+                    second_send_started.set()
+                await release_send.wait()
 
             monkeypatch.setattr(scheduler._write_stream, "send", fake_send)
 
-            await scheduler.run_task(  # type: ignore[arg-type]
-                {
-                    "task_id": str(uuid4()),
-                    "context_id": str(uuid4()),
-                    "messages": [],
-                }
+            first_run = asyncio.create_task(
+                scheduler.run_task(  # type: ignore[arg-type]
+                    {
+                        "task_id": uuid4(),
+                        "context_id": uuid4(),
+                    }
+                )
             )
+            await asyncio.wait_for(first_send_started.wait(), timeout=1.0)
 
-            assert send_called is True
+            second_run = asyncio.create_task(
+                scheduler.run_task(  # type: ignore[arg-type]
+                    {
+                        "task_id": uuid4(),
+                        "context_id": uuid4(),
+                    }
+                )
+            )
+            await asyncio.wait_for(second_send_started.wait(), timeout=1.0)
+
+            assert first_run.done() is False
+            assert second_run.done() is False
+
+            release_send.set()
+            await asyncio.gather(first_run, second_run)
+
+            assert send_call_count == 2
