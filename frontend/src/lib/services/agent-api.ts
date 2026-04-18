@@ -48,6 +48,10 @@ export class AgentAPI {
     return this.authToken;
   }
 
+  getBaseUrl(): string {
+    return this.baseUrl;
+  }
+
   private getHeaders(): Record<string, string> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json'
@@ -210,3 +214,7 @@ export class AgentAPI {
 }
 
 export const agentAPI = new AgentAPI();
+
+export function getAgentBaseUrl(): string {
+  return agentAPI.getBaseUrl() ?? 'http://localhost:3773';
+}
