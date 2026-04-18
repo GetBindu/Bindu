@@ -347,10 +347,14 @@ class RedisVoiceSessionManager:
             if not members:
                 return 0
 
+            pipeline = self._redis_client.pipeline()
+            for key in members:
+                pipeline.get(key)
+            values = await pipeline.execute()
+
             count = 0
             stale_members: list[str] = []
-            for key in members:
-                data = await self._redis_client.get(key)
+            for key, data in zip(members, values):
                 if data:
                     session = self._deserialize_session(key.split(":")[-1], data)
                     if session.state != "ended":
