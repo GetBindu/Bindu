@@ -170,12 +170,24 @@ class ScopeBlindExtension:
     def generate_and_save_key_pair(self) -> None:
         """Generate receipt signing keys if they do not already exist."""
         self._key_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            os.chmod(self._key_dir, 0o700)
+        except OSError:
+            logger.warning("Could not tighten ScopeBlind key dir permissions", path=str(self._key_dir))
         if self.private_key_path.exists() and self.public_key_path.exists():
             return
 
         private_pem, public_pem = self._generate_key_pair_data()
         self.private_key_path.write_bytes(private_pem)
+        try:
+            os.chmod(self.private_key_path, 0o600)
+        except OSError:
+            logger.warning("Could not tighten ScopeBlind private key permissions", path=str(self.private_key_path))
         self.public_key_path.write_bytes(public_pem)
+        try:
+            os.chmod(self.public_key_path, 0o644)
+        except OSError:
+            pass
 
     @cached_property
     def private_key(self) -> ed25519.Ed25519PrivateKey:
