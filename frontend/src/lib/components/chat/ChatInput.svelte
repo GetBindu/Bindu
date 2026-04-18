@@ -13,6 +13,7 @@
 	import CarbonClose from "~icons/carbon/close";
 	import UrlFetchModal from "./UrlFetchModal.svelte";
 	import { TEXT_MIME_ALLOWLIST, IMAGE_MIME_ALLOWLIST_DEFAULT } from "$lib/constants/mime";
+	import { error } from "$lib/stores/errors";
 
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
 	import { requireAuthUser } from "$lib/utils/auth";
@@ -173,8 +174,7 @@
 				fileParts = await getFileParts();
 			} catch (err) {
 				console.error("Error reading file parts:", err);
-				// Surface error to user via alert as fallback
-				alert(`Error reading file: ${err instanceof Error ? err.message : String(err)}`);
+				$error = `Error reading file: ${err instanceof Error ? err.message : String(err)}`;
 				// Reset file input state
 				if (fileInputEl) fileInputEl.value = "";
 				files = [];
