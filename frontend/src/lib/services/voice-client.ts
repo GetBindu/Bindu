@@ -1,4 +1,4 @@
-import { agentAPI } from "$lib/services/agent-api";
+import { getAgentBaseUrl } from "$lib/services/agent-api";
 
 export type VoiceState =
 	| "idle"
@@ -37,6 +37,8 @@ export class VoiceClient {
 	private pendingConnectResolve: (() => void) | null = null;
 	private pendingConnectReject: ((reason?: unknown) => void) | null = null;
 	private duplexHoldUntilMs = 0;
+	private isStopping = false;
+	private stopToken = 0;
 
 	private extendDuplexHold(ms: number): void {
 		this.duplexHoldUntilMs = Math.max(this.duplexHoldUntilMs, Date.now() + ms);
@@ -56,8 +58,7 @@ export class VoiceClient {
 	onError?: (message: string) => void;
 
 	async startSession(contextId?: string): Promise<VoiceSessionStart> {
-		const baseUrl =
-			(agentAPI as unknown as { baseUrl?: string }).baseUrl || "http://localhost:3773";
+		const baseUrl = getAgentBaseUrl();
 		let response: Response;
 		try {
 			response = await fetch(`${baseUrl}/voice/session/start`, {
@@ -120,6 +121,7 @@ export class VoiceClient {
 			this.ws.binaryType = "arraybuffer";
 
 			this.ws.onopen = () => {
+				this.isStopping = false;
 				this.pendingConnectResolve = null;
 				this.pendingConnectReject = null;
 				if (sessionToken) {
@@ -242,6 +244,8 @@ export class VoiceClient {
 	}
 
 	async stopSession(): Promise<void> {
+		this.isStopping = true;
+		this.stopToken += 1;
 		const id = this.sessionId;
 		this.sendControl({ type: "stop" });
 		this.cleanupAudioStreaming();
@@ -255,8 +259,7 @@ export class VoiceClient {
 		this.setState("ended");
 
 		if (id) {
-			const baseUrl =
-				(agentAPI as unknown as { baseUrl?: string }).baseUrl || "http://localhost:3773";
+			const baseUrl = getAgentBaseUrl();
 			await fetch(`${baseUrl}/voice/session/${id}`, { method: "DELETE" }).catch(() => undefined);
 		}
 	}
@@ -294,6 +297,12 @@ export class VoiceClient {
 			return;
 		}
 
+		if (this.isStopping || !this.sessionId) {
+			return;
+		}
+
+		const setupToken = this.stopToken;
+
 		if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
 			throw new Error("Voice WebSocket is not connected");
 		}
@@ -308,6 +317,11 @@ export class VoiceClient {
 			},
 		});
 
+		if (this.isStopping || setupToken !== this.stopToken || !this.sessionId) {
+			stream.getTracks().forEach((track) => track.stop());
+			return;
+		}
+
 		const AudioContextCtor =
 			window.AudioContext ||
 			(window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -320,6 +334,12 @@ export class VoiceClient {
 		const desiredSampleRate = 16000;
 		const audioContext = new AudioContextCtor({ sampleRate: desiredSampleRate });
 		await audioContext.resume();
+
+		if (this.isStopping || setupToken !== this.stopToken || !this.sessionId) {
+			void audioContext.close();
+			stream.getTracks().forEach((track) => track.stop());
+			return;
+		}
 
 		// Inline AudioWorkletProcessor code to avoid external file dependencies
 		const workletCode = `
@@ -368,6 +388,12 @@ export class VoiceClient {
 			URL.revokeObjectURL(workletUrl);
 		}
 
+		if (this.isStopping || setupToken !== this.stopToken || !this.sessionId) {
+			void audioContext.close();
+			stream.getTracks().forEach((track) => track.stop());
+			return;
+		}
+
 		const sourceNode = audioContext.createMediaStreamSource(stream);
 		const workletNode = new AudioWorkletNode(audioContext, "pcm16-processor");
 		const silentGainNode = audioContext.createGain();
@@ -388,6 +414,15 @@ export class VoiceClient {
 		workletNode.connect(silentGainNode);
 		silentGainNode.connect(audioContext.destination);
 
+		if (this.isStopping || setupToken !== this.stopToken || !this.sessionId) {
+			workletNode.disconnect();
+			silentGainNode.disconnect();
+			sourceNode.disconnect();
+			void audioContext.close();
+			stream.getTracks().forEach((track) => track.stop());
+			return;
+		}
+
 		this.mediaStream = stream;
 		this.audioContext = audioContext;
 		this.sourceNode = sourceNode;
@@ -402,6 +437,7 @@ export class VoiceClient {
 	}
 
 	private cleanupAudioStreaming(): void {
+		this.stopToken += 1;
 		this.isStreamingAudio = false;
 
 		if (this.processorNode) {
@@ -432,9 +468,7 @@ export class VoiceClient {
 	}
 
 	private resolveWebSocketUrl(wsUrl: string): string {
-		const configuredBaseUrl = (
-			(agentAPI as unknown as { baseUrl?: string }).baseUrl || "http://localhost:3773"
-		).replace(/^http/, "ws");
+		const configuredBaseUrl = getAgentBaseUrl().replace(/^http/, "ws");
 
 		try {
 			const endpointUrl = new URL(wsUrl);
