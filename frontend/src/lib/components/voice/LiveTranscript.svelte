@@ -8,7 +8,7 @@
 	let { items }: Props = $props();
 </script>
 
-<div class="flex max-h-72 flex-col gap-2 overflow-y-auto rounded-lg border border-gray-200 bg-white/80 p-3 text-sm dark:border-gray-700 dark:bg-gray-900/80">
+<div class="flex max-h-72 flex-col gap-2 overflow-y-auto rounded-lg border border-gray-200 bg-white/80 p-3 text-sm dark:border-gray-700 dark:bg-gray-900/80" role="log" aria-live="polite" aria-atomic="false">
 	{#if items.length === 0}
 		<p class="text-gray-500">Voice transcript will appear here...</p>
 	{:else}
