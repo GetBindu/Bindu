@@ -11,6 +11,7 @@ import ssl
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
+from urllib import error, request
 
 from bindu.common.protocol.types import PushNotificationConfig
 from bindu.utils.logging import get_logger
@@ -36,72 +37,25 @@ _BLOCKED_NETWORKS: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = [
 ]
 
 
-def _resolve_and_check_ip(hostname: str) -> str:
-    """Resolve hostname to an IP address and verify it is not in a blocked range.
-
-    Returns the resolved IP address string so callers can connect directly to it,
-    preventing a DNS-rebinding attack where a second resolution (inside urlopen) could
-    return a different—potentially internal—address.
-
-    Args:
-        hostname: The hostname to resolve and validate.
-
-    Returns:
-        The resolved IP address as a string.
-
-    Raises:
-        ValueError: If the hostname cannot be resolved or resolves to a blocked range.
-    """
+def _resolve_and_check_ip(hostname: str, port: int) -> str:
+    """Resolve hostname to an IP address and verify it is not in a blocked range."""
     try:
-        resolved_ip = str(socket.getaddrinfo(hostname, None)[0][4][0])
-        addr = ipaddress.ip_address(resolved_ip)
+        infos = socket.getaddrinfo(hostname, port, type=socket.SOCK_STREAM)
+        addrs = [ipaddress.ip_address(info[4][0]) for info in infos]
     except (socket.gaierror, ValueError) as exc:
         raise ValueError(
             f"Push notification URL hostname could not be resolved: {exc}"
         ) from exc
 
-    for blocked in _BLOCKED_NETWORKS:
-        if addr in blocked:
-            raise ValueError(
-                f"Push notification URL resolves to a blocked address range "
-                f"({addr} is in {blocked}). Internal addresses are not allowed."
-            )
+    for addr in addrs:
+        for blocked in _BLOCKED_NETWORKS:
+            if addr in blocked:
+                raise ValueError(
+                    f"Push notification URL resolves to a blocked address range "
+                    f"({addr} is in {blocked}). Internal addresses are not allowed."
+                )
 
-    return resolved_ip
-
-
-def _resolve_and_check_ip(hostname: str) -> str:
-    """Resolve hostname to an IP address and verify it is not in a blocked range.
-
-    Returns the resolved IP address string so callers can connect directly to it,
-    preventing a DNS-rebinding attack where a second resolution (inside urlopen) could
-    return a different—potentially internal—address.
-
-    Args:
-        hostname: The hostname to resolve and validate.
-
-    Returns:
-        The resolved IP address as a string.
-
-    Raises:
-        ValueError: If the hostname cannot be resolved or resolves to a blocked range.
-    """
-    try:
-        resolved_ip = str(socket.getaddrinfo(hostname, None)[0][4][0])
-        addr = ipaddress.ip_address(resolved_ip)
-    except (socket.gaierror, ValueError) as exc:
-        raise ValueError(
-            f"Push notification URL hostname could not be resolved: {exc}"
-        ) from exc
-
-    for blocked in _BLOCKED_NETWORKS:
-        if addr in blocked:
-            raise ValueError(
-                f"Push notification URL resolves to a blocked address range "
-                f"({addr} is in {blocked}). Internal addresses are not allowed."
-            )
-
-    return resolved_ip
+    return str(addrs[0])
 
 
 class NotificationDeliveryError(Exception):
@@ -143,7 +97,7 @@ class NotificationService:
         DNS-rebinding window that exists when validation and connection each
         perform independent DNS lookups (TOCTOU SSRF).
         """
-        self.validate_config(config)
+        resolved_ip = self.validate_config(config)
 
         payload = json.dumps(event, separators=(",", ":")).encode("utf-8")
         headers = self._build_headers(config)
@@ -172,10 +126,10 @@ class NotificationService:
         # SSRF defence: resolve the hostname and reject internal/private addresses.
         # The returned IP is used directly for the connection so that no second
         # DNS lookup can return a different (internal) address.
-        self._resolve_and_validate_destination(config["url"])
+        return self._resolve_and_validate_destination(config["url"])
 
     @staticmethod
-    def _resolve_and_validate_destination(url: str) -> None:
+    def _resolve_and_validate_destination(url: str) -> str:
         parsed = urlparse(url)
         hostname = parsed.hostname
         if not hostname:
@@ -185,12 +139,13 @@ class NotificationService:
 
         # If hostname is an IP literal, validate without DNS.
         try:
-            addrs = [ipaddress.ip_address(hostname)]
+            addr = ipaddress.ip_address(hostname)
         except ValueError:
             try:
-                infos = socket.getaddrinfo(hostname, port, type=socket.SOCK_STREAM)
-                addrs = [ipaddress.ip_address(info[4][0]) for info in infos]
+                return _resolve_and_check_ip(hostname, port)
             except (socket.gaierror, ValueError) as exc:
+                if "blocked address range" in str(exc):
+                    raise
                 logger.warning(
                     "Push notification hostname resolution failed; blocking registration",
                     hostname=hostname,
@@ -200,13 +155,13 @@ class NotificationService:
                     "Push notification URL hostname could not be resolved."
                 ) from exc
 
-        for addr in addrs:
-            for blocked in _BLOCKED_NETWORKS:
-                if addr in blocked:
-                    raise ValueError(
-                        f"Push notification URL resolves to a blocked address range "
-                        f"({addr} is in {blocked}). Internal addresses are not allowed."
-                    )
+        for blocked in _BLOCKED_NETWORKS:
+            if addr in blocked:
+                raise ValueError(
+                    f"Push notification URL resolves to a blocked address range "
+                    f"({addr} is in {blocked}). Internal addresses are not allowed."
+                )
+        return str(addr)
 
     @create_retry_decorator("api", max_attempts=3, min_wait=0.5, max_wait=5.0)
     async def _post_with_retry(
@@ -223,7 +178,7 @@ class NotificationService:
 
         try:
             status = await asyncio.to_thread(
-                self._post_once, url, resolved_ip, headers, payload
+                self._post_once, url, headers, payload, resolved_ip
             )
             logger.debug(
                 "Delivered push notification",
@@ -256,13 +211,31 @@ class NotificationService:
             self.total_failures += 1
             raise
 
-    def _post_once(self, url: str, headers: dict[str, str], payload: bytes) -> int:
+    def _post_once(
+        self,
+        url: str,
+        headers: dict[str, str],
+        payload: bytes,
+        resolved_ip: str | None = None,
+    ) -> int:
+        parsed = urlparse(url)
         try:
-            self._resolve_and_validate_destination(url)
+            destination_ip = resolved_ip or self._resolve_and_validate_destination(url)
         except ValueError as exc:
             raise NotificationDeliveryError(None, str(exc)) from exc
 
-        req = request.Request(url, data=payload, method="POST")
+        target_url = url
+        if isinstance(destination_ip, str) and destination_ip:
+            netloc = (
+                f"{destination_ip}:{parsed.port}"
+                if parsed.port is not None
+                else destination_ip
+            )
+            target_url = parsed._replace(netloc=netloc).geturl()
+
+        req = request.Request(target_url, data=payload, method="POST")
+        if parsed.netloc:
+            req.add_header("Host", parsed.netloc)
         for key, value in headers.items():
             req.add_header(key, value)
 
@@ -279,13 +252,16 @@ class NotificationService:
             status = exc.code
             body = b""
             try:
-                body = response.read() or b""
+                body = exc.read() or b""
             except OSError:
                 body = b""
             message = body.decode("utf-8", errors="ignore").strip()
             raise NotificationDeliveryError(status, message or f"HTTP error {status}")
         except NotificationDeliveryError:
             raise
+        except error.URLError as exc:
+            reason = getattr(exc, "reason", exc)
+            raise NotificationDeliveryError(None, f"Connection error: {reason}") from exc
         except (OSError, http.client.HTTPException) as exc:
             raise NotificationDeliveryError(None, f"Connection error: {exc}") from exc
 
