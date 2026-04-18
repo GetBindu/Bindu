@@ -18,6 +18,11 @@ let isStarting = false;
 let startTokenCounter = 0;
 let transcriptIdCounter = 0;
 
+function resetVoiceCallState(): void {
+	isVoiceMuted.set(false);
+	latestAgentAudio.set(null);
+}
+
 function mergeTranscriptText(previous: string, incoming: string): string {
 	const prev = previous.trim();
 	const next = incoming.trim();
@@ -108,6 +113,7 @@ export async function startVoiceSession(contextId?: string): Promise<void> {
 	transcripts.set([]);
 	currentUserTranscript.set("");
 	currentAgentTranscript.set("");
+	resetVoiceCallState();
 
 	// Clean up any existing client before creating a new one
 	const existingClient = client;
@@ -168,6 +174,7 @@ export async function startVoiceSession(contextId?: string): Promise<void> {
 }
 
 export async function endVoiceSession(): Promise<void> {
+	startTokenCounter += 1;
 	const active = client;
 	client = null;
 
@@ -183,8 +190,7 @@ export async function endVoiceSession(): Promise<void> {
 	// Reset all state variables
 	voiceSessionId.set(null);
 	voiceContextId.set(null);
-	isVoiceMuted.set(false);
-	latestAgentAudio.set(null);
+	resetVoiceCallState();
 	voiceState.set("idle");
 }
 
