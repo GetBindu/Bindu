@@ -15,9 +15,6 @@ export async function uploadFile(file: File, conv: Conversation): Promise<Messag
 		metadata: { conversation: conv._id.toString(), mime },
 	});
 
-	upload.write(Buffer.from(buffer));
-	upload.end();
-
 	// only return the filename when upload throws a finish event or a 20s time out occurs
 	return new Promise((resolve, reject) => {
 		const timeoutId = setTimeout(() => {
@@ -48,5 +45,8 @@ export async function uploadFile(file: File, conv: Conversation): Promise<Messag
 
 		upload.once("finish", handleFinish);
 		upload.once("error", handleError);
+
+		upload.write(Buffer.from(buffer));
+		upload.end();
 	});
 }
