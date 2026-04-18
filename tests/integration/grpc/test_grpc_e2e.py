@@ -165,6 +165,7 @@ def _wait_for_task_terminal(
     """Poll tasks/get until the task reaches a terminal state."""
     deadline = time.monotonic() + timeout_s
     last_task: dict[str, Any] | None = None
+    last_exc: Exception | None = None
 
     get_task_request = {
         "jsonrpc": "2.0",
@@ -181,7 +182,8 @@ def _wait_for_task_terminal(
                     json=get_task_request,
                     headers={"Content-Type": "application/json"},
                 )
-        except Exception:
+        except httpx.HTTPError as exc:
+            last_exc = exc
             time.sleep(0.2)
             continue
 
@@ -191,13 +193,15 @@ def _wait_for_task_terminal(
 
         try:
             payload = resp.json()
-        except Exception:
+        except ValueError as exc:
+            last_exc = exc
             time.sleep(0.2)
             continue
 
         if payload.get("error"):
-            time.sleep(0.2)
-            continue
+            pytest.fail(
+                f"tasks/get returned JSON-RPC error payload: {payload.get('error')} (full payload: {payload})"
+            )
 
         task = payload["result"]
         last_task = task
@@ -215,6 +219,7 @@ def _wait_for_task_terminal(
             if last_task
             else ""
         )
+        + (f" (last error: {last_exc})" if last_exc else "")
     )
 
 
