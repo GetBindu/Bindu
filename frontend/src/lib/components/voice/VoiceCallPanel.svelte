@@ -76,10 +76,8 @@
 		source.start(startAt);
 		playbackNextTime = startAt + audioBuffer.duration;
 
-		// Keep scheduling stable if there's a long pause between chunks.
-		if (playbackNextTime - ctx.currentTime > 2) {
-			playbackNextTime = ctx.currentTime;
-		}
+		const queuedDurationMs = Math.max(0, (playbackNextTime - ctx.currentTime) * 1000);
+		holdVoiceInputFor(queuedDurationMs);
 	}
 
 	$effect(() => {

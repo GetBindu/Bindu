@@ -24,6 +24,18 @@ def mock_pipecat_modules(monkeypatch, request):
     """Stub Pipecat modules used by the voice websocket endpoint."""
     runner_delay = getattr(request, "param", 0)
 
+    pipecat_mod = types.ModuleType("pipecat")
+    pipecat_mod.__path__ = []
+
+    transports_mod = types.ModuleType("pipecat.transports")
+    transports_mod.__path__ = []
+
+    websocket_mod = types.ModuleType("pipecat.transports.websocket")
+    websocket_mod.__path__ = []
+
+    pipeline_pkg_mod = types.ModuleType("pipecat.pipeline")
+    pipeline_pkg_mod.__path__ = []
+
     fastapi_mod = types.ModuleType("pipecat.transports.websocket.fastapi")
 
     class FastAPIWebsocketParams:
@@ -68,9 +80,21 @@ def mock_pipecat_modules(monkeypatch, request):
 
     runner_mod.PipelineRunner = PipelineRunner
 
+    pipecat_mod.transports = transports_mod
+    pipecat_mod.pipeline = pipeline_pkg_mod
+    transports_mod.websocket = websocket_mod
+    websocket_mod.fastapi = fastapi_mod
+    pipeline_pkg_mod.pipeline = pipeline_mod
+    pipeline_pkg_mod.task = task_mod
+    pipeline_pkg_mod.runner = runner_mod
+
+    monkeypatch.setitem(sys.modules, "pipecat", pipecat_mod)
+    monkeypatch.setitem(sys.modules, "pipecat.transports", transports_mod)
+    monkeypatch.setitem(sys.modules, "pipecat.transports.websocket", websocket_mod)
     monkeypatch.setitem(
         sys.modules, "pipecat.transports.websocket.fastapi", fastapi_mod
     )
+    monkeypatch.setitem(sys.modules, "pipecat.pipeline", pipeline_pkg_mod)
     monkeypatch.setitem(sys.modules, "pipecat.pipeline.pipeline", pipeline_mod)
     monkeypatch.setitem(sys.modules, "pipecat.pipeline.task", task_mod)
     monkeypatch.setitem(sys.modules, "pipecat.pipeline.runner", runner_mod)
@@ -121,7 +145,7 @@ async def test_voice_websocket_accepts_subprotocol_session_token(
         manager = VoiceSessionManager(max_sessions=5, session_timeout=300)
         session = await manager.create_session(
             "ctx",
-            session_token="token-abc",  # pragma: allowlist secret
+            session_token="token-abc",  # noqa: S106
             session_token_expires_at=1e12,
         )
 
@@ -191,11 +215,13 @@ async def test_voice_websocket_times_out_and_sends_error(
 
     from bindu.server.endpoints import voice_endpoints as module
 
+    original_required = module.app_settings.voice.session_auth_required
     original_timeout = module.app_settings.voice.session_timeout
     original_enabled = module.app_settings.voice.enabled
     original_stt = module.app_settings.voice.stt_api_key
     original_tts = module.app_settings.voice.tts_api_key
     try:
+        module.app_settings.voice.session_auth_required = False
         module.app_settings.voice.session_timeout = 0.01
         module.app_settings.voice.enabled = True
         module.app_settings.voice.stt_api_key = (
@@ -237,6 +263,7 @@ async def test_voice_websocket_times_out_and_sends_error(
             for item in sent
         )
     finally:
+        module.app_settings.voice.session_auth_required = original_required
         module.app_settings.voice.session_timeout = original_timeout
         module.app_settings.voice.enabled = original_enabled
         module.app_settings.voice.stt_api_key = original_stt

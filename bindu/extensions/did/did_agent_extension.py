@@ -218,7 +218,7 @@ class DIDAgentExtension:
             try:
                 self._harden_windows_key_file_acl(self.private_key_path)
                 self._harden_windows_key_file_acl(self.public_key_path)
-            except RuntimeError:
+            except Exception:
                 for key_path in (self.private_key_path, self.public_key_path):
                     try:
                         key_path.unlink(missing_ok=True)
@@ -232,16 +232,16 @@ class DIDAgentExtension:
             fd = os.open(
                 str(self.private_key_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600
             )
+            os.fchmod(fd, 0o600)
             with os.fdopen(fd, "wb") as f:
                 f.write(private_pem)
-            os.chmod(self.private_key_path, 0o600)
 
             fd = os.open(
                 str(self.public_key_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644
             )
+            os.fchmod(fd, 0o644)
             with os.fdopen(fd, "wb") as f:
                 f.write(public_pem)
-            os.chmod(self.public_key_path, 0o644)
 
         return {
             "private_key_path": str(self.private_key_path),
@@ -255,18 +255,14 @@ class DIDAgentExtension:
         if not username:
             try:
                 username = os.getlogin().strip()
-            except OSError:
+            except Exception:
                 username = ""
         if not username:
-            username = (getpass.getuser() or "").strip()
+            try:
+                username = (getpass.getuser() or "").strip()
+            except Exception:
+                username = ""
         if not username:
-            username = (os.getenv("USER") or os.getenv("COMPUTERNAME") or "").strip()
-        if not username:
-            username = "unknown_user"
-            logger.warning(
-                "Falling back to 'unknown_user' principal for Windows ACL hardening step"
-            )
-        if not isinstance(username, str) or not username.strip():
             raise RuntimeError(
                 "Unable to determine Windows username for key ACL hardening"
             )

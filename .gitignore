@@ -239,3 +239,4 @@ logs/
 # Local tooling/worktree manager state
 .kilo/
 .idea/
+.local/

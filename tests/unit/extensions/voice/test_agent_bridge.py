@@ -252,8 +252,15 @@ class TestAgentBridgeProcessor:
             await bridge.process_transcription(f"message {index}")
 
         history = bridge.history
-        assert len(history) == 40
-        assert history[0]["content"] == "message 5"
+        from bindu.settings import app_settings
+
+        max_messages = app_settings.voice.conversation_history_limit
+        total_messages = 50
+        expected_len = min(max_messages, total_messages)
+        trimmed_count = total_messages - expected_len
+        expected_first_index = max(0, trimmed_count // 2)
+        assert len(history) == expected_len
+        assert history[0]["content"] == f"message {expected_first_index}"
         assert history[-1]["content"] == "Echo: message 24"
 
     @pytest.mark.asyncio

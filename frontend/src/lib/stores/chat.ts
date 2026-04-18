@@ -22,7 +22,7 @@ type FilePart = {
   kind: 'file';
   fileId?: string;
   file?: {
-    bytes?: string | ArrayBuffer | Uint8Array | Blob;
+    bytes?: string;
     mimeType?: string;
     name?: string;
   };
@@ -30,6 +30,44 @@ type FilePart = {
 };
 
 type Part = TextPart | FilePart;
+
+function base64FromBytes(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i] ?? 0);
+  }
+  return btoa(binary);
+}
+
+async function normalizeFileBytes(value: string | ArrayBuffer | Uint8Array | Blob): Promise<string> {
+  if (typeof value === 'string') return value;
+  if (value instanceof Uint8Array) return base64FromBytes(value);
+  if (value instanceof ArrayBuffer) return base64FromBytes(new Uint8Array(value));
+  if (value instanceof Blob) {
+    const buffer = await value.arrayBuffer();
+    return base64FromBytes(new Uint8Array(buffer));
+  }
+  return '';
+}
+
+async function normalizePartsForSend(parts: Part[]): Promise<Part[]> {
+  const normalized = await Promise.all(
+    parts.map(async (part) => {
+      if (part.kind !== 'file') return part;
+      const file = part.file;
+      if (!file?.bytes) return part;
+      const normalizedBytes = await normalizeFileBytes(file.bytes as string | ArrayBuffer | Uint8Array | Blob);
+      return {
+        ...part,
+        file: {
+          ...file,
+          bytes: normalizedBytes,
+        },
+      };
+    })
+  );
+  return normalized;
+}
 
 export const currentTaskId = writable<string | null>(null);
 export const currentTaskState = writable<TaskState | null>(null);
@@ -275,8 +313,9 @@ export async function sendMessage(parts: Part[]) {
   const useContextId = currentContext || generateUUID();
 
   try {
+    const normalizedParts = await normalizePartsForSend(parts || []);
     // Add user message immediately (combine all text parts for display)
-    const text = (parts || [])
+    const text = normalizedParts
       .filter(
         (p): p is TextPart =>
           p.kind === 'text' && typeof p.text === 'string' && p.text.trim().length > 0
@@ -293,7 +332,7 @@ export async function sendMessage(parts: Part[]) {
     const task = await agentAPI.sendMessage({
       message: {
         role: 'user' as const,
-        parts,
+        parts: normalizedParts,
         kind: 'message' as const,
         messageId,
         contextId: useContextId,

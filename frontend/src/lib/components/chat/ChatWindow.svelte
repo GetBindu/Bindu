@@ -43,6 +43,7 @@
 		isMessageToolErrorUpdate,
 		isMessageToolResultUpdate,
 	} from "$lib/utils/messageUpdates";
+	import { MessageUpdateType } from "$lib/types/MessageUpdate";
 	import type { ToolFront } from "$lib/types/Tool";
 	import {
 		startVoiceSession,
@@ -147,32 +148,39 @@
 	);
 	let isTouchDevice = $derived(browser && navigator.maxTouchPoints > 0);
 
-	async function handleSubmit() {
+	async function handleSubmit(): Promise<boolean> {
 		if (!draft) {
-			return;
+			return false;
 		}
 		try {
 			const fileParts = (sources ? await Promise.all(sources) : []).filter(Boolean) as MessageFile[];
-			await submit(draft, { fileParts });
+			return await submit(draft, { fileParts });
 		} catch (err) {
 			console.error("Error preparing chat submission:", err);
 			$error = err instanceof Error ? err.message : String(err);
+			return false;
 		}
 	}
 
 	async function submit(
 		message: string,
 		options: { fileParts?: MessageFile[] } = {}
-	) {
+	): Promise<boolean> {
 		const fileParts = options.fileParts ?? [];
-		if (!message || loading || isReadOnly) return;
-		if (requireAuthUser()) return;
+		if (!message || loading || isReadOnly) return false;
+		if (requireAuthUser()) return false;
 
 		const contextId = agentContextId ?? undefined;
 		let success = false;
 		try {
-			for await (const _update of sendAgentMessage(message, contextId, { fileParts })) {
-				// Deliberately fire-and-forget consume the stream to completion so side-effects run; yielded updates are intentionally ignored.
+			let streamed = "";
+			for await (const update of sendAgentMessage(message, contextId, { fileParts })) {
+				if (update.type === MessageUpdateType.Stream) {
+					streamed += update.token ?? "";
+					onmessage?.(streamed);
+				} else if (update.type === MessageUpdateType.FinalAnswer) {
+					onmessage?.(update.text ?? "");
+				}
 			}
 			success = true;
 		} catch (err) {
@@ -184,6 +192,8 @@
 			draft = "";
 			files = [];
 		}
+
+		return success;
 	}
 
 	let lastTarget: EventTarget | null = null;
@@ -296,7 +306,7 @@
 			file2base64(file).then((value) => ({
 				type: "base64",
 				value,
-				mime: file.type,
+				mime: file.type || "application/octet-stream",
 				name: file.name,
 			}))
 		)
@@ -650,14 +660,14 @@
 						{#if lastIsError}
 							<ChatInput value="Sorry, something went wrong. Please try again." disabled={true} />
 						{:else}
-									       <ChatInput
+										<ChatInput
 										       placeholder={isReadOnly ? "This conversation is read-only." : "Imagine and Question"}
 										       {loading}
 										       bind:value={draft}
 										       bind:files
 										       mimeTypes={activeMimeTypes}
 										       onsubmit={async (message, fileParts) => {
-											       await submit(message, { fileParts: fileParts as MessageFile[] });
+												return await submit(message, { fileParts: fileParts as MessageFile[] });
 										       }}
 										       {onPaste}
 										       disabled={isReadOnly || lastIsError}

@@ -66,7 +66,7 @@ export async function submitTaskFeedback(
 interface FilePart {
 	kind: 'file';
 	file: {
-		bytes: string | ArrayBuffer | Uint8Array | Blob;
+		bytes: string;
 		mimeType?: string;
 		name?: string;
 	};
@@ -117,6 +117,27 @@ function generateId(): string {
 function getAuthToken(): string | null {
 	if (typeof window === 'undefined') return null;
 	return localStorage.getItem('bindu_oauth_token');
+}
+
+function base64FromBytes(bytes: Uint8Array): string {
+	let binary = '';
+	for (let i = 0; i < bytes.length; i++) {
+		binary += String.fromCharCode(bytes[i] ?? 0);
+	}
+	return btoa(binary);
+}
+
+async function normalizeFileValue(
+	value: string | ArrayBuffer | Uint8Array | Blob
+): Promise<string> {
+	if (typeof value === 'string') return value;
+	if (value instanceof Uint8Array) return base64FromBytes(value);
+	if (value instanceof ArrayBuffer) return base64FromBytes(new Uint8Array(value));
+	if (value instanceof Blob) {
+		const buffer = await value.arrayBuffer();
+		return base64FromBytes(new Uint8Array(buffer));
+	}
+	return '';
 }
 
 /**
@@ -267,10 +288,19 @@ export async function* sendAgentMessage(
 				continue;
 			}
 
+			const normalizedValue = await normalizeFileValue(value);
+			if (!normalizedValue) {
+				console.warn('[agentMessageHandler] Dropping empty file part after normalization', {
+					mime,
+					name,
+				});
+				continue;
+			}
+
 			parts.push({
 				kind: 'file',
 				file: {
-					bytes: value,
+					bytes: normalizedValue,
 					mimeType: mime,
 					name,
 				},

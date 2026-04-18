@@ -95,7 +95,20 @@ class InMemoryCollection<T = Record<string, unknown>> {
 		doc: Partial<T> | T
 	): Promise<{ insertedId: ObjectId; acknowledged: boolean }> {
 		const source = doc as Record<string, unknown>;
-		const id = ("_id" in source && source._id ? source._id : new ObjectId()) as ObjectId;
+		let id: ObjectId;
+		if ("_id" in source && source._id) {
+			if (source._id instanceof ObjectId) {
+				id = source._id;
+			} else {
+				try {
+					id = new ObjectId(String(source._id));
+				} catch {
+					id = new ObjectId();
+				}
+			}
+		} else {
+			id = new ObjectId();
+		}
 		const docWithId = { ...source, _id: id } as T;
 		this.data.set(id.toString(), docWithId);
 		return { insertedId: id, acknowledged: true };
