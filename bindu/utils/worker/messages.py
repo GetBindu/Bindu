@@ -80,10 +80,24 @@ class FileInterceptor:
                 processed_parts.append(part)
                 continue
 
-            file_info = part.get("file") or {}
+            file_info = part.get("file")
+            if not isinstance(file_info, dict):
+                part_identifier = part.get("id") or part.get("kind") or "unknown"
+                logger.warning(
+                    f"Malformed file part skipped: id={part_identifier}, reason=missing file object"
+                )
+                continue
+
             mime_type = file_info.get("mimeType", "")
             file_name = file_info.get("name", "uploaded file")
             base64_data = file_info.get("bytes") or file_info.get("data", "")
+
+            if not base64_data or not mime_type:
+                logger.warning(
+                    f"Malformed file part skipped: file_name={file_name}, "
+                    f"missing={'bytes/data' if not base64_data else ''}{' and ' if (not base64_data and not mime_type) else ''}{'mimeType' if not mime_type else ''}"
+                )
+                continue
 
             if mime_type not in cls.SUPPORTED_MIME_TYPES:
                 logger.warning(f"Unsupported MIME type rejected: {mime_type}")
