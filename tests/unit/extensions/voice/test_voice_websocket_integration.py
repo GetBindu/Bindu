@@ -80,7 +80,6 @@ def mock_pipecat_modules(monkeypatch, request):
 async def test_voice_websocket_accepts_subprotocol_session_token(
     monkeypatch, mock_pipecat_modules
 ):
-
     # Stub build_voice_pipeline to avoid creating real provider clients.
     pipeline_builder = __import__(
         "bindu.extensions.voice.pipeline_builder", fromlist=["build_voice_pipeline"]
@@ -176,7 +175,6 @@ async def test_voice_websocket_accepts_subprotocol_session_token(
 async def test_voice_websocket_times_out_and_sends_error(
     monkeypatch, mock_pipecat_modules
 ):
-
     pipeline_builder = __import__(
         "bindu.extensions.voice.pipeline_builder", fromlist=["build_voice_pipeline"]
     )

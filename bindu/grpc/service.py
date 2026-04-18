@@ -48,6 +48,7 @@ def _require_grpc_dependencies() -> None:
 if agent_handler_pb2_grpc is not None:
     _BinduServiceBase = agent_handler_pb2_grpc.BinduServiceServicer
 else:  # pragma: no cover - optional dependency path
+
     class _BinduServiceBase:  # type: ignore[too-many-ancestors]
         pass
 

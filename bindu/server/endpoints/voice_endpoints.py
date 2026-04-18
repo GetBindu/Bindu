@@ -372,7 +372,10 @@ def _voice_preflight_error() -> str | None:
         return "Voice dependencies are not installed. Install with: pip install 'bindu[voice]'"
 
     # Ensure provider keys exist (provider-dependent).
-    if app_settings.voice.stt_provider == "deepgram" and not app_settings.voice.stt_api_key:
+    if (
+        app_settings.voice.stt_provider == "deepgram"
+        and not app_settings.voice.stt_api_key
+    ):
         return "VOICE__STT_API_KEY is required when VOICE__STT_PROVIDER=deepgram"
 
     tts_provider = app_settings.voice.tts_provider
@@ -813,18 +816,6 @@ async def voice_websocket(websocket: WebSocket) -> None:
     inbound_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=10)
     filtered_ws = _FilteredWebSocket(websocket, inbound_queue)
 
-    async def _handle_user_text(text: str) -> None:
-        await _send_json(
-            websocket,
-            {"type": "transcript", "role": "user", "text": text, "is_final": True},
-            send_lock,
-        )
-        response = await components["bridge"].process_transcription(
-            text, emit_frames=True
-        )
-        if response:
-            await _on_agent_response(response)
-
     reader_task: asyncio.Task[Any] | None = None
     runner_task: asyncio.Task[Any] | None = None
 
@@ -835,7 +826,9 @@ async def voice_websocket(websocket: WebSocket) -> None:
         manifest = getattr(app, "manifest", None)
         if voice_ext is None or manifest is None or not hasattr(manifest, "run"):
             await websocket.send_text(
-                json.dumps({"type": "error", "message": "Agent not configured for voice"})
+                json.dumps(
+                    {"type": "error", "message": "Agent not configured for voice"}
+                )
             )
             await websocket.close(code=1011)
             return
@@ -861,6 +854,18 @@ async def voice_websocket(websocket: WebSocket) -> None:
 
         # Notify UI we are listening
         await _send_json(websocket, {"type": "state", "state": "listening"}, send_lock)
+
+        async def _handle_user_text(text: str) -> None:
+            await _send_json(
+                websocket,
+                {"type": "transcript", "role": "user", "text": text, "is_final": True},
+                send_lock,
+            )
+            response = await components["bridge"].process_transcription(
+                text, emit_frames=True
+            )
+            if response:
+                await _on_agent_response(response)
 
         transport = FastAPIWebsocketTransport(
             websocket=filtered_ws,  # type: ignore[arg-type]

@@ -7,7 +7,6 @@ import http.client
 import ipaddress
 import json
 import socket
-import ssl
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
@@ -261,7 +260,9 @@ class NotificationService:
             raise
         except error.URLError as exc:
             reason = getattr(exc, "reason", exc)
-            raise NotificationDeliveryError(None, f"Connection error: {reason}") from exc
+            raise NotificationDeliveryError(
+                None, f"Connection error: {reason}"
+            ) from exc
         except (OSError, http.client.HTTPException) as exc:
             raise NotificationDeliveryError(None, f"Connection error: {exc}") from exc
 
