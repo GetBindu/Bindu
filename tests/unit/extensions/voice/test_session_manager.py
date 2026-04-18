@@ -104,6 +104,13 @@ class TestVoiceSessionManager:
         assert found.state == "active"
 
     @pytest.mark.asyncio
+    async def test_update_state_nonexistent_session(self, manager):
+        # Nonexistent session updates are a no-op and should not create sessions.
+        await manager.update_state("nonexistent", "active")
+        found = await manager.get_session("nonexistent")
+        assert found is None
+
+    @pytest.mark.asyncio
     async def test_cleanup_loop_starts_and_stops(self, manager):
         await manager.start_cleanup_loop()
         assert manager._cleanup_task is not None
