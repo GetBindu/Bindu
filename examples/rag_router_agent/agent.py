@@ -19,12 +19,26 @@ agent = Agent(
 
 
 def handler(messages: list[dict]):
-    # 🧠 Extract user query safely
-    try:
-        query = messages[-1]["content"]
-    except (KeyError, IndexError):
+    # 🧠 Robust input validation
+    if (
+        not isinstance(messages, list)
+        or len(messages) == 0
+        or not isinstance(messages[-1], dict)
+        or "content" not in messages[-1]
+        or not isinstance(messages[-1]["content"], str)
+    ):
         return {
             "answer": "Invalid input format.",
+            "intent": None,
+            "db_used": None,
+            "docs_used": []
+        }
+
+    query = messages[-1]["content"].strip()
+
+    if not query:
+        return {
+            "answer": "Empty query provided.",
             "intent": None,
             "db_used": None,
             "docs_used": []
@@ -64,9 +78,9 @@ Answer clearly based only on the context above:
     try:
         result = agent.run(prompt)
         answer = result.content if hasattr(result, "content") else str(result)
-    except Exception as e:
+    except Exception:
         return {
-            "answer": f"Error generating response: {str(e)}",
+            "answer": "Error generating response. Please try again.",
             "intent": intent,
             "db_used": db_path,
             "docs_used": docs,
@@ -82,14 +96,14 @@ Answer clearly based only on the context above:
 
 # ⚙️ Bindu config
 config = {
-    "author": "dassubhojit750075@gmail.com",  # ✅ YOUR EMAIL
+    "author": os.getenv("BINDU_AUTHOR", "your.email@example.com"),
     "name": "rag_router_agent",
     "description": "RAG agent with intelligent database routing",
     "deployment": {
         "url": os.getenv("BINDU_DEPLOYMENT_URL", "http://localhost:3773"),
         "expose": True,
     },
-    "skills": []  # keep empty for now (safe)
+    "skills": []
 }
 
 
