@@ -1,2 +1,2 @@
-def tech_agent(query: str, context: str):
-    return f"Tech Agent Response:\n{context}"
+def tech_agent(query, context):
+    return f"Tech Answer for '{query}': {context}"

@@ -7,7 +7,7 @@ from router import classify_intent, route_db, route_agent
 from retriever import retrieve_docs
 
 
-# 🔐 Validate API key at startup (IMPORTANT FIX)
+# 🔐 Validate API key at startup
 api_key = os.getenv("OPENROUTER_API_KEY")
 if not api_key:
     raise RuntimeError(
@@ -57,6 +57,16 @@ def handler(messages: list[dict]):
     # 🔍 Step 1: Intent classification
     intent = classify_intent(query)
 
+    # 🚫 Handle unknown intent (IMPORTANT FIX)
+    if intent is None:
+        return {
+            "answer": "No relevant domain found for this query.",
+            "intent": None,
+            "agent_used": None,
+            "db_used": None,
+            "docs_used": []
+        }
+
     # 📦 Step 2: Retrieve context
     db_path = route_db(intent)
     docs = retrieve_docs(db_path, query)
@@ -74,6 +84,16 @@ def handler(messages: list[dict]):
 
     # 🔀 Step 3: Route to domain agent (A2A)
     agent_fn = route_agent(intent)
+
+    if agent_fn is None:
+        return {
+            "answer": "No agent available for this intent.",
+            "intent": intent,
+            "agent_used": None,
+            "db_used": db_path,
+            "docs_used": docs,
+        }
+
     agent_response = agent_fn(query, context)
 
     # 🤖 Step 4: LLM refines final answer
@@ -91,7 +111,7 @@ Provide a clear and final answer based only on the above.
         result = agent.run(final_prompt)
         answer = result.content if hasattr(result, "content") else str(result)
     except Exception as e:
-        # 🛠️ Log error for debugging (IMPORTANT FIX)
+        # 🛠️ Log error for debugging
         print(f"[ERROR] LLM call failed: {e}")
         answer = "Error generating response. Please try again."
 
