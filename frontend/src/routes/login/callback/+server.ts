@@ -1,10 +1,11 @@
 import { error, redirect } from "@sveltejs/kit";
-import { getOIDCUserData, validateAndParseCsrfToken } from "$lib/server/auth";
+import { getOIDCUserData, validateAndParseCsrfToken, OAuthProviderError } from "$lib/server/auth";
 import { z } from "zod";
 import { base } from "$app/paths";
 import { config } from "$lib/server/config";
 import JSON5 from "json5";
 import { updateUser } from "./updateUser.js";
+import { logger } from "$lib/server/logger";
 
 const sanitizeJSONEnv = (val: string, fallback: string) => {
 	const raw = (val ?? "").trim();
@@ -57,13 +58,31 @@ export async function GET({ url, locals, cookies, request, getClientAddress }) {
 		throw error(403, "Code verifier cookie not found");
 	}
 
-	const { userData, token } = await getOIDCUserData(
-		{ redirectURI: validatedToken.redirectUrl },
-		code,
-		codeVerifier,
-		iss,
-		url
-	);
+	let userData: Awaited<ReturnType<typeof getOIDCUserData>>["userData"];
+	let token: Awaited<ReturnType<typeof getOIDCUserData>>["token"];
+	try {
+		({ userData, token } = await getOIDCUserData(
+			{ redirectURI: validatedToken.redirectUrl },
+			code,
+			codeVerifier,
+			iss,
+			url
+		));
+	} catch (err) {
+		if (err instanceof OAuthProviderError) {
+			logger.error(
+				{ code: err.code, msg: err.message },
+				"OAuth provider error during callback token exchange"
+			);
+			throw error(
+				502,
+				err.code === "OAUTH_PROVIDER_UNAVAILABLE"
+					? "The sign-in service is temporarily unavailable. Please try again later."
+					: "An error occurred during sign-in. Please try again."
+			);
+		}
+		throw err;
+	}
 
 	// Filter by allowed user emails or domains
 	if (allowedUserEmails.length > 0 || allowedUserDomains.length > 0) {
