@@ -46,6 +46,7 @@
 		"isomorphic-dompurify": "2.13.0",
 		"js-yaml": "^4.1.0",
 		"minimist": "^1.2.8",
+		"mongodb-memory-server": "^11.0.1",
 		"playwright": "^1.55.1",
 		"prettier": "^3.5.3",
 		"prettier-plugin-svelte": "^3.2.6",
