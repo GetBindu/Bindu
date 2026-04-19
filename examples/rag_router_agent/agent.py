@@ -3,7 +3,7 @@ from bindu.penguin.bindufy import bindufy
 from agno.agent import Agent
 from agno.models.openai import OpenAIChat
 
-from router import classify_intent, route_db
+from router import classify_intent, route_db, route_agent
 from retriever import retrieve_docs
 
 
@@ -30,6 +30,7 @@ def handler(messages: list[dict]):
         return {
             "answer": "Invalid input format.",
             "intent": None,
+            "agent_used": None,
             "db_used": None,
             "docs_used": []
         }
@@ -40,6 +41,7 @@ def handler(messages: list[dict]):
         return {
             "answer": "Empty query provided.",
             "intent": None,
+            "agent_used": None,
             "db_used": None,
             "docs_used": []
         }
@@ -47,48 +49,46 @@ def handler(messages: list[dict]):
     # 🔍 Step 1: Intent classification
     intent = classify_intent(query)
 
-    # 🧭 Step 2: Route to DB
+    # 📦 Step 2: Retrieve context
     db_path = route_db(intent)
-
-    # 📦 Step 3: Retrieve documents
     docs = retrieve_docs(db_path, query)
 
-    # ⚠️ Handle no results
     if not docs:
         return {
-            "answer": "No relevant information found in the database.",
+            "answer": "No relevant information found.",
             "intent": intent,
+            "agent_used": intent,
             "db_used": db_path,
             "docs_used": []
         }
 
     context = "\n".join(docs)
 
-    # 🤖 Step 4: Generate response
-    prompt = f"""
-Context:
-{context}
+    # 🔀 Step 3: Route to domain agent (A2A)
+    agent_fn = route_agent(intent)
+    agent_response = agent_fn(query, context)
 
-Question:
+    # 🤖 Step 4: LLM refines final answer
+    final_prompt = f"""
+User Query:
 {query}
 
-Answer clearly based only on the context above:
+Agent Output:
+{agent_response}
+
+Provide a clear and final answer based only on the above.
 """
 
     try:
-        result = agent.run(prompt)
+        result = agent.run(final_prompt)
         answer = result.content if hasattr(result, "content") else str(result)
     except Exception:
-        return {
-            "answer": "Error generating response. Please try again.",
-            "intent": intent,
-            "db_used": db_path,
-            "docs_used": docs,
-        }
+        answer = "Error generating response."
 
     return {
         "answer": answer.strip(),
         "intent": intent,
+        "agent_used": intent,
         "db_used": db_path,
         "docs_used": docs,
     }
@@ -98,7 +98,7 @@ Answer clearly based only on the context above:
 config = {
     "author": os.getenv("BINDU_AUTHOR", "your.email@example.com"),
     "name": "rag_router_agent",
-    "description": "RAG agent with intelligent database routing",
+    "description": "RAG agent with intelligent routing and multi-agent delegation",
     "deployment": {
         "url": os.getenv("BINDU_DEPLOYMENT_URL", "http://localhost:3773"),
         "expose": True,
@@ -107,6 +107,6 @@ config = {
 }
 
 
-# 🚀 Start agent only when run directly
+# 🚀 Run agent
 if __name__ == "__main__":
     bindufy(config, handler)
