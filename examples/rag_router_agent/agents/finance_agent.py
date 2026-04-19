@@ -1,2 +1,2 @@
-def finance_agent(query: str, context: str):
-    return f"Finance Agent Response:\n{context}"
+def finance_agent(query, context):
+    return f"Finance Answer for '{query}': {context}"
