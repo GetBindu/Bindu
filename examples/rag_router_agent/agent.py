@@ -7,12 +7,20 @@ from router import classify_intent, route_db, route_agent
 from retriever import retrieve_docs
 
 
+# 🔐 Validate API key at startup (IMPORTANT FIX)
+api_key = os.getenv("OPENROUTER_API_KEY")
+if not api_key:
+    raise RuntimeError(
+        "OPENROUTER_API_KEY is not set. See examples/rag_router_agent/README.md."
+    )
+
+
 # 🔑 LLM setup (OpenRouter)
 agent = Agent(
     instructions="You are a helpful assistant that answers based only on the given context.",
     model=OpenAIChat(
         id="openai/gpt-4o-mini",
-        api_key=os.getenv("OPENROUTER_API_KEY"),
+        api_key=api_key,
         base_url="https://openrouter.ai/api/v1"
     ),
 )
@@ -82,8 +90,10 @@ Provide a clear and final answer based only on the above.
     try:
         result = agent.run(final_prompt)
         answer = result.content if hasattr(result, "content") else str(result)
-    except Exception:
-        answer = "Error generating response."
+    except Exception as e:
+        # 🛠️ Log error for debugging (IMPORTANT FIX)
+        print(f"[ERROR] LLM call failed: {e}")
+        answer = "Error generating response. Please try again."
 
     return {
         "answer": answer.strip(),
