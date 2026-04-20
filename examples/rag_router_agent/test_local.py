@@ -1,19 +1,24 @@
-from agent import handler
-
-
 def run_test():
-    from agent import handler  # ✅ moved inside
+    # Import inside the function to avoid pytest collection side effects
+    try:
+        from .agent import handler
+    except ImportError:
+        from agent import handler
 
-    messages = [
-        {"role": "user", "content": "What is GST?"}
+    queries = [
+        "What is GST?",
+        "What is a contract?",
+        "What is an API?"
     ]
 
-    try:
-        response = handler(messages)
-        print("Response:")
-        print(response)
-    except Exception as e:
-        print(f"[ERROR] Test execution failed: {e}")
+    for q in queries:
+        print(f"\nQuery: {q}")
+        try:
+            response = handler([{"role": "user", "content": q}])
+            print("Response:")
+            print(response)
+        except Exception as e:
+            print(f"[ERROR] Test execution failed: {e}")
 
 
 if __name__ == "__main__":

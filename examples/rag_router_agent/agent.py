@@ -4,7 +4,7 @@ from bindu.penguin.bindufy import bindufy
 from agno.agent import Agent
 from agno.models.openai import OpenAIChat
 
-# 🔁 Robust imports (works in CI + script execution)
+# 🔁 Robust imports (module + script)
 try:
     from .skale_payment import call_skale_facilitator
     from .router import classify_intent, route_db, route_agent
@@ -15,18 +15,19 @@ except ImportError:
     from retriever import retrieve_docs
 
 
-# 🔐 Safe API key handling (no crash in CI)
+# 🔐 Safe API key handling (CI-safe)
 api_key = os.getenv("OPENROUTER_API_KEY")
+
 if not api_key:
     print("[WARN] OPENROUTER_API_KEY not set — running in limited mode")
 
-# 🤖 LLM setup (safe even if key missing)
+# 🤖 LLM setup (safe even without key)
 agent = Agent(
     instructions="You are a helpful assistant that answers based only on the given context.",
     model=OpenAIChat(
         id="openai/gpt-4o-mini",
         api_key=api_key,
-        base_url="https://openrouter.ai/api/v1",
+        base_url="https://openrouter.ai/api/v1"
     ),
 )
 
@@ -57,7 +58,7 @@ def handler(messages: list[dict]):
     db_path = route_db(intent)
     docs = retrieve_docs(db_path, query)
 
-    # 💳 Always probe facilitator (consistency across all paths)
+    # 💳 Always include payment info
     payment_result = call_skale_facilitator()
 
     if not docs:
@@ -90,8 +91,12 @@ def handler(messages: list[dict]):
         print(f"[ERROR] Agent execution failed: {e}")
         agent_response = "Unable to process request via domain agent."
 
-    # 🤖 Step 4: LLM refinement
-    final_prompt = f"""
+    # 🤖 Step 4: LLM refinement (skip if no API key)
+    if not api_key:
+        answer = agent_response
+    else:
+        try:
+            result = agent.run(final_prompt := f"""
 User Query:
 {query}
 
@@ -99,22 +104,20 @@ Agent Output:
 {agent_response}
 
 Provide a clear and final answer based only on the above.
-"""
+""")
 
-    try:
-        result = agent.run(final_prompt)
-        content = getattr(result, "content", None)
+            content = getattr(result, "content", None)
 
-        if isinstance(content, str) and content.strip():
-            answer = content
-        else:
-            answer = str(result) if result is not None else agent_response
+            if isinstance(content, str) and content.strip():
+                answer = content
+            else:
+                answer = str(result) if result is not None else agent_response
 
-    except Exception as e:
-        print(f"[ERROR] LLM call failed: {e}")
-        answer = agent_response
+        except Exception as e:
+            print(f"[ERROR] LLM call failed: {e}")
+            answer = agent_response
 
-    # 🛡️ Ensure answer is always a string
+    # 🛡️ Ensure answer is always string
     if not isinstance(answer, str):
         answer = str(answer) if answer is not None else ""
 
@@ -127,7 +130,7 @@ Provide a clear and final answer based only on the above.
     )
 
 
-# 🧱 Helper functions
+# 🧱 Helper responses
 
 def _error_response(message: str):
     return {
@@ -155,12 +158,12 @@ def _base_response(answer, intent, db_path, docs, payment=None):
 config = {
     "author": os.getenv("BINDU_AUTHOR", "your.email@example.com"),
     "name": "rag_router_agent",
-    "description": "RAG agent with intelligent routing + multi-agent delegation + SKALE facilitator integration",
+    "description": "RAG agent with routing + multi-agent delegation + SKALE integration",
     "deployment": {
         "url": os.getenv("BINDU_DEPLOYMENT_URL", "http://localhost:3773"),
         "expose": True,
     },
-    "skills": [],
+    "skills": []
 }
 
 
