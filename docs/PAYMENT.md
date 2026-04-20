@@ -96,7 +96,7 @@ config = {
 In this configuration, callers can pay **either** 0.1 USDC on Base **or** 0.0001 ETH
 on Ethereum to access the protected methods.
 
-### 🚧 Integration Note: SKALE Network Support (Pending / Upstream Blocker)
+### Integration Note: SKALE Network Support (Pending / Upstream Blocker)
 
 While Bindu's `execution_cost` configuration fully supports multi-asset and multi-network arrays, direct support for the **SKALE network** is currently blocked by an upstream dependency. 
 
