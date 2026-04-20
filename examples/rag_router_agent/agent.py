@@ -15,9 +15,8 @@ except ImportError:
     from retriever import retrieve_docs
 
 
-# 🔐 Safe API key handling (NO crash in CI)
+# 🔐 Safe API key handling (no crash in CI)
 api_key = os.getenv("OPENROUTER_API_KEY")
-
 if not api_key:
     print("[WARN] OPENROUTER_API_KEY not set — running in limited mode")
 
@@ -27,7 +26,7 @@ agent = Agent(
     model=OpenAIChat(
         id="openai/gpt-4o-mini",
         api_key=api_key,
-        base_url="https://openrouter.ai/api/v1"
+        base_url="https://openrouter.ai/api/v1",
     ),
 )
 
@@ -58,12 +57,16 @@ def handler(messages: list[dict]):
     db_path = route_db(intent)
     docs = retrieve_docs(db_path, query)
 
+    # 💳 Always probe facilitator (consistency across all paths)
+    payment_result = call_skale_facilitator()
+
     if not docs:
         return _base_response(
             answer="No relevant information found.",
             intent=intent,
             db_path=db_path,
-            docs=[]
+            docs=[],
+            payment=payment_result,
         )
 
     context = "\n".join(docs)
@@ -76,10 +79,11 @@ def handler(messages: list[dict]):
             answer="No agent available for this intent.",
             intent=intent,
             db_path=db_path,
-            docs=docs
+            docs=docs,
+            payment=payment_result,
         )
 
-    # 🔥 Safe agent execution (important fix)
+    # 🔥 Safe agent execution
     try:
         agent_response = agent_fn(query, context)
     except Exception as e:
@@ -99,20 +103,27 @@ Provide a clear and final answer based only on the above.
 
     try:
         result = agent.run(final_prompt)
-        answer = result.content if hasattr(result, "content") else str(result)
+        content = getattr(result, "content", None)
+
+        if isinstance(content, str) and content.strip():
+            answer = content
+        else:
+            answer = str(result) if result is not None else agent_response
+
     except Exception as e:
         print(f"[ERROR] LLM call failed: {e}")
-        answer = agent_response  # fallback to agent output
+        answer = agent_response
 
-    # 💳 Step 5: SKALE facilitator call
-    payment_result = call_skale_facilitator()
+    # 🛡️ Ensure answer is always a string
+    if not isinstance(answer, str):
+        answer = str(answer) if answer is not None else ""
 
     return _base_response(
         answer=answer.strip(),
         intent=intent,
         db_path=db_path,
         docs=docs,
-        payment=payment_result
+        payment=payment_result,
     )
 
 
@@ -125,7 +136,7 @@ def _error_response(message: str):
         "agent_used": None,
         "db_used": None,
         "docs_used": [],
-        "payment": None
+        "payment": None,
     }
 
 
@@ -136,7 +147,7 @@ def _base_response(answer, intent, db_path, docs, payment=None):
         "agent_used": intent,
         "db_used": db_path,
         "docs_used": docs,
-        "payment": payment
+        "payment": payment,
     }
 
 
@@ -149,7 +160,7 @@ config = {
         "url": os.getenv("BINDU_DEPLOYMENT_URL", "http://localhost:3773"),
         "expose": True,
     },
-    "skills": []
+    "skills": [],
 }
 
 
