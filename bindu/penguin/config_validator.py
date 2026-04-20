@@ -10,7 +10,7 @@ from typing import Any, Dict
 from urllib.parse import urlparse
 
 from bindu import __version__
-from bindu.common.protocol.types import AgentCapabilities, Skill
+from bindu.common.protocol.types import AgentCapabilities, AgentTrustConfig, Skill
 
 
 class ConfigError(ValueError):
@@ -173,6 +173,9 @@ class ConfigValidator:
         if config.get("auth"):
             cls._validate_auth_config(config["auth"])
 
+        if config.get("agent_trust") is not None:
+            cls._validate_agent_trust_config(config["agent_trust"])
+
         if config.get("telemetry"):
             cls._process_oltp_config(config)
 
@@ -292,6 +295,15 @@ class ConfigValidator:
             raise ValueError(
                 f"Unknown auth provider: '{provider}'. Supported providers: hydra"
             )
+
+    @classmethod
+    def _validate_agent_trust_config(cls, trust_config: Dict[str, Any]) -> None:
+        if not isinstance(trust_config, dict):
+            raise ValueError("Field 'agent_trust' must be a dictionary")
+        try:
+            AgentTrustConfig(**trust_config)
+        except Exception as exc:
+            raise ValueError(f"Invalid 'agent_trust' configuration: {exc}") from exc
 
     @classmethod
     def _validate_hydra_config(cls, auth_config: Dict[str, Any]) -> None:

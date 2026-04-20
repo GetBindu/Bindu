@@ -1681,6 +1681,25 @@ class AgentTrust(TypedDict):
     allowed_operations: Dict[str, TrustLevel]
 
 
+class AgentTrustConfig(pydantic.BaseModel):
+    """Config-layer validation model for the agent_trust configuration field.
+
+    Unlike AgentTrust (wire format), this model validates user-provided config dicts
+    and provides sensible defaults for optional fields.
+    """
+
+    model_config = A2A_MODEL_CONFIG
+
+    identity_provider: IdentityProvider
+    inherited_roles: List[Dict[str, Any]] = []
+    certificate: Union[str, None] = None
+    certificate_fingerprint: Union[str, None] = None
+    creator_id: Union[str, int, None] = None
+    creation_timestamp: Union[int, None] = None
+    trust_verification_required: bool = False
+    allowed_operations: Dict[str, TrustLevel] = {}
+
+
 # -----------------------------------------------------------------------------
 # Agent
 # -----------------------------------------------------------------------------
