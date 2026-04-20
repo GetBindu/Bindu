@@ -2,6 +2,8 @@ from agent import handler
 
 
 def run_test():
+    from agent import handler  # ✅ moved inside
+
     messages = [
         {"role": "user", "content": "What is GST?"}
     ]
