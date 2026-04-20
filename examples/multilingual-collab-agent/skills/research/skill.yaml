@@ -1,0 +1,139 @@
+id: research-v1
+name: research
+version: 1.0.0
+author: dassubhojit750075@gmail.com
+
+description: |
+  Multilingual web research skill that searches the internet using DuckDuckGo
+  and summarizes findings in the user's language (English, Hindi, or Bengali).
+  Supports factual queries, current events, and topic deep-dives.
+
+tags:
+  - research
+  - web-search
+  - multilingual
+  - duckduckgo
+  - information-retrieval
+
+input_modes:
+  - text/plain
+  - application/json
+
+output_modes:
+  - text/plain
+  - application/json
+
+examples:
+  - "What is the Bindu framework?"
+  - "बिंदू फ्रेमवर्क क्या है?"
+  - "ইন্টারনেট অফ এজেন্টস কী?"
+  - "Latest news about AI agents"
+  - "How does the A2A protocol work?"
+
+capabilities_detail:
+  web_search:
+    supported: true
+    description: "Search the web using DuckDuckGo and return summarized results"
+    features:
+      - "Real-time web search via DuckDuckGo"
+      - "Automatic language detection — responds in EN, HI, or BN"
+      - "Source citation when available"
+      - "Concise summaries of search results"
+    limitations: "Limited to publicly available web content. No paywalled sources."
+
+  multilingual_research:
+    supported: true
+    description: "Accept queries in English, Hindi, or Bengali and respond in kind"
+    features:
+      - "Query understanding in English, Hindi (Devanagari), Bengali script"
+      - "Response generation in the detected input language"
+      - "Cross-language research — query in one language, search globally"
+
+requirements:
+  packages:
+    - "duckduckgo-search>=8.1.1"
+    - "agno>=2.5.2"
+  system: []
+  min_memory_mb: 256
+
+performance:
+  avg_processing_time_ms: 3000
+  max_concurrent_requests: 5
+  memory_per_request_mb: 128
+  scalability: horizontal
+
+allowed_tools:
+  - Read
+
+documentation:
+  overview: |
+    The research skill enables the multilingual agent to search the web for
+    current information and return summarized results. Uses DuckDuckGo as
+    the search backend (no API key required) and automatically responds in
+    the user's language (English, Hindi, or Bengali).
+
+  use_cases:
+    when_to_use:
+      - "User asks a factual question about any topic"
+      - "User wants current news or recent information"
+      - "User asks about the Bindu framework or Internet of Agents"
+      - "Query is in Hindi or Bengali and requires web research"
+
+    when_not_to_use:
+      - "User wants to translate text — use translate skill instead"
+      - "User wants help drafting a document — use collaborate skill instead"
+      - "Query requires authenticated or paywalled sources"
+
+  input_structure: |
+    Plain text query in any supported language.
+
+    English: "What is the Bindu framework?"
+    Hindi:   "बिंदू फ्रेमवर्क क्या है?"
+    Bengali: "বিন্দু ফ্রেমওয়ার্ক কী?"
+
+  output_format: |
+    Plain text summary in the same language as the input query.
+    Sources cited inline where available.
+
+  error_handling:
+    - "DuckDuckGo unavailable: returns cached knowledge, else informs user"
+    - "Unknown language: defaults to English response"
+    - "No results found: informs user and suggests alternative queries"
+
+assessment:
+  keywords:
+    - "research"
+    - "search"
+    - "find"
+    - "what is"
+    - "how does"
+    - "latest"
+    - "news"
+    - "खोज"
+    - "क्या है"
+    - "খোঁজ"
+    - "কী"
+
+  specializations:
+    - domain: "bindu-framework"
+      confidence_boost: 0.4
+    - domain: "internet-of-agents"
+      confidence_boost: 0.3
+    - domain: "general-knowledge"
+      confidence_boost: 0.2
+
+  anti_patterns:
+    - "translate this text"
+    - "write a document"
+    - "help me draft"
+
+  complexity_indicators:
+    simple:
+      - "What is X?"
+      - "Define X"
+    medium:
+      - "How does X work?"
+      - "Compare X and Y"
+    complex:
+      - "Explain the architecture of X with examples"
+      - "Research and summarize recent developments in X"

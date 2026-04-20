@@ -30,6 +30,20 @@ if TYPE_CHECKING:
 # Pre-compiled regex patterns for performance
 _TOKEN_SPLIT_PATTERN = re.compile(r"[^a-z0-9]+")
 
+# Scoring constants
+DEFAULT_EQUAL_WEIGHT = 0.2
+LATENCY_REJECTION_MULTIPLIER = 2
+DEFAULT_LOAD_SCORE = 0.5
+DEFAULT_COST_SCORE = 0.5
+COST_DISCOUNT_FACTOR = 0.5
+
+# Confidence calculation constants
+BASE_CONFIDENCE = 0.5
+HIGH_MATCH_THRESHOLD = 0.3
+HIGH_MATCH_BOOST = 0.2
+LOW_MATCH_BOOST = 0.1
+CONSTRAINT_BOOST = 0.1
+
 
 @dataclass(frozen=True)
 class ScoringWeights:
@@ -62,11 +76,11 @@ class ScoringWeights:
         )
         if total == 0:
             return {
-                "skill_match": 0.2,
-                "io_compatibility": 0.2,
-                "performance": 0.2,
-                "load": 0.2,
-                "cost": 0.2,
+                "skill_match": DEFAULT_EQUAL_WEIGHT,
+                "io_compatibility": DEFAULT_EQUAL_WEIGHT,
+                "performance": DEFAULT_EQUAL_WEIGHT,
+                "load": DEFAULT_EQUAL_WEIGHT,
+                "cost": DEFAULT_EQUAL_WEIGHT,
             }
         return {
             "skill_match": self.skill_match / total,
@@ -224,9 +238,9 @@ class CapabilityCalculator:
             else:
                 latency_estimate_ms = self.DEFAULT_LATENCY_MS
 
-        # Reject if latency exceeds constraint by 2x
+        # Reject if latency exceeds constraint by multiplier
         if max_latency_ms and latency_estimate_ms:
-            if latency_estimate_ms > max_latency_ms * 2:
+            if latency_estimate_ms > max_latency_ms * LATENCY_REJECTION_MULTIPLIER:
                 return AssessmentResult(
                     accepted=False,
                     score=0.0,
@@ -601,7 +615,7 @@ class CapabilityCalculator:
     def _calculate_load_score(self, queue_depth: int | None) -> float:
         """Calculate load score based on queue depth."""
         if queue_depth is None:
-            return 0.5
+            return DEFAULT_LOAD_SCORE
         return round(1.0 / (1.0 + queue_depth), 4)
 
     def _calculate_cost_score(self, max_cost_amount: str | None) -> float:
@@ -610,24 +624,29 @@ class CapabilityCalculator:
             return 1.0
 
         if not max_cost_amount:
-            return 0.5
+            return DEFAULT_COST_SCORE
 
         try:
-            agent_cost = self._parse_cost_amount(
-                self._x402_extension.get("amount", "0")
-            )
+            # Handle both dict and object forms of x402_extension
+            if isinstance(self._x402_extension, dict):
+                agent_cost_str = self._x402_extension.get("amount", "0")
+            else:
+                # It's an object, try to get amount attribute
+                agent_cost_str = getattr(self._x402_extension, "amount", "0")
+
+            agent_cost = self._parse_cost_amount(agent_cost_str)
             max_cost = self._parse_cost_amount(max_cost_amount)
 
             if max_cost <= 0:
-                return 0.5
+                return DEFAULT_COST_SCORE
 
             if agent_cost <= max_cost:
-                # Linear discount: max cost gets 1.0, zero cost gets 0.5
-                return round(1.0 - (agent_cost / max_cost) * 0.5, 4)
+                # Linear discount: max cost gets 1.0, zero cost gets default
+                return round(1.0 - (agent_cost / max_cost) * COST_DISCOUNT_FACTOR, 4)
             else:
                 return 0.0
-        except (ValueError, TypeError):
-            return 0.5
+        except (ValueError, TypeError, AttributeError):
+            return DEFAULT_COST_SCORE
 
     def _parse_cost_amount(self, amount: str | float | int) -> float:
         """Parse cost amount string to float."""
@@ -644,20 +663,20 @@ class CapabilityCalculator:
         has_queue_depth: bool,
     ) -> float:
         """Calculate confidence level based on data quality."""
-        confidence = 0.5
+        confidence = BASE_CONFIDENCE
 
-        if skill_matches and skill_matches[0].score > 0.3:
-            confidence += 0.2
+        if skill_matches and skill_matches[0].score > HIGH_MATCH_THRESHOLD:
+            confidence += HIGH_MATCH_BOOST
         elif skill_matches:
-            confidence += 0.1
+            confidence += LOW_MATCH_BOOST
 
         if has_io_constraints:
-            confidence += 0.1
+            confidence += CONSTRAINT_BOOST
 
         if has_latency_constraint:
-            confidence += 0.1
+            confidence += CONSTRAINT_BOOST
 
         if has_queue_depth:
-            confidence += 0.1
+            confidence += CONSTRAINT_BOOST
 
         return min(confidence, 1.0)

@@ -71,6 +71,65 @@ SUPPORTED_FRAMEWORKS = [
 ]
 
 
+def _detect_framework(installed_dists: dict[str, Any]) -> AgentFrameworkSpec | None:
+    """Detect installed AI framework from supported frameworks list.
+
+    Args:
+        installed_dists: Dictionary of installed package distributions
+
+    Returns:
+        Framework specification if found, None otherwise
+    """
+    return next(
+        (spec for spec in SUPPORTED_FRAMEWORKS if spec.framework in installed_dists),
+        None,
+    )
+
+
+def _validate_framework_version(
+    framework_spec: AgentFrameworkSpec, installed_dists: dict[str, Any]
+) -> tuple[bool, str]:
+    """Validate framework version meets minimum requirement.
+
+    Args:
+        framework_spec: Framework specification with minimum version
+        installed_dists: Dictionary of installed package distributions
+
+    Returns:
+        Tuple of (is_valid, installed_version)
+    """
+    installed_version = installed_dists[framework_spec.framework].version
+    is_valid = version.parse(installed_version) >= version.parse(
+        framework_spec.min_version
+    )
+    return is_valid, installed_version
+
+
+def _get_package_manager() -> list[str]:
+    """Detect package manager (uv or pip) based on project files.
+
+    Returns:
+        Command prefix for package installation
+    """
+    current_directory = Path.cwd()
+    has_uv = (current_directory / "uv.lock").exists() or (
+        current_directory / "pyproject.toml"
+    ).exists()
+    return ["uv", "add"] if has_uv else [sys.executable, "-m", "pip", "install"]
+
+
+def _log_if_verbose(verbose: bool, message: str, **kwargs) -> None:
+    """Log message if verbose logging is enabled.
+
+    Args:
+        verbose: Whether verbose logging is enabled
+        message: Log message
+        **kwargs: Additional context for structured logging
+    """
+    if verbose:
+        logger.info(message, **kwargs)
+
+
 def _instrument_framework(framework: str, tracer_provider: Any) -> None:
     """Dynamically import and instrument a framework.
 
@@ -261,28 +320,29 @@ def _setup_tracer_provider(
             processor = BatchSpanProcessor(logging_exporter, **batch_config)  # type: ignore[arg-type]
             tracer_provider.add_span_processor(processor)
 
-            if verbose_logging:
-                logger.info(
-                    "Configured OTLP exporter with batch processing",
-                    endpoint=endpoint,
-                    max_queue_size=batch_max_queue_size,
-                    schedule_delay_millis=batch_schedule_delay_millis,
-                    max_export_batch_size=batch_max_export_batch_size,
-                    export_timeout_millis=batch_export_timeout_millis,
-                )
+            _log_if_verbose(
+                verbose_logging,
+                "Configured OTLP exporter with batch processing",
+                endpoint=endpoint,
+                max_queue_size=batch_max_queue_size,
+                schedule_delay_millis=batch_schedule_delay_millis,
+                max_export_batch_size=batch_max_export_batch_size,
+                export_timeout_millis=batch_export_timeout_millis,
+            )
     else:
         tracer_provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
-        if verbose_logging:
-            logger.info("Using console exporter - no OTLP endpoint configured")
+        _log_if_verbose(
+            verbose_logging, "Using console exporter - no OTLP endpoint configured"
+        )
 
     # Set as global tracer provider so all tracers use it
     trace.set_tracer_provider(tracer_provider)
-    if verbose_logging:
-        logger.info(
-            "Global tracer provider configured",
-            service_name=resource_attrs[SERVICE_NAME],
-            environment=resource_attrs["deployment.environment"],
-        )
+    _log_if_verbose(
+        verbose_logging,
+        "Global tracer provider configured",
+        service_name=resource_attrs[SERVICE_NAME],
+        environment=resource_attrs["deployment.environment"],
+    )
 
     return tracer_provider
 
@@ -333,54 +393,47 @@ def setup(
         batch_export_timeout_millis=batch_export_timeout_millis,
     )
 
-    # Step 1: Detect installed framework for optional instrumentation (logic from _detect_framework, now inlined)
+    # Step 1: Detect installed framework for optional instrumentation
     installed_dists = {dist.name: dist for dist in distributions()}
-    framework_spec = next(
-        (spec for spec in SUPPORTED_FRAMEWORKS if spec.framework in installed_dists),
-        None,
-    )
+    framework_spec = _detect_framework(installed_dists)
 
     if not framework_spec:
-        if verbose_logging:
-            logger.info(
-                "OpenInference framework instrumentation skipped - no supported agent framework found",
-                supported_frameworks=[spec.framework for spec in SUPPORTED_FRAMEWORKS],
-            )
-        return
-
-    # Step 2: Validate framework version (logic from _validate_framework_version, now inlined)
-    installed_version = installed_dists[framework_spec.framework].version
-
-    if version.parse(installed_version) < version.parse(framework_spec.min_version):
-        if verbose_logging:
-            logger.warning(
-                "OpenInference framework instrumentation skipped - framework version below minimum",
-                framework=framework_spec.framework,
-                installed_version=installed_version,
-                required_version=framework_spec.min_version,
-            )
-        return
-
-    if verbose_logging:
-        logger.info(
-            "Agent framework detected",
-            framework=framework_spec.framework,
-            version=installed_version,
-            instrumentation_package=framework_spec.instrumentation_package,
+        _log_if_verbose(
+            verbose_logging,
+            "OpenInference framework instrumentation skipped - no supported agent framework found",
+            supported_frameworks=[spec.framework for spec in SUPPORTED_FRAMEWORKS],
         )
+        return
+
+    # Step 2: Validate framework version
+    is_valid, installed_version = _validate_framework_version(
+        framework_spec, installed_dists
+    )
+
+    if not is_valid:
+        _log_if_verbose(
+            verbose_logging,
+            "OpenInference framework instrumentation skipped - framework version below minimum",
+            framework=framework_spec.framework,
+            installed_version=installed_version,
+            required_version=framework_spec.min_version,
+        )
+        return
+
+    _log_if_verbose(
+        verbose_logging,
+        "Agent framework detected",
+        framework=framework_spec.framework,
+        version=installed_version,
+        instrumentation_package=framework_spec.instrumentation_package,
+    )
 
     # Step 3: Check for missing packages
     missing_packages = _check_missing_packages(framework_spec, installed_dists)
 
     if missing_packages:
-        # Detect package manager (logic from _get_package_manager, now inlined)
-        current_directory = Path.cwd()
-        has_uv = (current_directory / "uv.lock").exists() or (
-            current_directory / "pyproject.toml"
-        ).exists()
-        cmd_prefix = (
-            ["uv", "add"] if has_uv else [sys.executable, "-m", "pip", "install"]
-        )
+        # Detect package manager
+        cmd_prefix = _get_package_manager()
         install_cmd = " ".join(cmd_prefix + missing_packages)
 
         logger.warning(
@@ -388,29 +441,28 @@ def setup(
             packages=", ".join(missing_packages),
             install_command=install_cmd,
         )
-        if verbose_logging:
-            logger.info(
-                "Bindu framework tracing is active, but LLM-level tracing requires instrumentation packages"
-            )
+        _log_if_verbose(
+            verbose_logging,
+            "Bindu framework tracing is active, but LLM-level tracing requires instrumentation packages",
+        )
         return
 
-    if verbose_logging:
-        logger.info("All required packages installed")
+    _log_if_verbose(verbose_logging, "All required packages installed")
 
     # Step 4: Setup framework instrumentation
-    if verbose_logging:
-        logger.info(
-            "Starting OpenInference framework instrumentation",
-            framework=framework_spec.framework,
-        )
+    _log_if_verbose(
+        verbose_logging,
+        "Starting OpenInference framework instrumentation",
+        framework=framework_spec.framework,
+    )
 
     try:
         _instrument_framework(framework_spec.framework, tracer_provider)
-        if verbose_logging:
-            logger.info(
-                "OpenInference framework instrumentation completed successfully",
-                framework=framework_spec.framework,
-            )
+        _log_if_verbose(
+            verbose_logging,
+            "OpenInference framework instrumentation completed successfully",
+            framework=framework_spec.framework,
+        )
     except ImportError as e:
         logger.error(
             "OpenInference framework instrumentation failed - instrumentation packages unavailable",

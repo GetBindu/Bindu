@@ -1,0 +1,80 @@
+id: pdf-research-skill
+name: PDF Research Skill
+version: 1.0.0
+author: your.email@example.com
+description: >
+  Processes PDF files and raw document text to produce structured, LLM-generated
+  summaries. Identifies the main thesis, extracts key findings, and surfaces
+  conclusions or recommendations. Powered by OpenRouter and exposed as a live
+  A2A-compliant Bindu microservice.
+
+features:
+  - Accept a local PDF file path or raw document text as input
+  - Extract full text from multi-page PDFs using pypdf
+  - Generate structured summaries with thesis, key findings, and conclusions
+  - Graceful fallback to raw-text mode when pypdf is unavailable
+  - Deployed as a live Bindu microservice via bindufy()
+  - A2A / AP2 / X402 protocol-compliant out of the box
+
+tags:
+  - pdf
+  - research
+  - summarisation
+  - document-analysis
+  - openrouter
+  - nlp
+
+input_modes:
+  - text/plain         # Raw document text pasted directly
+  - application/pdf    # Local PDF file path resolved server-side
+
+output_modes:
+  - text/plain         # Structured summary returned as plain text
+
+examples:
+  - input: "/home/user/papers/attention_is_all_you_need.pdf"
+    output: |
+      **Topic:** Transformer architecture for sequence-to-sequence tasks.
+      **Key Findings:**
+        - Self-attention replaces recurrence and convolution entirely.
+        - Multi-head attention allows the model to attend to different positions jointly.
+        - The model achieves state-of-the-art BLEU on WMT 2014 EN-DE and EN-FR.
+        - Training time is significantly reduced compared to RNN-based models.
+        - Positional encodings preserve sequence order without recurrence.
+      **Conclusions:** The Transformer generalises well to other tasks beyond MT and
+      enables highly parallelisable training at scale.
+
+  - input: |
+      Climate change is the long-term shift in global temperatures and weather
+      patterns. While natural factors play a role, human activity since the 1800s
+      has been the dominant driver through greenhouse gas emissions...
+    output: |
+      **Topic:** Causes and impacts of climate change.
+      **Key Findings:**
+        - Human activity is the primary driver since the industrial revolution.
+        - Greenhouse gas emissions are the main mechanism of warming.
+        - Weather patterns and sea levels are measurably shifting.
+      **Conclusions:** Urgent systemic action is required to limit warming below 1.5°C.
+
+capabilities_detail:
+  pdf_extraction:
+    description: Reads multi-page PDFs page-by-page using pypdf and joins extracted text.
+    fallback: If pypdf is not installed, returns a clear installation hint to the caller.
+    max_pages: unlimited  # all pages extracted; very large PDFs may increase latency
+
+  summarisation:
+    model: openrouter/openai/gpt-4o-mini
+    prompt_strategy: |
+      Instruction-tuned prompt asks the model to:
+        1. Identify the main topic or thesis.
+        2. List 3–5 key findings or arguments.
+        3. Surface important conclusions or recommendations.
+    fallback_behaviour: If input text is too short or unclear the model says so explicitly.
+
+  transport:
+    protocol: A2A (JSON-RPC over HTTP)
+    endpoint: POST /
+    port: 3775
+    auth: disabled (configurable via config.auth.enabled)
+    storage: in-memory (configurable — see .env.example for Postgres/Redis options)
+    scheduler: in-memory (configurable — see .env.example for Redis options)

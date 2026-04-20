@@ -6,6 +6,7 @@ signal handling and graceful shutdown.
 
 import signal
 import sys
+import threading
 from typing import Any
 
 import uvicorn
@@ -19,7 +20,12 @@ def setup_signal_handlers() -> None:
     """Register signal handlers for graceful shutdown.
 
     Registers handlers for SIGINT (Ctrl+C) and SIGTERM (Docker/systemd stop).
+    Skips registration if not running in the main thread (e.g., when uvicorn
+    is started in a background thread by the gRPC registration flow).
     """
+    if threading.current_thread() is not threading.main_thread():
+        logger.debug("Skipping signal handler registration (not in main thread)")
+        return
 
     def handle_shutdown(signum: int, frame: Any) -> None:
         """Handle shutdown signals gracefully."""
@@ -39,13 +45,17 @@ def setup_signal_handlers() -> None:
 def run_server(app: Any, host: str, port: int, display_info: bool = True) -> None:
     """Run uvicorn server with graceful shutdown handling.
 
+    Supports being called from both the main thread (normal bindufy flow)
+    and from a background thread (gRPC registration flow via _bindufy_core
+    with run_server_in_background=True).
+
     Args:
         app: ASGI application to serve
         host: Host address to bind to
         port: Port number to bind to
         display_info: Whether to display startup info messages
     """
-    # Setup signal handlers
+    # Setup signal handlers (skips automatically if not in main thread)
     setup_signal_handlers()
 
     if display_info:

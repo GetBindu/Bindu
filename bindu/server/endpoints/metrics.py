@@ -8,8 +8,17 @@ from starlette.responses import Response
 from bindu.server.applications import BinduApplication
 from bindu.server.metrics import get_metrics
 from bindu.utils.logging import get_logger
+from .utils import get_agent_did
 
 logger = get_logger("bindu.server.endpoints.metrics")
+
+# Constants - using string literals that match TaskState
+ACTIVE_TASK_STATUSES: tuple[str, str, str] = ("submitted", "working", "input-required")
+NO_CACHE_HEADERS = {
+    "Cache-Control": "no-cache, no-store, must-revalidate",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
 
 
 async def _update_agent_metrics(app: BinduApplication) -> None:
@@ -24,31 +33,25 @@ async def _update_agent_metrics(app: BinduApplication) -> None:
     metrics = get_metrics()
 
     # Get agent ID from manifest
-    if app.manifest and app.manifest.did_extension:
-        agent_id = app.manifest.did_extension.did
-
+    agent_id = get_agent_did(app)
+    if agent_id:
         try:
-            # Count active tasks from storage (optimized)
-            # We count tasks that are NOT in terminal states
-            # Since count_tasks supports single status filtering, we might need multiple calls
-            # or just count total active if storage supports it.
-            # For now, let's use the most common active state "submitted" + "working"
-            # Or if storage supports efficient filtering.
+            # Count active tasks (submitted, working, input-required)
+            from typing import cast
+            from bindu.common.protocol.types import TaskState
 
-            # Optimization: most tasks are likely completed.
-            # If we want total active, we can count total and subtract completed/failed?
-            # Or just count 'submitted' and 'working' which are the main active ones.
-
-            submitted = await app._storage.count_tasks(status="submitted")
-            working = await app._storage.count_tasks(status="working")
-            input_required = await app._storage.count_tasks(status="input-required")
+            submitted = await app._storage.count_tasks(
+                status=cast(TaskState, ACTIVE_TASK_STATUSES[0])
+            )
+            working = await app._storage.count_tasks(
+                status=cast(TaskState, ACTIVE_TASK_STATUSES[1])
+            )
+            input_required = await app._storage.count_tasks(
+                status=cast(TaskState, ACTIVE_TASK_STATUSES[2])
+            )
 
             active_count = submitted + working + input_required
             metrics.set_agent_tasks_active(agent_id, active_count)
-
-            # Count completed tasks by status
-            # Note: This counts from current session only, not historical totals
-            # For historical totals, you'd need to track this separately
         except Exception as e:
             logger.debug(f"Failed to update agent metrics: {e}")
 
@@ -76,9 +79,5 @@ async def metrics_endpoint(app: BinduApplication, request: Request) -> Response:
     return Response(
         content=prometheus_text,
         media_type="text/plain; version=0.0.4; charset=utf-8",
-        headers={
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache",
-            "Expires": "0",
-        },
+        headers=NO_CACHE_HEADERS,
     )

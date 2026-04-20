@@ -8,7 +8,6 @@ with comprehensive tracing, metrics, and logging.
 import functools
 import time
 from typing import Any, Callable, ParamSpec, TypeVar, cast
-from uuid import UUID
 
 from opentelemetry import metrics, trace
 from opentelemetry.trace import Status, StatusCode
@@ -202,6 +201,10 @@ def track_active_task(func: F) -> F:
             if operation in ["cancel_task"]:
                 active_tasks.add(-1, {"operation": "cancel"})
 
+            # FIX: Ensure creation operations decrement when the request cycle completes
+            elif operation in create_operations:
+                active_tasks.add(-1, {"operation": "completed"})
+
             return result
 
         except Exception:
@@ -264,30 +267,3 @@ def trace_context_operation(operation_name: str):
         return cast(F, wrapper)
 
     return decorator
-
-
-# Custom span creation utilities
-def create_task_span(task_id: UUID, operation: str, context_id: UUID | None = None):
-    """Create a task-specific span with standard attributes."""
-    span = tracer.start_span(f"task.{operation}")
-    span.set_attributes(
-        {
-            "bindu.task_id": str(task_id),
-            "bindu.operation": operation,
-            "bindu.component": "task",
-        }
-    )
-
-    if context_id:
-        span.set_attribute("bindu.context_id", str(context_id))
-
-    return span
-
-
-def record_task_metrics(operation: str, duration: float, status: str, **labels):
-    """Record task-related metrics with consistent labeling."""
-    base_labels = {"operation": operation, "status": status}
-    base_labels.update(labels)
-
-    task_duration.record(duration, base_labels)
-    task_counter.add(1, base_labels)

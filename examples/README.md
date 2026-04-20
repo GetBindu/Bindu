@@ -47,15 +47,34 @@ For full URL override, use `BINDU_DEPLOYMENT_URL` (e.g. `http://127.0.0.1:5001`)
 - `beginner/agno_example.py` - Research assistant with DuckDuckGo
 - `beginner/faq_agent.py` - Documentation search agent
 - `beginner/agno_notion_agent.py` - Notion integration
+- `beginner/ag2_simple_example.py` - AG2 (AutoGen) simple agent
+- `beginner/minimax_example.py` - MiniMax AI research agent (OpenAI-compatible)
+- `beginner/dspy_agent.py` - DSPy framework integration
+- `beginner/agno_paywall_example.py` - Paywall-protected agent
+- `beginner/echo_agent_behind_paywall.py` - Echo agent with payment requirement
 
 ### Specialized
 - `summarizer/` - Text summarization agent
 - `weather-research/` - Weather intelligence agent
+- `web-scraping-agent/` - AI web scraping agent with ScrapeGraph + Mem0 memory
 - `premium-advisor/` - Paid agent with X402 payments (0.01 USDC per query)
+- `news-summarizer/` - Real-time news search and summarization using local Ollama
+- `document-analyzer/` - PDF/DOCX document analysis and Q&A agent
+- `speech-to-text/` - Audio transcription using Gemini 2.0 Flash (MP3, WAV, OGG, M4A)
+- `ai-data-analysis-agent/` - Autonomous data analyst with CSV profiling and visualization
+- `cybersecurity-newsletter/` - Security news aggregator with CVE tracking
+
+### TypeScript (Language-Agnostic via gRPC)
+- `typescript-openai-agent/` - OpenAI SDK agent bindufied with TypeScript SDK
+- `typescript-langchain-agent/` - LangChain.js agent bindufied with TypeScript SDK
+
+> TypeScript agents use `@bindu/sdk` which automatically launches the Bindu Python core in the background. Same A2A protocol, same DID, same everything — just a different language. See the [gRPC documentation](../docs/GRPC_LANGUAGE_AGNOSTIC.md) for details.
 
 ### Advanced
 - `agent_swarm/` - Multi-agent collaboration system
 - `cerina_bindu/cbt/` - CBT therapy protocol generator
+- `ag2_research_team/` - Multi-agent research pipeline using AG2 (AutoGen)
+- `langgraph_blog_writing_agent/` - Map-Reduce blog writing with LangGraph
 
 ### Components
 - `skills/` - Reusable agent capabilities
@@ -63,8 +82,9 @@ For full URL override, use `BINDU_DEPLOYMENT_URL` (e.g. `http://127.0.0.1:5001`)
 ## Environment Variables
 
 ```bash
-# Required
+# Required (at least one LLM provider)
 OPENROUTER_API_KEY=sk-or-v1-your-api-key-here
+MINIMAX_API_KEY=your-minimax-api-key  # Alternative: MiniMax AI (https://platform.minimaxi.com)
 
 # Optional
 PORT=4000
@@ -121,7 +141,8 @@ if __name__ == "__main__":
 ## Documentation
 
 - [Bindu Docs](https://docs.getbindu.com)
-- [API Reference](../openapi.yaml)
+- [gRPC Language-Agnostic Guide](../docs/GRPC_LANGUAGE_AGNOSTIC.md)
+- [TypeScript SDK](../sdks/typescript/README.md)
 - [Payment Guide](../docs/PAYMENT.md)
 - [DID Guide](../docs/DID.md)
 - [Skills Guide](../docs/SKILLS.md)
@@ -135,4 +156,4 @@ if __name__ == "__main__":
 
 ## License
 
-See [LICENSE.md](LICENSE.md)
+See [LICENSE.md](../LICENSE.md)

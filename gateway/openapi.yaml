@@ -1,0 +1,1115 @@
+openapi: 3.1.0
+info:
+  title: Bindu Gateway API
+  version: "1.0.0"
+  summary: External HTTP surface of the Bindu Gateway — a task-first orchestrator that plans over a caller-supplied catalog of A2A agents.
+  description: |
+    # Bindu Gateway API
+
+    The **Bindu Gateway** sits between an external system (your app, a custom
+    frontend, another service) and one or more **Bindu A2A agents**. It takes
+    a user question + an agent catalog and returns a streaming plan: the
+    gateway's planner LLM decomposes the request, invokes A2A agents via the
+    polling protocol, and emits Server-Sent Events in real time.
+
+    Distinct from the per-agent **Bindu Agent API** (see the repo-root
+    `openapi.yaml`), which describes what a single `bindufy()`-built agent
+    exposes. This spec documents the **gateway** — the orchestrator sitting
+    one layer up.
+
+    ---
+
+    ## Mental model: one endpoint, many turns
+
+    Every orchestration goes through `POST /plan`. Inside, the planner LLM
+    runs an agentic loop — it calls A2A agents as tools, the results feed
+    back into the LLM, and the loop continues up to `max_steps` or until the
+    plan resolves.
+
+    Two auxiliary endpoints support health probing and DID-based peer
+    authentication:
+
+    | Path | Purpose |
+    |---|---|
+    | `POST /plan` | Open a new plan or resume an existing session. Streams SSE. |
+    | `GET /health` | Liveness + cheap config probe. |
+    | `GET /.well-known/did.json` | The gateway's own DID document (only when a DID identity is configured via env). |
+
+    ---
+
+    ## Request shape
+
+    A `/plan` request carries three things:
+
+    1. **`question`** — the user's natural-language input.
+    2. **`agents[]`** — the catalog of A2A peers the planner may call, each
+       with an endpoint, authentication descriptor, and list of skills.
+       The gateway does **not** host agents; the caller is always the
+       source of truth for "what can we reach."
+    3. **`preferences`** and **`session_id`** (both optional) — caps and
+       continuation handles.
+
+    The shape is stable and additive; unknown top-level keys are accepted
+    (forward-compatible `.passthrough()`), but `preferences` keys are strict
+    snake_case. Clients sending camelCase preferences will have them
+    silently dropped — match the schema below.
+
+    ---
+
+    ## Response shape — Server-Sent Events
+
+    The happy path returns `200 OK` with `Content-Type: text/event-stream`.
+    Errors surface in three ways depending on when they occur:
+
+    - **Before streaming starts** (auth failure, invalid JSON, malformed
+      request, session creation failure): `401`/`400`/`500` with a JSON
+      `{ error, detail? }` body.
+    - **During streaming** (planner or tool failure): a single
+      `event: error` SSE frame, followed by `event: done`.
+    - **Never silent** — every successful plan closes with `event: done`
+      (empty payload). Consumers should treat the absence of `done` as
+      an incomplete stream.
+
+    SSE events emitted during a plan, in typical order:
+
+    | Event | When | Purpose |
+    |---|---|---|
+    | `session` | Once, before the plan starts | Carries session identifiers so clients can correlate. |
+    | `plan` | Once, when the planner starts its first turn | Announces plan_id. |
+    | `text.delta` | Many (streaming planner output) | Incremental text chunks for the final assistant message. |
+    | `task.started` | Per A2A tool call | The planner decided to call a peer agent. |
+    | `task.artifact` | Per A2A tool call | The peer returned an artifact, wrapped in a `<remote_content>` envelope. |
+    | `task.finished` | Per A2A tool call | Terminal state of the peer call. |
+    | `final` | Once, at the end | Stop reason + usage counters. |
+    | `error` | Only on failure during streaming | Human-readable message. |
+    | `done` | Always last | Empty marker so clients can close cleanly. |
+
+    ---
+
+    ## Recipes (internal)
+
+    The gateway supports **progressive-disclosure recipes** — markdown
+    playbooks the planner lazy-loads when a task matches (e.g.,
+    "multi-agent research", "payment-required flow"). Recipes are operator-
+    authored and not part of this HTTP API surface: they live in
+    `gateway/recipes/` and are injected automatically into the planner's
+    system prompt as metadata, with the body fetched on demand via an
+    internal `load_recipe` tool.
+
+    You cannot upload, list, or invoke recipes via the HTTP API; they
+    influence the planner's behavior transparently. See the gateway README
+    §Recipes for authoring details.
+
+    ---
+
+    ## A2A protocol pass-through
+
+    The gateway speaks A2A (JSON-RPC 2.0 over HTTP) to every peer in
+    `agents[]` — `message/send` + `tasks/get` polling, with DID signature
+    verification when configured. A2A task states (`submitted`, `working`,
+    `input-required`, `auth-required`, `payment-required`, `completed`,
+    `failed`, `canceled`) flow through to the planner; terminal states
+    become `task.finished` events, non-terminal states can surface as
+    planner text or trigger recipe-based handling (e.g., surfacing a
+    `payment-required` URL to the user).
+
+    See the Bindu Agent API spec (`openapi.yaml` at the repo root) for the
+    full A2A protocol surface.
+
+  contact:
+    name: Bindu Team
+    url: https://docs.getbindu.com/
+  license:
+    name: Apache-2.0
+
+servers:
+  - url: http://localhost:3774
+    description: Local development (default port)
+  - url: https://gateway.example.com
+    description: Production deployment (replace with your host)
+
+tags:
+  - name: Plan
+    description: |
+      Open a new plan or resume an existing session. Server-Sent Events
+      stream back the planner's turn-by-turn output, tool calls, and
+      final answer.
+  - name: Health
+    description: Liveness and basic configuration probes.
+  - name: Identity
+    description: |
+      The gateway's self-published DID document, for A2A peers that
+      need to verify `did_signed` outbound calls. Only exposed when
+      the gateway has a DID identity configured via env.
+
+paths:
+  /plan:
+    post:
+      tags: [Plan]
+      operationId: postPlan
+      summary: Open a plan; stream SSE of the orchestration.
+      description: |
+        Accepts a user question + agent catalog, starts (or resumes) a
+        session, and streams Server-Sent Events as the planner runs.
+
+        ### Session continuation
+
+        Pass `session_id` to resume an existing session — history persists,
+        the planner sees prior turns. Omit to start a fresh session. The
+        server returns the resolved `session_id` in the first SSE frame
+        (`event: session`), even for new sessions, so clients can cache it.
+
+        ### Catalog immutability per session
+
+        The `agents` catalog is stored on first plan and refreshed on each
+        subsequent call; agents added or removed between plans take effect
+        immediately but don't retroactively change prior turns' tool sets.
+
+        ### Streaming & abort
+
+        Closing the HTTP connection aborts the plan — in-flight A2A calls
+        receive an `AbortSignal` and the planner loop terminates. Clients
+        that want a partial result should buffer `text.delta` frames
+        client-side rather than relying on `final`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlanRequest"
+            examples:
+              minimal:
+                summary: Simplest possible plan (no agents)
+                value:
+                  question: "What's the capital of France?"
+              singleAgent:
+                summary: One agent with one skill, no auth
+                value:
+                  question: "Find 3 recent papers on LLM evaluation."
+                  agents:
+                    - name: "research"
+                      endpoint: "http://localhost:3773"
+                      auth: { type: "none" }
+                      skills:
+                        - id: "search"
+                          description: "Web search."
+              multiAgentDIDSigned:
+                summary: Two agents, DID-signed auth, session continuation
+                value:
+                  session_id: "client-session-42"
+                  question: "Compare AWS and GCP pricing for a 5-node Kubernetes cluster; then summarize for a non-technical audience."
+                  agents:
+                    - name: "pricing"
+                      endpoint: "https://pricing.example.com"
+                      auth: { type: "did_signed" }
+                      trust:
+                        verifyDID: true
+                        pinnedDID: "did:bindu:pricing-agent-key-1"
+                      skills:
+                        - id: "compare"
+                          description: "Compare cloud pricing."
+                          inputSchema:
+                            type: object
+                            properties:
+                              provider_a: { type: "string" }
+                              provider_b: { type: "string" }
+                              workload: { type: "string" }
+                            required: [provider_a, provider_b, workload]
+                    - name: "summarizer"
+                      endpoint: "https://summarize.example.com"
+                      auth:
+                        type: "bearer_env"
+                        envVar: "SUMMARIZER_TOKEN"
+                      skills:
+                        - id: "summarize"
+                          description: "Summarize text for a target audience."
+                  preferences:
+                    max_steps: 8
+                    timeout_ms: 60000
+      responses:
+        "200":
+          description: |
+            SSE stream of the plan. Each event is one of the types
+            documented under `SSEEvent` below. The stream closes after
+            `event: done`.
+          content:
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/SSEStream"
+              examples:
+                happyPath:
+                  summary: Plan with one tool call and a final answer
+                  value: |
+                    event: session
+                    data: {"session_id":"s_01H...","external_session_id":"client-session-42","created":true}
+
+                    event: plan
+                    data: {"plan_id":"m_01H...","session_id":"s_01H..."}
+
+                    event: task.started
+                    data: {"task_id":"call_01H...","agent":"research","agent_did":null,"skill":"search","input":{"input":"Find 3 recent papers on LLM evaluation."}}
+
+                    event: task.artifact
+                    data: {"task_id":"call_01H...","agent":"research","agent_did":null,"content":"<remote_content agent=\"research\" verified=\"unknown\">Paper A ...\nPaper B ...\nPaper C ...</remote_content>","title":"@research/search"}
+
+                    event: task.finished
+                    data: {"task_id":"call_01H...","agent":"research","agent_did":null,"state":"completed"}
+
+                    event: text.delta
+                    data: {"session_id":"s_01H...","part_id":"p_01H...","delta":"Here are three recent papers on LLM evaluation:\n\n"}
+
+                    event: final
+                    data: {"session_id":"s_01H...","stop_reason":"stop","usage":{"inputTokens":1820,"outputTokens":312,"totalTokens":2132,"cachedInputTokens":0}}
+
+                    event: done
+                    data: {}
+        "400":
+          description: |
+            Malformed JSON, missing required fields, schema validation
+            failure, or a catalog that would produce colliding tool ids
+            (two entries whose `<agent>_<skill>` combination normalizes
+            to the same value — silently swallowed before this guard,
+            which let one peer mask another).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                missingField:
+                  summary: Schema validation failure
+                  value:
+                    error: "invalid_request"
+                    detail: "question: Required; question must be a non-empty string"
+                collidingToolIds:
+                  summary: Two catalog entries produce the same normalized tool id
+                  value:
+                    error: "invalid_request"
+                    detail: 'agents catalog has colliding tool ids — toolId "call_research_search" produced by: research/search, research/search'
+        "401":
+          description: Missing or invalid bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "unauthorized"
+        "500":
+          description: |
+            Session creation failed (database unreachable, Supabase row
+            insertion error, etc.). Only emitted **before** the SSE stream
+            opens — once streaming starts, errors surface as `event: error`
+            on the stream.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "session_failed"
+                detail: "Supabase insert failed: connection refused"
+
+  /health:
+    get:
+      tags: [Health]
+      operationId: getHealth
+      summary: Liveness and basic configuration probe.
+      description: |
+        Unauthenticated, cheap, returns immediately. Does NOT verify
+        downstream connectivity (Supabase, OpenRouter, Hydra) — it only
+        reports whether the gateway process has booted with the expected
+        config. Use this for container liveness checks; for readiness
+        probes that include downstream health, build a higher-level
+        check.
+      security: []
+      responses:
+        "200":
+          description: |
+            Gateway is up. Response body describes the process — version,
+            identity, configured planner model, recipe count, uptime. The
+            200 status is informational, not a health gate: read `status`
+            and `ready` in the body to distinguish healthy from degraded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                version: "0.1.0"
+                health: "healthy"
+                runtime:
+                  storage_backend: "Supabase"
+                  bus_backend: "EffectPubSub"
+                  planner:
+                    model: "openrouter/anthropic/claude-sonnet-4.6"
+                    provider: "openrouter"
+                    model_id: "anthropic/claude-sonnet-4.6"
+                    temperature: 0.3
+                    top_p: null
+                    max_steps: 10
+                  recipe_count: 2
+                  did_signing_enabled: true
+                  hydra_integrated: true
+                application:
+                  name: "@bindu/gateway"
+                  session_mode: "stateful"
+                  gateway_did: "did:bindu:ops_at_example_com:gateway:f72ba681-f873-324c-6012-23c4d5b72451"
+                  gateway_id: "f72ba681-f873-324c-6012-23c4d5b72451"
+                  author: "ops_at_example_com"
+                system:
+                  node_version: "v22.22.1"
+                  platform: "darwin"
+                  architecture: "arm64"
+                  environment: "development"
+                status: "ok"
+                ready: true
+                uptime_seconds: 2.4
+
+  /.well-known/did.json:
+    get:
+      tags: [Identity]
+      operationId: getDidDocument
+      summary: The gateway's self-published DID document.
+      description: |
+        Returns a W3C DID Core v1-compatible document with the gateway's
+        Ed25519 public key under `authentication[]`. A2A peers that
+        accept `did_signed` requests fetch this to verify the gateway's
+        outbound signatures.
+
+        **Availability:** only registered when the gateway has a DID
+        identity configured via env — `BINDU_GATEWAY_DID_SEED`,
+        `BINDU_GATEWAY_AUTHOR`, and `BINDU_GATEWAY_NAME` all set. When no
+        identity is loaded this endpoint returns 404.
+
+        **Caching:** the gateway's DID is stable across process lifetime
+        (env-driven); responses carry `Cache-Control: public, max-age=300`
+        as a defense against bad caches that would otherwise hold the key
+        indefinitely.
+
+        **Content-Type:** `application/did+json` per W3C DID Core, not
+        plain `application/json`. Some DID resolvers enforce the media
+        type.
+
+        **Auth:** none. Well-known endpoints are public by spec — the
+        whole point is that any peer can resolve the DID without
+        credentials.
+      security: []
+      responses:
+        "200":
+          description: DID document for the configured gateway identity.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              example: "public, max-age=300"
+          content:
+            application/did+json:
+              schema:
+                $ref: "#/components/schemas/GatewayDidDocument"
+              example:
+                "@context":
+                  - "https://www.w3.org/ns/did/v1"
+                  - "https://getbindu.com/ns/v1"
+                id: "did:bindu:gateway-prod-key-1"
+                authentication:
+                  - id: "did:bindu:gateway-prod-key-1#key-1"
+                    type: "Ed25519VerificationKey2020"
+                    controller: "did:bindu:gateway-prod-key-1"
+                    publicKeyBase58: "6MkjQ2r..."
+        "404":
+          description: No DID identity configured on this gateway instance.
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+      description: |
+        Shared-secret bearer token(s) configured via `config.gateway.auth.tokens`.
+        Validated in constant time against a SHA-256 hash of each configured
+        token, so neither timing nor length leaks which token matched. Set
+        `gateway.auth.mode: "none"` in config to disable bearer auth
+        (not recommended outside of localhost).
+
+  schemas:
+
+    # -----------------------------------------------------------------
+    # /plan request
+    # -----------------------------------------------------------------
+
+    PlanRequest:
+      type: object
+      additionalProperties: true
+      required: [question]
+      properties:
+        question:
+          type: string
+          minLength: 1
+          description: |
+            The user's natural-language question. Non-empty — an empty
+            string is rejected upstream because some LLM providers
+            (Anthropic) reject empty user messages with a 400 mid-stream,
+            surfacing as a vague "Provider returned error". Validating
+            here gives a clean 400 with `invalid_request` instead.
+          example: "Summarize the latest quarterly results for Apple."
+        agents:
+          type: array
+          default: []
+          description: |
+            Catalog of A2A peers the planner may call. Empty array =
+            planner runs with no tools (useful for questions the
+            configured planner LLM can answer on its own, e.g.,
+            general knowledge).
+          items:
+            $ref: "#/components/schemas/AgentRequest"
+        preferences:
+          $ref: "#/components/schemas/PlanPreferences"
+        session_id:
+          type: string
+          description: |
+            Opaque external session identifier. If provided AND a session
+            row exists with the matching `external_session_id`, that
+            session is resumed (history persists). If omitted or
+            unmatched, a new session is created and its server-assigned
+            id is surfaced in the first SSE `session` event.
+          example: "client-session-42"
+
+    AgentRequest:
+      type: object
+      required: [name, endpoint]
+      properties:
+        name:
+          type: string
+          description: |
+            Display name of the peer. Used to derive the tool id exposed
+            to the planner LLM (`call_<name>_<skillId>`) and to correlate
+            SSE events back to the catalog entry. Operator-chosen and
+            potentially collision-prone — use `trust.pinnedDID` for a
+            cryptographically stable identifier.
+          example: "research"
+        endpoint:
+          type: string
+          format: uri
+          description: |
+            Absolute HTTP(S) URL where the peer's A2A endpoint is
+            reachable. The gateway POSTs JSON-RPC envelopes here for
+            `message/send` and `tasks/get`.
+          example: "http://localhost:3773"
+        auth:
+          $ref: "#/components/schemas/PeerAuth"
+        trust:
+          $ref: "#/components/schemas/PeerTrust"
+        skills:
+          type: array
+          default: []
+          description: |
+            Peer capabilities the planner may invoke. Each becomes one
+            dynamic tool scoped to this request. The gateway does NOT
+            discover skills from the peer's `AgentCard` — the caller
+            declares them, ensuring the planner sees only capabilities
+            the caller vouches for.
+          items:
+            $ref: "#/components/schemas/SkillRequest"
+
+    SkillRequest:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: string
+          description: |
+            The skill id the A2A peer recognizes. Passed back to the
+            peer inside `message/send` so it can route to the right
+            internal handler.
+          example: "search"
+        description:
+          type: string
+          description: |
+            Human-readable description. The planner LLM relies heavily
+            on this to decide whether to invoke the skill — write 3–4
+            sentences covering intent, inputs, outputs, and when to use
+            it. Descriptions under 120 chars are auto-padded server-side
+            with agent/skill context so the LLM still gets enough
+            signal.
+          example: "Search the open web and return a ranked list of passages."
+        inputSchema:
+          description: |
+            Optional JSON Schema for structured inputs. When present,
+            the planner LLM emits a JSON object matching this shape
+            and the gateway forwards it as the message text (serialized).
+            When omitted, the planner sends a plain-text `input` string.
+          type: object
+          additionalProperties: true
+        outputModes:
+          type: array
+          items:
+            type: string
+          description: |
+            Advisory list of output MIME-like hints the peer may return
+            (e.g., `text/plain`, `application/json`). Surfaced in the
+            tool description so the planner knows what to expect back.
+          example: ["text/plain", "application/json"]
+        tags:
+          type: array
+          items:
+            type: string
+          description: |
+            Free-form tags — helps the planner disambiguate when
+            multiple peers expose similarly-named skills.
+          example: ["research", "web"]
+
+    PeerAuth:
+      description: |
+        How the gateway authenticates its outbound calls to this peer.
+        Discriminated on `type`:
+
+        - `none` — anonymous; peer must accept unauthenticated calls.
+        - `bearer` — static token passed literally in `Authorization`.
+          Caller includes the secret in the request, so only use over TLS.
+        - `bearer_env` — gateway reads the token from the named env var.
+          Keeps secrets out of the wire; rotation = restart.
+        - `did_signed` — gateway signs the request body with its
+          configured Ed25519 identity and attaches an OAuth2 token. By
+          default uses the gateway's own auto-acquired Hydra token;
+          pass `tokenEnvVar` to use a per-peer federated token.
+      oneOf:
+        - $ref: "#/components/schemas/PeerAuth_None"
+        - $ref: "#/components/schemas/PeerAuth_Bearer"
+        - $ref: "#/components/schemas/PeerAuth_BearerEnv"
+        - $ref: "#/components/schemas/PeerAuth_DidSigned"
+      discriminator:
+        propertyName: type
+        mapping:
+          none: "#/components/schemas/PeerAuth_None"
+          bearer: "#/components/schemas/PeerAuth_Bearer"
+          bearer_env: "#/components/schemas/PeerAuth_BearerEnv"
+          did_signed: "#/components/schemas/PeerAuth_DidSigned"
+
+    PeerAuth_None:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [none]
+
+    PeerAuth_Bearer:
+      type: object
+      required: [type, token]
+      properties:
+        type:
+          type: string
+          enum: [bearer]
+        token:
+          type: string
+          description: "Literal bearer token to include in `Authorization: Bearer <token>`."
+
+    PeerAuth_BearerEnv:
+      type: object
+      required: [type, envVar]
+      properties:
+        type:
+          type: string
+          enum: [bearer_env]
+        envVar:
+          type: string
+          description: Name of the env var on the gateway process whose value is the bearer token.
+          example: "PEER_A_TOKEN"
+
+    PeerAuth_DidSigned:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [did_signed]
+        tokenEnvVar:
+          type: string
+          description: |
+            Optional. Env var name for a pre-acquired OAuth2 token to pair
+            with the DID signature. Omit to use the gateway's own Hydra
+            auto-acquired token (requires `BINDU_GATEWAY_HYDRA_*` env).
+
+    PeerTrust:
+      type: object
+      description: |
+        Per-peer trust policy. Both fields are optional; omitting both
+        means "trust the peer's identity at face value — don't verify."
+      properties:
+        verifyDID:
+          type: boolean
+          description: |
+            When true, the gateway verifies every Ed25519 signature on
+            artifacts returned by this peer. Mismatched signatures fail
+            the task. Requires a resolvable DID on the peer.
+        pinnedDID:
+          type: string
+          description: |
+            DID the peer is expected to present. Used both for
+            correlation (SSE `agent_did`) and, when `verifyDID` is true,
+            to reject responses signed by a different key.
+          example: "did:bindu:research-agent-key-1"
+
+    PlanPreferences:
+      type: object
+      additionalProperties: true
+      description: |
+        Caps and shaping hints. All keys are **snake_case**; an earlier
+        draft declared them camelCase, which caused docs-compliant clients
+        to silently lose the caps — the schema is now strict on casing
+        and unknown keys pass through via `additionalProperties: true`
+        for forward compatibility.
+      properties:
+        response_format:
+          type: string
+          description: |
+            Advisory hint for the planner's final-message format
+            (`"markdown"`, `"plain"`, `"json"`, etc.). Not enforced by
+            the gateway; the planner may honor or ignore it.
+        max_hops:
+          type: integer
+          minimum: 1
+          description: |
+            Maximum number of A2A hops (recursive peer-to-peer calls)
+            the gateway allows. Phase 2+ enforced; currently informational.
+        timeout_ms:
+          type: integer
+          minimum: 1
+          description: Hard timeout for the whole plan, in milliseconds.
+        max_steps:
+          type: integer
+          minimum: 1
+          description: |
+            Maximum agentic loop steps. Overrides the planner agent's
+            default (`agent.steps`). A "step" is one LLM call — tool
+            calls inside a step don't count.
+          example: 8
+
+    # -----------------------------------------------------------------
+    # Responses
+    # -----------------------------------------------------------------
+
+    HealthResponse:
+      type: object
+      required: [version, health, runtime, application, system, status, ready, uptime_seconds]
+      description: |
+        Detailed gateway health payload. Shape aligned with the per-agent
+        Bindu health (the one a `bindufy()`-built agent returns), adapted
+        for the coordinator role: `gateway_id`/`gateway_did` replace the
+        agent-side `penguin_id`/`agent_did`, and `runtime` reports
+        gateway-specific knobs (planner model, recipe count, DID-signing
+        status) instead of the agent's task-manager fields.
+      properties:
+        version:
+          type: string
+          description: Gateway package version, from gateway/package.json.
+          example: "0.1.0"
+        health:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+          description: |
+            Overall classification.
+            - `healthy`: every boot invariant satisfied, planner model resolves.
+            - `degraded`: non-critical subsystem missing (reserved — no current signals trigger this).
+            - `unhealthy`: a required invariant is broken (e.g. no planner model configured).
+        runtime:
+          $ref: "#/components/schemas/HealthRuntime"
+        application:
+          $ref: "#/components/schemas/HealthApplication"
+        system:
+          $ref: "#/components/schemas/HealthSystem"
+        status:
+          type: string
+          enum: [ok, error]
+          description: Two-state mirror of `health` — `ok` when healthy, `error` when unhealthy. Provided for operators that prefer binary.
+        ready:
+          type: boolean
+          description: Liveness gate. True when every boot invariant is satisfied. Use this for k8s readiness probes via a `jq` post-processor.
+        uptime_seconds:
+          type: number
+          description: Seconds since gateway process boot (float, 2 decimal places).
+          example: 23.3
+
+    HealthRuntime:
+      type: object
+      required: [storage_backend, bus_backend, planner, recipe_count, did_signing_enabled, hydra_integrated]
+      properties:
+        storage_backend:
+          type: string
+          description: Durable session store. Today always `Supabase`.
+        bus_backend:
+          type: string
+          description: Event bus driver. Today always `EffectPubSub` (in-process).
+        planner:
+          $ref: "#/components/schemas/HealthPlanner"
+        recipe_count:
+          type: integer
+          description: Number of recipes discovered at boot (union across all scanned directories, after permission filtering for the default agent).
+          example: 2
+        did_signing_enabled:
+          type: boolean
+          description: True when a gateway DID identity is loaded (env vars `BINDU_GATEWAY_DID_SEED` + friends all set). `did_signed` peers require this.
+        hydra_integrated:
+          type: boolean
+          description: True when a Hydra token provider was successfully wired at boot. `did_signed` peers without `tokenEnvVar` need this to auto-acquire tokens.
+
+    HealthPlanner:
+      type: object
+      required: [model, provider, model_id, temperature, top_p, max_steps]
+      description: |
+        The planner LLM configuration — what model drives the agentic loop
+        inside every `/plan` call. Sourced from `gateway/agents/planner.md`
+        frontmatter (or config.agent.planner overrides).
+      properties:
+        model:
+          type: [string, "null"]
+          description: Full provider-prefixed model id as configured. Null when no planner agent is configured.
+          example: "openrouter/anthropic/claude-sonnet-4.6"
+        provider:
+          type: [string, "null"]
+          description: Provider segment (bit before the first `/`). Today always `openrouter`.
+          example: "openrouter"
+        model_id:
+          type: [string, "null"]
+          description: Upstream model id the provider understands. For OpenRouter-proxied Anthropic this is `anthropic/claude-sonnet-4.6`.
+          example: "anthropic/claude-sonnet-4.6"
+        temperature:
+          type: [number, "null"]
+          description: Sampling temperature configured on the planner agent.
+        top_p:
+          type: [number, "null"]
+          description: Nucleus sampling top_p.
+        max_steps:
+          type: [integer, "null"]
+          description: Cap on agentic loop steps per plan. Null when no cap is set (the planner will run until natural completion or context overflow).
+
+    HealthApplication:
+      type: object
+      required: [name, session_mode, gateway_did, gateway_id, author]
+      properties:
+        name:
+          type: string
+          const: "@bindu/gateway"
+        session_mode:
+          type: string
+          enum: [stateful, stateless]
+          description: Configured session persistence mode.
+        gateway_did:
+          type: [string, "null"]
+          description: The gateway's full DID, null when no identity is configured.
+          example: "did:bindu:ops_at_example_com:gateway:f72ba681-f873-324c-6012-23c4d5b72451"
+        gateway_id:
+          type: [string, "null"]
+          description: Short identifier — last segment of the DID (UUID-ish hash of the public key for `did:bindu`).
+          example: "f72ba681-f873-324c-6012-23c4d5b72451"
+        author:
+          type: [string, "null"]
+          description: Author segment from the DID. Null for non-Bindu DIDs or when no identity is configured.
+          example: "ops_at_example_com"
+
+    HealthSystem:
+      type: object
+      required: [node_version, platform, architecture, environment]
+      properties:
+        node_version:
+          type: string
+          description: Node.js runtime version.
+          example: "v22.22.1"
+        platform:
+          type: string
+          description: Underlying OS kernel identifier from `process.platform`.
+          example: "darwin"
+        architecture:
+          type: string
+          description: CPU architecture from `process.arch`.
+          example: "arm64"
+        environment:
+          type: string
+          description: Value of `NODE_ENV`, or `"development"` when unset.
+          example: "development"
+
+    GatewayDidDocument:
+      type: object
+      required: ["@context", id, authentication]
+      description: |
+        W3C DID Core v1 document describing the gateway's identity.
+        Deliberately omits `created` — the gateway's identity is env-
+        driven and stateless, so there's no persisted "first published"
+        moment to report (W3C DID Core has `created` as optional).
+      properties:
+        "@context":
+          type: array
+          items:
+            type: string
+          example:
+            - "https://www.w3.org/ns/did/v1"
+            - "https://getbindu.com/ns/v1"
+        id:
+          type: string
+          example: "did:bindu:gateway-prod-key-1"
+        authentication:
+          type: array
+          items:
+            $ref: "#/components/schemas/GatewayVerificationMethod"
+
+    GatewayVerificationMethod:
+      type: object
+      required: [id, type, controller, publicKeyBase58]
+      properties:
+        id:
+          type: string
+          example: "did:bindu:gateway-prod-key-1#key-1"
+        type:
+          type: string
+          enum: [Ed25519VerificationKey2020]
+        controller:
+          type: string
+          example: "did:bindu:gateway-prod-key-1"
+        publicKeyBase58:
+          type: string
+          description: Ed25519 public key, base58-encoded.
+          example: "6MkjQ2r..."
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          enum: [unauthorized, invalid_request, session_failed]
+          description: Machine-readable error code.
+        detail:
+          type: string
+          description: Human-readable explanation. Absent for `unauthorized` (don't leak whether a token matched any configured value).
+
+    # -----------------------------------------------------------------
+    # SSE stream — descriptive schemas
+    # -----------------------------------------------------------------
+
+    SSEStream:
+      type: string
+      description: |
+        The `text/event-stream` body is a sequence of `event:` / `data:`
+        pairs. Each `data:` value is a JSON object matching one of the
+        `SSEEvent_*` schemas below. OpenAPI doesn't model SSE natively;
+        `$ref` the per-event schemas to generate typed consumers.
+
+    SSEEvent_Session:
+      type: object
+      description: |
+        Emitted first, before the plan starts. Carries session identifiers
+        so clients can cache them for resume.
+      required: [session_id, external_session_id, created]
+      properties:
+        session_id:
+          type: string
+          description: Server-assigned internal session id. Stable across resumes.
+          example: "s_01H..."
+        external_session_id:
+          type: [string, "null"]
+          description: Echo of `session_id` from the request body, if provided.
+        created:
+          type: boolean
+          description: True if this is a freshly created session; false if resumed.
+
+    SSEEvent_Plan:
+      type: object
+      required: [plan_id, session_id]
+      properties:
+        plan_id:
+          type: string
+          description: Unique id for this planner turn (the assistant message id).
+        session_id:
+          type: string
+
+    SSEEvent_TextDelta:
+      type: object
+      required: [session_id, part_id, delta]
+      properties:
+        session_id:
+          type: string
+        part_id:
+          type: string
+          description: Unique id for the text part. Multiple `text.delta` frames share a `part_id` — concatenate their `delta` fields in order.
+        delta:
+          type: string
+          description: Incremental UTF-8 text chunk. May contain partial multi-byte characters across delta boundaries in theory; OpenRouter does not split these in practice.
+
+    SSEEvent_TaskStarted:
+      type: object
+      required: [task_id, agent, agent_did, skill, input]
+      properties:
+        task_id:
+          type: string
+          description: Unique per tool call. Correlates with the matching `task.artifact` + `task.finished` frames.
+        agent:
+          type: string
+          description: Display name of the peer agent (from `agents[].name`).
+        agent_did:
+          type: [string, "null"]
+          description: Pinned DID for the agent (from `agents[].trust.pinnedDID`), or null if not pinned.
+        skill:
+          type: string
+          description: Skill id being invoked on the peer.
+        input:
+          description: |
+            The JSON payload the planner sent to the tool — either the
+            structured object matching `SkillRequest.inputSchema` or the
+            `{input: "<text>"}` default-schema shape.
+          type: object
+          additionalProperties: true
+
+    SSEEvent_TaskArtifact:
+      type: object
+      required: [task_id, agent, agent_did, content]
+      properties:
+        task_id:
+          type: string
+        agent:
+          type: string
+        agent_did:
+          type: [string, "null"]
+        content:
+          type: string
+          description: |
+            The peer's artifact text, wrapped in a `<remote_content agent="..." did="..." verified="yes|no|unknown">...</remote_content>`
+            envelope. The planner treats this as untrusted data — clients
+            should too.
+        title:
+          type: string
+          description: Short display title, typically `@<agent>/<skill>`.
+        signatures:
+          $ref: "#/components/schemas/PlanSignatures"
+          description: |
+            Signature-verification outcome for this peer call. Present
+            only when the caller set `trust.verifyDID: true` on the
+            agent in the /plan request and the gateway attempted
+            verification. Absent on `load_recipe` / other local tool
+            calls that don't involve a peer. A `null` here means
+            verification was configured but skipped at run time (no
+            pinnedDID, DID doc unreachable, or no usable public key in
+            the doc) — distinct from absence, which means "not even
+            attempted".
+
+    SSEEvent_TaskFinished:
+      type: object
+      required: [task_id, agent, agent_did, state]
+      properties:
+        task_id:
+          type: string
+        agent:
+          type: string
+        agent_did:
+          type: [string, "null"]
+        state:
+          type: string
+          enum: [completed, failed]
+          description: |
+            Terminal state of the A2A task from the gateway's perspective.
+            Non-terminal states on the A2A peer (`input-required`,
+            `auth-required`, `payment-required`) surface as `completed` here
+            with the prompt in `task.artifact.content`; the planner decides
+            whether to retry or surface to the user.
+        signatures:
+          $ref: "#/components/schemas/PlanSignatures"
+          description: |
+            Same shape as on `task.artifact` — duplicated here so
+            consumers that only subscribe to `task.finished` (e.g. for
+            audit logging) still see the verification outcome.
+        error:
+          type: string
+          description: "Present only when `state: failed`. Human-readable."
+
+    SSEEvent_Final:
+      type: object
+      required: [session_id, stop_reason]
+      properties:
+        session_id:
+          type: string
+        stop_reason:
+          type: string
+          enum: [stop, length, tool-calls, content-filter, error]
+          description: |
+            Why the planner stopped:
+            - `stop` — natural end (assistant message complete).
+            - `length` — hit the model's max output length.
+            - `tool-calls` — tool call emitted but loop cap reached.
+            - `content-filter` — provider-side content filter triggered.
+            - `error` — runtime error during streaming.
+        usage:
+          $ref: "#/components/schemas/PlanUsage"
+
+    SSEEvent_Error:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          description: Human-readable error message. Always followed by a `done` frame.
+
+    SSEEvent_Done:
+      type: object
+      description: Empty object. Last frame of every successful plan.
+      additionalProperties: false
+
+    PlanSignatures:
+      type: [object, "null"]
+      description: |
+        DID-signature verification outcome for one peer call. Emitted
+        on `task.artifact` and `task.finished` when the caller set
+        `trust.verifyDID: true` on the agent in the /plan request.
+
+        **How to interpret the counts:**
+
+        - `signed > 0 && signed === verified` — every artifact that
+          carried a signature checked out against the pinned DID's
+          public key. Strongest guarantee.
+        - `signed === 0 && unsigned > 0` — artifacts came back but
+          none had signatures. The gateway will still report `ok:true`
+          (nothing to fail), but the `verified="yes"` on the
+          `<remote_content>` envelope is a *vacuous* yes — there was
+          nothing to verify. Check the agent's signing config.
+        - `signed > 0 && signed !== verified` — at least one signature
+          didn't match. `ok:false`. The task will also be marked
+          `failed` and surface an error.
+        - Field is `null` — `verifyDID` was enabled but verification
+          couldn't run: pinnedDID missing, DID doc unreachable, or no
+          usable public key in the doc.
+        - Field absent entirely — verification wasn't attempted (no
+          `verifyDID: true`, or this tool call wasn't a peer call —
+          e.g. `load_recipe`).
+      properties:
+        ok:
+          type: boolean
+          description: True when no signed artifact failed verification. Note — if NO artifacts were signed (signed === 0) this is vacuously true; always cross-reference `signed`.
+        signed:
+          type: integer
+          minimum: 0
+          description: Number of artifacts that carried a signature header.
+        verified:
+          type: integer
+          minimum: 0
+          description: Of the signed artifacts, how many passed verification against the pinned DID's public key.
+        unsigned:
+          type: integer
+          minimum: 0
+          description: Number of artifacts that had no signature attached. Informational — doesn't affect `ok`.
+
+    PlanUsage:
+      type: object
+      description: |
+        Token accounting for the planner turn. Values come from the
+        provider's usage block; fields may be absent if the provider
+        didn't return them.
+      properties:
+        inputTokens:
+          type: integer
+          description: Tokens in the combined prompt (system + history + tools).
+        outputTokens:
+          type: integer
+          description: Tokens in the assistant output (text + tool call JSON).
+        totalTokens:
+          type: integer
+        cachedInputTokens:
+          type: integer
+          description: Tokens served from the provider's prompt cache (OpenRouter + Anthropic ephemeral cache).

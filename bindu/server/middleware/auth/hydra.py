@@ -22,16 +22,20 @@ from starlette.websockets import WebSocket
 
 from bindu.auth.hydra.client import HydraClient
 from bindu.utils.logging import get_logger
-from bindu.utils.request_utils import extract_error_fields, jsonrpc_error
-from bindu.utils.did_signature import (
+from bindu.server.endpoints.utils import extract_error_fields, jsonrpc_error
+from bindu.utils.did import (
     extract_signature_headers,
     verify_signature,
-    get_public_key_from_hydra,
 )
 
 from .base import AuthMiddleware
 
 logger = get_logger("bindu.server.middleware.hydra")
+
+# Constants
+CACHE_TTL_SECONDS = 300  # 5 minutes
+MAX_BODY_SIZE_BYTES = 2 * 1024 * 1024  # 2 MB
+MAX_SIGNATURE_AGE_SECONDS = 300  # 5 minutes
 
 
 class HydraMiddleware(AuthMiddleware):
@@ -43,8 +47,8 @@ class HydraMiddleware(AuthMiddleware):
 
         self._introspection_cache = {}
         self._cache_locks = {}
-        self._cache_ttl = 300  # 5 minutes cache TTL
-        self._max_body_size = 2 * 1024 * 1024  # 2 MB
+        self._cache_ttl = CACHE_TTL_SECONDS
+        self._max_body_size = MAX_BODY_SIZE_BYTES
 
     def _initialize_provider(self) -> None:
         """Initialize Hydra-specific components and HTTP clients."""
@@ -154,26 +158,56 @@ class HydraMiddleware(AuthMiddleware):
     async def _verify_did_signature_asgi(
         self, receive: Callable, client_did: str, headers: Any
     ) -> tuple[bool, dict[str, Any], Callable]:
-        """Safely verify DID signature by buffering the raw ASGI receive stream."""
+        """Safely verify DID signature by buffering the raw ASGI receive stream.
+
+        Contract: this function is only invoked for callers whose OAuth
+        ``client_id`` starts with ``did:`` — the outer ``__call__`` gate in
+        :meth:`HydraMiddleware.__call__` enforces that. At that point the
+        DID-signed request envelope is mandatory; there is no fallback to
+        "unsigned is fine." Previously this function failed open (returned
+        ``is_valid=True``) when signature headers were absent or when Hydra
+        had no public key for the client — both treated as "can't verify, so
+        allow." That reduced DID signing to a header the caller could simply
+        omit. See ``bugs/2026-04-18-did-signature-fail-open.md``.
+        """
         signature_data = extract_signature_headers(dict(headers))
 
         if not signature_data:
+            # Caller is a DID client but sent no X-DID-Signature. Reject —
+            # signing is mandatory once client_id is a DID.
+            logger.warning(
+                f"DID client {client_did} sent request without signature "
+                f"headers; signing is mandatory for did:* clients."
+            )
             return (
-                True,
-                {"did_verified": False, "reason": "no_signature_headers"},
+                False,
+                {"did_verified": False, "reason": "missing_signature_headers"},
                 receive,
             )
 
         if signature_data["did"] != client_did:
             return False, {"did_verified": False, "reason": "did_mismatch"}, receive
 
-        public_key = await get_public_key_from_hydra(client_did, self.hydra_client)
+        public_key = await self.hydra_client.get_public_key_from_client(client_did)
         if not public_key:
-            return True, {"did_verified": False, "reason": "no_public_key"}, receive
+            # Hydra client metadata has no public_key — the signature can't
+            # be verified. Reject rather than wave the request through. An
+            # operator who registered a DID client without a public key in
+            # metadata has a configuration bug that must be fixed explicitly.
+            logger.warning(
+                f"No public key in Hydra metadata for DID client {client_did}; "
+                f"signature verification cannot proceed. Register the client's "
+                f"base58 Ed25519 public key under metadata.public_key."
+            )
+            return (
+                False,
+                {"did_verified": False, "reason": "public_key_unavailable"},
+                receive,
+            )
 
         # Memory Safety Guard
         content_length = int(headers.get("content-length", 0))
-        if content_length > self._max_body_size:
+        if content_length > MAX_BODY_SIZE_BYTES:
             logger.warning(
                 f"Payload too large for signature verification: {content_length} bytes"
             )
@@ -207,7 +241,7 @@ class HydraMiddleware(AuthMiddleware):
             did=signature_data["did"],
             timestamp=signature_data["timestamp"],
             public_key=public_key,
-            max_age_seconds=300,
+            max_age_seconds=MAX_SIGNATURE_AGE_SECONDS,
         )
 
         verification_result = {

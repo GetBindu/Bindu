@@ -27,6 +27,7 @@ from sqlalchemy import (
     String,
     Table,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 
@@ -49,14 +50,20 @@ tasks_table = Table(
         ForeignKey("contexts.id", ondelete="CASCADE"),
         nullable=False,
     ),
+    # Ownership — recorded from the authenticated caller at task creation.
+    # Nullable because (a) requests with auth disabled have no caller identity
+    # and (b) rows predating this column keep NULL until backfilled. Enforcement
+    # filters reads/writes by this value; see bugs/known-issues.md slug
+    # `idor-task-context-no-ownership-check`.
+    Column("owner_did", String(255), nullable=True),
     # Task metadata
     Column("kind", String(50), nullable=False, default="task"),
     Column("state", String(50), nullable=False),
     Column("state_timestamp", TIMESTAMP(timezone=True), nullable=False),
     # JSONB columns for A2A protocol data
-    Column("history", JSONB, nullable=False, server_default="[]"),
-    Column("artifacts", JSONB, nullable=True, server_default="[]"),
-    Column("metadata", JSONB, nullable=True, server_default="{}"),
+    Column("history", JSONB, nullable=False, server_default=text("'[]'::jsonb")),
+    Column("artifacts", JSONB, nullable=True, server_default=text("'[]'::jsonb")),
+    Column("metadata", JSONB, nullable=True, server_default=text("'{}'::jsonb")),
     # Timestamps
     Column(
         "created_at",
@@ -76,9 +83,8 @@ tasks_table = Table(
     Index("idx_tasks_state", "state"),
     Index("idx_tasks_created_at", "created_at"),
     Index("idx_tasks_updated_at", "updated_at"),
-    Index("idx_tasks_history_gin", "history", postgresql_using="gin"),
+    Index("idx_tasks_owner_did", "owner_did"),
     Index("idx_tasks_metadata_gin", "metadata", postgresql_using="gin"),
-    Index("idx_tasks_artifacts_gin", "artifacts", postgresql_using="gin"),
     # Table comment
     comment="A2A protocol tasks with JSONB history and artifacts",
 )
@@ -92,9 +98,12 @@ contexts_table = Table(
     metadata,
     # Primary key
     Column("id", PG_UUID(as_uuid=True), primary_key=True, nullable=False),
+    # Ownership — set on first write (submit_task) and never changed.
+    # See tasks_table.owner_did for the same rationale.
+    Column("owner_did", String(255), nullable=True),
     # JSONB columns
-    Column("context_data", JSONB, nullable=False, server_default="{}"),
-    Column("message_history", JSONB, nullable=True, server_default="[]"),
+    Column("context_data", JSONB, nullable=False, server_default=text("'{}'::jsonb")),
+    Column("message_history", JSONB, nullable=True, server_default=text("'[]'::jsonb")),
     # Timestamps
     Column(
         "created_at",
@@ -112,8 +121,8 @@ contexts_table = Table(
     # Indexes
     Index("idx_contexts_created_at", "created_at"),
     Index("idx_contexts_updated_at", "updated_at"),
+    Index("idx_contexts_owner_did", "owner_did"),
     Index("idx_contexts_data_gin", "context_data", postgresql_using="gin"),
-    Index("idx_contexts_history_gin", "message_history", postgresql_using="gin"),
     # Table comment
     comment="Conversation contexts with message history",
 )

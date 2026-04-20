@@ -4,8 +4,7 @@ This module contains extracted helper classes to keep ManifestWorker clean and f
 Each helper class handles a specific aspect of task execution.
 """
 
-from .payment_handler import PaymentHandler
 from .response_detector import ResponseDetector
 from .result_processor import ResultProcessor
 
-__all__ = ["ResultProcessor", "ResponseDetector", "PaymentHandler"]
+__all__ = ["ResultProcessor", "ResponseDetector"]

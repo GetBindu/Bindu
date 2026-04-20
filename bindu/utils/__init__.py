@@ -1,24 +1,39 @@
-"""bindu utilities and helper functions."""
+"""Bindu utilities and helper functions.
 
+Organized into focused packages:
+- config: Configuration loading with DRY factory pattern
+- http: HTTP clients (generic, auth, vault, tokens)
+- did: DID signature and validation utilities
+- worker: Worker operation utilities (messages, parts, artifacts, tasks)
+- skills: Skill loading and management
+
+Backward compatibility maintained through re-exports.
+"""
+
+# Core utilities (kept at top level)
 from .capabilities import (
     add_extension_to_capabilities,
     get_x402_extension_from_capabilities,
 )
-from .config_loader import load_config_from_env, update_auth_settings
-from .did_utils import check_did_match, validate_did_extension
-from .env_loader import load_and_apply_env_file, load_env_file, resolve_path
-from .path_resolver import (
-    get_caller_directory,
-    resolve_key_directory,
-    ensure_directory_exists,
+from .exceptions import (
+    HTTPError,
+    HTTPConnectionError,
+    HTTPTimeoutError,
+    HTTPClientError,
+    HTTPServerError,
 )
-from .request_utils import handle_endpoint_errors
+from .retry import create_retry_decorator
 from .server_runner import run_server, setup_signal_handlers
-from .skill_loader import load_skills
-from .skill_utils import find_skill_by_id
 
-# Note: worker_utils is NOT imported here to avoid circular dependency with DID extension
-# Import directly from bindu.utils.worker_utils where needed
+# Organized packages (new structure)
+from .config import load_config_from_env, update_auth_settings
+from .did import check_did_match, validate_did_extension
+from .skills import load_skills, find_skill_by_id
+
+# Note: worker package is NOT imported here to avoid circular dependency with DID extension
+# Import directly from bindu.utils.worker where needed
+# Note: http package contains http_client, hybrid_auth_client, vault_client, agent_token_utils
+# Import directly from bindu.utils.http where needed
 
 __all__ = [
     # Skill utilities
@@ -33,17 +48,15 @@ __all__ = [
     # Configuration utilities
     "load_config_from_env",
     "update_auth_settings",
-    # Environment utilities
-    "load_env_file",
-    "load_and_apply_env_file",
-    "resolve_path",
-    # Path utilities
-    "get_caller_directory",
-    "resolve_key_directory",
-    "ensure_directory_exists",
+    # Exception types
+    "HTTPError",
+    "HTTPConnectionError",
+    "HTTPTimeoutError",
+    "HTTPClientError",
+    "HTTPServerError",
     # Server utilities
     "run_server",
     "setup_signal_handlers",
-    # Request utilities
-    "handle_endpoint_errors",
+    # Retry utilities
+    "create_retry_decorator",
 ]

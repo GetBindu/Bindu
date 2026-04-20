@@ -29,10 +29,9 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import delete, func, select, update, cast
-from sqlalchemy.dialects.postgresql import insert, JSONB, JSON
+from sqlalchemy.dialects.postgresql import insert, JSON
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from typing_extensions import TypeVar
 
 from bindu.common.protocol.types import (
     Artifact,
@@ -45,7 +44,7 @@ from bindu.common.protocol.types import (
 from bindu.settings import app_settings
 from bindu.utils.logging import get_logger
 
-from .base import Storage
+from .base import OwnershipError, Storage
 from .helpers import (
     mask_database_url,
     normalize_message_uuids,
@@ -54,7 +53,7 @@ from .helpers import (
     serialize_for_jsonb,
     validate_uuid_type,
 )
-from .helpers.db_operations import get_current_utc_timestamp
+from .helpers.db_operations import get_current_utc_timestamp, prepare_jsonb_value
 from .schema import (
     contexts_table,
     task_feedback_table,
@@ -64,10 +63,17 @@ from .schema import (
 
 logger = get_logger("bindu.server.storage.postgres_storage")
 
-ContextT = TypeVar("ContextT", default=Any)
+# Constants
+ENGINE_NOT_INITIALIZED_ERROR = (
+    "PostgreSQL engine not initialized. Call connect() first."
+)
+TERMINAL_STATE_ERROR_TEMPLATE = (
+    "Cannot continue task {task_id}: Task is in terminal state '{state}' and is immutable. "
+    "Create a new task with referenceTaskIds to continue the conversation."
+)
 
 
-class PostgresStorage(Storage[ContextT]):
+class PostgresStorage(Storage[dict[str, Any]]):
     """PostgreSQL storage implementation using SQLAlchemy imperative mapping.
 
     Storage Structure:
@@ -143,6 +149,9 @@ class PostgresStorage(Storage[ContextT]):
             ConnectionError: If unable to connect to database
         """
         try:
+            # Type narrowing: database_url should be set
+            assert self.database_url is not None, "Database URL must be configured"
+
             masked_url = mask_database_url(self.database_url)
             logger.info("Connecting to PostgreSQL database with SQLAlchemy...")
 
@@ -200,7 +209,7 @@ class PostgresStorage(Storage[ContextT]):
             logger.error(f"Failed to connect to PostgreSQL: {e}")
             raise ConnectionError(f"Failed to connect to PostgreSQL: {e}") from e
 
-    async def disconnect(self) -> None:
+    async def close(self) -> None:
         """Close SQLAlchemy engine and connection pool."""
         if self._engine:
             await self._engine.dispose()
@@ -215,9 +224,7 @@ class PostgresStorage(Storage[ContextT]):
             RuntimeError: If engine is not initialized
         """
         if self._engine is None or self._session_factory is None:
-            raise RuntimeError(
-                "PostgreSQL engine not initialized. Call connect() first."
-            )
+            raise RuntimeError(ENGINE_NOT_INITIALIZED_ERROR)
 
     def _get_session_with_schema(self):
         """Create a session factory that will set search_path on connection.
@@ -230,6 +237,7 @@ class PostgresStorage(Storage[ContextT]):
         """
         # Return the session factory directly - search_path will be set
         # at the connection level via event listeners or within transactions
+        assert self._session_factory is not None, "Session factory not initialized"
         return self._session_factory()
 
     async def _retry_on_connection_error(self, func, *args, **kwargs):
@@ -324,7 +332,12 @@ class PostgresStorage(Storage[ContextT]):
 
         return await self._retry_on_connection_error(_load)
 
-    async def submit_task(self, context_id: UUID, message: Message) -> Task:
+    async def submit_task(
+        self,
+        context_id: UUID,
+        message: Message,
+        caller_did: str | None = None,
+    ) -> Task:
         """Create a new task or continue an existing non-terminal task.
 
         Task-First Pattern (Bindu):
@@ -335,6 +348,12 @@ class PostgresStorage(Storage[ContextT]):
         Args:
             context_id: Context to associate the task with
             message: Initial message containing task request
+            caller_did: Authenticated caller identity. Recorded as the task
+                owner on creation. When this call also creates the context,
+                the context's owner is recorded too. Context ownership is
+                write-once by virtue of the ``on_conflict_do_nothing`` insert
+                on ``contexts``; subsequent tasks on an existing context do
+                not overwrite its owner.
 
         Returns:
             Task in 'submitted' state (new or continued)
@@ -365,22 +384,22 @@ class PostgresStorage(Storage[ContextT]):
 
                         if current_state in app_settings.agent.terminal_states:
                             raise ValueError(
-                                f"Cannot continue task {task_id}: Task is in terminal state '{current_state}' and is immutable. "
-                                f"Create a new task with referenceTaskIds to continue the conversation."
+                                TERMINAL_STATE_ERROR_TEMPLATE.format(
+                                    task_id=task_id, state=current_state
+                                )
                             )
 
                         logger.info(
                             f"Continuing existing task {task_id} from state '{current_state}'"
                         )
 
-                        serialized_message = serialize_for_jsonb(message)
                         stmt = (
                             update(tasks_table)
                             .where(tasks_table.c.id == task_id)
                             .values(
                                 history=func.jsonb_concat(
                                     tasks_table.c.history,
-                                    cast([serialized_message], JSONB),
+                                    prepare_jsonb_value([message]),
                                 ),
                                 state="submitted",
                                 state_timestamp=get_current_utc_timestamp(),
@@ -393,26 +412,44 @@ class PostgresStorage(Storage[ContextT]):
 
                         return self._row_to_task(updated_row)
 
-                    # Ensure context exists BEFORE creating task (foreign key constraint)
+                    # Ensure context exists BEFORE creating task (foreign key constraint).
+                    # owner_did set on insert; on_conflict_do_nothing preserves existing
+                    # context owner (write-once semantics).
                     stmt = insert(contexts_table).values(
                         id=context_id,
+                        owner_did=caller_did,
                         context_data={},
                         message_history=[],
                     )
                     stmt = stmt.on_conflict_do_nothing(index_elements=["id"])
                     await session.execute(stmt)
 
-                    serialized_message = serialize_for_jsonb(message)
+                    # Confirm context ownership matches caller. With
+                    # on_conflict_do_nothing, an existing context's owner is
+                    # preserved; here we refuse the write if that owner is
+                    # somebody else. Query is cheap (PK lookup on contexts.id).
+                    owner_row = await session.execute(
+                        select(contexts_table.c.owner_did).where(
+                            contexts_table.c.id == context_id
+                        )
+                    )
+                    existing_owner = owner_row.scalar()
+                    if existing_owner != caller_did:
+                        raise OwnershipError(
+                            f"Context {context_id} is owned by a different caller."
+                        )
+
                     now = get_current_utc_timestamp()
                     stmt = (
                         insert(tasks_table)
                         .values(
                             id=task_id,
                             context_id=context_id,
+                            owner_did=caller_did,
                             kind="task",
                             state="submitted",
                             state_timestamp=now,
-                            history=[serialized_message],
+                            history=prepare_jsonb_value([message]),
                             artifacts=[],
                             metadata={},
                         )
@@ -465,22 +502,20 @@ class PostgresStorage(Storage[ContextT]):
                         raise KeyError(f"Task {task_id} not found")
 
                     now = get_current_utc_timestamp()
-                    update_values = {
+                    update_values: dict[str, Any] = {
                         "state": state,
                         "state_timestamp": now,
                         "updated_at": now,
                     }
 
                     if metadata:
-                        serialized_metadata = serialize_for_jsonb(metadata)
                         update_values["metadata"] = func.jsonb_concat(
-                            tasks_table.c.metadata, cast(serialized_metadata, JSONB)
+                            tasks_table.c.metadata, prepare_jsonb_value(metadata)
                         )
 
                     if new_artifacts:
-                        serialized_artifacts = serialize_for_jsonb(new_artifacts)
                         update_values["artifacts"] = func.jsonb_concat(
-                            tasks_table.c.artifacts, cast(serialized_artifacts, JSONB)
+                            tasks_table.c.artifacts, prepare_jsonb_value(new_artifacts)
                         )
 
                     if new_messages:
@@ -493,9 +528,8 @@ class PostgresStorage(Storage[ContextT]):
                                 message, task_id=task_id, context_id=task_row.context_id
                             )
 
-                        serialized_messages = serialize_for_jsonb(new_messages)
                         update_values["history"] = func.jsonb_concat(
-                            tasks_table.c.history, cast(serialized_messages, JSONB)
+                            tasks_table.c.history, prepare_jsonb_value(new_messages)
                         )
 
                     # Execute update
@@ -512,23 +546,26 @@ class PostgresStorage(Storage[ContextT]):
 
         return await self._retry_on_connection_error(_update)
 
-    async def list_tasks(self, length: int | None = None) -> list[Task]:
-        """List all tasks using SQLAlchemy.
-
-        Args:
-            length: Optional limit on number of tasks to return
-
-        Returns:
-            List of tasks
-        """
+    async def list_tasks(
+        self,
+        length: int | None = None,
+        offset: int = 0,
+        owner_did: str | None = None,
+    ) -> list[Task]:
+        """List tasks using SQLAlchemy, optionally filtered by owner."""
         self._ensure_connected()
 
         async def _list():
             async with self._get_session_with_schema() as session:
                 stmt = select(tasks_table).order_by(tasks_table.c.created_at.desc())
 
+                if owner_did is not None:
+                    stmt = stmt.where(tasks_table.c.owner_did == owner_did)
+
                 if length is not None:
                     stmt = stmt.limit(length)
+                if offset > 0:
+                    stmt = stmt.offset(offset)
 
                 result = await session.execute(stmt)
                 rows = result.fetchall()
@@ -537,11 +574,11 @@ class PostgresStorage(Storage[ContextT]):
 
         return await self._retry_on_connection_error(_list)
 
-    async def count_tasks(self, status: str | None = None) -> int:
+    async def count_tasks(self, status: TaskState | None = None) -> int:
         """Count number of tasks, optionally filtered by status.
 
         Args:
-            status: Optional status to filter by
+            status: Optional strict TaskState to filter by
 
         Returns:
             Count of matching tasks
@@ -561,16 +598,13 @@ class PostgresStorage(Storage[ContextT]):
         return await self._retry_on_connection_error(_count)
 
     async def list_tasks_by_context(
-        self, context_id: UUID, length: int | None = None
+        self,
+        context_id: UUID,
+        length: int | None = None,
+        offset: int = 0,
+        owner_did: str | None = None,
     ) -> list[Task]:
         """List tasks belonging to a specific context.
-
-        Args:
-            context_id: Context to filter tasks by
-            length: Optional limit on number of tasks to return
-
-        Returns:
-            List of tasks in the context
 
         Raises:
             TypeError: If context_id is not UUID
@@ -587,8 +621,13 @@ class PostgresStorage(Storage[ContextT]):
                     .order_by(tasks_table.c.created_at.asc())
                 )
 
+                if owner_did is not None:
+                    stmt = stmt.where(tasks_table.c.owner_did == owner_did)
+
                 if length is not None:
                     stmt = stmt.limit(length)
+                if offset > 0:
+                    stmt = stmt.offset(offset)
 
                 result = await session.execute(stmt)
                 rows = result.fetchall()
@@ -627,7 +666,7 @@ class PostgresStorage(Storage[ContextT]):
 
         return await self._retry_on_connection_error(_load)
 
-    async def update_context(self, context_id: UUID, context: ContextT) -> None:
+    async def update_context(self, context_id: UUID, context: dict[str, Any]) -> None:
         """Store or update context using SQLAlchemy.
 
         Args:
@@ -644,18 +683,16 @@ class PostgresStorage(Storage[ContextT]):
         async def _update():
             async with self._get_session_with_schema() as session:
                 async with session.begin():
-                    serialized_context = serialize_for_jsonb(
-                        context if isinstance(context, dict) else {}
-                    )
+                    context_data = context if isinstance(context, dict) else {}
                     stmt = insert(contexts_table).values(
                         id=context_id,
-                        context_data=serialized_context,
+                        context_data=serialize_for_jsonb(context_data),
                         message_history=[],
                     )
                     stmt = stmt.on_conflict_do_update(
                         index_elements=["id"],
                         set_={
-                            "context_data": serialized_context,
+                            "context_data": serialize_for_jsonb(context_data),
                             "updated_at": get_current_utc_timestamp(),
                         },
                     )
@@ -694,14 +731,13 @@ class PostgresStorage(Storage[ContextT]):
                     stmt = stmt.on_conflict_do_nothing(index_elements=["id"])
                     await session.execute(stmt)
 
-                    serialized_messages = serialize_for_jsonb(messages)
                     stmt = (
                         update(contexts_table)
                         .where(contexts_table.c.id == context_id)
                         .values(
                             message_history=func.jsonb_concat(
                                 contexts_table.c.message_history,
-                                cast(serialized_messages, JSONB),
+                                prepare_jsonb_value(messages),
                             ),
                             updated_at=get_current_utc_timestamp(),
                         )
@@ -710,15 +746,13 @@ class PostgresStorage(Storage[ContextT]):
 
         await self._retry_on_connection_error(_append)
 
-    async def list_contexts(self, length: int | None = None) -> list[dict[str, Any]]:
-        """List all contexts using SQLAlchemy.
-
-        Args:
-            length: Optional limit on number of contexts to return
-
-        Returns:
-            List of context objects with task counts
-        """
+    async def list_contexts(
+        self,
+        length: int | None = None,
+        offset: int = 0,
+        owner_did: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """List contexts using SQLAlchemy, optionally filtered by owner."""
         self._ensure_connected()
 
         async def _list():
@@ -742,8 +776,13 @@ class PostgresStorage(Storage[ContextT]):
                     .order_by(contexts_table.c.created_at.desc())
                 )
 
+                if owner_did is not None:
+                    stmt = stmt.where(contexts_table.c.owner_did == owner_did)
+
                 if length is not None:
                     stmt = stmt.limit(length)
+                if offset > 0:
+                    stmt = stmt.offset(offset)
 
                 result = await session.execute(stmt)
                 rows = result.fetchall()
@@ -859,9 +898,9 @@ class PostgresStorage(Storage[ContextT]):
         async def _store():
             async with self._get_session_with_schema() as session:
                 async with session.begin():
-                    serialized_feedback = serialize_for_jsonb(feedback_data)
                     stmt = insert(task_feedback_table).values(
-                        task_id=task_id, feedback_data=serialized_feedback
+                        task_id=task_id,
+                        feedback_data=serialize_for_jsonb(feedback_data),
                     )
                     await session.execute(stmt)
 
@@ -925,15 +964,15 @@ class PostgresStorage(Storage[ContextT]):
         async def _save():
             async with self._get_session_with_schema() as session:
                 async with session.begin():
-                    serialized_config = serialize_for_jsonb(config)
+                    config_data = serialize_for_jsonb(config)
                     stmt = insert(webhook_configs_table).values(
                         task_id=task_id,
-                        config=serialized_config,
+                        config=config_data,
                     )
                     stmt = stmt.on_conflict_do_update(
                         index_elements=["task_id"],
                         set_={
-                            "config": serialized_config,
+                            "config": config_data,
                             "updated_at": get_current_utc_timestamp(),
                         },
                     )
@@ -1019,3 +1058,43 @@ class PostgresStorage(Storage[ContextT]):
                 return {row.task_id: row.config for row in rows}
 
         return await self._retry_on_connection_error(_load_all)
+
+    # -------------------------------------------------------------------------
+    # Ownership Lookup
+    # -------------------------------------------------------------------------
+
+    async def get_task_owner(self, task_id: UUID) -> str | None:
+        """Return the owner DID for a task, or None if unknown or unowned."""
+        task_id = validate_uuid_type(task_id, "task_id")
+        self._ensure_connected()
+
+        async def _lookup():
+            async with self._get_session_with_schema() as session:
+                stmt = select(tasks_table.c.owner_did).where(
+                    tasks_table.c.id == task_id
+                )
+                result = await session.execute(stmt)
+                row = result.first()
+                if row is None:
+                    return None
+                return row.owner_did
+
+        return await self._retry_on_connection_error(_lookup)
+
+    async def get_context_owner(self, context_id: UUID) -> str | None:
+        """Return the owner DID for a context, or None if unknown or unowned."""
+        context_id = validate_uuid_type(context_id, "context_id")
+        self._ensure_connected()
+
+        async def _lookup():
+            async with self._get_session_with_schema() as session:
+                stmt = select(contexts_table.c.owner_did).where(
+                    contexts_table.c.id == context_id
+                )
+                result = await session.execute(stmt)
+                row = result.first()
+                if row is None:
+                    return None
+                return row.owner_did
+
+        return await self._retry_on_connection_error(_lookup)

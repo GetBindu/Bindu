@@ -19,10 +19,6 @@
 		isThinking,
 		sendMessage as sendAgentMessage,
 		contextId,
-		currentTaskId,
-		currentTaskState,
-		createNewContext,
-		clearContext as clearAgentContext,
 		setReplyTo,
 		clearReplyTo,
 		replyToTaskId
@@ -38,6 +34,13 @@
 	// Check if we're in agent mode (have an active context OR messages)
 	// Keep agent mode active if we have messages, even if context temporarily clears
 	let isAgentMode = $derived($contextId !== null || $agentMessages.length > 0);
+
+	// Save agent context ID when it changes for session restoration
+	$effect(() => {
+		if (browser && $contextId) {
+			localStorage.setItem("lastContextId", $contextId);
+		}
+	});
 
 	// Convert agent messages to display format
 	let displayMessages = $derived($agentMessages.map(msg => ({
@@ -121,6 +124,30 @@
 	}
 
 	onMount(async () => {
+		// Check if we should restore the last conversation
+		if (browser) {
+			const lastConversationId = localStorage.getItem("lastConversationId");
+			const leafId = localStorage.getItem("leafId");
+			const lastContextId = localStorage.getItem("lastContextId");
+
+			// If we have a last conversation ID and we're not already in a conversation
+			if (lastConversationId && !page.url.pathname.includes("/conversation/")) {
+				// Build URL with leafId if available
+				let redirectUrl = `${base}/conversation/${lastConversationId}`;
+				if (leafId) {
+					redirectUrl += `?leafId=${leafId}`;
+				}
+				await goto(redirectUrl);
+				return;
+			}
+
+			// If we have an agent context but no conversation, restore agent mode
+			if (lastContextId && !page.url.pathname.includes("/conversation/")) {
+				// Restore agent context
+				contextId.set(lastContextId);
+			}
+		}
+
 		try {
 			// Check if auth is required before processing any query params
 			const hasQ = page.url.searchParams.has("q");
@@ -192,22 +219,6 @@
 	function handleClearReply() {
 		clearReplyTo();
 	}
-
-	async function handleClearTasks() {
-		// UI-only reset: start a fresh task thread (keep context if it exists)
-		currentTaskId.set(null);
-		currentTaskState.set(null);
-		setReplyTo(null);
-	}
-
-	async function handleClearContext() {
-		// Best-effort: reset UI immediately, then try clearing server-side if reachable.
-		const ctx = $contextId;
-		createNewContext();
-		if (ctx) {
-			await clearAgentContext(ctx);
-		}
-	}
 </script>
 
 <svelte:head>
@@ -225,8 +236,6 @@
 			onReplyToTask={handleReplyToTask}
 			replyToTaskId={$replyToTaskId}
 			onClearReply={handleClearReply}
-			onClearContext={handleClearContext}
-			onClearTasks={handleClearTasks}
 		/>
 	{:else}
 		<ChatWindow
@@ -236,8 +245,6 @@
 			models={data.models}
 			bind:files
 			bind:draft
-			onClearContext={handleClearContext}
-			onClearTasks={handleClearTasks}
 		/>
 	{/if}
 {:else}

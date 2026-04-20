@@ -18,12 +18,21 @@ export async function handlePaymentRequired(
 	try {
 		onStatusUpdate?.('💳 Payment required - starting payment session...');
 
-		// Start payment session (no auth required - public endpoint)
+		// Get OAuth token from localStorage
+		const authToken = localStorage.getItem('bindu_oauth_token');
+		const headers: Record<string, string> = {
+			'Content-Type': 'application/json'
+		};
+
+		// Add auth token if available
+		if (authToken) {
+			headers['Authorization'] = `Bearer ${authToken}`;
+		}
+
+		// Start payment session
 		const sessionResponse = await fetch(`${AGENT_BASE_URL}/api/start-payment-session`, {
 			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json'
-			}
+			headers
 		});
 
 		if (!sessionResponse.ok) {
@@ -53,7 +62,16 @@ export async function handlePaymentRequired(
 			await new Promise((resolve) => setTimeout(resolve, 5000)); // Wait 5 seconds
 			attempts++;
 
-			const statusResponse = await fetch(`${AGENT_BASE_URL}/api/payment-status/${session_id}`);
+			// Include auth token in status check
+			const statusHeaders: Record<string, string> = {};
+			if (authToken) {
+				statusHeaders['Authorization'] = `Bearer ${authToken}`;
+			}
+
+			const statusResponse = await fetch(
+				`${AGENT_BASE_URL}/api/payment-status/${session_id}`,
+				{ headers: statusHeaders }
+			);
 
 			if (!statusResponse.ok) continue;
 

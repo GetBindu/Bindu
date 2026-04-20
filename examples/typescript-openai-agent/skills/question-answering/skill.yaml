@@ -1,0 +1,138 @@
+# Question Answering Skill
+# General-purpose Q&A powered by OpenRouter (300+ models)
+
+# Basic Metadata
+id: question-answering-v1
+name: question-answering
+version: 1.0.0
+author: dev@example.com
+
+# Description
+description: |
+  General-purpose question answering capability powered by OpenRouter.
+  Access 300+ LLM models (GPT-4o, Claude, Llama, Gemini, Mistral, etc.)
+  through a single unified API. Handles conversational queries, explanations,
+  code generation, analysis, and creative writing.
+
+# Tags and Modes
+tags:
+  - question-answering
+  - conversation
+  - assistant
+  - general-purpose
+  - multi-model
+
+input_modes:
+  - text/plain
+  - application/json
+
+output_modes:
+  - text/plain
+  - application/json
+
+# Example Queries
+examples:
+  - "Explain how microservices work"
+  - "What are the pros and cons of GraphQL vs REST?"
+  - "Help me understand async/await in TypeScript"
+  - "Write a Python function to parse CSV files"
+  - "Compare PostgreSQL and MongoDB for my use case"
+  - "Summarize the key points of this document"
+
+# Detailed Capabilities
+capabilities_detail:
+  conversational_qa:
+    supported: true
+    description: "Direct question answering with contextual understanding"
+    features:
+      - multi_turn_conversation
+      - follow_up_handling
+      - context_awareness
+
+  code_assistance:
+    supported: true
+    description: "Code generation, explanation, and debugging"
+    languages:
+      - typescript
+      - python
+      - rust
+      - kotlin
+      - go
+      - java
+
+  analysis_reasoning:
+    supported: true
+    description: "Data interpretation, comparative analysis, logical reasoning"
+
+  creative_writing:
+    supported: true
+    description: "Content generation with tone adaptation"
+    formats:
+      - articles
+      - emails
+      - documentation
+      - summaries
+
+# Requirements
+requirements:
+  packages:
+    - "@openrouter/sdk>=0.1.0"
+  system:
+    - internet_connection
+  api_keys:
+    - OPENROUTER_API_KEY
+
+# Performance Metrics
+performance:
+  avg_processing_time_ms: 2000
+  max_concurrent_requests: 10
+  context_window_tokens: 128000
+  supported_natural_languages: 50
+  scalability: horizontal
+
+# Assessment fields for skill negotiation
+assessment:
+  keywords:
+    - question
+    - answer
+    - explain
+    - help
+    - how
+    - what
+    - why
+    - write
+    - generate
+    - analyze
+    - summarize
+    - compare
+    - code
+    - debug
+
+  specializations:
+    - domain: general_knowledge
+      confidence_boost: 0.2
+    - domain: code_assistance
+      confidence_boost: 0.3
+    - domain: content_generation
+      confidence_boost: 0.2
+
+  anti_patterns:
+    - "real-time data"
+    - "stock prices"
+    - "image generation"
+    - "pdf processing"
+    - "database query"
+
+  complexity_indicators:
+    simple:
+      - "what is"
+      - "explain"
+      - "define"
+    medium:
+      - "compare"
+      - "analyze"
+      - "multi-step"
+    complex:
+      - "design a system"
+      - "debug this code"
+      - "multi-domain synthesis"

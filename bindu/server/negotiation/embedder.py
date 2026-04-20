@@ -15,17 +15,22 @@ to enable semantic similarity matching during negotiation.
 
 from __future__ import annotations
 
-import httpx
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from bindu.settings import app_settings
+from bindu.utils.http import AsyncHTTPClient
 from bindu.utils.logging import get_logger
 
 if TYPE_CHECKING:
     from bindu.common.protocol.types import Skill
 
 logger = get_logger("bindu.server.negotiation.embedder")
+
+# Constants
+OPENROUTER_API_URL = "https://openrouter.ai/api/v1"
+EMBEDDING_REQUEST_TIMEOUT_SECONDS = 30
+MAX_TASK_EMBEDDING_CACHE_SIZE = 1000
 
 
 class SkillEmbedder:
@@ -46,15 +51,16 @@ class SkillEmbedder:
         self._provider = app_settings.negotiation.embedding_provider
         self._client = None
 
-    def _get_client(self) -> httpx.AsyncClient:
+    def _get_client(self) -> AsyncHTTPClient:
         """Get or create async HTTP client.
 
-        Using ``httpx.AsyncClient`` (instead of the synchronous ``httpx.Client``)
-        prevents the OpenRouter HTTP call from blocking the event loop while the
-        ``/agent/negotiation`` endpoint awaits the response.
+        Using AsyncHTTPClient prevents the OpenRouter HTTP call from blocking
+        the event loop while the `/agent/negotiation` endpoint awaits the response.
         """
         if self._client is None:
-            self._client = httpx.AsyncClient(timeout=30.0)
+            self._client = AsyncHTTPClient(
+                base_url=OPENROUTER_API_URL, timeout=EMBEDDING_REQUEST_TIMEOUT_SECONDS
+            )
         return self._client
 
     async def _embed_with_openrouter(self, texts: list[str]) -> np.ndarray:
@@ -76,7 +82,7 @@ class SkillEmbedder:
 
         try:
             response = await client.post(
-                "https://openrouter.ai/api/v1/embeddings",
+                "/embeddings",
                 headers={
                     "Authorization": f"Bearer {self._api_key}",
                     "Content-Type": "application/json",
@@ -86,16 +92,12 @@ class SkillEmbedder:
                     "input": texts,
                 },
             )
-            response.raise_for_status()
-            data = response.json()
+            data = await response.json()
 
             # Extract embeddings from response
             embeddings = [item["embedding"] for item in data["data"]]
             return np.array(embeddings, dtype=np.float32)
 
-        except httpx.HTTPError as e:
-            logger.error(f"OpenRouter API error: {e}")
-            raise
         except Exception as e:
             logger.error(f"Failed to get embeddings from OpenRouter: {e}")
             raise
@@ -127,16 +129,12 @@ class SkillEmbedder:
         # Route to appropriate provider
         if self._provider == "openrouter":
             return await self._embed_with_openrouter(texts)
-        elif self._provider == "sentence-transformers":
-            logger.warning(
-                f"Unknown embedding provider: {self._provider}, falling back to OpenRouter"
-            )
-            return await self._embed_with_openrouter(texts)
-            # return await self._embed_with_sentence_transformers(texts)
         else:
-            logger.warning(
-                f"Unknown embedding provider: {self._provider}, falling back to OpenRouter"
-            )
+            # Fallback to OpenRouter for unknown providers
+            if self._provider != "openrouter":
+                logger.warning(
+                    f"Unknown embedding provider: {self._provider}, falling back to OpenRouter"
+                )
             return await self._embed_with_openrouter(texts)
 
     async def compute_skill_embeddings(
@@ -249,8 +247,8 @@ class SkillEmbedder:
 
         if text not in self._task_embedding_cache:
             self._task_embedding_cache[text] = await self.embed_text(text)
-            # Evict oldest entry when cache exceeds 1000 items
-            if len(self._task_embedding_cache) > 1000:
+            # Evict oldest entry when cache exceeds limit
+            if len(self._task_embedding_cache) > MAX_TASK_EMBEDDING_CACHE_SIZE:
                 oldest = next(iter(self._task_embedding_cache))
                 del self._task_embedding_cache[oldest]
 

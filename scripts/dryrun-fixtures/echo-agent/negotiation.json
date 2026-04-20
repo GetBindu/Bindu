@@ -1,0 +1,14 @@
+{
+  "accepted": false,
+  "score": 0.45,
+  "confidence": 0.7,
+  "rejection_reason": "score_below_threshold",
+  "queue_depth": 0,
+  "subscores": {
+    "skill_match": 0,
+    "io_compatibility": 1,
+    "load": 1,
+    "cost": 1,
+    "performance": 1
+  }
+}

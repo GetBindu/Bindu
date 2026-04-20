@@ -7,37 +7,66 @@
 </div>
 
 <p align="center">
-  <em>Identiteit, communicatie en betalingslaag voor AI-agents</em>
+  <em>De identiteit, communicatie & betalingslaag voor AI-agenten</em>
+</p>
+
+<p align="center">
+  <a href="README.md">🇬🇧 Engels</a> •
+  <a href="README.de.md">🇩🇪 Duits</a> •
+  <a href="README.es.md">🇪🇸 Spaans</a> •
+  <a href="README.fr.md">🇫🇷 Frans</a> •
+  <a href="README.hi.md">🇮🇳 Hindi</a> •
+  <a href="README.bn.md">🇮🇳 Bengaals</a> •
+  <a href="README.zh.md">🇨🇳 Chinees</a> •
+  <a href="README.nl.md">🇳🇱 Nederlands</a> •
+  <a href="README.ta.md">🇮🇳 Tamil</a>
 </p>
 
 <p align="center">
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
   <a href="https://hits.sh/github.com/Saptha-me/Bindu.svg"><img src="https://hits.sh/github.com/Saptha-me/Bindu.svg" alt="Hits"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="Python Version"></a>
-  <a href="https://pepy.tech/projects/bindu"><img src="https://static.pepy.tech/personalized-badge/bindu?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads" alt="PyPI Downloads"></a>
   <a href="https://pypi.org/project/bindu/"><img src="https://img.shields.io/pypi/v/bindu.svg" alt="PyPI version"></a>
-  <a href="https://pypi.org/project/bindu/"><img src="https://img.shields.io/pypi/dm/bindu" alt="PyPI Downloads"></a>
   <a href="https://coveralls.io/github/Saptha-me/Bindu?branch=v0.3.18"><img src="https://coveralls.io/repos/github/Saptha-me/Bindu/badge.svg?branch=v0.3.18" alt="Coverage"></a>
   <a href="https://github.com/getbindu/Bindu/actions/workflows/release.yml"><img src="https://github.com/getbindu/Bindu/actions/workflows/release.yml/badge.svg" alt="Tests"></a>
   <a href="https://discord.gg/3w5zuYUuwt"><img src="https://img.shields.io/badge/Join%20Discord-7289DA?logo=discord&logoColor=white" alt="Discord"></a>
   <a href="https://github.com/getbindu/Bindu/graphs/contributors"><img src="https://img.shields.io/github/contributors/getbindu/Bindu" alt="Contributors"></a>
 </p>
 
----
-
-**Bindu** (uitspraak: _bin-doe_) is een operating layer voor AI-agents die identiteit, communicatie en betalingsmogelijkheden biedt. Het is een production-ready service die agents verbindt, authenticeert en orkestreert over gedistribueerde systemen met handige API's – gebruikmakend van open protocollen: **A2A**, **AP2**, en **X402**.
-
-Gebouwd met een gedistribueerde architectuur (Task Manager, scheduler, storage), maakt Bindu het eenvoudig om snel te ontwikkelen en te integreren met elk AI-framework. Transformeer elk agent-framework in een volledig interoperabele service voor communicatie, samenwerking en commerce in het Internet of Agents.
+<br/>
 
 <p align="center">
-  <strong>🌟 <a href="https://bindus.directory">Registreer je agent</a> • 🌻 <a href="https://docs.getbindu.com">Documentatie</a> • 💬 <a href="https://discord.gg/3w5zuYUuwt">Discord Community</a></strong>
+  <img src="assets/sunflower-mountains.jpeg" alt="Bindu — The Internet of Agents" width="720" />
 </p>
+
+<p align="center">
+  <em>"Zoals zonnebloemen die naar het licht draaien, werken agenten samen in zwermen - elk onafhankelijk, maar samen creëren ze iets groters."</em>
+</p>
+
+<br/>
+
+<div align="center">
+  <h3>Onboard je agent in één regel</h3>
+</div>
+
+<div align="center">
+  <pre><code>curl -fsSL https://getbindu.com/install-bindu.sh | bash</code></pre>
+</div>
+
+---
+
+**Bindu** (uitgesproken als _binduu_) is een operationele laag voor AI-agenten die identiteit, communicatie en betalingsmogelijkheden biedt. Het levert een productieklare service met een handige API om agenten te verbinden, te authenticeren en te orkestreren over gedistribueerde systemen met behulp van open protocollen: **A2A**, **AP2** en **X402**.Gebouwd met een gedistribueerde architectuur (Taakbeheerder, planner, opslag), maakt Bindu het snel om te ontwikkelen en eenvoudig om te integreren met elk AI-framework. Transformeer elk agentframework in een volledig interoperabele service voor communicatie, samenwerking en handel in het Internet van Agents.
+
+<p align="center">
+  <strong>🌟 <a href="https://getbindu.com">Registreer uw agent</a> • 🌻 <a href="https://docs.getbindu.com">Documentatie</a> • 💬 <a href="https://discord.gg/3w5zuYUuwt">Discord Gemeenschap</a></strong>
+</p>
+
 
 ---
 
 <br/>
 
-## 🎥 Zie Bindu in actie
+## 🎥 Bekijk Bindu in Actie
 
 <div align="center">
   <a href="https://www.youtube.com/watch?v=qppafMuw_KI" target="_blank">
@@ -45,20 +74,24 @@ Gebouwd met een gedistribueerde architectuur (Task Manager, scheduler, storage),
   </a>
 </div>
 
+<br/>
+
 ## 📋 Vereisten
 
-Voordat je Bindu installeert, zorg ervoor dat je hebt:
+Voordat u Bindu installeert, zorg ervoor dat u heeft:
 
-- **Python 3.12 of hoger** - [Download hier](https://www.python.org/downloads/)
-- **UV Package Manager** - [Installatiegids](https://github.com/astral-sh/uv)
+- **Python 3.12 of hoger** - [Download here](https://www.python.org/downloads/)
+- **UV pakketbeheerder** - [Installation guide](https://github.com/astral-sh/uv)
+- **API-sleutel vereist**: Stel `OPENROUTER_API_KEY` of `OPENAI_API_KEY` in uw omgevingsvariabelen in. Gratis OpenRouter-modellen zijn beschikbaar voor testen.
 
-### Verifieer je setup
+
+### Verifieer uw Setup
 
 ```bash
-# Controleer Python versie
-uv run python --version  # Moet 3.12 of hoger tonen
+# Check Python version
+uv run python --version  # Should show 3.12 or higher
 
-# Controleer UV installatie
+# Check UV installation
 uv --version
 ```
 
@@ -67,46 +100,44 @@ uv --version
 <br/>
 
 ## 📦 Installatie
-
 <details>
-<summary><b>Opmerking voor Windows-gebruikers (Git & GitHub Desktop)</b></summary>
+<summary><b>Gebruikersopmerking (Git & GitHub Desktop)</b></summary>
 
-Op sommige Windows-systemen wordt git mogelijk niet herkend in de Command Prompt, zelfs na installatie – vanwege PATH-configuratieproblemen.
+Op sommige Windows-systemen wordt git mogelijk niet herkend in de Opdrachtprompt, zelfs na installatie, vanwege problemen met de PATH-configuratie.
 
-Als je dit probleem tegenkomt, kun je *GitHub Desktop* als alternatief gebruiken:
+Als u dit probleem ondervindt, kunt u *GitHub Desktop* als alternatief gebruiken:
 
 1. Installeer GitHub Desktop van https://desktop.github.com/
-2. Log in met je GitHub-account
-3. Kloon met de repository URL:
+2. Meld u aan met uw GitHub-account
+3. Clone de repository met de repository-URL:
    https://github.com/getbindu/Bindu.git
 
-GitHub Desktop stelt je in staat om repositories te klonen, branches te beheren, wijzigingen te committen en pull requests te openen zonder de command line.
+GitHub Desktop stelt u in staat om te clonen, takken te beheren, wijzigingen vast te leggen en pull-verzoeken te openen zonder de opdrachtregel te gebruiken.
 
 </details>
 
 ```bash
-# Installeer Bindu
+# Install Bindu
 uv add bindu
 
-# Voor ontwikkeling (als je bijdraagt aan Bindu)
-# Maak en activeer een virtuele omgeving
+# For development (if contributing to Bindu)
+# Create and activate virtual environment
 uv venv --python 3.12.9
-source .venv/bin/activate  # Op macOS/Linux
-# .venv\Scripts\activate  # Op Windows
+source .venv/bin/activate  # On macOS/Linux
+# .venv\Scripts\activate  # On Windows
 
 uv sync --dev
 ```
 
 <details>
-<summary><b>Veelvoorkomende installatieproblemen</b> (Klik om uit te vouwen)</summary>
+<summary><b>Veelvoorkomende Installatieproblemen</b> (klik om uit te vouwen)</summary>
 
 <br/>
 
 | Probleem | Oplossing |
-|-------|----------|
-| `uv: command not found` | Herstart terminal na het installeren van UV. Gebruik PowerShell op Windows |
+|-------|----------|| `uv: command not found` | Herstart je terminal na het installeren van UV. Gebruik PowerShell op Windows |
 | `Python version not supported` | Installeer Python 3.12+ van [python.org](https://www.python.org/downloads/) |
-| Virtuele omgeving activeert niet (Windows) | Gebruik PowerShell en voer `.venv\Scripts\activate` uit |
+| Virtuele omgeving wordt niet geactiveerd (Windows) | Gebruik PowerShell en voer `.venv\Scripts\activate` uit |
 | `Microsoft Visual C++ required` | Download [Visual C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) |
 | `ModuleNotFoundError` | Activeer venv en voer `uv sync --dev` uit |
 
@@ -116,89 +147,115 @@ uv sync --dev
 
 <br/>
 
-## 🚀 Snel starten
+## 🚀 Snelle Start
 
 ### Optie 1: Gebruik Cookiecutter (Aanbevolen)
 
-**Tijd tot eerste agent: ~2 minuten ⏱️**
+**Tijd tot de eerste agent: ~2 minuten ⏱️**
 
 ```bash
-# Installeer Cookiecutter
+# Install cookiecutter
 uv add cookiecutter
 
-# Maak je Bindu agent
+# Create your Bindu agent
 uvx cookiecutter https://github.com/getbindu/create-bindu-agent.git
 ```
 
-## 🎥 Bouw production-ready agents in minuten
-
 <div align="center">
   <a href="https://youtu.be/obY1bGOoWG8?si=uEeDb0XWrtYOQTL7" target="_blank">
-    <img src="https://img.youtube.com/vi/obY1bGOoWG8/maxresdefault.jpg" alt="Bindu Demo" width="640" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
+    <img src="https://img.youtube.com/vi/obY1bGOoWG8/maxresdefault.jpg" alt="Create Production Ready Agent" width="640" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
   </a>
 </div>
 
-Dat is alles! Je lokale agent is nu een live, veilige en vindbare service. [Meer informatie →](https://docs.getbindu.com/bindu/create-bindu-agent/overview)
+Je lokale agent wordt een live, veilige, vindbare service. [Learn more →](https://docs.getbindu.com/bindu/create-bindu-agent/overview)
 
-> **💡 Pro tip:** Agents die met Cookiecutter zijn gemaakt, bevatten GitHub Actions die je agent automatisch registreren in de [Bindu Directory](https://bindus.directory) wanneer je naar je repository pusht. Geen handmatige registratie nodig!
+> **💡 Pro Tip:** Agents die met cookiecutter zijn gemaakt, bevatten GitHub Actions die je agent automatisch registreren in de [GetBindu.com](https://getbindu.com) wanneer je naar je repository pusht.
 
-### Optie 2: Handmatige setup
+### Optie 2: Handmatige Setup
 
-Maak je agent script `my_agent.py`:
+Maak je agent-script `my_agent.py`:
 
 ```python
+import os
+
 from bindu.penguin.bindufy import bindufy
 from agno.agent import Agent
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.models.openai import OpenAIChat
 
-# Definieer je agent
+# Define your agent
 agent = Agent(
-    instructions="Je bent een onderzoeksassistent die informatie vindt en samenvat.",
+    instructions="You are a research assistant that finds and summarizes information.",
     model=OpenAIChat(id="gpt-4o"),
     tools=[DuckDuckGoTools()],
 )
 
-# Configuratie
+# Configuration
 config = {
     "author": "your.email@example.com",
     "name": "research_agent",
-    "description": "Een onderzoeksassistent agent",
-    "deployment": {"url": "http://localhost:3773", "expose": True},
+    "description": "A research assistant agent",
+    "deployment": {
+        "url": os.getenv("BINDU_DEPLOYMENT_URL", "http://localhost:3773"),
+        "expose": True,
+    },
     "skills": ["skills/question-answering", "skills/pdf-processing"]
 }
 
-# Handler functie
+# Handler function
 def handler(messages: list[dict[str, str]]):
-    """Verwerkt berichten en retourneert agent response.
+    """Process messages and return agent response.
 
     Args:
-        messages: Lijst van bericht dictionaries met conversatiegeschiedenis
+        messages: List of message dictionaries containing conversation history
 
     Returns:
-        Agent response resultaat
+        Agent response result
     """
     result = agent.run(input=messages)
     return result
 
-# Bindu-fy
+# Bindu-fy it
 bindufy(config, handler)
+
+# Use tunnel to expose your agent to the internet
+# bindufy(config, handler, launch=True)
 ```
 
 ![Sample Agent](assets/agno-simple.png)
 
-Je agent draait nu live op `http://localhost:3773` en is klaar om te communiceren met andere agents.
+Je agent is nu live op de URL die is geconfigureerd in `deployment.url`.
 
----
+Stel een aangepaste poort in zonder codewijzigingen:
 
-### Optie 3: Minimale Echo Agent (Testen)
+```bash
+# Linux/macOS
+export BINDU_PORT=4000
+
+# Windows PowerShell
+$env:BINDU_PORT="4000"
+```
+
+Bestaande voorbeelden die `http://localhost:3773` gebruiken, worden automatisch overschreven wanneer `BINDU_PORT` is ingesteld.
+
+### Optie 3: Zero-Config Lokale Agent
+
+Probeer Bindu zonder Postgres, Redis of andere cloudservices in te stellen. Draait volledig lokaal met behulp van in-memory opslag en planner.
+
+```bash
+python examples/beginner_zero_config_agent.py
+```
+
+### Optie 4: Minimale Echo Agent (Testen)
 
 <details>
-<summary><b>Bekijk minimaal voorbeeld</b> (Klik om uit te vouwen)</summary>
+<summary><b>Bekijk minimaal voorbeeld</b> (klik om uit te vouwen)</summary>
 
-De kleinste werkende agent:
+Kleinste mogelijke werkende agent:
 
 ```python
+import os
+
 from bindu.penguin.bindufy import bindufy
 
 def handler(messages):
@@ -207,29 +264,35 @@ def handler(messages):
 config = {
     "author": "your.email@example.com",
     "name": "echo_agent",
-    "description": "Een basis echo agent voor snel testen.",
-    "deployment": {"url": "http://localhost:3773", "expose": True},
+    "description": "A basic echo agent for quick testing.",
+    "deployment": {
+        "url": os.getenv("BINDU_DEPLOYMENT_URL", "http://localhost:3773"),
+        "expose": True,
+    },
     "skills": []
 }
 
 bindufy(config, handler)
+
+# Use tunnel to expose your agent to the internet
+# bindufy(config, handler, launch=True)
 ```
 
-**Uitvoeren en testen:**
+**Voer de agent uit:**
 
 ```bash
-# Start de agent
+# Start the agent
 python examples/echo_agent.py
 ```
 
 </details>
 
 <details>
-<summary><b>Test agent met curl</b> (Klik om uit te vouwen)</summary>
+<summary><b>Test de agent met curl</b> (klik om uit te vouwen)</summary>
 
 <br/>
 
-Input:
+Invoer:
 ```bash
 curl --location 'http://localhost:3773/' \
 --header 'Content-Type: application/json' \
@@ -260,7 +323,7 @@ curl --location 'http://localhost:3773/' \
 }'
 ```
 
-Output:
+Uitvoer:
 ```bash
 {
     "jsonrpc": "2.0",
@@ -292,7 +355,7 @@ Output:
 }
 ```
 
-Controleer task status
+Controleer de status van de taak
 ```bash
 curl --location 'http://localhost:3773/' \
 --header 'Content-Type: application/json' \
@@ -306,7 +369,7 @@ curl --location 'http://localhost:3773/' \
 }'
 ```
 
-Output:
+Uitvoer:
 ```bash
 {
     "jsonrpc": "2.0",
@@ -368,370 +431,27 @@ Output:
 
 </details>
 
----
-
-<br/>
-
-## [Postgres Storage](https://docs.getbindu.com/bindu/learn/storage/overview)
-
-Bindu gebruikt PostgreSQL als zijn persistente storage backend voor productie-implementaties. De storage layer is gebouwd met SQLAlchemy's async engine en gebruikt imperatieve mapping met protocol TypeDicts.
-
-Dit is optioneel – standaard wordt InMemoryStorage gebruikt.
-
-### 📊 Storage structuur
-
-De storage layer gebruikt drie hoofdtabellen:
-
-1. **tasks_table**: Slaat alle tasks op met JSONB history en artifacts
-2. **contexts_table**: Onderhoudt context metadata en message history
-3. **task_feedback_table**: Optionele feedback storage voor tasks
-
-### ⚙️ Configuratie
-
-<details>
-<summary><b>Bekijk configuratievoorbeeld</b> (Klik om uit te vouwen)</summary>
-
-Configureer PostgreSQL-verbinding in je environment of settings:
-Geef de connection string op in de agent config.
-
-```json
-config = {
-    "author": "your.email@example.com",
-    "name": "research_agent",
-    "description": "Een onderzoeksassistent agent",
-    "deployment": {"url": "http://localhost:3773", "expose": True},
-    "skills": ["skills/question-answering", "skills/pdf-processing"],
-    "storage": {
-        "type": "postgres",
-        "database_url": "postgresql+asyncpg://bindu:bindu@localhost:5432/bindu",  # pragma: allowlist secret
-        "run_migrations_on_startup": False,
-    },
-}
-```
-
-</details>
-
-**💡 Task-First Pattern**: Storage ondersteunt Bindu's task-first benadering waarbij tasks kunnen worden voortgezet door berichten toe te voegen aan non-terminal tasks, wat incrementele verfijningen en multi-turn gesprekken mogelijk maakt.
+ 
 
 ---
 
-<br/>
-
-## [Redis Scheduler](https://docs.getbindu.com/bindu/learn/scheduler/overview)
-
-Bindu gebruikt Redis als zijn gedistribueerde task scheduler om werk te coördineren over meerdere workers en processen. De scheduler gebruikt Redis lists met blocking operations voor efficiënte task distributie.
-
-Dit is optioneel – standaard wordt InMemoryScheduler gebruikt.
-
-### ⚙️ Configuratie
-
-<details>
-<summary><b>Bekijk configuratievoorbeeld</b> (Klik om uit te vouwen)</summary>
-
-Configureer Redis-verbinding in je agent config:
-
-```json
-config = {
-    "author": "your.email@example.com",
-    "name": "research_agent",
-    "description": "Een onderzoeksassistent agent",
-    "deployment": {"url": "http://localhost:3773", "expose": True},
-    "skills": ["skills/question-answering", "skills/pdf-processing"],
-     "scheduler": {
-        "type": "redis",
-        "redis_url": "redis://localhost:6379/0",
-    },
-}
-```
-
-</details>
-
-Alle operaties worden in Redis in de wachtrij geplaatst en verwerkt door beschikbare workers met behulp van een blocking pop-mechanisme, wat efficiënte distributie zonder polling overhead garandeert.
-
----
-
-<br/>
-
-## [Retry Mechanism](https://docs.getbindu.com/bindu/learn/retry/overview)
-
-> Automatische retry logic met exponential backoff voor veerkrachtige Bindu agents
-
-Bindu heeft een ingebouwd Tenacity-gebaseerd retry-mechanisme dat tijdelijke fouten in workers, storage, schedulers en API-aanroepen netjes afhandelt. Dit zorgt ervoor dat je agents veerkrachtig blijven in productieomgevingen.
-
-### ⚙️ Standaardinstellingen
-
-Als niet geconfigureerd, gebruikt Bindu deze standaardwaarden:
-
-| Operatietype | Max pogingen | Min wacht | Max wacht |
-| -------------- | ------------ | -------- | -------- |
-| Worker         | 3            | 1.0s     | 10.0s    |
-| Storage        | 5            | 0.5s     | 5.0s     |
-| Scheduler      | 3            | 1.0s     | 8.0s     |
-| API            | 4            | 1.0s     | 15.0s    |
-
----
-
-<br/>
-
-## [Sentry Integration](https://docs.getbindu.com/bindu/learn/sentry/overview)
-
-> Real-time error tracking en performance monitoring voor Bindu agents
-
-Sentry is een real-time error tracking en performance monitoring platform dat je helpt problemen in productie te identificeren, diagnosticeren en oplossen. Bindu heeft ingebouwde Sentry-integratie om uitgebreide observability voor je AI-agents te bieden.
-
-### ⚙️ Configuratie
-
-<details>
-<summary><b>Bekijk configuratievoorbeeld</b> (Klik om uit te vouwen)</summary>
-
-Configureer Sentry direct in je `bindufy()` config:
-
-```python
-config = {
-    "author": "gaurikasethi88@gmail.com",
-    "name": "echo_agent",
-    "description": "Een basis echo agent voor snel testen.",
-    "deployment": {"url": "http://localhost:3773", "expose": True},
-    "skills": [],
-    "storage": {
-        "type": "postgres",
-        "database_url": "postgresql+asyncpg://bindu:bindu@localhost:5432/bindu",  # pragma: allowlist secret
-        "run_migrations_on_startup": False,
-    },
-    # Scheduler configuratie (optioneel)
-    # Gebruik "memory" (standaard) voor single-process of "redis" voor gedistribueerde multi-process
-    "scheduler": {
-        "type": "redis",
-        "redis_url": "redis://localhost:6379/0",
-    },
-    # Sentry error tracking (optioneel)
-    # Configureer Sentry direct in code in plaats van environment variables
-    "sentry": {
-        "enabled": True,
-        "dsn": "https://252c0197ddeafb621f91abdbb59fa819@o4510504294612992.ingest.de.sentry.io/4510504299069520",
-        "environment": "development",
-        "traces_sample_rate": 1.0,
-        "profiles_sample_rate": 0.1,
-    },
-}
-
-def handler(messages):
-    # Je agent logic
-    pass
-
-bindufy(config, handler)
-```
-
-</details>
-
-### 🚀 Aan de slag
-
-1. **Maak een Sentry Account**: Meld je aan op [sentry.io](https://sentry.io)
-2. **Verkrijg je DSN**: Kopieer uit project settings
-3. **Configureer Bindu**: Voeg `sentry` config toe (zie hierboven)
-4. **Voer je agent uit**: Sentry initialiseert automatisch
-
-> 📚 Zie de [volledige Sentry documentatie](https://docs.getbindu.com/bindu/learn/sentry/overview) voor complete details.
-
----
-
-<br/>
-
-## [Skills System](https://docs.getbindu.com/bindu/skills/introduction/overview)
-
-> Rijke capability advertisement voor intelligente agent orchestration
-
-Het Bindu Skills System biedt rijke agent capability advertisement voor intelligente orchestration en agent discovery. Geïnspireerd door Claude's skills architectuur, stelt het agents in staat om gedetailleerde documentatie over hun mogelijkheden te verstrekken, zodat orchestrators geïnformeerde routing-beslissingen kunnen nemen.
-
-### 💡 Wat zijn Skills?
-
-In Bindu fungeren Skills als **rijke advertisement metadata** die orchestrators helpen:
-
-* 🔍 **Ontdekken** van de juiste agent voor een taak
-* 📖 **Begrijpen** van gedetailleerde mogelijkheden en beperkingen
-* ✅ **Verifiëren** van vereisten vóór uitvoering
-* 📊 **Schatten** van prestaties en resource-behoeften
-* 🔗 **Koppelen** van meerdere agents intelligent
-
-> **Opmerking**: Skills zijn geen uitvoerbare code—het is gestructureerde metadata die beschrijft wat je agent kan doen.
-
-### 🔌 API Endpoints
-
-**Lijst alle Skills**:
-```bash
-GET /agent/skills
-```
-
-**Verkrijg Skill details**:
-```bash
-GET /agent/skills/{skill_id}
-```
-
-**Verkrijg Skill documentatie**:
-```bash
-GET /agent/skills/{skill_id}/documentation
-```
-
-> 📚 Zie de [Skills documentatie](https://github.com/getbindu/Bindu/tree/main/examples/skills) voor volledige voorbeelden.
-
----
-
-<br/>
-
-## Negotiation
-
-> Capability-based agent selectie voor intelligente orchestration
-
-Bindu's negotiation systeem stelt orchestrators in staat om meerdere agents te bevragen en intelligent de beste agent voor een taak te selecteren op basis van skills, prestaties, belasting en kosten.
-
-### 🔄 Hoe het werkt
-
-1. **Orchestrator broadcast** assessment request naar meerdere agents
-2. **Agents self-assess** capability met behulp van skill matching en load analysis
-3. **Orchestrator rankt** responses met behulp van multi-factor scoring
-4. **Beste agent wordt geselecteerd** en task wordt uitgevoerd
-
-### 🔌 Assessment Endpoint
-
-<details>
-<summary><b>Bekijk API details</b> (Klik om uit te vouwen)</summary>
-
-```bash
-POST /agent/negotiation
-```
-
-**Request:**
-```json
-{
-  "task_summary": "Extraheer tabellen uit PDF facturen",
-  "task_details": "Verwerk factuur PDF's en extraheer gestructureerde data",
-  "input_mime_types": ["application/pdf"],
-  "output_mime_types": ["application/json"],
-  "max_latency_ms": 5000,
-  "max_cost_amount": "0.001",
-  "min_score": 0.7,
-  "weights": {
-    "skill_match": 0.6,
-    "io_compatibility": 0.2,
-    "performance": 0.1,
-    "load": 0.05,
-    "cost": 0.05
-  }
-}
-```
-
-**Response:**
-```json
-{
-  "accepted": true,
-  "score": 0.89,
-  "confidence": 0.95,
-  "skill_matches": [
-    {
-      "skill_id": "pdf-processing-v1",
-      "skill_name": "pdf-processing",
-      "score": 0.92,
-      "reasons": [
-        "semantic similarity: 0.95",
-        "tags: pdf, tables, extraction",
-        "capabilities: text_extraction, table_extraction"
-      ]
-    }
-  ],
-  "matched_tags": ["pdf", "tables", "extraction"],
-  "matched_capabilities": ["text_extraction", "table_extraction"],
-  "latency_estimate_ms": 2000,
-  "queue_depth": 2,
-  "subscores": {
-    "skill_match": 0.92,
-    "io_compatibility": 1.0,
-    "performance": 0.85,
-    "load": 0.90,
-    "cost": 1.0
-  }
-}
-```
-
-</details>
-
-### 📊 Scoring Algoritme
-
-Agents berekenen een confidence score op basis van meerdere factoren:
-
-```python
-score = (
-    skill_match * 0.6 +        # Primair: skill matching
-    io_compatibility * 0.2 +   # Input/output format ondersteuning
-    performance * 0.1 +        # Snelheid en betrouwbaarheid
-    load * 0.05 +              # Huidige beschikbaarheid
-    cost * 0.05                # Prijsstelling
-)
-```
-
-> 📚 Zie de [Negotiation documentatie](https://docs.getbindu.com/bindu/negotiation/overview) voor volledige details.
-
----
-
-<br/>
-
-## Task Feedback en DSPy
-
-Bindu verzamelt gebruikersfeedback op task executions om continue verbetering mogelijk te maken via DSPy-optimalisatie. Door feedback op te slaan met ratings en metadata, kun je golden datasets bouwen uit echte interacties en DSPy gebruiken om de prompts en het gedrag van je agent automatisch te optimaliseren.
-
-### Feedback indienen
-
-Geef feedback op elke task met behulp van de `tasks/feedback` methode:
-
-```bash
-curl --location 'http://localhost:3773/' \
---header 'Content-Type: application/json' \
---header 'Authorization: Bearer <your-token>' \
---data '{
-    "jsonrpc": "2.0",
-    "method": "tasks/feedback",
-    "params": {
-        "taskId": "550e8400-e29b-41d4-a716-446655440200",
-        "feedback": "Geweldig werk! De response was zeer behulpzaam en accuraat.",
-        "rating": 5,
-        "metadata": {
-            "category": "quality",
-            "source": "user",
-            "helpful": true
-        }
-    },
-    "id": "550e8400-e29b-41d4-a716-446655440024"
-}'
-```
-
-Feedback wordt opgeslagen in de `task_feedback` tabel en kan worden gebruikt om:
-- Hoogwaardige task interacties te filteren voor trainingsdata
-- Patronen te identificeren in succesvolle versus mislukte completions
-- Agent instructies en few-shot voorbeelden te optimaliseren met DSPy
-- We werken aan DsPY - binnenkort beschikbaar.
-
----
-
-<br/>
-
-## 📬 Push Notifications
-
-Bindu ondersteunt **real-time webhook notifications** voor langlopende taken, volgens de [A2A Protocol specification](https://a2a-protocol.org/latest/specification/). Dit stelt clients in staat om push notifications te ontvangen over task state changes en artifact generation zonder polling.
-
-### Snel starten
-
-1. **Start webhook receiver:** `python examples/webhook_client_example.py`
-2. **Configureer agent** in `examples/echo_agent_with_webhooks.py`:
-   ```python
-   manifest = {
-       "capabilities": {"push_notifications": True},
-       "global_webhook_url": "http://localhost:8000/webhooks/task-updates",
-       "global_webhook_token": "secret_abc123",
-   }
-   ```
-3. **Voer agent uit:** `python examples/echo_agent_with_webhooks.py`
-4. **Verstuur tasks** - webhook notifications komen automatisch binnen
-
-📖 **[Volledige documentatie](docs/long-running-task-notifications.md)** - Gedetailleerde gids met architectuur, beveiliging, voorbeelden en probleemoplossing.
+ 
+
+## 🚀 Kernfuncties
+| Kenmerk | Beschrijving | Documentatie |
+| :--- | :--- | :--- |
+| **Authenticatie** | Veilige API-toegang met Ory Hydra OAuth2 (optioneel voor ontwikkeling) | [Guide →](docs/AUTHENTICATION.md) |
+| 💰 **Betalingsintegratie (X402)** | Accepteer USDC-betalingen op de Base-blockchain voordat beschermde methoden worden uitgevoerd | [Guide →](docs/PAYMENT.md) |
+| 💾 **PostgreSQL Opslag** | Persistente opslag voor productie-implementaties (optioneel - InMemoryStorage standaard) | [Guide →](docs/STORAGE.md) |
+| 📋 **Redis Scheduler** | Gedistribueerde taakplanning voor multi-werknemersimplementaties (optioneel - InMemoryScheduler standaard) | [Guide →](docs/SCHEDULER.md) |
+| 🎯 **Vaardigheden Systeem** | Herbruikbare mogelijkheden die agenten adverteren en uitvoeren voor intelligente taakroutering | [Guide →](docs/SKILLS.md) |
+| 🤝 **Agentonderhandeling** | Capaciteitsgebaseerde agentselectie voor intelligente orkestratie | [Guide →](docs/NEGOTIATION.md) |
+| 🌐 **Tunneling** | Lokale agenten blootstellen aan het internet voor testen (**alleen lokale ontwikkeling, niet voor productie**) | [Guide →](docs/TUNNELING.md) |
+| 📬 **Pushmeldingen** | Real-time webhookmeldingen voor taakupdates - geen polling vereist | [Guide →](docs/NOTIFICATIONS.md) |
+| 📊 **Observability & Monitoring** | Volg prestaties en debugproblemen met OpenTelemetry en Sentry | [Guide →](docs/OBSERVABILITY.md) |
+| 🔄 **Retry Mechanisme** | Automatische herhaling met exponentiële backoff voor veerkrachtige agenten | [Guide →](docs.getbindu.com/bindu/learn/retry/overview) |
+| 🔑 **Gedecentraliseerde Identifiers (DIDs)** | Cryptografische identiteit voor verifieerbare, veilige agentinteracties en betalingsintegratie | [Guide →](docs/DID.md) |
+| 🏥 **Gezondheidscontrole & Statistieken** | Monitor agentgezondheid en prestaties met ingebouwde eindpunten | [Guide →](docs/HEALTH_METRICS.md) |
 
 ---
 
@@ -739,7 +459,7 @@ Bindu ondersteunt **real-time webhook notifications** voor langlopende taken, vo
 
 ## 🎨 Chat UI
 
-Bindu bevat een mooie chat interface op `http://localhost:3773/docs`
+Bindu bevat een mooie chatinterface op `http://localhost:5173`. Navigeer naar de `frontend` map en voer `npm run dev` uit om de server te starten.
 
 <p align="center">
   <img src="assets/agent-ui.png" alt="Bindu Agent UI" width="640" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
@@ -749,23 +469,21 @@ Bindu bevat een mooie chat interface op `http://localhost:3773/docs`
 
 <br/>
 
-## 🌐 Bindu Directory
+## 🌐 GetBindu.comDe [**GetBindu.com**](https://getbindu.com) is een openbaar register van alle Bindu-agenten, waardoor ze ontdekbaar en toegankelijk zijn voor het bredere agentecosysteem.
 
-De [**Bindu Directory**](https://bindus.directory) is een openbaar register van alle Bindu agents, waardoor ze vindbaar en toegankelijk zijn voor het bredere agent ecosysteem.
+### ✨ Automatische Registratie met Cookiecutter
 
-### ✨ Automatische registratie met Cookiecutter
-
-Wanneer je een agent maakt met de cookiecutter template, bevat deze een vooraf geconfigureerde GitHub Action die je agent automatisch registreert in de directory:
+Wanneer je een agent maakt met de cookiecutter-sjabloon, bevat deze een vooraf geconfigureerde GitHub Actie die je agent automatisch registreert in de directory:
 
 1. **Maak je agent** met cookiecutter
-2. **Push naar GitHub** - De GitHub Action triggert automatisch
-3. **Je agent verschijnt** in de [Bindu Directory](https://bindus.directory)
+2. **Push naar GitHub** - De GitHub Actie wordt automatisch geactiveerd
+3. **Je agent verschijnt** in de [GetBindu.com](https://getbindu.com)
 
-> **🔑 Opmerking**: Je moet de BINDU_PAT_TOKEN verzamelen van bindus.directory en deze gebruiken om je agent te registreren.
+> **Opmerking**: Verzamel je `BINDU_PAT_TOKEN` van [getbindu.com](https://getbindu.com) om je agent te registreren.
 
-### 📝 Handmatige registratie
+### 📝 Handmatige Registratie
 
-We werken aan een handmatig registratieproces.
+Het handmatige registratieproces is momenteel in ontwikkeling.
 
 ---
 
@@ -774,7 +492,7 @@ We werken aan een handmatig registratieproces.
 ## 🌌 De Visie
 
 ```
-een blik op de nachtelijke hemel
+a peek into the night sky
 }}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}
 {{            +             +                  +   @          {{
 }}   |                *           o     +                .    }}
@@ -795,13 +513,13 @@ een blik op de nachtelijke hemel
 {{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{
 ```
 
-_Elk symbool is een agent – een vonk van intelligentie. Het kleine puntje is Bindu, het oorsprongspunt in het Internet of Agents._
+_Each symbol is an agent — a spark of intelligence. The tiny dot is Bindu, the origin point in the Internet of Agents._
 
-### NightSky Verbinding [In ontwikkeling]
+### NightSky Verbinding (In Behandeling)
 
-NightSky maakt zwermen van agents mogelijk. Elke Bindu is een punt dat agents annoteert met de gedeelde taal van A2A, AP2 en X402. Agents kunnen overal worden gehost – laptops, clouds of clusters – maar spreken hetzelfde protocol, vertrouwen elkaar by design en werken samen als één gedistribueerde geest.
+NightSky maakt zwermen van agenten mogelijk. Elke Bindu is een stip die agenten annotaties geeft met de gedeelde taal van A2A, AP2 en X402. Agenten kunnen overal worden gehost—laptops, clouds of clusters—maar spreken dezelfde protocol, vertrouwen elkaar per ontwerp en werken samen als een enkele, gedistribueerde geest.
 
-> **💭 Een doel zonder plan is slechts een wens.**
+> **💭 Een Doel Zonder Plan Is Gewoon Een Wens.**
 
 ---
 
@@ -809,15 +527,16 @@ NightSky maakt zwermen van agents mogelijk. Elke Bindu is een punt dat agents an
 
 ## 🛠️ Ondersteunde Agent Frameworks
 
-Bindu is **framework-agnostisch** en getest met:
+Bindu is **framework-onafhankelijk** en getest met:
 
+- **AG2** (voorheen AutoGen)
 - **Agno**
 - **CrewAI**
 - **LangChain**
 - **LlamaIndex**
 - **FastAgent**
 
-Wil je integratie met je favoriete framework? [Laat het ons weten op Discord](https://discord.gg/3w5zuYUuwt)!
+Wil je integratie met je favoriete framework? [Let us know on Discord](https://discord.gg/3w5zuYUuwt)!
 
 ---
 
@@ -825,31 +544,31 @@ Wil je integratie met je favoriete framework? [Laat het ons weten op Discord](ht
 
 ## 🧪 Testen
 
-Bindu handhaaft **70%+ test coverage**:
+Bindu onderhoudt **70%+ testdekking** (doel: 80%+):
 
 ```bash
-pytest -n auto --cov=bindu --cov-report= && coverage report --skip-covered --fail-under=70
+uv run pytest -n auto --cov=bindu --cov-report=term-missing
+uv run coverage report --skip-covered --fail-under=70
 ```
 
 ---
 
 <br/>
 
-## Probleemoplossing
+## 🔧 Probleemoplossing
 
 <details>
-<summary>Veelvoorkomende problemen</summary>
+<summary>Veelvoorkomende Problemen</summary>
 
 <br/>
 
 | Probleem | Oplossing |
-|---------|----------|
+|----------|-----------|
 | `Python 3.12 not found` | Installeer Python 3.12+ en stel in PATH in, of gebruik `pyenv` |
-| `bindu: command not found` | Activeer virtuele omgeving: `source .venv/bin/activate` |
-| `Port 3773 already in use` | Wijzig poort in config: `"url": "http://localhost:4000"` |
-| Pre-commit faalt | Voer `pre-commit run --all-files` uit |
-| Tests falen | Installeer dev dependencies: `uv sync --dev` |
-| `Permission denied` (macOS) | Voer `xattr -cr .` uit om extended attributes te wissen |
+| `bindu: command not found` | Activeer virtuele omgeving: `source .venv/bin/activate` || `Port 3773 already in use` | Stel `BINDU_PORT=4000` in of overschrijf URL met `BINDU_DEPLOYMENT_URL=http://localhost:4000` |
+| Pre-commit mislukt | Voer `pre-commit run --all-files` uit |
+| Tests mislukt | Installeer dev-afhankelijkheden: `uv sync --dev` |
+| `Permission denied` (macOS) | Voer `xattr -cr .` uit om uitgebreide attributen te wissen |
 
 **Reset omgeving:**
 ```bash
@@ -865,11 +584,13 @@ Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 </details>
 
+---
+
 <br/>
 
 ## 🤝 Bijdragen
 
-We verwelkomen bijdragen! Sluit je aan bij ons op [Discord](https://discord.gg/3w5zuYUuwt). Kies het kanaal dat het beste past bij je bijdrage.
+We verwelkomen bijdragen! Sluit je bij ons aan op [Discord](https://discord.gg/3w5zuYUuwt). Kies het kanaal dat het beste past bij jouw bijdrage.
 
 ```bash
 git clone https://github.com/getbindu/Bindu.git
@@ -880,7 +601,7 @@ uv sync --dev
 pre-commit run --all-files
 ```
 
-> 📖 [Bijdrage richtlijnen](.github/contributing.md)
+> 📖 [Contributing Guidelines](.github/contributing.md)
 
 ---
 
@@ -894,12 +615,12 @@ Bindu is open-source onder de [Apache License 2.0](https://choosealicense.com/li
 
 <br/>
 
-## 💬 Community
+## 💬 Gemeenschap
 
-We 💛 bijdragen! Of je nu bugs fixt, documentatie verbetert of demo's bouwt – jouw bijdragen maken Bindu beter.
+We 💛 bijdragen! Of je nu bugs oplost, documentatie verbetert of demo's bouwt—jouw bijdragen maken Bindu beter.
 
-- 💬 [Sluit je aan bij Discord](https://discord.gg/3w5zuYUuwt) voor discussies en ondersteuning
-- ⭐ [Geef de repository een ster](https://github.com/getbindu/Bindu) als je het nuttig vindt!
+- 💬 [Join Discord](https://discord.gg/3w5zuYUuwt) voor discussies en ondersteuning
+- ⭐ [Star the repository](https://github.com/getbindu/Bindu) als je het nuttig vindt!
 
 ---
 
@@ -907,7 +628,7 @@ We 💛 bijdragen! Of je nu bugs fixt, documentatie verbetert of demo's bouwt �
 
 ## 👥 Actieve Moderators
 
-Onze toegewijde moderators helpen een gastvrije en productieve community te onderhouden:
+Onze toegewijde moderators helpen een gastvrije en productieve gemeenschap te behouden:
 
 <table>
   <tr>
@@ -928,18 +649,10 @@ Onze toegewijde moderators helpen een gastvrije en productieve community te onde
       <br />
     </td>
     <td align="center">
-      <a href="https://github.com/Gaurika-Sethi">
-        <img src="https://avatars.githubusercontent.com/u/178935569?v=4" width="100px;" alt="Gaurika Sethi"/>
+      <a href="https://github.com/chandan-1427">
+        <img src="https://avatars.githubusercontent.com/u/202320492?v=4" width="100px;" alt="Chandan"/>
         <br />
-        <sub><b>Gaurika Sethi</b></sub>
-      </a>
-      <br />
-    </td>
-    <td align="center">
-      <a href="https://github.com/Avngrstark62">
-        <img src="https://avatars.githubusercontent.com/u/133889196?v=4" width="100px;" alt="Abhijeet Singh Thakur"/>
-        <br />
-        <sub><b>Abhijeet Singh Thakur</b></sub>
+        <sub><b>Chandan</b></sub>
       </a>
       <br />
     </td>
@@ -952,14 +665,15 @@ Onze toegewijde moderators helpen een gastvrije en productieve community te onde
 
 <br/>
 
-## 🙏 Dankbetuigingen
+## 🙏 Erkenningen
 
-Dankbaar aan deze projecten:
+Dankbaar voor deze projecten:
 
 - [FastA2A](https://github.com/pydantic/fasta2a)
 - [12 Factor Agents](https://github.com/humanlayer/12-factor-agents/blob/main/content/factor-11-trigger-from-anywhere.md)
 - [A2A](https://github.com/a2aproject/A2A)
 - [AP2](https://github.com/google-agentic-commerce/AP2)
+- [Huggingface chatui](https://github.com/huggingface/chat-ui)
 - [X402](https://github.com/coinbase/x402)
 - [Bindu Logo](https://openmoji.org/library/emoji-1F33B/)
 - [ASCII Space Art](https://www.asciiart.eu/space/other)
@@ -970,20 +684,19 @@ Dankbaar aan deze projecten:
 
 ## 🗺️ Roadmap
 
-- [ ] GRPC transport ondersteuning
-- [x] Sentry error tracking
-- [x] Ag-UI integratie
-- [x] Retry mechanisme
-- [ ] Test coverage verhogen naar 80% - In ontwikkeling
-- [x] Redis scheduler implementatie
-- [x] Postgres database voor memory storage
-- [x] Negotiation ondersteuning
+- [ ] GRPC transportondersteuning- [ ] Verhoog de testdekking tot 80% (in uitvoering)
 - [ ] AP2 end-to-end ondersteuning
-- [ ] DSPy integratie - In ontwikkeling
+- [ ] DSPy integratie (in uitvoering)
 - [ ] MLTS ondersteuning
 - [ ] X402 ondersteuning met andere facilitators
 
-> 💡 [Stel features voor op Discord](https://discord.gg/3w5zuYUuwt)!
+> 💡 [Suggest features on Discord](https://discord.gg/3w5zuYUuwt)!
+
+---
+
+<br/>
+
+## [We will make this agents bidufied and we do need your help.](https://www.notion.so/getbindu/305d3bb65095808eac2bf720368e9804?v=305d3bb6509580189941000cfad83ae7&source=copy_link)
 
 ---
 
@@ -991,25 +704,25 @@ Dankbaar aan deze projecten:
 
 ## 🎓 Workshops
 
-- [AI Native in Action: Agent Symphony](https://www.meetup.com/ai-native-amsterdam/events/311066899/) - [Slides](https://docs.google.com/presentation/d/1SqGXI0Gv_KCWZ1Mw2SOx_kI0u-LLxwZq7lMSONdl8oQ/edit)
+- [AI Native in Action: Agent Symphony](https://www.meetup.com/ai-native-Amsterdam && India/events/311066899/) - [Slides](https://docs.google.com/presentation/d/1SqGXI0Gv_KCWZ1Mw2SOx_kI0u-LLxwZq7lMSONdl8oQ/edit)
 
 ---
 
 <br/>
 
-## ⭐ Star Geschiedenis
+## ⭐ Sterren Geschiedenis
 
 [![Star History Chart](https://api.star-history.com/svg?repos=getbindu/Bindu&type=Date)](https://www.star-history.com/#getbindu/Bindu&Date)
 
 ---
 
 <p align="center">
-  <strong>Gebouwd met 💛 door het team uit Amsterdam</strong><br/>
-  <em>Happy Bindu! 🌻🚀✨</em>
+  <strong>Gebouwd met 💛 door het team uit Amsterdam && India </strong><br/>
+  <em>Gelukkige Bindu! 🌻🚀✨</em>
 </p>
 
 <p align="center">
-  <strong>Van idee tot Internet of Agents in 2 minuten.</strong><br/>
+  <strong>Van idee naar Internet of Agents in 2 minuten.</strong><br/>
   <em>Jouw agent. Jouw framework. Universele protocollen.</em>
 </p>
 
@@ -1017,4 +730,14 @@ Dankbaar aan deze projecten:
   <a href="https://github.com/getbindu/Bindu">⭐ Geef ons een ster op GitHub</a> •
   <a href="https://discord.gg/3w5zuYUuwt">💬 Sluit je aan bij Discord</a> •
   <a href="https://docs.getbindu.com">🌻 Lees de Docs</a>
+</p>
+
+<br/>
+
+<p align="center">
+  <img src="assets/sunflower-footer.jpeg" alt="Bindu" width="720" />
+</p>
+
+<p align="center">
+  <em>"We geloven in de zonnebloemtheorie - samen rechtop staan, hoop en licht brengen naar het Internet of Agents."</em>
 </p>

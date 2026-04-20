@@ -6,7 +6,7 @@ from dataclasses import asdict, is_dataclass
 from typing import Any
 
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import Response, StreamingResponse
 
 from bindu.common.protocol.types import (
     InternalError,
@@ -18,13 +18,72 @@ from bindu.common.protocol.types import (
 from bindu.server.applications import BinduApplication
 from bindu.settings import app_settings
 from bindu.utils.logging import get_logger
-from bindu.utils.request_utils import extract_error_fields, get_client_ip, jsonrpc_error
+from .utils import (
+    extract_error_fields,
+    get_client_ip,
+    jsonrpc_error,
+    validate_authentication,
+)
 from bindu.extensions.x402.extension import (
     is_activation_requested as x402_is_requested,
     add_activation_header as x402_add_header,
 )
 
 logger = get_logger("bindu.server.endpoints.a2a_protocol")
+
+
+def _attach_payment_context(request: Request, a2a_request: Any, method: str) -> None:
+    """Attach payment context to message metadata if available.
+
+    Payment context is passed through the metadata field in params.
+    All three state fields are set atomically by X402Middleware only after
+    successful payment validation. Use explicit ``is not None`` guards so
+    that a falsy-but-present value (e.g. zero-amount payload) is not
+    accidentally skipped.
+
+    Args:
+        request: Starlette request with payment state
+        a2a_request: A2A request dict to modify
+        method: Request method name
+    """
+    if method != "message/send":
+        return
+
+    # Extract payment state from request
+    payment_payload = getattr(request.state, "payment_payload", None)
+    payment_requirements = getattr(request.state, "payment_requirements", None)
+    verify_response = getattr(request.state, "verify_response", None)
+
+    # All three must be present
+    if not all(
+        [
+            payment_payload is not None,
+            payment_requirements is not None,
+            verify_response is not None,
+        ]
+    ):
+        return
+
+    # Ensure message exists in params
+    if "params" not in a2a_request or "message" not in a2a_request["params"]:
+        return
+
+    msg_obj = a2a_request["params"]["message"]
+    msg_obj.setdefault("metadata", {})
+
+    try:
+        msg_obj["metadata"]["_payment_context"] = {
+            "payment_payload": _serialize_state_obj(payment_payload),
+            "payment_requirements": _serialize_state_obj(payment_requirements),
+            "verify_response": _serialize_state_obj(verify_response),
+        }
+    except Exception as ser_err:
+        # Serialization failure must not abort the request;
+        # log and continue without attaching the payment context.
+        logger.warning(
+            f"Failed to serialize payment context into message metadata "
+            f"– payment context will be omitted: {ser_err}"
+        )
 
 
 def _serialize_state_obj(obj: Any) -> dict:
@@ -58,7 +117,7 @@ async def agent_run_endpoint(app: BinduApplication, request: Request) -> Respons
         2.1. The task was "completed" successfully.
         2.2. The task was "canceled".
         2.3. The task "failed".
-    3. The server will send a "working" on the first chunk on `tasks/pushNotification/get`.
+    3. The server will send a "working" on the first chunk on `tasks/pushNotificationConfig/get`.
     """
     client_ip = get_client_ip(request)
     request_id = None
@@ -78,30 +137,23 @@ async def agent_run_endpoint(app: BinduApplication, request: Request) -> Respons
 
         logger.debug(f"A2A request from {client_ip}: method={method}, id={request_id}")
 
-        # ---------------------------------------------------------------------
         # Authentication / Authorization guard
-        # ---------------------------------------------------------------------
-        if app_settings.auth.enabled:
-            # verify middleware has attached user context (if middleware was used)
-            user_info = getattr(request.state, "user_info", None)
-            if not user_info:
-                # no authentication data, reject immediately
-                logger.warning(f"Unauthenticated request for {method} from {client_ip}")
-                from bindu.common.protocol.types import AuthenticationRequiredError
+        auth_error = validate_authentication(
+            request, client_ip, "agent execution", request_id
+        )
+        if auth_error:
+            return auth_error
 
-                code, message = extract_error_fields(AuthenticationRequiredError)
-                return jsonrpc_error(
-                    code,
-                    message,
-                    "Authentication required for agent execution",
-                    request_id,
-                    401,
-                )
+        # Permission checks (if authentication passed)
+        user_info = None
+        if app_settings.auth.enabled:
+            # Get user info from request state (set by auth middleware)
+            user_info = getattr(request.state, "user", None)
 
             # if permission checks are enabled, ensure the token has required scope
             if app_settings.auth.require_permissions:
                 required_scopes = app_settings.auth.permissions.get(method, [])
-                if required_scopes:
+                if required_scopes and user_info:
                     token_scopes = user_info.get("scope", []) or []
                     if not any(scope in token_scopes for scope in required_scopes):
                         logger.warning(
@@ -122,6 +174,19 @@ async def agent_run_endpoint(app: BinduApplication, request: Request) -> Respons
                             403,
                         )
 
+        # Resolve the authenticated caller identity used for task/context
+        # ownership. ``client_id`` is the Hydra OAuth client — the same value
+        # used elsewhere in the auth middleware for DID matching. ``None``
+        # means auth is disabled or the caller has no client_id; rows created
+        # by such callers end up with ``owner_did=NULL`` and are accessible
+        # only to other unauthenticated callers once Phase 2 enforcement
+        # lands.
+        caller_did: str | None = None
+        if user_info is not None:
+            client_id = user_info.get("client_id")
+            if isinstance(client_id, str) and client_id:
+                caller_did = client_id
+
         handler_name = app_settings.agent.method_handlers.get(method)
         if handler_name is None:
             logger.warning(f"Unsupported A2A method '{method}' from {client_ip}")
@@ -132,48 +197,15 @@ async def agent_run_endpoint(app: BinduApplication, request: Request) -> Respons
 
         handler = getattr(app.task_manager, handler_name)
 
-        # Pass payment details from middleware to handler if available.
-        # Payment context is passed through the metadata field in params.
-        # All three state fields are set atomically by X402Middleware only after
-        # successful payment validation.  Use explicit ``is not None`` guards so
-        # that a falsy-but-present value (e.g. zero-amount payload) is not
-        # accidentally skipped, and wrap serialization in a try/except so that
-        # an unexpected type never produces a 500 for the caller.
-        if method == "message/send":
-            payment_payload = getattr(request.state, "payment_payload", None)
-            payment_requirements = getattr(request.state, "payment_requirements", None)
-            verify_response = getattr(request.state, "verify_response", None)
+        # Attach payment context to message metadata if available
+        _attach_payment_context(request, a2a_request, method)
 
-            if (
-                payment_payload is not None
-                and payment_requirements is not None
-                and verify_response is not None
-            ):
-                if "params" in a2a_request and "message" in a2a_request["params"]:
-                    msg_obj = a2a_request["params"]["message"]
-                    msg_obj.setdefault("metadata", {})
-                    try:
-                        msg_obj["metadata"]["_payment_context"] = {
-                            "payment_payload": _serialize_state_obj(payment_payload),
-                            "payment_requirements": _serialize_state_obj(
-                                payment_requirements
-                            ),
-                            "verify_response": _serialize_state_obj(verify_response),
-                        }
-                    except Exception as _ser_err:
-                        # Serialization failure must not abort the request;
-                        # log and continue without attaching the payment context.
-                        logger.warning(
-                            "Failed to serialize payment context into message metadata"
-                            f" – payment context will be omitted: {_ser_err}"
-                        )
-
-        jsonrpc_response = await handler(a2a_request)
+        jsonrpc_response = await handler(a2a_request, caller_did=caller_did)
 
         logger.debug(f"A2A response to {client_ip}: method={method}, id={request_id}")
 
-        # Streaming handlers return a Starlette Response directly
-        if isinstance(jsonrpc_response, Response):
+        # FIX: Strictly check for StreamingResponse to prevent bypassing JSON-RPC
+        if isinstance(jsonrpc_response, StreamingResponse):
             if x402_is_requested(request):
                 jsonrpc_response = x402_add_header(jsonrpc_response)
             return jsonrpc_response

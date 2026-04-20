@@ -1,0 +1,141 @@
+# Quiz Generation Skill
+# Educational assessment expert for MCQ generation powered by LangChain.js + OpenRouter
+
+# Basic Metadata
+id: quiz-generation-v1
+name: quiz-generation
+version: 1.0.0
+author: dev@example.com
+
+# Description
+description: |
+  Educational assessment expert that generates high-quality multiple-choice quizzes
+  from any provided text. Creates exactly 10 MCQs with 4 options each, correct answer
+  identification, and concise explanations. Perfect for educational content assessment,
+  knowledge testing, and learning reinforcement.
+
+# Tags and Modes
+tags:
+  - quiz-generation
+  - education
+  - mcq-creation
+  - assessment
+  - langchain
+  - openrouter
+
+input_modes:
+  - text/plain
+  - application/json
+
+output_modes:
+  - text/plain
+  - application/json
+
+# Example Queries
+examples:
+  - "Generate a quiz from this chapter about photosynthesis"
+  - "Create 10 MCQs based on the following text about World War II"
+  - "Make a quiz from this article about machine learning basics"
+  - "Generate assessment questions from this study material"
+  - "Create a knowledge check from this documentation"
+
+# Detailed Capabilities
+capabilities_detail:
+  quiz_generation:
+    supported: true
+    description: "Generate exactly 10 multiple-choice questions with explanations"
+    features:
+      - standardized_format
+      - correct_answer_identification
+      - explanation_provision
+      - academic_language
+
+  assessment_creation:
+    supported: true
+    description: "Create educational assessments for various subjects"
+    output_formats:
+      - structured_markdown
+      - json_format
+      - plain_text
+
+  content_analysis:
+    supported: true
+    description: "Analyze text to extract key concepts for quiz generation"
+    analysis_types:
+      - concept_identification
+      - key_point_extraction
+      - topic_understanding
+
+  educational_design:
+    supported: true
+    description: "Design pedagogically sound assessment questions"
+    design_principles:
+      - clear_questioning
+      - plausible_distractors
+      - single_correct_answer
+      - appropriate_difficulty
+
+# Requirements
+requirements:
+  packages:
+    - "@langchain/openai>=0.4.0"
+    - "@bindu/sdk>=1.0.0"
+  system:
+    - internet_connection
+  api_keys:
+    - OPENROUTER_API_KEY
+
+# Performance Metrics
+performance:
+  avg_processing_time_ms: 5000
+  max_concurrent_requests: 5
+  context_window_tokens: 128000
+  scalability: horizontal
+
+# Assessment fields for skill negotiation
+assessment:
+  keywords:
+    - quiz
+    - test
+    - assessment
+    - questions
+    - mcq
+    - multiple-choice
+    - generate
+    - create
+    - questions
+    - knowledge
+    - check
+    - exam
+    - evaluate
+
+  specializations:
+    - domain: education
+      confidence_boost: 0.4
+    - domain: assessment
+      confidence_boost: 0.3
+    - domain: quiz-generation
+      confidence_boost: 0.5
+
+  anti_patterns:
+    - "real-time data"
+    - "image generation"
+    - "video content"
+    - "audio processing"
+    - "database query"
+    - "file upload"
+    - "code execution"
+
+  complexity_indicators:
+    simple:
+      - "quiz from"
+      - "questions about"
+      - "test on"
+    medium:
+      - "generate assessment"
+      - "create mcqs"
+      - "knowledge check"
+    complex:
+      - "comprehensive quiz"
+      - "detailed assessment"
+      - "multi-topic evaluation"

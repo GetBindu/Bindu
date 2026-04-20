@@ -4,21 +4,18 @@ from __future__ import annotations as _annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
-from dataclasses import dataclass
 from typing import Annotated, Any, Generic, Literal, TypeVar
 
-from opentelemetry.trace import Span, get_tracer
 from pydantic import Discriminator
 from typing_extensions import Self, TypedDict
+from opentelemetry.trace import Span
 
 from bindu.common.protocol.types import TaskIdParams, TaskSendParams
 from bindu.utils.logging import get_logger
 
-tracer = get_tracer(__name__)
 logger = get_logger("bindu.server.scheduler.base")
 
 
-@dataclass
 class Scheduler(ABC):
     """The scheduler class is in charge of scheduling the tasks."""
 
@@ -66,7 +63,12 @@ ParamsT = TypeVar("ParamsT")
 
 
 class _TaskOperation(TypedDict, Generic[OperationT, ParamsT]):
-    """A task operation."""
+    """A task operation.
+
+    Carries a live OpenTelemetry Span so the worker can restore trace context.
+    The Redis scheduler uses a separate trace_id/span_id serialization approach
+    (see redis_scheduler.py) since live Span objects cannot cross process boundaries.
+    """
 
     operation: OperationT
     params: ParamsT

@@ -92,8 +92,6 @@
 		{:else}
 			<div
 				role="dialog"
-				aria-modal="true"
-				aria-label="Dialog"
 				tabindex="-1"
 				bind:this={modalEl}
 				onkeydown={handleKeydown}
@@ -104,7 +102,7 @@
 				]}
 			>
 				{#if closeButton}
-					<button class="absolute right-4 top-4 z-50" aria-label="Close" onclick={() => onclose?.()}>
+					<button class="absolute right-4 top-4 z-50" onclick={() => onclose?.()}>
 						<CarbonClose class="size-6 text-gray-700 dark:text-gray-300" />
 					</button>
 				{/if}

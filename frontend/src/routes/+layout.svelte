@@ -115,34 +115,44 @@
 	<title>{publicConfig.PUBLIC_APP_NAME}</title>
 </svelte:head>
 
-<!-- ✅ SKIP LINK ADDED -->
 <a href="#main-content" class="skip-link">Skip to Content</a>
 
 <BackgroundGenerationPoller />
 
-<div class="fixed grid h-full w-screen grid-cols-1 grid-rows-[auto,1fr] overflow-hidden text-smd">
-
-	<MobileNav>
-		<NavMenu {conversations} user={data.user} />
-	</MobileNav>
-
-	<nav class="max-md:hidden">
-		<NavMenu {conversations} user={data.user} />
+<div class="fixed flex h-full w-screen overflow-hidden text-smd">
+	<nav
+		class="h-full border-r border-gray-200 bg-[var(--sidebar-bg)] transition-all duration-300 dark:border-gray-800 max-md:hidden"
+		style="width: {isNavCollapsed ? '0px' : '280px'}; opacity: {isNavCollapsed ? 0 : 1}; transform: translateX({isNavCollapsed ? '-280px' : '0px'})"
+	>
+		<div class="h-full w-[280px]">
+			<NavMenu {conversations} user={data.user} />
+		</div>
 	</nav>
 
-	{#if currentError}
-		<Toast message={currentError} />
-	{/if}
+	<div class="relative flex h-full flex-1 flex-col overflow-hidden bg-[var(--page-bg)]">
+		<MobileNav>
+			<NavMenu {conversations} user={data.user} />
+		</MobileNav>
 
-	<!-- ✅ MAIN WRAPPER ADDED -->
-	<main id="main-content" class="contents">
-		{@render children?.()}
-	</main>
+		<ExpandNavigation
+			isCollapsed={isNavCollapsed}
+			onClick={() => (isNavCollapsed = !isNavCollapsed)}
+			classNames="absolute left-0 top-1/2 -translate-y-1/2 z-20"
+		/>
 
-	<Footer />
+		{#if currentError}
+			<Toast message={currentError} />
+		{/if}
+
+		<main id="main-content" class="relative min-h-0 flex-1 overflow-hidden">
+			{@render children?.()}
+		</main>
+
+		<Footer />
+	</div>
 </div>
 
-<!-- ✅ ACCESSIBILITY STYLES -->
+
 <style>
 .skip-link {
 	position: absolute;

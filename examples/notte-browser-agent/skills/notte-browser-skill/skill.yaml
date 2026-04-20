@@ -1,0 +1,76 @@
+id: notte-browser-skill
+name: notte-browser-skill
+version: 1.0.0
+author: bindu.builder@getbindu.com
+description: |
+  Real-browser automation skill powered by Notte. Navigates JavaScript-rendered
+  pages, fills forms, clicks through multi-step flows, solves captchas, and
+  routes through proxies. Use whenever the task needs a real browser (not just
+  HTTP) — dynamic pages, e-commerce flows, or extraction from pages that won't
+  respond to `requests` / `curl`.
+
+tags:
+  - browser-automation
+  - web-agent
+  - web-scraping
+  - form-filling
+  - captcha
+  - proxies
+
+input_modes:
+  - application/json
+
+output_modes:
+  - application/json
+  - text/plain
+
+examples:
+  - "Go to news.ycombinator.com and return the top 5 posts as JSON with title, url, points, author"
+  - "Search 'air force 1' on nike.com, solve any captcha, and return the current price and availability"
+  - "Fill the contact form at https://example.com/contact with name=Jane, email=jane@ex.com, submit, and confirm the success state"
+
+capabilities_detail:
+  real_browser:
+    supported: true
+    description: "Runs a Chromium-based Notte cloud session — JavaScript renders, forms submit, cookies persist. Local or alternate-browser runtimes require passing cdp_url / extra params to client.Session()."
+  multi_step_workflows:
+    supported: true
+    description: "Natural-language task routed through a Notte agent with configurable max_steps and reasoning_model"
+  captcha_solving:
+    supported: true
+    description: "Set NOTTE_SOLVE_CAPTCHAS=true to enable automatic captcha resolution on the Session"
+  proxies:
+    supported: true
+    description: "Set NOTTE_USE_PROXIES=true to route traffic through Notte's managed proxies"
+
+assessment:
+  keywords:
+    - browser
+    - navigate
+    - click
+    - fill
+    - form
+    - login
+    - captcha
+    - proxy
+    - dynamic
+    - javascript
+    - spa
+    - multi-step
+    - checkout
+    - booking
+
+  specializations:
+    - domain: dynamic_page_extraction
+      confidence_boost: 0.3
+    - domain: multi_step_web_workflows
+      confidence_boost: 0.3
+    - domain: e_commerce_checkout
+      confidence_boost: 0.25
+
+  anti_patterns:
+    - "static html fetch"
+    - "public json api"
+    - "offline file processing"
+    - "pdf text extraction without a browser"
+    - "database query"

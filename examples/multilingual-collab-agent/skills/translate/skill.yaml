@@ -1,0 +1,144 @@
+id: translate-v1
+name: translate
+version: 1.0.0
+author: dassubhojit750075@gmail.com
+
+description: |
+  Translates text between English, Hindi, and Bengali while preserving
+  meaning, tone, and context. Handles technical terms, colloquial expressions,
+  and formal documents. Uses an LLM for high-quality natural translations.
+
+tags:
+  - translate
+  - multilingual
+  - english
+  - hindi
+  - bengali
+  - language
+
+input_modes:
+  - text/plain
+  - application/json
+
+output_modes:
+  - text/plain
+  - application/json
+
+examples:
+  - "Translate to Hindi: The Bindu framework enables agent communication"
+  - "हिंदी से अंग्रेजी में अनुवाद करें: एजेंट संचार"
+  - "Translate to Bengali: Internet of Agents"
+  - "বাংলায় অনুবাদ করুন: decentralized identity"
+  - "Translate this email to Hindi"
+
+capabilities_detail:
+  text_translation:
+    supported: true
+    description: "Translate text between English, Hindi, and Bengali"
+    features:
+      - "English ↔ Hindi translation"
+      - "English ↔ Bengali translation"
+      - "Hindi ↔ Bengali translation"
+      - "Preserves meaning, tone, and cultural context"
+      - "Handles technical terminology with explanations"
+      - "Supports formal and informal registers"
+    limitations: "Currently supports EN, HI, BN only. Other languages not supported."
+
+  technical_translation:
+    supported: true
+    description: "Translate technical content with context-aware term handling"
+    features:
+      - "Keeps untranslatable technical terms in original with explanation"
+      - "Handles code snippets — translates comments, keeps code intact"
+      - "Translates UI strings and error messages"
+
+requirements:
+  packages:
+    - "agno>=2.5.2"
+  system: []
+  min_memory_mb: 128
+
+performance:
+  avg_processing_time_ms: 2000
+  max_concurrent_requests: 10
+  memory_per_request_mb: 64
+  scalability: horizontal
+
+allowed_tools:
+  - Read
+
+documentation:
+  overview: |
+    The translate skill provides high-quality translation between English,
+    Hindi, and Bengali using an LLM backend via OpenRouter. Unlike rule-based
+    translators, it understands context and produces natural-sounding output.
+
+    Particularly useful for technical content about Bindu and AI agents where
+    standard translators produce poor results for domain-specific terms.
+
+  use_cases:
+    when_to_use:
+      - "User provides text and asks to translate to a specific language"
+      - "User writes in one language and wants output in another"
+      - "Translating documentation or README files"
+      - "Translating technical terms for non-English speakers"
+
+    when_not_to_use:
+      - "User wants to research a topic — use research skill instead"
+      - "Languages outside EN/HI/BN requested"
+      - "Real-time speech translation (text only)"
+
+  input_structure: |
+    Text with explicit translation instruction.
+
+    Examples:
+      "Translate to Hindi: [text]"
+      "हिंदी में अनुवाद करें: [text]"
+      "বাংলায় অনুবাদ করুন: [text]"
+      "Translate this to English: [text in any language]"
+
+  output_format: |
+    Translated text in the target language.
+    For technical terms without direct translation:
+      Original term kept + brief explanation in target language.
+
+  error_handling:
+    - "Unsupported language requested: informs user of supported languages (EN/HI/BN)"
+    - "Ambiguous source language: asks for clarification"
+    - "Very long text: processes in chunks and combines output"
+
+assessment:
+  keywords:
+    - "translate"
+    - "translation"
+    - "अनुवाद"
+    - "অনুবাদ"
+    - "in hindi"
+    - "in bengali"
+    - "in english"
+    - "हिंदी में"
+    - "বাংলায়"
+    - "convert language"
+
+  specializations:
+    - domain: "technical-translation"
+      confidence_boost: 0.3
+    - domain: "document-translation"
+      confidence_boost: 0.25
+
+  anti_patterns:
+    - "search for"
+    - "research"
+    - "what is"
+    - "find information"
+
+  complexity_indicators:
+    simple:
+      - "Translate one sentence"
+      - "What does X mean in Hindi?"
+    medium:
+      - "Translate this paragraph"
+      - "Translate this email"
+    complex:
+      - "Translate this technical document"
+      - "Translate with cultural adaptation"
