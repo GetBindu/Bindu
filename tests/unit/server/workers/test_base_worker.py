@@ -2,7 +2,7 @@
 
 import pytest
 import pytest_asyncio
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 from bindu.server.workers.manifest_worker import ManifestWorker
@@ -135,7 +135,9 @@ class TestHandleResume:
         mock_worker.scheduler.run_task.assert_called_once()
         # Verify run_task was called (message may be None or passed positionally)
         call_args = mock_worker.scheduler.run_task.call_args[0]
-        assert len(call_args) == 1  # Called with one positional argument (TaskSendParams)
+        assert (
+            len(call_args) == 1
+        )  # Called with one positional argument (TaskSendParams)
 
     @pytest.mark.asyncio
     async def test_resume_task_with_metadata(self, mock_worker, task_id):
@@ -147,7 +149,10 @@ class TestHandleResume:
             return_value={
                 "id": task_id,
                 "status": {"state": "suspended"},
-                "metadata": {"original_key": "original_value", "paused_at": "2024-01-01T00:00:00"},
+                "metadata": {
+                    "original_key": "original_value",
+                    "paused_at": "2024-01-01T00:00:00",
+                },
                 "context_id": context_id,
                 "history": [history_message],
             }

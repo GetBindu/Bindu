@@ -76,9 +76,9 @@ class TestCapabilityUtilities:
 
     def test_add_extension_with_non_dict_capabilities(self):
         """Test adding extension when capabilities is not a dict."""
-        from bindu.common.protocol.types import AgentCapabilities
 
         extension = "https://example.com/ext"
+
         # AgentCapabilities is a TypedDict which at runtime is a dict,
         # but we can test the edge case by passing something else
         # Actually this case won't happen in practice since TypedDict IS a dict

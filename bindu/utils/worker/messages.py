@@ -63,14 +63,14 @@ class FileInterceptor:
                 continue
 
             mime_type = part.get("mimeType", "")
-            base64_data = str(part.get("data", ""))
+            base64_data = part.get("data", "")
 
             if mime_type not in cls.SUPPORTED_MIME_TYPES:
                 logger.warning(f"Unsupported MIME type rejected: {mime_type}")
                 processed_parts.append(
                     {
                         "kind": "text",
-                        "text": f"[Unsupported file type: {mime_type}]",
+                        "text": f"[System: User uploaded an unsupported file format ({mime_type})]",
                     }
                 )
                 continue

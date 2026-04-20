@@ -210,9 +210,19 @@ class TestTaskHandlers:
         mock_storage = AsyncMock()
         mock_task = {"id": "task123", "status": {"state": "working"}}
         mock_storage.load_task.return_value = mock_task
+        mock_storage.get_task_owner.return_value = (
+            None  # Dev-mode: owner=None matches caller_did=None
+        )
         mock_scheduler = AsyncMock()
+        mock_error_creator = Mock(
+            return_value={"jsonrpc": "2.0", "id": "10", "error": {}}
+        )
 
-        handler = TaskHandlers(scheduler=mock_scheduler, storage=mock_storage)
+        handler = TaskHandlers(
+            scheduler=mock_scheduler,
+            storage=mock_storage,
+            error_response_creator=mock_error_creator,
+        )
         request = {"jsonrpc": "2.0", "id": "10", "params": {"task_id": "task123"}}
 
         response = await handler.cancel_task(request)

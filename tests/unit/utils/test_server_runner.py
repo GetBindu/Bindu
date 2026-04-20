@@ -1,8 +1,6 @@
 """Tests for server runner utilities."""
 
-import pytest
 from unittest.mock import patch, MagicMock
-import threading
 
 
 class TestServerRunner:
