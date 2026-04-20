@@ -104,7 +104,8 @@ Specifically, the underlying [x402 package](https://github.com/coinbase/x402) ha
 
 **What this means right now:**
 * The Bindu-side structure is ready: You can define `execution_cost` as a list of options.
-* You must currently restrict the `network` values to those natively supported by the upstream `x402` package (e.g., `base`, `base-sepolia`, `ethereum`, `polygon`).
+* You must currently restrict the `network` values to networks that are both supported by the upstream `x402` package **and** configured with RPC URLs in Bindu. With the default Bindu configuration, that means using networks such as `base`, `base-sepolia`, or `ethereum`.
+* Other `x402`-supported networks may require additional Bindu configuration before they work. For example, `polygon` will require adding RPC URLs in Bindu first; otherwise verification can fail at runtime with errors such as `No RPC URLs configured for network`.
 * We are currently tracking this and deciding whether to wait for upstream `x402` updates or implement a local runtime patch to inject SKALE network definitions directly into the `x402` module footprint.
 
 ## Setup for Testing
