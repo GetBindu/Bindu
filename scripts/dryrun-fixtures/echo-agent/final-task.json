@@ -1,0 +1,53 @@
+{
+  "id": "ef6cb76c-65ff-4e36-833c-345e9d7c75df",
+  "context_id": "365cbee3-f502-41da-afb4-32d75009ac38",
+  "kind": "task",
+  "status": {
+    "state": "completed",
+    "timestamp": "2026-04-17T18:10:44.710903+00:00"
+  },
+  "history": [
+    {
+      "message_id": "1f0a6b5c-e8f7-4be3-811a-c096b8f8960b",
+      "context_id": "365cbee3-f502-41da-afb4-32d75009ac38",
+      "task_id": "ef6cb76c-65ff-4e36-833c-345e9d7c75df",
+      "kind": "message",
+      "parts": [
+        {
+          "kind": "text",
+          "text": "hello from dry-run"
+        }
+      ],
+      "role": "user",
+      "metadata": {}
+    },
+    {
+      "role": "agent",
+      "parts": [
+        {
+          "kind": "text",
+          "text": "hello from dry-run"
+        }
+      ],
+      "kind": "message",
+      "message_id": "4eb45672-46a2-4c19-bc8b-0a5235aff28b",
+      "task_id": "ef6cb76c-65ff-4e36-833c-345e9d7c75df",
+      "context_id": "365cbee3-f502-41da-afb4-32d75009ac38"
+    }
+  ],
+  "artifacts": [
+    {
+      "artifact_id": "d2253c92-a11f-48a5-bb8b-c45ddb467a98",
+      "name": "result",
+      "parts": [
+        {
+          "kind": "text",
+          "text": "hello from dry-run",
+          "metadata": {
+            "did.message.signature": "5kyvg2qwU2xCSSGYrkEYQLF3N48mPVfRJQhSGvmomFXs3GzEZuzu9TWuiH8XEa1p3HTqorK1oMTPAN3dSpa4KtXs"
+          }
+        }
+      ]
+    }
+  ]
+}

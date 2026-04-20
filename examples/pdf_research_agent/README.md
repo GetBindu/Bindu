@@ -39,7 +39,7 @@ pip install bindu agno pypdf python-dotenv
 echo "OPENROUTER_API_KEY=your_api_key_here" > .env
 
 # Or export directly
-export OPENROUTER_API_KEY="your_api_key_here"
+export OPENROUTER_API_KEY="your_api_key_here"  # pragma: allowlist secret
 ```
 
 ## 🎯 Usage
@@ -268,7 +268,7 @@ uv add pypdf
 
 #### "OPENROUTER_API_KEY not set"
 ```bash
-export OPENROUTER_API_KEY="your_api_key_here"
+export OPENROUTER_API_KEY="your_api_key_here"  # pragma: allowlist secret
 ```
 
 #### "Port 3773 already in use"

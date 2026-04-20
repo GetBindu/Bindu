@@ -194,4 +194,4 @@ def test_bindufy_non_callable_handler_raises_clear_error():
         TypeError,
         match="callable function or coroutine function",
     ):
-        bindufy(config=config, handler="not_callable", run_server=False)
+        bindufy(config=config, handler="not_callable", run_server=False)  # type: ignore[arg-type]

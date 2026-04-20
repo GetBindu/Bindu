@@ -113,6 +113,22 @@ Migrations are located in `alembic/versions/`:
   - Creates `tasks`, `contexts`, and `task_feedback` tables
   - Adds indexes for performance
   - Sets up automatic `updated_at` triggers
+- `20260418_0001_add_owner_did.py` - Per-caller ownership tracking
+  - Adds a nullable `owner_did` column + index to `tasks` and
+    `contexts` so each row records the DID that created it.
+  - **Upgrade ordering matters** when enabling the A2A authorization
+    fix (see slug `idor-task-context-no-ownership-check` in
+    [`bugs/known-issues.md`](../bugs/known-issues.md)):
+    1. Run `alembic upgrade head` to add the nullable columns.
+    2. Run `python scripts/backfill_owner_did.py
+       --owner-did did:bindu:<your-legacy-owner>` to assign all
+       pre-existing rows to a designated owner — otherwise they
+       become inaccessible to authenticated callers after step 3.
+       Pass `--dry-run` first to count affected rows. If you run
+       per-DID schemas from the `create_bindu_tables_in_schema`
+       helper below, repeat once per schema with `--schema <name>`.
+    3. Deploy the code revision that enforces ownership on A2A
+       handlers. Reads/writes now filter by `owner_did`.
 
 ## Database Schema
 

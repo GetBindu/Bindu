@@ -11,8 +11,12 @@ from pathlib import Path
 import pytest
 
 # Path to the example file
-EXAMPLE_PATH = Path(__file__).parent.parent.parent / "examples" / "beginner" / "minimax_example.py"
-ENV_EXAMPLE_PATH = Path(__file__).parent.parent.parent / "examples" / "beginner" / ".env.example"
+EXAMPLE_PATH = (
+    Path(__file__).parent.parent.parent / "examples" / "beginner" / "minimax_example.py"
+)
+ENV_EXAMPLE_PATH = (
+    Path(__file__).parent.parent.parent / "examples" / "beginner" / ".env.example"
+)
 
 
 class TestMiniMaxExampleFile:
@@ -59,7 +63,7 @@ class TestMiniMaxExampleFile:
     def test_example_reads_api_key_from_env(self):
         """Verify the example reads MINIMAX_API_KEY from env."""
         source = EXAMPLE_PATH.read_text()
-        assert 'MINIMAX_API_KEY' in source
+        assert "MINIMAX_API_KEY" in source
         assert 'os.getenv("MINIMAX_API_KEY")' in source
 
     def test_example_has_config_dict(self):
@@ -162,12 +166,16 @@ class TestReadmeUpdates:
 
     def test_examples_readme_mentions_minimax(self):
         """Verify examples README lists the MiniMax example."""
-        readme = (Path(__file__).parent.parent.parent / "examples" / "README.md").read_text()
+        readme = (
+            Path(__file__).parent.parent.parent / "examples" / "README.md"
+        ).read_text()
         assert "minimax_example.py" in readme
 
     def test_examples_readme_mentions_minimax_env(self):
         """Verify examples README mentions MINIMAX_API_KEY in env vars."""
-        readme = (Path(__file__).parent.parent.parent / "examples" / "README.md").read_text()
+        readme = (
+            Path(__file__).parent.parent.parent / "examples" / "README.md"
+        ).read_text()
         assert "MINIMAX_API_KEY" in readme
 
 
@@ -184,6 +192,7 @@ class TestMiniMaxIntegration:
     def test_minimax_api_connection(self, api_key):
         """Test that MiniMax API is reachable with valid key."""
         import httpx
+
         resp = httpx.post(
             "https://api.minimax.io/v1/chat/completions",
             headers={
@@ -202,6 +211,7 @@ class TestMiniMaxIntegration:
     def test_minimax_chat_completion(self, api_key):
         """Test a simple chat completion via MiniMax API."""
         import httpx
+
         resp = httpx.post(
             "https://api.minimax.io/v1/chat/completions",
             headers={
@@ -223,6 +233,7 @@ class TestMiniMaxIntegration:
     def test_minimax_m27_highspeed_model(self, api_key):
         """Test that M2.7-highspeed model is also accessible."""
         import httpx
+
         resp = httpx.post(
             "https://api.minimax.io/v1/chat/completions",
             headers={

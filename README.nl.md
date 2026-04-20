@@ -26,9 +26,7 @@
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
   <a href="https://hits.sh/github.com/Saptha-me/Bindu.svg"><img src="https://hits.sh/github.com/Saptha-me/Bindu.svg" alt="Hits"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="Python Version"></a>
-  <a href="https://pepy.tech/projects/bindu"><img src="https://static.pepy.tech/personalized-badge/bindu?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads" alt="PyPI Downloads"></a>
   <a href="https://pypi.org/project/bindu/"><img src="https://img.shields.io/pypi/v/bindu.svg" alt="PyPI version"></a>
-  <a href="https://pypi.org/project/bindu/"><img src="https://img.shields.io/pypi/dm/bindu" alt="PyPI Downloads"></a>
   <a href="https://coveralls.io/github/Saptha-me/Bindu?branch=v0.3.18"><img src="https://coveralls.io/repos/github/Saptha-me/Bindu/badge.svg?branch=v0.3.18" alt="Coverage"></a>
   <a href="https://github.com/getbindu/Bindu/actions/workflows/release.yml"><img src="https://github.com/getbindu/Bindu/actions/workflows/release.yml/badge.svg" alt="Tests"></a>
   <a href="https://discord.gg/3w5zuYUuwt"><img src="https://img.shields.io/badge/Join%20Discord-7289DA?logo=discord&logoColor=white" alt="Discord"></a>
@@ -442,18 +440,18 @@ Uitvoer:
 ## 🚀 Kernfuncties
 | Kenmerk | Beschrijving | Documentatie |
 | :--- | :--- | :--- |
-| **Authenticatie** | Veilige API-toegang met Ory Hydra OAuth2 (optioneel voor ontwikkeling) | [Guide →](https://www.google.com/search?q=docs/AUTHENTICATION.md) |
-| 💰 **Betalingsintegratie (X402)** | Accepteer USDC-betalingen op de Base-blockchain voordat beschermde methoden worden uitgevoerd | [Guide →](https://www.google.com/search?q=docs/PAYMENT.md) |
-| 💾 **PostgreSQL Opslag** | Persistente opslag voor productie-implementaties (optioneel - InMemoryStorage standaard) | [Guide →](https://www.google.com/search?q=docs/STORAGE.md) |
-| 📋 **Redis Scheduler** | Gedistribueerde taakplanning voor multi-werknemersimplementaties (optioneel - InMemoryScheduler standaard) | [Guide →](https://www.google.com/search?q=docs/SCHEDULER.md) |
-| 🎯 **Vaardigheden Systeem** | Herbruikbare mogelijkheden die agenten adverteren en uitvoeren voor intelligente taakroutering | [Guide →](https://www.google.com/search?q=docs/SKILLS.md) |
-| 🤝 **Agentonderhandeling** | Capaciteitsgebaseerde agentselectie voor intelligente orkestratie | [Guide →](https://www.google.com/search?q=docs/NEGOTIATION.md) |
-| 🌐 **Tunneling** | Lokale agenten blootstellen aan het internet voor testen (**alleen lokale ontwikkeling, niet voor productie**) | [Guide →](https://www.google.com/search?q=docs/TUNNELING.md) |
-| 📬 **Pushmeldingen** | Real-time webhookmeldingen voor taakupdates - geen polling vereist | [Guide →](https://www.google.com/search?q=docs/NOTIFICATIONS.md) |
-| 📊 **Observability & Monitoring** | Volg prestaties en debugproblemen met OpenTelemetry en Sentry | [Guide →](https://www.google.com/search?q=docs/OBSERVABILITY.md) |
-| 🔄 **Retry Mechanisme** | Automatische herhaling met exponentiële backoff voor veerkrachtige agenten | [Guide →](https://docs.getbindu.com/bindu/learn/retry/overview) |
-| 🔑 **Gedecentraliseerde Identifiers (DIDs)** | Cryptografische identiteit voor verifieerbare, veilige agentinteracties en betalingsintegratie | [Guide →](https://www.google.com/search?q=docs/DID.md) |
-| 🏥 **Gezondheidscontrole & Statistieken** | Monitor agentgezondheid en prestaties met ingebouwde eindpunten | [Guide →](https://www.google.com/search?q=docs/HEALTH_METRICS.md) |
+| **Authenticatie** | Veilige API-toegang met Ory Hydra OAuth2 (optioneel voor ontwikkeling) | [Guide →](docs/AUTHENTICATION.md) |
+| 💰 **Betalingsintegratie (X402)** | Accepteer USDC-betalingen op de Base-blockchain voordat beschermde methoden worden uitgevoerd | [Guide →](docs/PAYMENT.md) |
+| 💾 **PostgreSQL Opslag** | Persistente opslag voor productie-implementaties (optioneel - InMemoryStorage standaard) | [Guide →](docs/STORAGE.md) |
+| 📋 **Redis Scheduler** | Gedistribueerde taakplanning voor multi-werknemersimplementaties (optioneel - InMemoryScheduler standaard) | [Guide →](docs/SCHEDULER.md) |
+| 🎯 **Vaardigheden Systeem** | Herbruikbare mogelijkheden die agenten adverteren en uitvoeren voor intelligente taakroutering | [Guide →](docs/SKILLS.md) |
+| 🤝 **Agentonderhandeling** | Capaciteitsgebaseerde agentselectie voor intelligente orkestratie | [Guide →](docs/NEGOTIATION.md) |
+| 🌐 **Tunneling** | Lokale agenten blootstellen aan het internet voor testen (**alleen lokale ontwikkeling, niet voor productie**) | [Guide →](docs/TUNNELING.md) |
+| 📬 **Pushmeldingen** | Real-time webhookmeldingen voor taakupdates - geen polling vereist | [Guide →](docs/NOTIFICATIONS.md) |
+| 📊 **Observability & Monitoring** | Volg prestaties en debugproblemen met OpenTelemetry en Sentry | [Guide →](docs/OBSERVABILITY.md) |
+| 🔄 **Retry Mechanisme** | Automatische herhaling met exponentiële backoff voor veerkrachtige agenten | [Guide →](docs.getbindu.com/bindu/learn/retry/overview) |
+| 🔑 **Gedecentraliseerde Identifiers (DIDs)** | Cryptografische identiteit voor verifieerbare, veilige agentinteracties en betalingsintegratie | [Guide →](docs/DID.md) |
+| 🏥 **Gezondheidscontrole & Statistieken** | Monitor agentgezondheid en prestaties met ingebouwde eindpunten | [Guide →](docs/HEALTH_METRICS.md) |
 
 ---
 

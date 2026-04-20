@@ -1,0 +1,62 @@
+{
+  "skills": [
+    {
+      "id": "question-answering-v1",
+      "name": "question-answering",
+      "description": "Provides intelligent question answering capabilities for general knowledge queries.\nUse when users ask factual questions, need explanations, or require information retrieval.\n",
+      "version": "1.0.0",
+      "tags": [
+        "qa",
+        "knowledge",
+        "reasoning",
+        "general"
+      ],
+      "input_modes": [
+        "text/plain",
+        "application/json"
+      ],
+      "output_modes": [
+        "text/plain",
+        "application/json"
+      ],
+      "examples": [
+        "What is photosynthesis?",
+        "How does a refrigerator work?",
+        "Why do we see different phases of the moon?",
+        "Explain quantum computing in simple terms",
+        "What's the difference between RNA and DNA?"
+      ],
+      "documentation_path": "beginner/skills/question-answering/skill.yaml"
+    },
+    {
+      "id": "pdf-processing-v1",
+      "name": "pdf-processing",
+      "description": "Extract text, fill forms, and extract tables from PDF documents.\nHandles both standard text-based PDFs and scanned documents with OCR.\n",
+      "version": "1.0.0",
+      "tags": [
+        "pdf",
+        "documents",
+        "extraction",
+        "forms",
+        "tables"
+      ],
+      "input_modes": [
+        "application/pdf"
+      ],
+      "output_modes": [
+        "text/plain",
+        "application/json",
+        "application/pdf"
+      ],
+      "examples": [
+        "Extract text from this PDF document",
+        "Fill out this PDF form with the provided data",
+        "Extract tables from this invoice PDF",
+        "Get text from this scanned document",
+        "Parse form fields from this PDF"
+      ],
+      "documentation_path": "beginner/skills/pdf-processing/skill.yaml"
+    }
+  ],
+  "total": 2
+}

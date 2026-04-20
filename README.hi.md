@@ -26,9 +26,7 @@
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
   <a href="https://hits.sh/github.com/Saptha-me/Bindu.svg"><img src="https://hits.sh/github.com/Saptha-me/Bindu.svg" alt="Hits"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="Python Version"></a>
-  <a href="https://pepy.tech/projects/bindu"><img src="https://static.pepy.tech/personalized-badge/bindu?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads" alt="PyPI Downloads"></a>
   <a href="https://pypi.org/project/bindu/"><img src="https://img.shields.io/pypi/v/bindu.svg" alt="PyPI version"></a>
-  <a href="https://pypi.org/project/bindu/"><img src="https://img.shields.io/pypi/dm/bindu" alt="PyPI Downloads"></a>
   <a href="https://coveralls.io/github/Saptha-me/Bindu?branch=v0.3.18"><img src="https://coveralls.io/repos/github/Saptha-me/Bindu/badge.svg?branch=v0.3.18" alt="Coverage"></a>
   <a href="https://github.com/getbindu/Bindu/actions/workflows/release.yml"><img src="https://github.com/getbindu/Bindu/actions/workflows/release.yml/badge.svg" alt="Tests"></a>
   <a href="https://discord.gg/3w5zuYUuwt"><img src="https://img.shields.io/badge/Join%20Discord-7289DA?logo=discord&logoColor=white" alt="Discord"></a>
@@ -443,18 +441,18 @@ curl --location 'http://localhost:3773/' \
 
 | Feature | Description | Documentation |
 | :--- | :--- | :--- |
-| **Authentication** | Ory Hydra OAuth2 के साथ सुरक्षित API पहुंच (विकास के लिए वैकल्पिक) | [Guide →](https://www.google.com/search?q=docs/AUTHENTICATION.md) |
-| 💰 **Payment Integration (X402)** | सुरक्षित विधियों को निष्पादित करने से पहले बेस ब्लॉकचेन पर USDC भुगतान स्वीकार करें | [Guide →](https://www.google.com/search?q=docs/PAYMENT.md) |
-| 💾 **PostgreSQL Storage** | उत्पादन तैनाती के लिए स्थायी भंडारण (वैकल्पिक - डिफ़ॉल्ट रूप से InMemoryStorage) | [Guide →](https://www.google.com/search?q=docs/STORAGE.md) |
-| 📋 **Redis Scheduler** | मल्टी-वर्कर तैनाती के लिए वितरित कार्य अनुसूची (वैकल्पिक - डिफ़ॉल्ट रूप से InMemoryScheduler) | [Guide →](https://www.google.com/search?q=docs/SCHEDULER.md) |
-| 🎯 **Skills System** | पुन: प्रयोज्य क्षमताएँ जो एजेंट विज्ञापन करते हैं और बुद्धिमान कार्य रूटिंग के लिए निष्पादित करते हैं | [Guide →](https://www.google.com/search?q=docs/SKILLS.md) |
-| 🤝 **Agent Negotiation** | बुद्धिमान समन्वय के लिए क्षमता-आधारित एजेंट चयन | [Guide →](https://www.google.com/search?q=docs/NEGOTIATION.md) |
-| 🌐 **Tunneling** | परीक्षण के लिए स्थानीय एजेंटों को इंटरनेट पर उजागर करें (**स्थानीय विकास के लिए ही, उत्पादन के लिए नहीं**) | [Guide →](https://www.google.com/search?q=docs/TUNNELING.md) |
-| 📬 **Push Notifications** | कार्य अपडेट के लिए वास्तविक समय वेबहुक सूचनाएँ - कोई पोलिंग आवश्यक नहीं | [Guide →](https://www.google.com/search?q=docs/NOTIFICATIONS.md) |
-| 📊 **Observability & Monitoring** | OpenTelemetry और Sentry के साथ प्रदर्शन को ट्रैक करें और समस्याओं को डिबग करें | [Guide →](https://www.google.com/search?q=docs/OBSERVABILITY.md) |
-| 🔄 **Retry Mechanism** | लचीले एजेंटों के लिए स्वचालित पुनः प्रयास के साथ गुणात्मक बैकऑफ | [Guide →](https://docs.getbindu.com/bindu/learn/retry/overview) |
-| 🔑 **Decentralized Identifiers (DIDs)** | सत्यापन योग्य, सुरक्षित एजेंट इंटरैक्शन और भुगतान एकीकरण के लिए क्रिप्टोग्राफिक पहचान | [Guide →](https://www.google.com/search?q=docs/DID.md) |
-| 🏥 **Health Check & Metrics** | अंतर्निहित एंडपॉइंट्स के साथ एजेंट के स्वास्थ्य और प्रदर्शन की निगरानी करें | [Guide →](https://www.google.com/search?q=docs/HEALTH_METRICS.md) |
+| **Authentication** | Ory Hydra OAuth2 के साथ सुरक्षित API पहुंच (विकास के लिए वैकल्पिक) | [Guide →](docs/AUTHENTICATION.md) |
+| 💰 **Payment Integration (X402)** | सुरक्षित विधियों को निष्पादित करने से पहले बेस ब्लॉकचेन पर USDC भुगतान स्वीकार करें | [Guide →](docs/PAYMENT.md) |
+| 💾 **PostgreSQL Storage** | उत्पादन तैनाती के लिए स्थायी भंडारण (वैकल्पिक - डिफ़ॉल्ट रूप से InMemoryStorage) | [Guide →](docs/STORAGE.md) |
+| 📋 **Redis Scheduler** | मल्टी-वर्कर तैनाती के लिए वितरित कार्य अनुसूची (वैकल्पिक - डिफ़ॉल्ट रूप से InMemoryScheduler) | [Guide →](docs/SCHEDULER.md) |
+| 🎯 **Skills System** | पुन: प्रयोज्य क्षमताएँ जो एजेंट विज्ञापन करते हैं और बुद्धिमान कार्य रूटिंग के लिए निष्पादित करते हैं | [Guide →](docs/SKILLS.md) |
+| 🤝 **Agent Negotiation** | बुद्धिमान समन्वय के लिए क्षमता-आधारित एजेंट चयन | [Guide →](docs/NEGOTIATION.md) |
+| 🌐 **Tunneling** | परीक्षण के लिए स्थानीय एजेंटों को इंटरनेट पर उजागर करें (**स्थानीय विकास के लिए ही, उत्पादन के लिए नहीं**) | [Guide →](docs/TUNNELING.md) |
+| 📬 **Push Notifications** | कार्य अपडेट के लिए वास्तविक समय वेबहुक सूचनाएँ - कोई पोलिंग आवश्यक नहीं | [Guide →](docs/NOTIFICATIONS.md) |
+| 📊 **Observability & Monitoring** | OpenTelemetry और Sentry के साथ प्रदर्शन को ट्रैक करें और समस्याओं को डिबग करें | [Guide →](docs/OBSERVABILITY.md) |
+| 🔄 **Retry Mechanism** | लचीले एजेंटों के लिए स्वचालित पुनः प्रयास के साथ गुणात्मक बैकऑफ | [Guide →](docs.getbindu.com/bindu/learn/retry/overview) |
+| 🔑 **Decentralized Identifiers (DIDs)** | सत्यापन योग्य, सुरक्षित एजेंट इंटरैक्शन और भुगतान एकीकरण के लिए क्रिप्टोग्राफिक पहचान | [Guide →](docs/DID.md) |
+| 🏥 **Health Check & Metrics** | अंतर्निर्मित एंडपॉइंट्स के साथ एजेंट के स्वास्थ्य और प्रदर्शन की निगरानी करें | [Guide →](docs/HEALTH_METRICS.md) |
 
 ---
 

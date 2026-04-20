@@ -1,0 +1,19 @@
+{
+  "name": "@bindu/dryrun",
+  "private": true,
+  "type": "module",
+  "description": "Phase 0 dry-run scripts for the Bindu Gateway. See gateway/plans/phase-0-dryrun.md.",
+  "scripts": {
+    "dryrun": "tsx bindu-dryrun.ts"
+  },
+  "dependencies": {
+    "@noble/ed25519": "^2.1.0",
+    "@noble/hashes": "^2.2.0",
+    "bs58": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.4.0"
+  }
+}

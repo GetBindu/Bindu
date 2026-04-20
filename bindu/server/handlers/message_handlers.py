@@ -23,6 +23,7 @@ from typing import Any
 from uuid import UUID
 
 from bindu.common.protocol.types import (
+    ContextNotFoundError,
     SendMessageRequest,
     SendMessageResponse,
     StreamMessageRequest,
@@ -36,6 +37,7 @@ from bindu.utils.task_telemetry import trace_task_operation, track_active_task
 
 from bindu.server.scheduler import Scheduler
 from bindu.server.storage import Storage
+from bindu.server.storage.base import OwnershipError
 
 logger = get_logger("bindu.server.handlers.message_handlers")
 
@@ -54,6 +56,7 @@ class MessageHandlers:
     workers: list[Any] | None = None
     context_id_parser: Any = None
     push_manager: Any | None = None
+    error_response_creator: Any = None
 
     async def _handle_stream_error(
         self,
@@ -113,13 +116,17 @@ class MessageHandlers:
         }
 
     async def _submit_and_schedule_task(
-        self, request_params: dict[str, Any]
+        self,
+        request_params: dict[str, Any],
+        caller_did: str | None = None,
     ) -> tuple[Task, UUID]:
         """Submit task to storage and schedule it with shared send/stream logic."""
         message = request_params["message"]
         context_id = self.context_id_parser(message.get("context_id"))
 
-        task: Task = await self.storage.submit_task(context_id, message)
+        task: Task = await self.storage.submit_task(
+            context_id, message, caller_did=caller_did
+        )
 
         scheduler_params: TaskSendParams = TaskSendParams(
             task_id=task["id"],
@@ -177,27 +184,63 @@ class MessageHandlers:
 
     @trace_task_operation("send_message")
     @track_active_task
-    async def send_message(self, request: SendMessageRequest) -> SendMessageResponse:
+    async def send_message(
+        self,
+        request: SendMessageRequest,
+        caller_did: str | None = None,
+    ) -> SendMessageResponse:
         """Send a message using the A2A protocol.
 
         Note: Payment enforcement is handled by X402Middleware before this method is called.
         If the request reaches here, payment has already been verified.
         Settlement will be handled by ManifestWorker when task completes.
+
+        ``caller_did`` is recorded as the task/context owner on creation. If
+        the referenced context exists with a different owner, storage raises
+        ``OwnershipError`` and this handler returns ``ContextNotFoundError``
+        — same error the client would get for a truly missing context, to
+        avoid leaking existence across tenants.
         """
-        task, _ = await self._submit_and_schedule_task(request["params"])
+        try:
+            task, _ = await self._submit_and_schedule_task(
+                request["params"], caller_did=caller_did
+            )
+        except OwnershipError:
+            return self.error_response_creator(
+                SendMessageResponse,
+                request["id"],
+                ContextNotFoundError,
+                "Context not found",
+            )
         return SendMessageResponse(jsonrpc="2.0", id=request["id"], result=task)
 
     @trace_task_operation("stream_message")
     @track_active_task
-    async def stream_message(self, request: StreamMessageRequest):
+    async def stream_message(
+        self,
+        request: StreamMessageRequest,
+        caller_did: str | None = None,
+    ):
         """Stream messages using Server-Sent Events.
 
         Uses the same submit + scheduler execution path as message/send to keep
-        lifecycle and error handling consistent.
+        lifecycle and error handling consistent. If the referenced context
+        belongs to a different caller, returns a plain JSON-RPC error response
+        (not an SSE stream) since the error occurs before any stream begins.
         """
         from starlette.responses import StreamingResponse
 
-        task, context_id = await self._submit_and_schedule_task(request["params"])
+        try:
+            task, context_id = await self._submit_and_schedule_task(
+                request["params"], caller_did=caller_did
+            )
+        except OwnershipError:
+            return self.error_response_creator(
+                SendMessageResponse,
+                request["id"],
+                ContextNotFoundError,
+                "Context not found",
+            )
 
         async def stream_generator():
             """Stream task status and artifact events from storage updates."""

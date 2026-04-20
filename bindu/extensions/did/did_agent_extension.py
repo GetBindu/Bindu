@@ -224,13 +224,17 @@ class DIDAgentExtension:
             self.public_key_path.write_bytes(public_pem)
         else:
             # POSIX: use os.open to set permissions atomically on creation
-            fd = os.open(str(self.private_key_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            fd = os.open(
+                str(self.private_key_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600
+            )
             with os.fdopen(fd, "wb") as f:
                 f.write(private_pem)
 
-            fd = os.open(str(self.public_key_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644)
+            fd = os.open(
+                str(self.public_key_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644
+            )
             with os.fdopen(fd, "wb") as f:
-                f.write(public_pem)    
+                f.write(public_pem)
 
         return {
             "private_key_path": str(self.private_key_path),

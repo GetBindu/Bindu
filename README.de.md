@@ -26,9 +26,7 @@
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
   <a href="https://hits.sh/github.com/Saptha-me/Bindu.svg"><img src="https://hits.sh/github.com/Saptha-me/Bindu.svg" alt="Hits"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="Python Version"></a>
-  <a href="https://pepy.tech/projects/bindu"><img src="https://static.pepy.tech/personalized-badge/bindu?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads" alt="PyPI Downloads"></a>
   <a href="https://pypi.org/project/bindu/"><img src="https://img.shields.io/pypi/v/bindu.svg" alt="PyPI version"></a>
-  <a href="https://pypi.org/project/bindu/"><img src="https://img.shields.io/pypi/dm/bindu" alt="PyPI Downloads"></a>
   <a href="https://coveralls.io/github/Saptha-me/Bindu?branch=v0.3.18"><img src="https://coveralls.io/repos/github/Saptha-me/Bindu/badge.svg?branch=v0.3.18" alt="Coverage"></a>
   <a href="https://github.com/getbindu/Bindu/actions/workflows/release.yml"><img src="https://github.com/getbindu/Bindu/actions/workflows/release.yml/badge.svg" alt="Tests"></a>
   <a href="https://discord.gg/3w5zuYUuwt"><img src="https://img.shields.io/badge/Join%20Discord-7289DA?logo=discord&logoColor=white" alt="Discord"></a>
@@ -442,18 +440,18 @@ Ausgabe:
 ## 🚀 Kernfunktionen
 | Feature | Beschreibung | Dokumentation |
 | :--- | :--- | :--- |
-| **Authentifizierung** | Sicherer API-Zugriff mit Ory Hydra OAuth2 (optional für die Entwicklung) | [Guide →](https://www.google.com/search?q=docs/AUTHENTICATION.md) |
-| 💰 **Zahlungsintegration (X402)** | Akzeptieren Sie USDC-Zahlungen auf der Base-Blockchain, bevor geschützte Methoden ausgeführt werden | [Guide →](https://www.google.com/search?q=docs/PAYMENT.md) |
-| 💾 **PostgreSQL-Speicher** | Persistenter Speicher für Produktionsbereitstellungen (optional - InMemoryStorage standardmäßig) | [Guide →](https://www.google.com/search?q=docs/STORAGE.md) |
-| 📋 **Redis-Planer** | Verteilte Aufgabenplanung für Multi-Worker-Bereitstellungen (optional - InMemoryScheduler standardmäßig) | [Guide →](https://www.google.com/search?q=docs/SCHEDULER.md) |
-| 🎯 **Fähigkeitssystem** | Wiederverwendbare Fähigkeiten, die Agenten für intelligentes Aufgabenrouting bewerben und ausführen | [Guide →](https://www.google.com/search?q=docs/SKILLS.md) |
-| 🤝 **Agentenverhandlung** | Fähigkeitsbasierte Agentenauswahl für intelligente Orchestrierung | [Guide →](https://www.google.com/search?q=docs/NEGOTIATION.md) |
-| 🌐 **Tunneling** | Lokale Agenten für Tests im Internet verfügbar machen (**nur lokale Entwicklung, nicht für die Produktion**) | [Guide →](https://www.google.com/search?q=docs/TUNNELING.md) |
-| 📬 **Push-Benachrichtigungen** | Echtzeit-Webhooks für Aufgabenaktualisierungen - kein Polling erforderlich | [Guide →](https://www.google.com/search?q=docs/NOTIFICATIONS.md) |
-| 📊 **Beobachtbarkeit & Überwachung** | Verfolgen Sie die Leistung und debuggen Sie Probleme mit OpenTelemetry und Sentry | [Guide →](https://www.google.com/search?q=docs/OBSERVABILITY.md) |
-| 🔄 **Wiederholungsmechanismus** | Automatische Wiederholung mit exponentiellem Backoff für resiliente Agenten | [Guide →](https://docs.getbindu.com/bindu/learn/retry/overview) |
-| 🔑 **Dezentrale Identifikatoren (DIDs)** | Kryptografische Identität für überprüfbare, sichere Agenteninteraktionen und Zahlungsintegration | [Guide →](https://www.google.com/search?q=docs/DID.md) |
-| 🏥 **Gesundheitsprüfung & Metriken** | Überwachen Sie die Gesundheit und Leistung von Agenten mit integrierten Endpunkten | [Guide →](https://www.google.com/search?q=docs/HEALTH_METRICS.md) |
+| **Authentifizierung** | Sicherer API-Zugriff mit Ory Hydra OAuth2 (optional für die Entwicklung) | [Guide →](docs/AUTHENTICATION.md) |
+| 💰 **Zahlungsintegration (X402)** | Akzeptieren Sie USDC-Zahlungen auf der Base-Blockchain, bevor geschützte Methoden ausgeführt werden | [Guide →](docs/PAYMENT.md) |
+| 💾 **PostgreSQL-Speicher** | Persistenter Speicher für Produktionsbereitstellungen (optional - InMemoryStorage standardmäßig) | [Guide →](docs/STORAGE.md) |
+| 📋 **Redis-Planer** | Verteilte Aufgabenplanung für Multi-Worker-Bereitstellungen (optional - InMemoryScheduler standardmäßig) | [Guide →](docs/SCHEDULER.md) |
+| 🎯 **Fähigkeitssystem** | Wiederverwendbare Fähigkeiten, die Agenten für intelligentes Aufgabenrouting bewerben und ausführen | [Guide →](docs/SKILLS.md) |
+| 🤝 **Agentenverhandlung** | Fähigkeitsbasierte Agentenauswahl für intelligente Orchestrierung | [Guide →](docs/NEGOTIATION.md) |
+| 🌐 **Tunneling** | Lokale Agenten für Tests im Internet verfügbar machen (**nur lokale Entwicklung, nicht für die Produktion**) | [Guide →](docs/TUNNELING.md) |
+| 📬 **Push-Benachrichtigungen** | Echtzeit-Webhooks für Aufgabenaktualisierungen - kein Polling erforderlich | [Guide →](docs/NOTIFICATIONS.md) |
+| 📊 **Beobachtbarkeit & Überwachung** | Verfolgen Sie die Leistung und debuggen Sie Probleme mit OpenTelemetry und Sentry | [Guide →](docs/OBSERVABILITY.md) |
+| 🔄 **Wiederholungsmechanismus** | Automatische Wiederholung mit exponentiellem Backoff für resiliente Agenten | [Guide →](docs.getbindu.com/bindu/learn/retry/overview) |
+| 🔑 **Dezentrale Identifikatoren (DIDs)** | Kryptografische Identität für überprüfbare, sichere Agenteninteraktionen und Zahlungsintegration | [Guide →](docs/DID.md) |
+| 🏥 **Gesundheitsprüfung & Metriken** | Überwachen Sie die Gesundheit und Leistung von Agenten mit integrierten Endpunkten | [Guide →](docs/HEALTH_METRICS.md) |
 
 ---
 

@@ -3,7 +3,7 @@ name: research-team-skill
 version: 1.0.0
 author: ag2-community
 description: |
-  Multi-agent research team powered by AG2 (formerly AutoGen) that 
+  Multi-agent research team powered by AG2 (formerly AutoGen) that
   produces comprehensive research reports through collaborative AI agents.
 
   This skill orchestrates three specialized agents:
@@ -133,7 +133,7 @@ assessment:
     - "file processing"
     - "database queries"
     - "code execution"
-    "live monitoring"
+    - "live monitoring"
 
   complexity_indicators:
     simple:

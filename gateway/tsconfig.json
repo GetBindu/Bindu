@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2023"],
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "verbatimModuleSyntax": false,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@opencode-ai/shared": ["./src/_shared/index.ts"],
+      "@opencode-ai/shared/*": ["./src/_shared/*.ts", "./src/_shared/*/index.ts", "./src/_shared/*"]
+    }
+  },
+  "include": ["src/**/*", "tests/**/*", "scripts/**/*"]
+}

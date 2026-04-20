@@ -145,6 +145,7 @@ async def agent_run_endpoint(app: BinduApplication, request: Request) -> Respons
             return auth_error
 
         # Permission checks (if authentication passed)
+        user_info = None
         if app_settings.auth.enabled:
             # Get user info from request state (set by auth middleware)
             user_info = getattr(request.state, "user", None)
@@ -173,6 +174,19 @@ async def agent_run_endpoint(app: BinduApplication, request: Request) -> Respons
                             403,
                         )
 
+        # Resolve the authenticated caller identity used for task/context
+        # ownership. ``client_id`` is the Hydra OAuth client — the same value
+        # used elsewhere in the auth middleware for DID matching. ``None``
+        # means auth is disabled or the caller has no client_id; rows created
+        # by such callers end up with ``owner_did=NULL`` and are accessible
+        # only to other unauthenticated callers once Phase 2 enforcement
+        # lands.
+        caller_did: str | None = None
+        if user_info is not None:
+            client_id = user_info.get("client_id")
+            if isinstance(client_id, str) and client_id:
+                caller_did = client_id
+
         handler_name = app_settings.agent.method_handlers.get(method)
         if handler_name is None:
             logger.warning(f"Unsupported A2A method '{method}' from {client_ip}")
@@ -186,7 +200,7 @@ async def agent_run_endpoint(app: BinduApplication, request: Request) -> Respons
         # Attach payment context to message metadata if available
         _attach_payment_context(request, a2a_request, method)
 
-        jsonrpc_response = await handler(a2a_request)
+        jsonrpc_response = await handler(a2a_request, caller_did=caller_did)
 
         logger.debug(f"A2A response to {client_ip}: method={method}, id={request_id}")
 

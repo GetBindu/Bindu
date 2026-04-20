@@ -20,7 +20,7 @@ medical_agent = Agent(
 # Define the Handler (The "Brain" Bindu calls)
 def medical_handler(messages: list[dict[str, str]]) -> str:
     """
-    Bindu passes a list of messages. 
+    Bindu passes a list of messages.
     We pass the latest message to Agno and return the string response.
     """
     user_query = messages[-1]["content"] if messages else ""

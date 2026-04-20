@@ -41,9 +41,9 @@
 		{#each sortedContexts as ctx (ctx.id)}
 			<button
 				type="button"
-				class="group relative flex flex-col gap-1 rounded-lg border transition-colors duration-150 px-2.5 py-2 text-left text-sm 
-				{ctx.id === activeContextId 
-					? 'border-slate-300 bg-white shadow-sm dark:border-white/15 dark:bg-white/10 dark:shadow-none' 
+				class="group relative flex flex-col gap-1 rounded-lg border transition-colors duration-150 px-2.5 py-2 text-left text-sm
+				{ctx.id === activeContextId
+					? 'border-slate-300 bg-white shadow-sm dark:border-white/15 dark:bg-white/10 dark:shadow-none'
 					: 'border-transparent hover:border-slate-200 hover:bg-slate-50 dark:hover:border-white/10 dark:hover:bg-white/5'}"
 				on:click={() => handleSwitchContext(ctx.id)}
 			>
