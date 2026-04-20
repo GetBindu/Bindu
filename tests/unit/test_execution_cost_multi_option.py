@@ -29,14 +29,14 @@ _SINGLE_COST = {
     "amount": "1000000",
     "token": "USDC",
     "network": "base-sepolia",
-    "pay_to_address": "0xABCDEF1234567890ABCDEF1234567890ABCDEF12",
+    "pay_to_address": "0xABCDEF1234567890ABCDEF1234567890ABCDEF12",  # pragma: allowlist secret
 }
 
 _COST_ETH = {
     "amount": "100000000000000",
     "token": "ETH",
     "network": "mainnet",
-    "pay_to_address": "0xABCDEF1234567890ABCDEF1234567890ABCDEF12",
+    "pay_to_address": "0xABCDEF1234567890ABCDEF1234567890ABCDEF12",  # pragma: allowlist secret
 }
 
 _BASE_CONFIG: dict[str, Any] = {
@@ -144,7 +144,7 @@ class TestX402AgentExtensionPaymentOptions:
             amount="1000000",
             token="USDC",
             network="base-sepolia",
-            pay_to_address="0xABCDEF1234567890ABCDEF1234567890ABCDEF12",
+            pay_to_address="0xABCDEF1234567890ABCDEF1234567890ABCDEF12",  # pragma: allowlist secret
         )
         assert ext.amount == "1000000"
         assert ext.payment_options is None
