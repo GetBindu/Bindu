@@ -100,7 +100,7 @@ on Ethereum to access the protected methods.
 
 While Bindu's `execution_cost` configuration fully supports multi-asset and multi-network arrays, direct support for the **SKALE network** is currently blocked by an upstream dependency.
 
-Specifically, the underlying [x402 package](https://github.com/coinbase/x402) handles network validation and chain/token mapping using a hardcoded `SupportedNetworks` list. If you attempt to pass a SKALE network (e.g., `"skale-europa"`) in your `execution_cost` array today, the upstream `process_price_to_atomic_amount` function will fail because it does not yet recognize SKALE's chain IDs or token contracts.
+Specifically, the underlying [x402 package](https://github.com/coinbase/x402) handles network validation and chain/token mapping using a hardcoded `SupportedNetworks` list. If you attempt to pass a SKALE network (e.g., `"skale-base"`) in your `execution_cost` array today, the upstream `process_price_to_atomic_amount` function will fail because it does not yet recognize SKALE's chain IDs or token contracts.
 
 **What this means right now:**
 * The Bindu-side structure is ready: You can define `execution_cost` as a list of options.
