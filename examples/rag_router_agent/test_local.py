@@ -1,9 +1,10 @@
 from agent import handler
 
-messages = [
-    {"role": "user", "content": "What is GST?"}
-]
 
-response = handler(messages)
+if __name__ == "__main__":
+    messages = [
+        {"role": "user", "content": "What is GST?"}
+    ]
 
-print(response)
+    response = handler(messages)
+    print(response)

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Charging for your agent
 
 You built something useful. People want to use it. Running it costs you
@@ -142,45 +143,51 @@ Same shape works for any other EVM chain — just add another entry to `extra_ne
 |---|---|---|
 | `https://x402.org/facilitator` *(default)* | Base, Solana, Algorand, Aptos, Stellar | Coinbase-operated. Solid. Doesn't know SKALE. |
 | `https://facilitator.x402.fi` | Base + Polygon + Ethereum + Avalanche + **5 SKALE chains** + Solana | Run by the x402.fi team. Currently has an expired TLS cert — see [`bugs/known-issues.md`](../bugs/known-issues.md) before using in production. |
+=======
+>>>>>>> 6a9d3dcf (fix: resolve remaining review issues (CI guard, payment handling, SKALE docs clarification))
 ## SKALE Integration Notes
 
-Bindu's current x402 flow is structured in a way that can support additional
-EVM-compatible payment networks through configuration and middleware reuse.
-However, direct SKALE support is not fully available yet because the current
-upstream `x402` package still restricts its own network validation and
-token/chain mappings to a limited set of networks, including:
+Bindu’s current x402 payment flow is architecturally compatible with additional
+EVM-based networks, including SKALE. The core payment middleware, RPC abstraction,
+and configuration model are already flexible enough to support such extensions.
 
-- `base`
-- `base-sepolia`
-- `avalanche`
-- `avalanche-fuji`
+However, direct SKALE support is not fully available yet due to facilitator
+compatibility and current integration gaps rather than limitations in the x402
+SDK itself.
 
-These upstream `x402` constraints are separate from Bindu's own runtime
-configuration, where RPC endpoint configuration can be defined independently.
+While x402 is designed to support EVM-compatible chains, the currently available
+facilitators and SDK configuration do not yet include:
+
+- SKALE network mappings
+- SKALE chain ID configuration
+- Token metadata (e.g., USDC contract on SKALE)
+
+This prevents end-to-end payment validation using SKALE in the current setup.
 
 ### What this means
 
-On the Bindu side, the payment middleware and RPC configuration model are
-already flexible enough for future network expansion. However, adding `skale`
-only in Bindu configuration is not sufficient yet, because the upstream `x402`
-dependency still needs:
+On the Bindu side:
+- The payment pipeline is already modular and extensible
+- RPC endpoints can be configured for new networks
+- No architectural changes are required to support SKALE
 
-- SKALE network definition in supported network validation
-- SKALE chain ID mapping
-- SKALE token metadata and default token address handling
+On the facilitator / SDK side:
+- Network definitions and mappings are not yet available
+- Facilitators do not yet expose SKALE-compatible endpoints
+- Full x402-compliant payment validation cannot be completed
 
 ### Safe integration path
 
-The safest path for SKALE support is:
+To properly support SKALE, the recommended approach is:
 
-1. Confirm or extend upstream `x402` support for SKALE.
-2. Add SKALE RPC endpoint configuration in Bindu.
-3. Add a minimal example for gasless x402 payments using SKALE.
-4. Validate the payment flow end-to-end against the supported SKALE
-   environment.
+1. Extend or confirm upstream x402 support for SKALE networks
+2. Add SKALE chain configuration (chain ID, RPC, token metadata)
+3. Integrate with a facilitator that supports SKALE
+4. Validate the full payment lifecycle (session → payment → verification)
 
-## Tips
+### Current Prototype Approach
 
+<<<<<<< HEAD
 To swap, set an environment variable:
 
 ```bash
@@ -210,8 +217,15 @@ from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
+=======
+Until full support is available, a safe prototype approach is:
+>>>>>>> 6a9d3dcf (fix: resolve remaining review issues (CI guard, payment handling, SKALE docs clarification))
 
+- Validate agent → facilitator connectivity
+- Simulate the x402 verification layer
+- Use facilitator reachability as a placeholder for payment validation
 
+<<<<<<< HEAD
 async def supported(request: Request) -> JSONResponse:
     # Tell Bindu which chains we 'support'.
     return JSONResponse({
@@ -532,3 +546,7 @@ If you want to read the actual implementation:
 * [Base documentation](https://docs.base.org/network-information) — what you'll be paying on by default.
 * [`docs/AUTHENTICATION.md`](./AUTHENTICATION.md) — payment endpoints need auth; this is how that works.
 * [`bugs/known-issues.md`](../bugs/known-issues.md) — current limitations (notably: the SKALE facilitator's expired cert).
+=======
+This allows end-to-end flow testing while keeping the system ready for
+proper x402 integration once upstream support is available.
+>>>>>>> 6a9d3dcf (fix: resolve remaining review issues (CI guard, payment handling, SKALE docs clarification))
