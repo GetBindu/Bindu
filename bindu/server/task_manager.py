@@ -280,13 +280,8 @@ class TaskManager:
         return await self._task_handlers.resume_task(request)
 
     async def task_feedback(self, request: TaskFeedbackRequest) -> TaskFeedbackResponse:
-    async def task_feedback(
-        self,
-        request: TaskFeedbackRequest,
-        caller_did: str | None = None,
-    ) -> TaskFeedbackResponse:
-        """Submit feedback for a completed task."""
-        return await self._task_handlers.task_feedback(request, caller_did=caller_did)
+    """Submit feedback for a completed task."""
+    return await self._task_handlers.task_feedback(request)
 
     # Context handler methods
     async def list_contexts(
