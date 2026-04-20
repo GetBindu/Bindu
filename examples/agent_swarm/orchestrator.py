@@ -18,9 +18,10 @@ class Orchestrator:
         self.critic_agent = build_critic_agent()
         self.reflection_agent = build_reflection_agent()
 
-
     @staticmethod
-    def safe_json_loads(raw: str, fallback: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def safe_json_loads(
+        raw: str, fallback: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         try:
             raw = raw.strip()
 
@@ -41,7 +42,6 @@ class Orchestrator:
             print("Raw output (first 200 chars):", raw[:200])
             return fallback or {}
 
-
     @staticmethod
     def _extract_final_content(critic_output: str) -> str:
         """
@@ -55,7 +55,7 @@ class Orchestrator:
             "Final Version:",
             "Refined Version:",
             "Corrected Version:",
-            "Updated Version:"
+            "Updated Version:",
         ]
 
         for marker in markers:
@@ -64,13 +64,21 @@ class Orchestrator:
                 if len(parts) > 1:
                     return parts[1].strip()
 
-        lines = critic_output.split('\n')
+        lines = critic_output.split("\n")
 
         skip_keywords = [
-            'evaluation', 'criticism', 'critique', 'weakness',
-            'analysis', 'improvement:', 'constructive',
-            'here\'s a', 'here is a', 'refined version',
-            'suggested changes', 'issues found'
+            "evaluation",
+            "criticism",
+            "critique",
+            "weakness",
+            "analysis",
+            "improvement:",
+            "constructive",
+            "here's a",
+            "here is a",
+            "refined version",
+            "suggested changes",
+            "issues found",
         ]
 
         content_start = 0
@@ -87,12 +95,13 @@ class Orchestrator:
             else:
                 break
 
-        final_content = '\n'.join(lines[content_start:]).strip()
+        final_content = "\n".join(lines[content_start:]).strip()
 
         return final_content if final_content else critic_output
 
-
-    def safe_agent_call(self, agent, input_text: str, agent_name: str, retries: int = 2) -> str:
+    def safe_agent_call(
+        self, agent, input_text: str, agent_name: str, retries: int = 2
+    ) -> str:
         """
         Execute agent with retry + graceful fallback.
         """
@@ -116,21 +125,20 @@ class Orchestrator:
                     time.sleep(wait_time)
                     continue
 
-                print(f"   ⚠️ {agent_name} permanently failed, returning partial context.")
+                print(
+                    f"   ⚠️ {agent_name} permanently failed, returning partial context."
+                )
                 return input_text
-
 
     def run(self, query: str) -> str:
         MAX_SWARM_RETRIES = 2
 
         for swarm_attempt in range(MAX_SWARM_RETRIES + 1):
-            print(f"\n{'='*60}")
+            print(f"\n{'=' * 60}")
             print(f"🚀 Swarm Attempt {swarm_attempt + 1}/{MAX_SWARM_RETRIES + 1}")
-            print(f"{'='*60}")
+            print(f"{'=' * 60}")
 
-            plan_output = self.safe_agent_call(
-                self.planner_agent, query, "planner"
-            )
+            plan_output = self.safe_agent_call(self.planner_agent, query, "planner")
 
             plan = self.safe_json_loads(plan_output, fallback={"steps": []})
             steps = plan.get("steps", [])
@@ -144,7 +152,9 @@ class Orchestrator:
 
             print(f"\n📋 Execution Plan: {len(steps)} steps")
             for i, step in enumerate(steps, 1):
-                print(f"   {i}. {step.get('agent', 'unknown').upper()}: {step.get('task', 'N/A')[:80]}...")
+                print(
+                    f"   {i}. {step.get('agent', 'unknown').upper()}: {step.get('task', 'N/A')[:80]}..."
+                )
 
             context = query
 
@@ -156,9 +166,9 @@ class Orchestrator:
                     print(f"\n⚠️ Skipping invalid step: {step}")
                     continue
 
-                print(f"\n{'─'*60}")
+                print(f"\n{'─' * 60}")
                 print(f"⚡ Step {idx}/{len(steps)}: {agent_name.upper()}")
-                print(f"{'─'*60}")
+                print(f"{'─' * 60}")
 
                 if idx == 1:
                     agent_input = f"{task_instruction}\n\nQuery: {query}"
@@ -180,23 +190,24 @@ class Orchestrator:
                         self.critic_agent, agent_input, "critic"
                     )
                     context = self._extract_final_content(raw_critic_output)
-                    print(f"    🧹 Cleaned critic output (first 150 chars): {context[:150]}...")
+                    print(
+                        f"    🧹 Cleaned critic output (first 150 chars): {context[:150]}..."
+                    )
 
                 else:
                     print(f"⚠️ Unknown agent: {agent_name}")
                     continue
 
-            print(f"\n{'─'*60}")
+            print(f"\n{'─' * 60}")
             print("🧠 Reflection Phase")
-            print(f"{'─'*60}")
+            print(f"{'─' * 60}")
 
             reflection_output = self.safe_agent_call(
                 self.reflection_agent, context, "reflection"
             )
 
             feedback = self.safe_json_loads(
-                reflection_output,
-                fallback={"quality": "unknown", "fix_strategy": ""}
+                reflection_output, fallback={"quality": "unknown", "fix_strategy": ""}
             )
 
             quality = feedback.get("quality", "unknown")
@@ -208,9 +219,9 @@ class Orchestrator:
                 print(f"⚠️ Issues found: {', '.join(issues)}")
 
             if quality == "good":
-                print("\n" + "="*60)
+                print("\n" + "=" * 60)
                 print("✅ Output validated by reflection agent - SUCCESS!")
-                print("="*60)
+                print("=" * 60)
                 return context
 
             print("\n⚠️ Output needs improvement")
@@ -218,7 +229,9 @@ class Orchestrator:
                 print(f"🔧 Fix Strategy: {fix_strategy}")
 
             if swarm_attempt < MAX_SWARM_RETRIES:
-                print(f"\n🔄 Preparing retry {swarm_attempt + 2}/{MAX_SWARM_RETRIES + 1}...")
+                print(
+                    f"\n🔄 Preparing retry {swarm_attempt + 2}/{MAX_SWARM_RETRIES + 1}..."
+                )
                 query = f"""
 Improve the following answer using this strategy:
 
@@ -230,7 +243,7 @@ Answer:
             else:
                 print("\n⚠️ Max retries reached - returning best available output")
 
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("⚠️ Swarm completed with warnings - returning final context")
-        print("="*60)
+        print("=" * 60)
         return context

@@ -88,9 +88,7 @@ def handler(messages: list[dict[str, str]]):
         llm_config=llm_config,
     )
 
-    user = ConversableAgent(
-        name="user", human_input_mode="NEVER"
-    )
+    user = ConversableAgent(name="user", human_input_mode="NEVER")
 
     pattern = AutoPattern(
         initial_agent=researcher,

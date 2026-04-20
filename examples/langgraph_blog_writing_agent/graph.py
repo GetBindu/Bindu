@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import operator
 
-from typing import TypedDict, List, Annotated, Literal,Optional
+from typing import TypedDict, List, Annotated, Literal, Optional
 
 from pydantic import BaseModel, Field
 from langgraph.graph import StateGraph, START, END
@@ -11,7 +11,9 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 from dotenv import load_dotenv
 import os
+
 load_dotenv()
+
 
 class Task(BaseModel):
     id: int
@@ -45,6 +47,7 @@ class Plan(BaseModel):
     tone: str = Field(..., description="Writing tone (e.g., practical, crisp).")
     tasks: List[Task]
 
+
 class State(TypedDict):
     topic: str
     plan: Optional[Plan]
@@ -57,6 +60,7 @@ llm = ChatOpenAI(
     openai_api_key=os.getenv("OPENROUTER_API_KEY"),
     openai_api_base="https://openrouter.ai/api/v1",
 )
+
 
 def orchestrator(state: State) -> dict:
     planner = llm.with_structured_output(Plan)
@@ -102,6 +106,7 @@ def orchestrator(state: State) -> dict:
 
     return {"plan": plan}
 
+
 def fanout(state: State):
     return [
         Send(
@@ -110,6 +115,7 @@ def fanout(state: State):
         )
         for task in state["plan"].tasks
     ]
+
 
 def worker(payload: dict) -> dict:
 
@@ -122,31 +128,30 @@ def worker(payload: dict) -> dict:
     section_md = llm.invoke(
         [
             SystemMessage(
-    content=(
-        "You are a senior technical writer and developer advocate. Write ONE section of a technical blog post in Markdown.\n\n"
-        "Hard constraints:\n"
-        "- Follow the provided Goal and cover ALL Bullets in order (do not skip or merge bullets).\n"
-        "- Stay close to the Target words (±15%).\n"
-        "- Output ONLY the section content in Markdown (no blog title H1, no extra commentary).\n\n"
-        "Technical quality bar:\n"
-        "- Be precise and implementation-oriented (developers should be able to apply it).\n"
-        "- Prefer concrete details over abstractions: APIs, data structures, protocols, and exact terms.\n"
-        "- When relevant, include at least one of:\n"
-        "  * a small code snippet (minimal, correct, and idiomatic)\n"
-        "  * a tiny example input/output\n"
-        "  * a checklist of steps\n"
-        "  * a diagram described in text (e.g., 'Flow: A -> B -> C')\n"
-        "- Explain trade-offs briefly (performance, cost, complexity, reliability).\n"
-        "- Call out edge cases / failure modes and what to do about them.\n"
-        "- If you mention a best practice, add the 'why' in one sentence.\n\n"
-        "Markdown style:\n"
-        "- Start with a '## <Section Title>' heading.\n"
-        "- Use short paragraphs, bullet lists where helpful, and code fences for code.\n"
-        "- Avoid fluff. Avoid marketing language.\n"
-        "- If you include code, keep it focused on the bullet being addressed.\n"
-    )
-)
-,
+                content=(
+                    "You are a senior technical writer and developer advocate. Write ONE section of a technical blog post in Markdown.\n\n"
+                    "Hard constraints:\n"
+                    "- Follow the provided Goal and cover ALL Bullets in order (do not skip or merge bullets).\n"
+                    "- Stay close to the Target words (±15%).\n"
+                    "- Output ONLY the section content in Markdown (no blog title H1, no extra commentary).\n\n"
+                    "Technical quality bar:\n"
+                    "- Be precise and implementation-oriented (developers should be able to apply it).\n"
+                    "- Prefer concrete details over abstractions: APIs, data structures, protocols, and exact terms.\n"
+                    "- When relevant, include at least one of:\n"
+                    "  * a small code snippet (minimal, correct, and idiomatic)\n"
+                    "  * a tiny example input/output\n"
+                    "  * a checklist of steps\n"
+                    "  * a diagram described in text (e.g., 'Flow: A -> B -> C')\n"
+                    "- Explain trade-offs briefly (performance, cost, complexity, reliability).\n"
+                    "- Call out edge cases / failure modes and what to do about them.\n"
+                    "- If you mention a best practice, add the 'why' in one sentence.\n\n"
+                    "Markdown style:\n"
+                    "- Start with a '## <Section Title>' heading.\n"
+                    "- Use short paragraphs, bullet lists where helpful, and code fences for code.\n"
+                    "- Avoid fluff. Avoid marketing language.\n"
+                    "- If you include code, keep it focused on the bullet being addressed.\n"
+                )
+            ),
             HumanMessage(
                 content=(
                     f"Blog: {plan.blog_title}\n"
@@ -165,6 +170,7 @@ def worker(payload: dict) -> dict:
 
     return {"sections": [section_md]}
 
+
 def reducer(state: State) -> dict:
 
     title = state["plan"].blog_title
@@ -172,15 +178,15 @@ def reducer(state: State) -> dict:
 
     final_md = f"# {title}\n\n{body}\n"
 
-
-
     return {"final": final_md}
+
+
 # -----------------------------
 # 5) Graph
 # -----------------------------
 def build_graph():
 
-    g= StateGraph(State)
+    g = StateGraph(State)
     g.add_node("orchestrator", orchestrator)
     g.add_node("worker", worker)
     g.add_node("reducer", reducer)

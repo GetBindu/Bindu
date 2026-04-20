@@ -31,7 +31,7 @@ from agno.models.openrouter import OpenRouter
 
 # Initialize the medical research agent
 agent = Agent(
-    instructions="""You are a medical research assistant. When asked about health or medical topics, provide clear, accurate information with appropriate disclaimers. 
+    instructions="""You are a medical research assistant. When asked about health or medical topics, provide clear, accurate information with appropriate disclaimers.
 
 Key guidelines:
 - Always include a medical disclaimer stating this is not professional medical advice
@@ -48,11 +48,10 @@ Response format:
 - End with a clear medical disclaimer
 - Avoid showing multiple search results - synthesize information coherently""",
     model=OpenRouter(
-        id="google/gemini-2.0-flash-001",
-        api_key=os.getenv("OPENROUTER_API_KEY")
+        id="google/gemini-2.0-flash-001", api_key=os.getenv("OPENROUTER_API_KEY")
     ),
     tools=[DuckDuckGoTools()],
-    markdown=True
+    markdown=True,
 )
 
 # Agent configuration for Bindu
@@ -63,10 +62,11 @@ config = {
     "deployment": {
         "url": "http://localhost:3773",
         "expose": True,
-        "cors_origins": ["http://localhost:5173"]
+        "cors_origins": ["http://localhost:5173"],
     },
     "skills": ["skills/medical-research-skill"],
 }
+
 
 # Message handler function
 def handler(messages: list[dict[str, str]]):
@@ -81,20 +81,25 @@ def handler(messages: list[dict[str, str]]):
     """
     # Extract the latest user message
     if messages:
-        latest_message = messages[-1].get('content', '') if isinstance(messages[-1], dict) else str(messages[-1])
+        latest_message = (
+            messages[-1].get("content", "")
+            if isinstance(messages[-1], dict)
+            else str(messages[-1])
+        )
 
         # Run the agent with the latest message
         result = agent.run(input=latest_message)
 
         # Format the response to be cleaner
-        if hasattr(result, 'content'):
+        if hasattr(result, "content"):
             return result.content
-        elif hasattr(result, 'response'):
+        elif hasattr(result, "response"):
             return result.response
         else:
             return str(result)
 
     return "Please provide a health or medical question. Remember, I provide general information for educational purposes only."
+
 
 # Bindu-fy the agent - converts it to a discoverable, interoperable Bindu agent
 bindufy(config, handler)

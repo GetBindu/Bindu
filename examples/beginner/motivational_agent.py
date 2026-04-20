@@ -38,10 +38,7 @@ agent = Agent(
         "Draw inspiration from successful people, psychology, and proven motivational techniques. "
         "When users face specific challenges, provide actionable steps and encouragement."
     ),
-    model=OpenRouter(
-        id="openai/gpt-oss-120b",
-        api_key=os.getenv("OPENROUTER_API_KEY")
-    ),
+    model=OpenRouter(id="openai/gpt-oss-120b", api_key=os.getenv("OPENROUTER_API_KEY")),
     tools=[DuckDuckGoTools()],  # optional: for inspirational quotes and success stories
 )
 
@@ -54,10 +51,10 @@ config = {
     "name": "motivational_agent",
     "description": "A motivational coach agent for personal development and goal achievement",
     "deployment": {
-            "url": "http://localhost:3773",
-            "expose": True,
-            "cors_origins": ["http://localhost:5173"]
-        },
+        "url": "http://localhost:3773",
+        "expose": True,
+        "cors_origins": ["http://localhost:5173"],
+    },
     "skills": ["skills/question-answering", "skills/pdf-processing"],
 }
 

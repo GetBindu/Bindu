@@ -2,7 +2,8 @@ import os
 import traceback
 import pandas as pd
 import matplotlib
-matplotlib.use('Agg')
+
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
 from agno.agent import Agent
@@ -16,6 +17,7 @@ load_dotenv()
 # Custom Data Analyst Tools
 # -----------------------------
 
+
 def analyze_dataset(file_path: str) -> str:
     if not os.path.exists(file_path):
         return f"Error: File not found at {file_path}. Please provide a valid absolute path."
@@ -25,13 +27,16 @@ def analyze_dataset(file_path: str) -> str:
             f"Dataset Shape: {df.shape[0]} rows, {df.shape[1]} columns\n",
             "Columns and Data Types:\n" + str(df.dtypes) + "\n",
             "Missing Values:\n" + str(df.isnull().sum()) + "\n",
-            "Summary Statistics:\n" + df.describe(include='all').to_string()
+            "Summary Statistics:\n" + df.describe(include="all").to_string(),
         ]
         return "\n".join(info)
     except Exception as e:
         return f"Error analyzing dataset: {str(e)}"
 
-def generate_visualization(file_path: str, x_column: str, y_column: str, chart_type: str = "bar") -> str:
+
+def generate_visualization(
+    file_path: str, x_column: str, y_column: str, chart_type: str = "bar"
+) -> str:
     if not os.path.exists(file_path):
         return f"Error: File not found at {file_path}."
     try:
@@ -62,9 +67,11 @@ def generate_visualization(file_path: str, x_column: str, y_column: str, chart_t
     except Exception as e:
         return f"Error generating visualization: {str(e)}"
 
+
 # -----------------------------
 # Agent Handler
 # -----------------------------
+
 
 def handler(messages: list[dict]):
     print("\n[DEBUG] --- Handler Triggered! ---")
@@ -94,14 +101,15 @@ def handler(messages: list[dict]):
                 "You are an elite Data Scientist.",
                 "When a user provides a path to a CSV, use the 'analyze_dataset' tool to understand its structure.",
                 "Proactively use the 'generate_visualization' tool to create compelling charts.",
-                "Always format your final output as a highly structured analytical report using Markdown."
+                "Always format your final output as a highly structured analytical report using Markdown.",
             ],
             model=OpenRouter(
                 id="openai/gpt-oss-120b",
-                api_key=os.getenv("OPENROUTER_API_KEY"),), # Or whatever model you prefer!
+                api_key=os.getenv("OPENROUTER_API_KEY"),
+            ),  # Or whatever model you prefer!
             tools=[analyze_dataset, generate_visualization],
             markdown=True,
-            telemetry=False # Keep this to prevent Agno from fighting with Bindu's tracing
+            telemetry=False,  # Keep this to prevent Agno from fighting with Bindu's tracing
         )
 
         print("[DEBUG] Agent is analyzing the data...")
@@ -122,6 +130,7 @@ def handler(messages: list[dict]):
         traceback.print_exc()
         return [{"role": "assistant", "content": f"Agent crashed: {str(e)}"}]
 
+
 # -----------------------------
 # Bindu Configuration
 # -----------------------------
@@ -131,11 +140,11 @@ config = {
     "name": "AI Data Analysis Agent",
     "description": "An analytical agent that processes CSV data and generates visual charts.",
     "deployment": {
-            "url": "http://localhost:3773",
-            "expose": True,
-            "cors_origins": ["http://localhost:5173"]
-        },
-    "skills":["skills/ai-data-analysis-agent"],
+        "url": "http://localhost:3773",
+        "expose": True,
+        "cors_origins": ["http://localhost:5173"],
+    },
+    "skills": ["skills/ai-data-analysis-agent"],
 }
 
 if __name__ == "__main__":

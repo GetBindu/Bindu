@@ -35,10 +35,7 @@ agent = Agent(
         "Keep the tone light, playful, and human-like. "
         "If a topic is given, tailor the joke to that topic."
     ),
-    model=OpenRouter(
-        id="openai/gpt-oss-120b",
-        api_key=os.getenv("OPENROUTER_API_KEY")
-    ),
+    model=OpenRouter(id="openai/gpt-oss-120b", api_key=os.getenv("OPENROUTER_API_KEY")),
     tools=[DuckDuckGoTools()],  # optional: for topical or trending jokes
 )
 
@@ -51,10 +48,10 @@ config = {
     "name": "joke_agent",
     "description": "A research assistant agent",
     "deployment": {
-            "url": "http://localhost:3773",
-            "expose": True,
-            "cors_origins": ["http://localhost:5173"]
-        },
+        "url": "http://localhost:3773",
+        "expose": True,
+        "cors_origins": ["http://localhost:5173"],
+    },
     "skills": ["skills/question-answering", "skills/pdf-processing"],
 }
 

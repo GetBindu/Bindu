@@ -57,12 +57,11 @@ def handler(messages: list[dict[str, str]]):
         llm_config=llm_config,
     )
     user_proxy = ConversableAgent(
-        name="user", human_input_mode="NEVER",
+        name="user",
+        human_input_mode="NEVER",
     )
 
-    result = user_proxy.initiate_chat(
-        agent, message=user_input, max_turns=1
-    )
+    result = user_proxy.initiate_chat(agent, message=user_input, max_turns=1)
     if not result.chat_history:
         return [{"role": "assistant", "content": "No response."}]
     reply = result.chat_history[-1].get("content", "")

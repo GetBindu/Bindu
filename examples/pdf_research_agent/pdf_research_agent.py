@@ -20,6 +20,7 @@ Send it a message like:
     {"role": "user", "content": "/path/to/paper.pdf"}
 or paste raw text directly as the message content.
 """
+
 from bindu.penguin.bindufy import bindufy
 from agno.agent import Agent
 from agno.models.openrouter import OpenRouter
@@ -32,11 +33,13 @@ load_dotenv()
 # 1. Helper — extract text from a PDF path or pass raw text straight through
 # ---------------------------------------------------------------------------
 
+
 def _read_content(source: str) -> str:
     """Return plain text from a PDF file path, or the source string itself."""
     if source.strip().endswith(".pdf") and os.path.isfile(source.strip()):
         try:
             from pypdf import PdfReader  # optional dependency
+
             reader = PdfReader(source.strip())
             pages = [page.extract_text() or "" for page in reader.pages]
             text = "\n\n".join(pages)
@@ -66,10 +69,7 @@ agent = Agent(
         "  3. Note any important conclusions or recommendations.\n"
         "Be factual and brief. If the text is too short or unclear, say so."
     ),
-    model=OpenRouter(
-        id="openai/gpt-4o-mini",
-        api_key=os.getenv("OPENROUTER_API_KEY")
-    ),
+    model=OpenRouter(id="openai/gpt-4o-mini", api_key=os.getenv("OPENROUTER_API_KEY")),
     markdown=True,  # Enable markdown formatting for better output
 )
 
@@ -86,9 +86,9 @@ config = {
     "capabilities": {
         "file_processing": ["pdf"],
         "text_analysis": ["summarization", "research"],
-        "streaming": False
+        "streaming": False,
     },
-     "skills": ["skills/pdf-research-skill"],
+    "skills": ["skills/pdf-research-skill"],
     "auth": {"enabled": False},
     "storage": {"type": "memory"},
     "scheduler": {"type": "memory"},
@@ -103,6 +103,7 @@ config = {
 # ---------------------------------------------------------------------------
 # 4. Handler — the bridge between Bindu messages and the agent
 # ---------------------------------------------------------------------------
+
 
 def handler(messages: list[dict[str, str]]):
     """
@@ -134,7 +135,9 @@ def handler(messages: list[dict[str, str]]):
 
         # Limit document size to prevent token overflow
         if len(document_text) > 50000:
-            document_text = document_text[:50000] + "\n\n[Document truncated for processing...]"
+            document_text = (
+                document_text[:50000] + "\n\n[Document truncated for processing...]"
+            )
 
         # Build a prompt that includes the full document text
         prompt = f"Summarize the following document and highlight the key insights:\n\n{document_text}"
@@ -154,5 +157,5 @@ def handler(messages: list[dict[str, str]]):
 if __name__ == "__main__":
     print("🚀 PDF Research Agent running at http://localhost:3773")
     print("📄 Send PDF paths or paste document text to get summaries")
-    print("🔧 Example: {\"role\": \"user\", \"content\": \"/path/to/paper.pdf\"}")
+    print('🔧 Example: {"role": "user", "content": "/path/to/paper.pdf"}')
     bindufy(config, handler)

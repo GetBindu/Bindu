@@ -9,19 +9,15 @@ from agno.agent import Agent
 from agno.models.openrouter import OpenRouter
 from dotenv import load_dotenv
 import os
+
 load_dotenv()
 
 
 # Define summarizer agent
 agent = Agent(
     instructions="You are a professional summarization assistant. Create clear, concise summaries that capture the main points and essential information from any input text. Aim for 2-3 sentences that preserve the core meaning while being significantly shorter than the original.",
-    model=OpenRouter(
-        id="openai/gpt-oss-120b",
-        api_key=os.getenv("OPENROUTER_API_KEY")
-    ),
+    model=OpenRouter(id="openai/gpt-oss-120b", api_key=os.getenv("OPENROUTER_API_KEY")),
 )
-
-
 
 
 def handler(messages):
@@ -38,7 +34,7 @@ config = {
     "deployment": {
         "url": "http://localhost:3773",
         "expose": True,
-        "cors_origins": ["http://localhost:5173"]
+        "cors_origins": ["http://localhost:5173"],
     },
     "skills": ["skills/text-summarization-skill"],
 }

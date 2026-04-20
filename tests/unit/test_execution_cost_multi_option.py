@@ -135,6 +135,7 @@ class TestX402AgentExtensionPaymentOptions:
         assert ext.network == _SINGLE_COST["network"]
         assert ext.pay_to_address == _SINGLE_COST["pay_to_address"]
         # full list preserved
+        assert ext.payment_options is not None
         assert len(ext.payment_options) == 2
         assert ext.payment_options[1] == _COST_ETH
 
@@ -222,9 +223,8 @@ class TestCreatePaymentRequirements:
             side_effect=self._mock_process_price,
         ):
             from bindu.server.applications import BinduApplication as _App
-            result = _App._create_payment_requirements(
-                app, ext, self._make_manifest()
-            )
+
+            result = _App._create_payment_requirements(app, ext, self._make_manifest())
 
         assert result is not None
         assert len(result) == 1
@@ -242,9 +242,8 @@ class TestCreatePaymentRequirements:
             side_effect=self._mock_process_price,
         ):
             from bindu.server.applications import BinduApplication as _App
-            result = _App._create_payment_requirements(
-                app, ext, self._make_manifest()
-            )
+
+            result = _App._create_payment_requirements(app, ext, self._make_manifest())
 
         assert result is not None
         assert len(result) == 2
@@ -267,9 +266,8 @@ class TestCreatePaymentRequirements:
             side_effect=self._mock_process_price,
         ):
             from bindu.server.applications import BinduApplication as _App
-            result = _App._create_payment_requirements(
-                app, ext, self._make_manifest()
-            )
+
+            result = _App._create_payment_requirements(app, ext, self._make_manifest())
 
         assert result is not None
         assert len(result) == 1
@@ -277,8 +275,8 @@ class TestCreatePaymentRequirements:
 
     def test_pay_to_address_per_option(self):
         """Each option uses its own pay_to_address, not the primary's."""
-        addr_a = "0x" + "A" * 40
-        addr_b = "0x" + "B" * 40
+        addr_a = "0x" + "A" * 40  # pragma: allowlist secret
+        addr_b = "0x" + "B" * 40  # pragma: allowlist secret
         opt_a = {**_SINGLE_COST, "pay_to_address": addr_a}
         opt_b = {**_COST_ETH, "pay_to_address": addr_b}
 
@@ -292,9 +290,8 @@ class TestCreatePaymentRequirements:
             side_effect=self._mock_process_price,
         ):
             from bindu.server.applications import BinduApplication as _App
-            result = _App._create_payment_requirements(
-                app, ext, self._make_manifest()
-            )
+
+            result = _App._create_payment_requirements(app, ext, self._make_manifest())
 
         assert result is not None
         pay_tos = [r._data["pay_to"] for r in result]
@@ -313,9 +310,13 @@ class TestCreatePaymentRequirements:
             side_effect=self._mock_process_price,
         ):
             from bindu.server.applications import BinduApplication as _App
+
             result = _App._create_payment_requirements(
-                app, ext, self._make_manifest(url="http://localhost:3773"),
+                app,
+                ext,
+                self._make_manifest(url="http://localhost:3773"),
                 resource_suffix="/",
             )
 
+        assert result is not None
         assert result[0]._data["resource"] == "http://localhost:3773/"

@@ -45,10 +45,11 @@ config = {
     "deployment": {
         "url": "http://localhost:3773",
         "expose": True,
-        "cors_origins": ["http://localhost:5173"]
+        "cors_origins": ["http://localhost:5173"],
     },
     "skills": [],
 }
+
 
 # Handler
 def handler(messages: list[dict[str, str]]):
@@ -64,6 +65,7 @@ def handler(messages: list[dict[str, str]]):
     latest_message = messages[-1]["content"]
     result = agent.run(input=messages)
     return result
+
 
 # Launch
 if __name__ == "__main__":

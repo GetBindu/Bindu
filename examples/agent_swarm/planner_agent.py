@@ -9,7 +9,7 @@ def build_planner_agent():
         model=OpenRouter(
             id="openai/gpt-oss-120b",  # Fast and good at following instructions
             api_key=os.getenv("OPENROUTER_API_KEY"),
-            temperature=0
+            temperature=0,
         ),
         description="""You are a strict JSON-only planning agent.
 

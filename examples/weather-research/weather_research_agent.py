@@ -31,10 +31,7 @@ from agno.models.openrouter import OpenRouter
 # Initialize the weather research agent
 agent = Agent(
     instructions="You are a weather research assistant. When asked about weather, provide a clear, concise weather report with current conditions, temperature, and forecast. Focus on the most relevant information and present it in an organized, easy-to-read format. Avoid showing multiple search results - synthesize the information into a single coherent response.",
-    model=OpenRouter(
-        id="openai/gpt-oss-120b",
-        api_key=os.getenv("OPENROUTER_API_KEY")
-    ),
+    model=OpenRouter(id="openai/gpt-oss-120b", api_key=os.getenv("OPENROUTER_API_KEY")),
     tools=[DuckDuckGoTools()],
 )
 
@@ -46,10 +43,11 @@ config = {
     "deployment": {
         "url": "http://localhost:3773",
         "expose": True,
-        "cors_origins": ["http://localhost:5173"]
+        "cors_origins": ["http://localhost:5173"],
     },
     "skills": ["skills/weather-research-skill"],
 }
+
 
 # Message handler function
 def handler(messages: list[dict[str, str]]):
@@ -64,20 +62,25 @@ def handler(messages: list[dict[str, str]]):
     """
     # Extract the latest user message
     if messages:
-        latest_message = messages[-1].get('content', '') if isinstance(messages[-1], dict) else str(messages[-1])
+        latest_message = (
+            messages[-1].get("content", "")
+            if isinstance(messages[-1], dict)
+            else str(messages[-1])
+        )
 
         # Run the agent with the latest message
         result = agent.run(input=latest_message)
 
         # Format the response to be cleaner
-        if hasattr(result, 'content'):
+        if hasattr(result, "content"):
             return result.content
-        elif hasattr(result, 'response'):
+        elif hasattr(result, "response"):
             return result.response
         else:
             return str(result)
 
     return "Please provide a location for weather information."
+
 
 # Bindu-fy the agent - converts it to a discoverable, interoperable Bindu agent
 bindufy(config, handler)

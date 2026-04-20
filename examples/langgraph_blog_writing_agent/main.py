@@ -4,6 +4,7 @@ from schemas import AgentResponse
 
 graph = build_graph()
 
+
 def handler(messages):
     try:
         # Handle possible dict wrapper
@@ -23,18 +24,17 @@ def handler(messages):
         else:
             query = str(last_message)
 
-        result = graph.invoke({
-            "topic": query,
-            "plan": None,
-            "sections": [],
-            "final": None
-        })
+        result = graph.invoke(
+            {"topic": query, "plan": None, "sections": [], "final": None}
+        )
 
         return result["final"]
 
     except Exception as e:
         return AgentResponse(
-            answer="Agent execution failed.",)
+            answer="Agent execution failed.",
+        )
+
 
 config = {
     "author": "amritanshu9973@gmail.com",

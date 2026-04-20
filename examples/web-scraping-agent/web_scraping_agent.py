@@ -61,6 +61,7 @@ config = {
     "skills": ["skills/web-scraping-skill"],
 }
 
+
 def handler(messages: list[dict[str, str]]):
     """
     Process incoming messages and return agent response.
@@ -84,6 +85,7 @@ def handler(messages: list[dict[str, str]]):
             return result.response
         return str(result)
     return "Please provide a URL and an extraction prompt."
+
 
 if __name__ == "__main__":
     # Bindu-fy the agent — converts it to a discoverable, interoperable Bindu agent

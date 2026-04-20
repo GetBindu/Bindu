@@ -50,9 +50,9 @@ config = {
     "deployment": {
         "url": os.getenv("BINDU_DEPLOYMENT_URL", "http://localhost:3773"),
         "expose": True,
-        "cors_origins": ["http://localhost:5173"]
+        "cors_origins": ["http://localhost:5173"],
     },
-    "skills": ["skills/question-answering", "skills/pdf-processing"]
+    "skills": ["skills/question-answering", "skills/pdf-processing"],
 }
 
 

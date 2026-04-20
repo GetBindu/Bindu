@@ -53,10 +53,7 @@ config = {
     "author": "varshayadav1722@gmail.com",
     "name": "dspy_agent",
     "description": "A DSPy-powered question answering agent",
-    "deployment": {
-        "url": "http://localhost:3773",
-        "expose": True
-    }
+    "deployment": {"url": "http://localhost:3773", "expose": True},
 }
 
 

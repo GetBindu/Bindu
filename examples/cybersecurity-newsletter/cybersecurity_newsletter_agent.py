@@ -60,9 +60,11 @@ config = {
     ],
 }
 
+
 # Handler
 def handler(messages: list[dict[str, str]]):
     return agent.run(input=messages)
+
 
 # Start
 bindufy(config, handler)
