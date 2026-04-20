@@ -232,10 +232,11 @@ class TestTaskHandlers:
 
     @pytest.mark.asyncio
     async def test_pause_task_success(self):
-        """Test pausing task in working state."""
+        """Test pausing task in working state (dev-mode: no auth)."""
         mock_storage = AsyncMock()
         mock_task = {"id": "task123", "status": {"state": "working"}}
         mock_storage.load_task.return_value = mock_task
+        mock_storage.get_task_owner.return_value = None  # Dev-mode
         mock_scheduler = AsyncMock()
 
         handler = TaskHandlers(scheduler=mock_scheduler, storage=mock_storage)
@@ -254,6 +255,7 @@ class TestTaskHandlers:
             {"id": "task123", "status": {"state": "working"}},
             None,
         ]
+        mock_storage.get_task_owner.return_value = None  # Dev-mode
         mock_scheduler = AsyncMock()
 
         mock_error_creator = Mock(return_value={"error": "not found"})
@@ -278,6 +280,7 @@ class TestTaskHandlers:
         mock_storage = AsyncMock()
         mock_task = {"id": "task123", "status": {"state": "completed"}}
         mock_storage.load_task.return_value = mock_task
+        mock_storage.get_task_owner.return_value = None  # Dev-mode
         mock_scheduler = AsyncMock()
 
         mock_error_creator = Mock(return_value={"error": "not pausable"})
@@ -315,10 +318,11 @@ class TestTaskHandlers:
 
     @pytest.mark.asyncio
     async def test_resume_task_success(self):
-        """Test resuming task in suspended state."""
+        """Test resuming task in suspended state (dev-mode: no auth)."""
         mock_storage = AsyncMock()
         mock_task = {"id": "task123", "status": {"state": "suspended"}}
         mock_storage.load_task.return_value = mock_task
+        mock_storage.get_task_owner.return_value = None  # Dev-mode
         mock_scheduler = AsyncMock()
 
         handler = TaskHandlers(scheduler=mock_scheduler, storage=mock_storage)
@@ -337,6 +341,7 @@ class TestTaskHandlers:
             {"id": "task123", "status": {"state": "suspended"}},
             None,
         ]
+        mock_storage.get_task_owner.return_value = None  # Dev-mode
         mock_scheduler = AsyncMock()
 
         mock_error_creator = Mock(return_value={"error": "not found"})
@@ -361,6 +366,7 @@ class TestTaskHandlers:
         mock_storage = AsyncMock()
         mock_task = {"id": "task123", "status": {"state": "working"}}
         mock_storage.load_task.return_value = mock_task
+        mock_storage.get_task_owner.return_value = None  # Dev-mode
         mock_scheduler = AsyncMock()
 
         mock_error_creator = Mock(return_value={"error": "not resumable"})

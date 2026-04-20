@@ -132,15 +132,28 @@ class TaskHandlers:
 
     @trace_task_operation("pause_task")
     @track_active_task
-    async def pause_task(self, request: PauseTaskRequest) -> PauseTaskResponse:
+    async def pause_task(
+        self,
+        request: PauseTaskRequest,
+        caller_did: str | None = None,
+    ) -> PauseTaskResponse:
         """Pause a running task.
 
         Tasks can only be paused when in 'working' state.
+        Only the task owner can pause the task.
         """
         task_id = request["params"]["task_id"]
         task = await self.storage.load_task(task_id)
 
         if task is None:
+            return self.error_response_creator(
+                PauseTaskResponse, request["id"], TaskNotFoundError, "Task not found"
+            )
+
+        # Check ownership - return same error as "not found" to prevent
+        # cross-tenant probing
+        owner = await self.storage.get_task_owner(task_id)
+        if owner != caller_did:
             return self.error_response_creator(
                 PauseTaskResponse, request["id"], TaskNotFoundError, "Task not found"
             )
@@ -171,15 +184,28 @@ class TaskHandlers:
 
     @trace_task_operation("resume_task")
     @track_active_task
-    async def resume_task(self, request: ResumeTaskRequest) -> ResumeTaskResponse:
+    async def resume_task(
+        self,
+        request: ResumeTaskRequest,
+        caller_did: str | None = None,
+    ) -> ResumeTaskResponse:
         """Resume a paused task.
 
         Tasks can only be resumed when in 'suspended' state.
+        Only the task owner can resume the task.
         """
         task_id = request["params"]["task_id"]
         task = await self.storage.load_task(task_id)
 
         if task is None:
+            return self.error_response_creator(
+                ResumeTaskResponse, request["id"], TaskNotFoundError, "Task not found"
+            )
+
+        # Check ownership - return same error as "not found" to prevent
+        # cross-tenant probing
+        owner = await self.storage.get_task_owner(task_id)
+        if owner != caller_did:
             return self.error_response_creator(
                 ResumeTaskResponse, request["id"], TaskNotFoundError, "Task not found"
             )
