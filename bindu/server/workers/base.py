@@ -262,7 +262,7 @@ class Worker(ABC):
             state="suspended",
             metadata={
                 **task.get("metadata", {}),
-                "paused_at": datetime.datetime.utcnow().isoformat(),
+                "paused_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                 "pause_checkpoint": task.get("status", {}).get("checkpoint", None),
             },
         )
@@ -296,7 +296,7 @@ class Worker(ABC):
             state="resumed",
             metadata={
                 **task.get("metadata", {}),
-                "resumed_at": datetime.datetime.utcnow().isoformat(),
+                "resumed_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             },
         )
 
@@ -305,7 +305,7 @@ class Worker(ABC):
             TaskSendParams(
                 task_id=task_id,
                 context_id=task["context_id"],
-                message=message,
+                message=message if message is not None else None,  # type: ignore[arg-type]
             )
         )
         logger.info(f"Task {task_id} resumed and re-queued")

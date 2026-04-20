@@ -83,7 +83,7 @@ class TestCapabilityUtilities:
         # but we can test the edge case by passing something else
         # Actually this case won't happen in practice since TypedDict IS a dict
         # Let's just cover the remaining code path by using a custom class
-        class FakeCapabilities:
+        class FakeCapabilities(dict):
             pass
 
         result = add_extension_to_capabilities(FakeCapabilities(), extension)
