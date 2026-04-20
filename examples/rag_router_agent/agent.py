@@ -3,16 +3,15 @@ from bindu.penguin.bindufy import bindufy
 from agno.agent import Agent
 from agno.models.openai import OpenAIChat
 
-# 🔥 NEW: x402 patch (must run early)
-from x402_patch import patch_x402
+
+
 
 from skale_payment import call_skale_facilitator
 from router import classify_intent, route_db, route_agent
 from retriever import retrieve_docs
 
 
-# 🔧 Apply x402 monkey patch at startup
-patch_x402()
+
 
 
 # 🔐 Validate API key at startup
