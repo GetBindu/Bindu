@@ -289,5 +289,11 @@ class Worker(ABC):
             "task_id": task_id,
             "context_id": task["context_id"],
         }
-        await self.scheduler.run_task(resume_params)
+        try:
+            await self.scheduler.run_task(resume_params)
+        except Exception:
+            # Enqueue failed — roll back to suspended so the task is not stranded
+            # in submitted state with no worker picking it up.
+            await self.storage.update_task(task_id, state="suspended")
+            raise
         logger.info(f"Task {task_id} resumed and re-queued for execution")

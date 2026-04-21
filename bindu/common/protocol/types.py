@@ -1685,10 +1685,11 @@ class AgentTrustConfig(pydantic.BaseModel):
     """Config-layer validation model for the agent_trust configuration field.
 
     Unlike AgentTrust (wire format), this model validates user-provided config dicts
-    and provides sensible defaults for optional fields.
+    and provides sensible defaults for optional fields. Extra keys are forbidden so
+    misspelled or camelCase fields are rejected rather than silently ignored.
     """
 
-    model_config = A2A_MODEL_CONFIG
+    model_config = ConfigDict(extra="forbid")
 
     identity_provider: IdentityProvider
     inherited_roles: List[Dict[str, Any]] = []

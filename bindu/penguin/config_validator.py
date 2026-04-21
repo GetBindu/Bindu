@@ -9,6 +9,8 @@ import os
 from typing import Any, Dict
 from urllib.parse import urlparse
 
+import pydantic
+
 from bindu import __version__
 from bindu.common.protocol.types import AgentCapabilities, AgentTrustConfig, Skill
 
@@ -298,11 +300,16 @@ class ConfigValidator:
 
     @classmethod
     def _validate_agent_trust_config(cls, trust_config: Dict[str, Any]) -> None:
+        """Validate the agent_trust configuration dict against AgentTrustConfig schema.
+
+        Raises:
+            ValueError: If trust_config is not a dict or fails Pydantic validation.
+        """
         if not isinstance(trust_config, dict):
             raise ValueError("Field 'agent_trust' must be a dictionary")
         try:
             AgentTrustConfig(**trust_config)
-        except Exception as exc:
+        except (pydantic.ValidationError, TypeError) as exc:
             raise ValueError(f"Invalid 'agent_trust' configuration: {exc}") from exc
 
     @classmethod

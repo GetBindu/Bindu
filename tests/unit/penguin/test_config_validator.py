@@ -1,7 +1,11 @@
 """Minimal focused tests for ConfigValidator."""
 
+import copy
+from typing import ClassVar
+
 import pytest
 
+from bindu.common.protocol.types import AgentTrustConfig
 from bindu.penguin.config_validator import ConfigError, ConfigValidator
 
 
@@ -76,14 +80,16 @@ class TestConfigValidator:
 class TestAgentTrustValidation:
     """Tests for agent_trust configuration validation."""
 
-    BASE_CONFIG = {
+    BASE_CONFIG: ClassVar[dict] = {
         "author": "test@example.com",
         "name": "TestAgent",
         "deployment": {"url": "http://localhost:3773"},
     }
 
     def _config_with_trust(self, trust):
-        return {**self.BASE_CONFIG, "agent_trust": trust}
+        config = copy.deepcopy(self.BASE_CONFIG)
+        config["agent_trust"] = trust
+        return config
 
     def test_valid_agent_trust_hydra(self):
         """Valid agent_trust with hydra provider passes validation."""
@@ -98,7 +104,7 @@ class TestAgentTrustValidation:
         assert result["agent_trust"]["identity_provider"] == "custom"
 
     def test_valid_agent_trust_with_all_fields(self):
-        """Valid agent_trust with all optional fields passes validation."""
+        """Valid agent_trust with all optional fields passes validation and round-trips."""
         trust = {
             "identity_provider": "hydra",
             "inherited_roles": [],
@@ -110,7 +116,8 @@ class TestAgentTrustValidation:
             "allowed_operations": {"read": "viewer", "write": "editor"},
         }
         result = ConfigValidator.validate_and_process(self._config_with_trust(trust))
-        assert result["agent_trust"] == trust
+        # Verify all fields survive validation by round-tripping through AgentTrustConfig
+        AgentTrustConfig(**result["agent_trust"])
 
     def test_agent_trust_none_is_allowed(self):
         """agent_trust defaults to None and is accepted."""

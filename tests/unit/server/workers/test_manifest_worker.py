@@ -802,30 +802,11 @@ class TestWorkerPauseResume:
         }
 
     @pytest.mark.asyncio
-    async def test_pause_working_task_transitions_to_suspended(self):
+    @pytest.mark.parametrize("state", ["working", "submitted", "input-required", "auth-required"])
+    async def test_pause_active_task_transitions_to_suspended(self, state):
         worker, mock_storage, _ = self._make_worker()
         task_id = uuid4()
-        mock_storage.load_task.return_value = self._make_task(task_id, uuid4(), "working")
-
-        await worker._handle_pause({"task_id": task_id})
-
-        mock_storage.update_task.assert_called_once_with(task_id, state="suspended")
-
-    @pytest.mark.asyncio
-    async def test_pause_submitted_task_transitions_to_suspended(self):
-        worker, mock_storage, _ = self._make_worker()
-        task_id = uuid4()
-        mock_storage.load_task.return_value = self._make_task(task_id, uuid4(), "submitted")
-
-        await worker._handle_pause({"task_id": task_id})
-
-        mock_storage.update_task.assert_called_once_with(task_id, state="suspended")
-
-    @pytest.mark.asyncio
-    async def test_pause_input_required_task_transitions_to_suspended(self):
-        worker, mock_storage, _ = self._make_worker()
-        task_id = uuid4()
-        mock_storage.load_task.return_value = self._make_task(task_id, uuid4(), "input-required")
+        mock_storage.load_task.return_value = self._make_task(task_id, uuid4(), state)
 
         await worker._handle_pause({"task_id": task_id})
 
@@ -885,3 +866,19 @@ class TestWorkerPauseResume:
 
         mock_storage.update_task.assert_not_called()
         mock_scheduler.run_task.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_resume_rolls_back_to_suspended_on_enqueue_failure(self):
+        worker, mock_storage, mock_scheduler = self._make_worker()
+        task_id = uuid4()
+        context_id = uuid4()
+        mock_storage.load_task.return_value = self._make_task(task_id, context_id, "suspended")
+        mock_scheduler.run_task.side_effect = RuntimeError("queue full")
+
+        with pytest.raises(RuntimeError, match="queue full"):
+            await worker._handle_resume({"task_id": task_id})
+
+        # First call sets submitted, second call rolls back to suspended
+        calls = mock_storage.update_task.call_args_list
+        assert calls[0] == ((task_id,), {"state": "submitted"})
+        assert calls[1] == ((task_id,), {"state": "suspended"})
