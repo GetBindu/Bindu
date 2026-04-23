@@ -10,8 +10,7 @@ def retrieve_docs(db_path, query, k=2):
     try:
         with open(db_path, "r", encoding="utf-8") as f:
             docs = f.readlines()
-    except (OSError, UnicodeDecodeError) as e:
-        logger.warning(f"Failed to read DB: {e}")
+    except (OSError, UnicodeDecodeError):
         return []
 
     query_words = {w for w in re.findall(r"\w+", query.lower()) if w not in STOPWORDS}

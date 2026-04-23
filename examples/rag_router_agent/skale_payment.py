@@ -13,6 +13,10 @@ SKIP_TLS = os.getenv("FACILITATOR_SKIP_TLS_VERIFY", "false").lower() == "true"
 
 
 def call_skale_facilitator():
+    # ✅ Skip external call in CI
+    if os.getenv("CI") == "true":
+        return {"status": "skipped", "note": "skipped in CI"}
+
     try:
         response = requests.get(
             FACILITATOR_URL,
@@ -32,7 +36,7 @@ def call_skale_facilitator():
 
         return {"status": "unexpected", "code": response.status_code}
 
-    except requests.RequestException as e:
+    except requests.RequestException:
         logger.warning("Facilitator request failed (SSL or network issue)")
         return {
             "status": "error",
