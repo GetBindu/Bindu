@@ -755,6 +755,7 @@ async def voice_websocket(websocket: WebSocket) -> None:
             else []
         )
         label, provided = _extract_ws_session_token(websocket)
+        accepted = False
 
         if len(subprotocol_items) > 1 and label != _VOICE_WS_SUBPROTOCOL:
             await _end_session_best_effort()
@@ -766,6 +767,8 @@ async def voice_websocket(websocket: WebSocket) -> None:
             provided = subprotocol_items[0]
 
         if provided is None:
+            await websocket.accept()
+            accepted = True
             try:
                 provided = (await websocket.receive_text()).strip()
             except Exception:
@@ -782,10 +785,11 @@ async def voice_websocket(websocket: WebSocket) -> None:
             await websocket.close(code=1008, reason="Session token expired")
             return
 
-        if len(subprotocol_items) > 1:
-            await websocket.accept(subprotocol=_VOICE_WS_SUBPROTOCOL)
-        else:
-            await websocket.accept()
+        if not accepted:
+            if len(subprotocol_items) > 1:
+                await websocket.accept(subprotocol=_VOICE_WS_SUBPROTOCOL)
+            else:
+                await websocket.accept()
     else:
         await websocket.accept()
 
@@ -801,18 +805,9 @@ async def voice_websocket(websocket: WebSocket) -> None:
         await websocket.close(code=1011)
         return
 
-    from bindu.extensions.voice.pipeline_builder import build_voice_pipeline
-    from pipecat.transports.websocket.fastapi import (
-        FastAPIWebsocketTransport,
-        FastAPIWebsocketParams,
-    )
-    from pipecat.pipeline.pipeline import Pipeline
-    from pipecat.pipeline.task import PipelineTask
-    from pipecat.pipeline.runner import PipelineRunner
-
-    # Notify UI we are listening
     send_lock = asyncio.Lock()
-    await _send_json(websocket, {"type": "state", "state": "listening"}, send_lock)
+    control = _VoiceControlState()
+    components: dict[str, Any] | None = None
 
     async def _on_user_transcript(text: str) -> None:
         await _send_json(
@@ -861,36 +856,52 @@ async def voice_websocket(websocket: WebSocket) -> None:
             send_lock,
         )
 
-    components = build_voice_pipeline(
-        voice_ext=voice_ext,
-        manifest_run=manifest.run,
-        context_id=session.context_id,
-        on_state_change=_on_state_change,
-        on_user_transcript=_on_user_transcript,
-        on_agent_response=_on_agent_response,
-        on_agent_transcript=_on_agent_transcript,
-    )
-
-    control = _VoiceControlState()
-    inbound_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=10)
-    filtered_ws = _FilteredWebSocket(websocket, inbound_queue)
-
-    async def _handle_user_text(text: str) -> None:
-        await _send_json(
-            websocket,
-            {"type": "transcript", "role": "user", "text": text, "is_final": True},
-            send_lock,
-        )
-        response = await components["bridge"].process_transcription(
-            text, emit_frames=True
-        )
-        if response:
-            await _on_agent_response(response)
-
     reader_task: asyncio.Task[Any] | None = None
     runner_task: asyncio.Task[Any] | None = None
 
     try:
+        from bindu.extensions.voice.pipeline_builder import build_voice_pipeline
+        from pipecat.transports.websocket.fastapi import (
+            FastAPIWebsocketTransport,
+            FastAPIWebsocketParams,
+        )
+        from pipecat.pipeline.pipeline import Pipeline
+        from pipecat.pipeline.task import PipelineTask
+        from pipecat.pipeline.runner import PipelineRunner
+
+        # Notify UI we are listening
+        await _send_json(websocket, {"type": "state", "state": "listening"}, send_lock)
+
+        components = build_voice_pipeline(
+            voice_ext=voice_ext,
+            manifest_run=manifest.run,
+            context_id=session.context_id,
+            on_state_change=_on_state_change,
+            on_user_transcript=_on_user_transcript,
+            on_agent_response=_on_agent_response,
+            on_agent_transcript=_on_agent_transcript,
+        )
+
+        inbound_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=10)
+        filtered_ws = _FilteredWebSocket(websocket, inbound_queue)
+
+        async def _handle_user_text(text: str) -> None:
+            await _send_json(
+                websocket,
+                {
+                    "type": "transcript",
+                    "role": "user",
+                    "text": text,
+                    "is_final": True,
+                },
+                send_lock,
+            )
+            response = await components["bridge"].process_transcription(
+                text, emit_frames=True
+            )
+            if response:
+                await _on_agent_response(response)
+
         transport = FastAPIWebsocketTransport(
             websocket=filtered_ws,  # type: ignore[arg-type]
             params=FastAPIWebsocketParams(
@@ -1007,10 +1018,11 @@ async def voice_websocket(websocket: WebSocket) -> None:
             await session_manager.update_state(session_id, "ending")
         except Exception:
             pass
-        try:
-            await components["bridge"].cleanup_background_tasks()
-        except Exception:
-            pass
+        if components is not None:
+            try:
+                await components["bridge"].cleanup_background_tasks()
+            except Exception:
+                pass
         try:
             await session_manager.end_session(session_id)
         except Exception:
