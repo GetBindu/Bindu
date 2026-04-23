@@ -35,32 +35,38 @@ ALLOWED_BASE_DIR = os.path.abspath(
 EXAMPLE_PDF_PATH = os.path.join(ALLOWED_BASE_DIR, "paper.pdf")
 EXAMPLE_MESSAGE = f'{{"role": "user", "content": "{EXAMPLE_PDF_PATH}"}}'
 
+
+class DocumentReadError(Exception):
+    """Raised when PDF content cannot be read."""
+
 # ---------------------------------------------------------------------------
 # 1. Helper — extract text from a PDF path or pass raw text straight through
 # ---------------------------------------------------------------------------
 
 def _read_content(source: str) -> str:
     """Return plain text from a PDF file path, or the source string itself."""
-    normalized_path = _normalize_pdf_path(source)
-    if normalized_path and os.path.isfile(normalized_path):
+    resolved_path = _normalize_pdf_path(source)
+    if resolved_path and os.path.isfile(resolved_path):
         try:
             from pypdf import PdfReader  # optional dependency
-            reader = PdfReader(normalized_path)
+            reader = PdfReader(resolved_path)
             pages = [page.extract_text() or "" for page in reader.pages]
             text = "\n\n".join(pages)
             if len(text.strip()) < 100:
                 return (
-                    f"PDF file '{normalized_path}' appears to be empty or "
+                    f"PDF file '{resolved_path}' appears to be empty or "
                     "contains very little text."
                 )
             return text
-        except ImportError:
-            return (
-                f"[pypdf not installed — cannot read '{normalized_path}'. "
+        except ImportError as exc:
+            raise DocumentReadError(
+                f"[pypdf not installed — cannot read '{resolved_path}'. "
                 "Run: uv add pypdf]"
-            )
+            ) from exc
         except Exception as e:
-            return f"Error reading PDF '{normalized_path}': {str(e)}"
+            raise DocumentReadError(
+                f"Error reading PDF '{resolved_path}': {e!s}"
+            ) from e
     return source  # treat as raw document text
 
 
@@ -178,6 +184,8 @@ def handler(messages: list[dict[str, str]]):
         result = agent.run(input=enriched_messages)
         return result
 
+    except DocumentReadError as e:
+        return str(e)
     except Exception as e:
         return f"Error processing request: {str(e)}"
 
