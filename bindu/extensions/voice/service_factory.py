@@ -109,25 +109,26 @@ def _create_tts_service_for_provider(provider: str, config: VoiceAgentExtension)
         try:
             piper_module = importlib.import_module("pipecat.services.piper.tts")
             PiperTTSService = getattr(piper_module, "PiperTTSService")
-            PiperTTSSettings = getattr(piper_module, "PiperTTSSettings", None)
         except (ImportError, AttributeError) as e:
             raise ImportError(
                 "Piper TTS requires pipecat[piper]. "
                 "Install with: pip install 'bindu[voice]'"
             ) from e
 
-        if PiperTTSSettings is not None:
-            tts = PiperTTSService(
-                settings=PiperTTSSettings(
-                    voice=voice_id,
-                ),
-                sample_rate=config.sample_rate,
-            )
-        else:
-            tts = PiperTTSService(
-                voice_id=voice_id,
-                sample_rate=config.sample_rate,
-            )
+        try:
+            piper_settings_cls = PiperTTSService.Settings
+        except AttributeError as e:
+            raise ImportError(
+                "Piper TTS requires a nested Settings class. "
+                "Install with: pip install 'bindu[voice]'"
+            ) from e
+
+        tts = PiperTTSService(
+            settings=piper_settings_cls(
+                voice=voice_id,
+            ),
+            sample_rate=config.sample_rate,
+        )
 
         logger.info(f"Created Piper TTS: voice={voice_id}")
         return tts

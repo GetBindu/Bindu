@@ -131,6 +131,7 @@ class TestCreateTTSService:
         )
         mock_tts_cls = MagicMock()
         mock_tts_settings = MagicMock()
+        mock_tts_cls.Settings = mock_tts_settings
         with (
             patch(
                 "bindu.extensions.voice.service_factory.app_settings"
@@ -140,7 +141,6 @@ class TestCreateTTSService:
                 {
                     "pipecat.services.piper.tts": MagicMock(
                         PiperTTSService=mock_tts_cls,
-                        PiperTTSSettings=mock_tts_settings,
                     )
                 },
             ),
@@ -154,6 +154,31 @@ class TestCreateTTSService:
                 sample_rate=16000,
             )
             assert result == mock_tts_cls.return_value
+
+    def test_piper_missing_nested_settings_raises_importerror(self):
+        ext = VoiceAgentExtension(tts_provider="piper", tts_voice_id="en_US-ryan-high")
+        mock_tts_cls = MagicMock()
+        del mock_tts_cls.Settings
+        with (
+            patch(
+                "bindu.extensions.voice.service_factory.app_settings"
+            ) as mock_settings,
+            patch.dict(
+                "sys.modules",
+                {
+                    "pipecat.services.piper.tts": MagicMock(
+                        PiperTTSService=mock_tts_cls,
+                    )
+                },
+            ),
+        ):
+            mock_settings.voice.tts_api_key = ""
+            mock_settings.voice.tts_fallback_provider = "none"
+
+            with pytest.raises(
+                ImportError, match="Piper TTS requires a nested Settings class"
+            ):
+                create_tts_service(ext)
 
     def test_piper_import_error_raises_importerror(self):
         ext = VoiceAgentExtension(tts_provider="piper", tts_voice_id="en_US-ryan-high")
