@@ -43,7 +43,7 @@ config = {
         "expose": True,
         "cors_origins": ["http://localhost:5173"],
     },
-    # "skills": ["../beginner/skills/question-answering"],
+    "skills": ["skills/research-team-skill"],
 }
 
 

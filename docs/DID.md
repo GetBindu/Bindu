@@ -1,889 +1,528 @@
 # Decentralized Identifiers (DIDs)
 
-Bindu uses **Decentralized Identifiers (DIDs)** to provide secure, verifiable, and self-sovereign identity for AI agents. Each agent gets a unique DID that serves as its cryptographic identity across the network.
+## Before you read this
 
-> **New to DIDs?** Think of a DID as a permanent, cryptographic "passport" for your AI agent that works everywhere, can't be taken away, and proves your agent's identity without needing permission from any company or authority.
+This page assumes you've already read [AUTHENTICATION.md](./AUTHENTICATION.md). If you haven't, go there first. The short version:
 
-## What is a DID?
+- Authentication (bearer tokens, Hydra) answers _"are you allowed to make this request?"_
+- DIDs answer the other half: _"are you really who you say you are?"_
 
-A **DID (Decentralized Identifier)** is a globally unique identifier that:
-- **Doesn't require a central authority** - No single entity controls it
-- **Is cryptographically verifiable** - Backed by public/private key pairs
-- **Is persistent** - Remains valid across platforms and time
-- **Enables trust** - Verify agent authenticity without intermediaries
+You need both. If either is missing, your request is either rejected or — worse — accepted when it shouldn't be. This page explains the second half, carefully, without assuming prior knowledge of cryptography.
 
-### The Problem DIDs Solve
+---
 
-Traditional identity systems have critical flaws:
+## The problem DIDs solve
 
-**Centralized Control:**
-- Your identity is controlled by companies (Google, Facebook, etc.)
-- They can suspend or delete your account at any time
-- You can't move your identity between platforms
-- Single point of failure - if the company goes down, so does your identity
+Imagine you run a coffee shop, and every morning a truck pulls up claiming to be your milk delivery. The driver says, _"I'm from Acme Dairy, same as always."_
 
-**Lack of Verification:**
-- Hard to prove you're talking to the real agent
-- Easy to impersonate or create fake accounts
-- No cryptographic proof of identity
-- Trust relies on the platform, not the agent itself
+How do you know they really are? A few options:
 
-**DIDs Fix This:**
-- **You own your identity** - No company can take it away
-- **Cryptographically verifiable** - Prove authenticity with math, not trust
-- **Portable** - Use the same identity across any platform
-- **Permanent** - Your DID never expires or gets reassigned
+1. **Ask for a company ID card.** But anyone can print a card that says "Acme Dairy."
+2. **Call Acme and ask, "is this driver yours?"** Works, but requires calling Acme every single morning. Slow. And if Acme's phone is down, you can't accept milk.
+3. **Acme issues the driver a _cryptographic_ credential — a physical key that only fits one lock, the lock being one you can verify on the spot.** Each morning the driver proves they have the key. You don't need to call anyone. Even if Acme's office burns down, the key still works.
 
-### DID Format
+Option 3 is the spirit of a **DID**. Instead of calling a central authority to vouch for an identity (option 2), the identity holder carries _proof_ they can demonstrate anywhere, to anyone, without a phone call.
 
-Bindu DIDs follow the W3C standard structure with a custom method:
+For software agents, "calling a central authority" looks like "asking Facebook if this user is real" or "asking a platform if this agent is legitimate." That makes the platform a single point of failure. If the platform disappears, or decides to remove you, your identity disappears too.
 
-```
-did:bindu:<email>:<agent_name>:<unique_hash>
-```
+DIDs remove the central authority. Your identity lives in math, not in a company's database.
 
-**Example:**
-```
-did:bindu:gaurikasethi88_at_gmail_com:echo_agent:352c17d030fb4bf1ab33d04b102aef3d
-```
+---
 
-**Breaking it down:**
+## The passport and the badge — an analogy that will carry us through
 
-| Component | Value | Purpose |
-|-----------|-------|----------|
-| `did:` | Fixed prefix | Identifies this as a DID (W3C standard) |
-| `bindu` | Method name | Specifies this is a Bindu DID method |
-| `gaurikasethi88_at_gmail_com` | Creator identifier | Links to agent creator (sanitized email) |
-| `echo_agent` | Agent name | Human-readable agent identifier |
-| `352c17d030fb4bf1ab33d04b102aef3d` | Unique hash | Cryptographic uniqueness guarantee |
+Pretend you're entering a secured building. The security desk wants to know three things:
 
-### DID Syntax Rules
+1. **Is your face on a real passport?** (Is the document authentic — not forged?)
+2. **Does the name on the passport match the face?** (Are you really the person it identifies?)
+3. **Do you have a day-pass letting you into this specific building?** (Are you allowed in today?)
 
-Based on W3C DID Core specification:
+Real life uses:
 
-- **Character set:** ASCII letters (A-Z, a-z), digits (0-9), and symbols `._:%-`
-- **Case sensitive:** `did:bindu:Agent` ≠ `did:bindu:agent`
-- **Must start with:** `did:` (lowercase)
-- **Method segment:** Lowercase letters followed by `:`
-- **Maximum length:** 2048 characters (Bindu limit)
-- **No query/fragment:** `?` and `#` are not allowed in Bindu DIDs
+- The **passport** — an expensive-to-forge document, issued once, lasts years. Proves _who you are_.
+- The **day-pass** — a sticker you get at the front desk. Proves _you have access today_.
 
-**Valid DIDs:**
-```
-did:bindu:user_at_example_com:my_agent:abc123
-did:bindu:alice:research_bot:xyz789
-```
+You need both. A passport without a day-pass gets you nowhere (you're a verified stranger). A day-pass without a passport is useless (anyone could claim the sticker).
 
-**Invalid DIDs:**
-```
-DID:bindu:...           # Wrong: uppercase DID
-did:Bindu:...           # Wrong: uppercase method
-did:bindu:my agent:...  # Wrong: spaces not allowed
-did:bindu:agent?v=1     # Wrong: query parameters not allowed
-```
+Bindu uses the exact same pattern:
 
-## How DIDs Work: A Complete Picture
+| Real life | Bindu |
+|---|---|
+| Passport | **DID + signature** — long-lived cryptographic identity |
+| Day-pass | **Bearer token** — short-lived (~1 hour) access grant |
+| Photo on passport | **Public key** stored in the DID document |
+| Secret signature only you can make | **Private key** that only you hold |
+| Security guard checks passport photo | Server checks DID signature |
+| Security guard checks day-pass | Server checks bearer token (via Hydra) |
 
-```mermaid
-sequenceDiagram
-    participant Agent
-    participant KeyStore
-    participant Registry
-    participant Verifier
+This document is about the passport side. The badge side was [AUTHENTICATION.md](./AUTHENTICATION.md).
 
-    Note over Agent,KeyStore: 1. Key Generation (bindufy)
-    Agent->>KeyStore: Generate Ed25519 key pair
-    KeyStore-->>Agent: private.pem + public.pem
+---
 
-    Note over Agent: 2. DID Creation
-    Agent->>Agent: Create DID from<br/>author:agent_name:agent_id
-    Agent->>Agent: Generate DID Document<br/>(public key + metadata)
+## Public and private keys, explained without math
 
-    Note over Agent,Registry: 3. Publish to Registry
-    Agent->>Registry: Publish DID Document
+Before we get into DID mechanics, we need one concept: **public-key cryptography**. You've probably heard the term. Here's what it actually means, stripped of math.
 
-    Note over Verifier,Registry: 4. DID Resolution
-    Verifier->>Registry: Resolve DID
-    Registry-->>Verifier: DID Document (public key)
+A **key pair** is two matched pieces of data — a **private key** and a **public key**. They're generated together, once. They have two magical properties:
 
-    Note over Agent,Verifier: 5. Signature Verification
-    Agent->>Agent: Sign message with private key
-    Agent->>Verifier: Send message + signature
-    Verifier->>Verifier: Verify signature with public key
-```
+1. **You can give the public key to anyone.** You should. That's why it's called public.
+2. **If you "sign" a message using the private key, anyone with the public key can check the signature.** They can't fake a signature, because they don't have the private key. But they can verify yours.
 
-### The DID Lifecycle
+A useful way to picture it: a private key is like the **one-of-a-kind stamp** a medieval kingdom's scribe uses to seal letters. The stamp is kept in the scribe's locked chest. The king gives an imprint of the stamp (the public key) to every city, so they can check whether a letter really came from the scribe.
+
+A letter without the stamp is just paper. A forgery (someone trying to fake the stamp) gets spotted instantly because the stamp has unique geometry that's impossible to reproduce without the original.
+
+In Bindu we use a specific kind of key pair called **Ed25519**. You don't need to know why Ed25519 specifically — just three facts:
+
+- Keys are tiny (32 bytes each). Cheap to store and send.
+- Signing and verifying are fast.
+- Ed25519 has been audited to death. Signal uses it. Tor uses it. SSH uses it. It's trustworthy.
+
+Two things we'll come back to:
+
+- **Seed** — a 32-byte random number that _generates_ the key pair. If you have the seed, you can always re-derive both keys. In Bindu, the seed is what you save and protect. Everything else is derived.
+- **Signature** — the output of signing a message. 64 bytes, usually encoded as Base58 so it's readable. If a signature verifies against the public key, you're certain it was made by someone holding the private key. If it doesn't, someone tampered with the message or you're looking at a forgery.
+
+---
+
+## What a DID actually is
+
+A DID is just a **string**. A specific shape of string that says, "this identifier belongs to a specific identity system, and here's where to look up more information about it."
+
+Bindu DIDs look like this:
 
 ```
-1. CREATION                    2. REGISTRATION              3. RESOLUTION
-   ┌─────────────┐                ┌─────────────┐              ┌─────────────┐
-   │ Generate    │                │ Publish DID │              │ Query DID   │
-   │ Key Pair    │───────────────>│ Document    │─────────────>│ Document    │
-   │             │                │             │              │             │
-   └─────────────┘                └─────────────┘              └─────────────┘
-         │                              │                            │
-         v                              v                            v
-   Private Key                    Public Registry              Verify Identity
-   (Keep Secret!)                 (Bindu Network)              (Use Public Key)
+did:bindu:dutta_raahul_at_gmail_com:postman:ee67868d-d4b6-6441-93d6-ba4b29dc5e1d
 ```
 
-**Step 1: Creation**
-- Agent generates Ed25519 key pair (public + private keys)
-- DID is constructed from creator email, agent name, and key hash
-- Private key is stored securely (never shared!)
+Break it into five parts separated by colons:
 
-**Step 2: Registration**
-- DID document is created with public key and metadata
-- Document is published to GetBindu.com
+| Part | Value in our example | What it means |
+|---|---|---|
+| 1 | `did` | The literal prefix. Says "this is a Decentralized Identifier." Every DID ever, in any system, starts with this. W3C standard. |
+| 2 | `bindu` | The **method**. Tells you which DID system to use for resolving this identifier. Others exist: `did:web`, `did:ethr`, `did:key`. Here we use Bindu's method. |
+| 3 | `dutta_raahul_at_gmail_com` | The **author segment**. A human-readable identifier of who created this DID. We sanitize emails: `@` becomes `_at_`, `.` becomes `_`. Pure metadata — helps humans know whose agent this is. |
+| 4 | `postman` | The **agent name**. A short label you give each agent you run. |
+| 5 | `ee67868d-...-ba4b29dc5e1d` | The **agent ID** — a UUID derived from the first 16 bytes of `sha256(public_key)`. This is what makes the DID _unique_. |
 
-**Step 3: Resolution**
-- Anyone can query the DID to get the public document
-- Public key is used to verify signatures from the agent
+The last segment is where the math enters. It's not a random UUID — it's computed from the public key. That has a lovely property: if you change your key, your DID changes too. You can't swap keys while keeping the same DID, because the DID string itself is bound to the key.
 
-## DID Resolution
+### Rules for DID strings
 
-### What is DID Resolution?
+A few constraints worth knowing, from the W3C spec:
 
-DID resolution is the process of retrieving a **DID Document** - a JSON file containing public information about the agent, including:
-- Public keys for signature verification
-- Service endpoints (where to reach the agent)
-- Creation timestamp
-- Authentication methods
+- Only ASCII letters, digits, and `._:%-`
+- Case-sensitive (`did:bindu:Agent` and `did:bindu:agent` are different identities)
+- No `?`, no `#`, no spaces
+- Under 2048 characters
 
-Think of it like looking up a phone number in a directory, but instead of getting a phone number, you get cryptographic proof of identity.
+And a Bindu-specific one: each of the five segments is always present. If any is missing or empty, the DID is malformed.
 
-### Resolve a DID
+---
 
-Get the DID document for an agent:
+## The DID document — what the server needs to trust you
+
+The DID _string_ is just a name. To trust someone, the server needs to know their **public key**. That mapping lives in a JSON file called the **DID document**.
+
+Here's a real one:
+
+```json
+{
+  "@context": [
+    "https://www.w3.org/ns/did/v1",
+    "https://getbindu.com/ns/v1"
+  ],
+  "id": "did:bindu:dutta_raahul_at_gmail_com:postman:ee67868d-d4b6-6441-93d6-ba4b29dc5e1d",
+  "created": "2026-04-19T17:23:45+00:00",
+  "authentication": [
+    {
+      "id":              "did:bindu:...#key-1",
+      "type":            "Ed25519VerificationKey2020",
+      "controller":      "did:bindu:...",
+      "publicKeyBase58": "BJx2RYuVCGNkgXuxcQEYe8FKTBqypJjz5gvTxXto9kQv"
+    }
+  ]
+}
+```
+
+Field by field:
+
+- `@context` — a pointer to the standards this document follows. Don't worry about it; it just tells parsers how to interpret the other fields.
+- `id` — the DID itself. Always matches the DID you resolved.
+- `created` — timestamp of first publication. Useful for audit and "how old is this agent."
+- `authentication` — the heart of the document. Contains one or more **verification methods** — public keys the DID owner has published.
+
+In the verification method:
+
+- `type: Ed25519VerificationKey2020` — "this is an Ed25519 public key, published using the 2020 version of the spec."
+- `controller` — who is allowed to update this document. Usually the DID itself (self-controlled).
+- `publicKeyBase58` — the actual public key, encoded so it's a short readable string (no padding, no confusing characters like `0/O`).
+
+> **Where is this document stored?** In Bindu, the DID document lives inside the Hydra OAuth client's `metadata` field. When you register a client with Hydra, you put the public key there. The agent fetches the DID document from Hydra when it needs to verify a signature.
+>
+> There's also a public resolver endpoint (`POST /did/resolve`) that returns the document without needing Hydra admin access. This is the A2A standard path for resolving any DID.
+
+---
+
+## Signing a request — what the client does
+
+Let's say you're the client. You're about to send a JSON-RPC request to an agent. You want to sign it so the agent knows the request really came from you (not someone replaying an old request, not a man-in-the-middle tampering in transit).
+
+Here's what your code has to do, step by step. This is word-for-word what our gateway and our Postman pre-script do.
+
+### Step 1. Gather the three inputs
+
+- **Body** — the exact bytes of the HTTP request body, as they'll hit the wire. Not a parsed object. Not a "reformatted" version. The exact UTF-8 bytes the server will receive. This is the most common thing people get wrong.
+- **DID** — your DID string.
+- **Timestamp** — current Unix time in seconds (an integer).
+
+### Step 2. Build the signing payload
+
+Combine the three into a small JSON object:
+
+```python
+{"body": <body>, "did": <did>, "timestamp": <ts>}
+```
+
+Then serialize it **using Python's `json.dumps(sort_keys=True)` convention**. Two things matter:
+
+1. **Keys sorted alphabetically**, at every nesting level. So `body` before `did` before `timestamp`.
+2. **Default Python separators** — `", "` and `": "` — with a **space** after the comma and colon.
+
+The second rule is where every other language trips up. JavaScript's `JSON.stringify` omits the spaces by default. Python includes them. If your client leaves out the spaces, the bytes you sign don't match the bytes the server reconstructs, and the signature fails — even though logically you "signed the right data."
+
+A working payload for a small example:
+
+```
+{"body": "{\"test\": \"value\"}", "did": "did:bindu:test", "timestamp": 1000}
+```
+
+Notice the spaces after `:` and `,`. Notice `body` comes first alphabetically. If your implementation matches Python's `json.dumps(payload, sort_keys=True)`, you're good. The gateway has a helper called `pythonSortedJson` that produces exactly this output.
+
+### Step 3. Sign the bytes
+
+Take the UTF-8 bytes of that payload string, and sign them with your Ed25519 private key. Base58-encode the 64-byte signature.
+
+### Step 4. Attach three headers to the HTTP request
+
+```
+X-DID:             <your DID string>
+X-DID-Timestamp:   <ts>
+X-DID-Signature:   <base58-encoded signature>
+```
+
+Plus your bearer token from the authentication flow:
+
+```
+Authorization:     Bearer <access token>
+```
+
+Send the request. The body on the wire must be _exactly the same bytes_ you put in the signing payload. If there's a middleware that reformats JSON between your sign-step and the network, you'll get a verification failure on the server.
+
+---
+
+## Verifying a request — what the server does
+
+When the agent receives your request, four gates fire in order. If any one fails, the request is rejected and the server tells you which gate failed via a `reason` code. Knowing the gates makes debugging quick.
+
+```
+Incoming request
+      │
+      ▼
+┌──────────────────────────────────────────────────────────────┐
+│ Gate 1: Bearer token must be valid                           │
+│                                                              │
+│ Server → Hydra admin: "is this token active?"                │
+│ Hydra  → Server:      active=true, client_id=did:bindu:...   │
+│                                                              │
+│ Fail reasons: invalid_token, expired, unknown                │
+└──────────────────────────────────────────────────────────────┘
+      │
+      ▼
+┌──────────────────────────────────────────────────────────────┐
+│ Gate 2: X-DID must match the token's client_id               │
+│                                                              │
+│ If the bearer token was issued to `did:bindu:A` but the      │
+│ X-DID header says `did:bindu:B`, something is off. The       │
+│ token's owner disagrees with the claimed identity. Reject.   │
+│                                                              │
+│ Fail reason: did_mismatch                                    │
+└──────────────────────────────────────────────────────────────┘
+      │
+      ▼
+┌──────────────────────────────────────────────────────────────┐
+│ Gate 3: The DID's public key must be known                   │
+│                                                              │
+│ The server looks up the public key in Hydra's metadata       │
+│ (or via the DID resolver). If no public key is registered,   │
+│ the signature can't be checked.                              │
+│                                                              │
+│ Fail reason: public_key_unavailable                          │
+└──────────────────────────────────────────────────────────────┘
+      │
+      ▼
+┌──────────────────────────────────────────────────────────────┐
+│ Gate 4: Timestamp and signature must both verify             │
+│                                                              │
+│ 1. Is X-DID-Timestamp within 300 seconds of the server's     │
+│    clock? If not → timestamp_out_of_window. This prevents    │
+│    old requests from being replayed hours later.             │
+│                                                              │
+│ 2. Reconstruct the signing payload from the exact body       │
+│    bytes + the X-DID + the X-DID-Timestamp. Verify the       │
+│    X-DID-Signature against it using the public key from      │
+│    Gate 3. If not → crypto_mismatch.                         │
+└──────────────────────────────────────────────────────────────┘
+      │
+      ▼
+Request proceeds to handler
+```
+
+Each `reason` code in a rejection response points to exactly one gate. That makes debugging narrow:
+
+| Reason | Gate | What's wrong |
+|---|---|---|
+| `missing_signature_headers` | 2 | You sent a bearer token but no X-DID-* headers |
+| `did_mismatch` | 2 | X-DID header disagrees with the token's `client_id` |
+| `public_key_unavailable` | 3 | Hydra has no public key registered for this DID |
+| `timestamp_out_of_window` | 4 | Clock skew > 300s, or replayed old request |
+| `crypto_mismatch` | 4 | Signature doesn't verify — wrong key, wrong bytes, or tampering |
+
+---
+
+## Setting up your own DID from scratch
+
+Let's walk through registering a brand-new identity, end to end. This mirrors what our internal debugging session does every time someone sets up Postman against Bindu.
+
+### 1. Generate a seed and derive everything from it
+
+Run this Python one-liner:
 
 ```bash
-curl -X POST http://localhost:3773/did/resolve \
-  -H "Content-Type: application/json" \
+python3 -c "
+import os, base64, base58, hashlib
+from nacl.signing import SigningKey
+
+AUTHOR = 'your.email@example.com'   # replace
+NAME   = 'my_agent'                  # replace (short, no colons)
+
+seed = os.urandom(32)
+sk   = SigningKey(seed)
+pk   = bytes(sk.verify_key)
+h    = hashlib.sha256(pk).hexdigest()
+agent_id = f'{h[0:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:32]}'
+author_safe = AUTHOR.replace('@', '_at_').replace('.', '_')
+did  = f'did:bindu:{author_safe}:{NAME}:{agent_id}'
+
+print()
+print('did              =', did)
+print('seed (base64)    =', base64.b64encode(seed).decode())
+print('public key (b58) =', base58.b58encode(pk).decode())
+"
+```
+
+It outputs three lines. Save them somewhere safe. **The seed is your private key.** If you lose it, this DID is orphaned. If it leaks, the holder can impersonate you.
+
+### 2. Register the client with Hydra
+
+```bash
+curl -X POST 'https://hydra-admin.getbindu.com/admin/clients' \
+  -H 'Content-Type: application/json' \
   -d '{
-    "did": "did:bindu:gaurikasethi88_at_gmail_com:echo_agent:352c17d030fb4bf1ab33d04b102aef3d"
+    "client_id":     "<the did from step 1>",
+    "client_secret": "<a strong random secret — see AUTHENTICATION.md>",
+    "grant_types":   ["client_credentials"],
+    "response_types": ["token"],
+    "scope":         "openid offline agent:read agent:write",
+    "token_endpoint_auth_method": "client_secret_post",
+    "metadata": {
+      "agent_id":            "<the uuid portion of the did>",
+      "did":                 "<the did>",
+      "public_key":          "<the base58 public key>",
+      "key_type":            "Ed25519",
+      "verification_method": "Ed25519VerificationKey2020",
+      "hybrid_auth":          true
+    }
   }'
 ```
 
-### DID Document Structure
+The important field is `metadata.public_key` — that's the base58 public key from step 1. The server uses this at Gate 3 to verify your signatures. The `metadata.did` and `hybrid_auth: true` signal to Bindu that this client requires DID signatures on top of the bearer token.
 
-**Response:**
-```json
-{
-    "@context": [
-        "https://www.w3.org/ns/did/v1",
-        "https://getbindu.com/ns/v1"
-    ],
-    "id": "did:bindu:gaurikasethi88_at_gmail_com:echo_agent:352c17d030fb4bf1ab33d04b102aef3d",
-    "created": "2026-02-11T05:33:56.969079+00:00",
-    "authentication": [
-        {
-            "id": "did:bindu:...#key-1",
-            "type": "Ed25519VerificationKey2020",
-            "controller": "did:bindu:...",
-            "publicKeyBase58": "<base58-encoded-public-key>"
-        }
-    ]
-}
-```
+### 3. Get a bearer token
 
-**Understanding Each Field:**
+See [AUTHENTICATION.md](./AUTHENTICATION.md#step-2--exchange-the-secret-for-a-token).
 
-#### `@context` - Document Format Specification
-```json
-"@context": [
-    "https://www.w3.org/ns/did/v1",      // W3C DID standard
-    "https://getbindu.com/ns/v1"         // Bindu-specific extensions
-]
-```
-Defines the JSON-LD context - essentially the "language" the document is written in. This ensures everyone interprets the document the same way.
+### 4. Sign and send a request
 
-#### `id` - The DID Itself
-```json
-"id": "did:bindu:gaurikasethi88_at_gmail_com:echo_agent:352c17d030fb4bf1ab33d04b102aef3d"
-```
-The unique identifier for this agent. This is what you use to reference the agent across the network.
+Use the gateway's sign-request helper (`gateway/src/bindu/identity/local.ts`), the frontend POC (`frontend/src/lib/did/`), or a Postman pre-request script (a full example lives in our Postman collection). All three produce identical bytes — they've been cross-tested.
 
-#### `created` - Creation Timestamp
-```json
-"created": "2026-02-11T05:33:56.969079+00:00"
-```
-When this DID was first created (ISO 8601 format with UTC timezone). Useful for:
-- Audit trails
-- Age verification
-- Historical tracking
-
-#### `authentication` - Public Keys
-```json
-"authentication": [{
-    "id": "did:bindu:...#key-1",                    // Key identifier
-    "type": "Ed25519VerificationKey2020",           // Crypto algorithm
-    "controller": "did:bindu:...",                  // Who owns this key
-    "publicKeyBase58": "<base58-encoded-public-key>"
-}]
-```
-The public keys used to verify signatures from this agent. Multiple keys can be listed for key rotation.
-
-### Understanding Authentication Keys
-
-The `authentication` section is the heart of DID security. It contains public keys that prove identity.
-
-#### Key Components Explained
-
-**Key Type (`type`)**
-```json
-"type": "Ed25519VerificationKey2020"
-```
-- Specifies the cryptographic algorithm
-- **Ed25519** is a modern, secure signature scheme
-- Fast, small signatures (64 bytes)
-- Resistant to timing attacks
-- Used by Signal, Tor, and other security-critical systems
-
-**Why Ed25519?**
-- **Security:** 128-bit security level (equivalent to 3072-bit RSA)
-- **Speed:** 10-20x faster than RSA
-- **Size:** Public keys are only 32 bytes
-- **Deterministic:** Same message always produces same signature
-
-**Controller (`controller`)**
-```json
-"controller": "did:bindu:gaurikasethi88_at_gmail_com:echo_agent:352c17d030fb4bf1ab33d04b102aef3d"
-```
-- Who has authority over this key
-- Must match the DID itself (self-controlled)
-- In future versions, could delegate to other DIDs
-
-**Public Key (`publicKeyBase58`)**
-```json
-"publicKeyBase58": "<base58-encoded-public-key>"
-```
-- The actual public key in Base58 encoding
-- **Base58:** Like Base64 but without confusing characters (0, O, I, l)
-- Used to verify signatures from the agent
-- Safe to share publicly (that's why it's called "public" key!)
-
-#### How Signature Verification Works
+If you're hand-rolling signing in a new language, the rules are in the "Signing a request" section above. Test against the canonical fixture: seed `= 32 zero bytes`, DID `= did:bindu:test`, body `= {"test": "value"}`, timestamp `= 1000`. Your signature should Base58-encode to:
 
 ```
-Agent Side (Private):              Verifier Side (Public):
-┌─────────────────┐                ┌─────────────────┐
-│ 1. Create       │                │ 4. Get DID      │
-│    Message      │                │    Document     │
-└────────┬────────┘                └────────┬────────┘
-         │                                  │
-         v                                  v
-┌─────────────────┐                ┌─────────────────┐
-│ 2. Sign with    │                │ 5. Extract      │
-│    Private Key  │                │    Public Key   │
-└────────┬────────┘                └────────┬────────┘
-         │                                  │
-         v                                  v
-┌─────────────────┐                ┌─────────────────┐
-│ 3. Send Message │───────────────>│ 6. Verify       │
-│    + Signature  │                │    Signature    │
-└─────────────────┘                └────────┬────────┘
-                                            │
-                                            v
-                                   ✓ Valid / ✗ Invalid
+3SfU4VPTHLbzZzCn17ZqU6y2tnzHQbdo2nnXQr6XZXk34XgyzwSKRrCYEWRmmGXrV39mdkyhTsy5oasfTpNuqyM2
 ```
 
-## Real-World Use Cases
+If it doesn't, your Python-compat JSON is almost certainly wrong (missing spaces between keys, or unsorted keys).
 
-### 1. Message Signing - Proving Authenticity
+---
 
-**Scenario:** An agent sends a research report. How do you know it's really from that agent?
+## What goes wrong — real failure modes
 
-**Without DIDs:**
-```python
-# Anyone could claim to be the agent
-message = {
-    "from": "research_agent",  # Easy to fake!
-    "content": "Here's your report..."
-}
-```
+This section is long because this is where people lose hours. Each of these happened to at least one person setting up Bindu. Save yourself the same hours.
 
-**With DIDs:**
-```python
-import nacl.signing
-import base58
+### "I'm getting `did_mismatch` and the strings look identical"
 
-# Agent side: Sign the message
-private_key = nacl.signing.SigningKey(agent_private_key_bytes)
-message = {"content": "Here's your report..."}
-message_bytes = json.dumps(message).encode()
-signature = private_key.sign(message_bytes).signature
+The X-DID header on your request must be byte-identical to the `client_id` returned by Hydra when introspecting your bearer token. Three things to check, in this order:
 
-signed_message = {
-    "did": "did:bindu:alice_at_example_com:research_agent:abc123",
-    "message": message,
-    "signature": base58.b58encode(signature).decode()
-}
+1. **Are you talking to the right Hydra?** If your agent's `HYDRA__ADMIN_URL` points at a different Hydra instance than the one that issued your token, introspection will either fail or return someone else's `client_id`. Run:
+   ```bash
+   curl -X POST '<your agent hydra admin>/admin/oauth2/introspect' -d 'token=<your token>'
+   ```
+   The `client_id` field must exactly match `X-DID`.
+2. **Did a variable get auto-edited?** Some clients (copy-paste from Slack, from Markdown tables) turn `-` into `–` (en dash). Look for invisible differences with `diff <(xxd <<< "$a") <(xxd <<< "$b")`.
+3. **Did Postman or your client keep the old value?** Re-sending with a stale `Authorization` header is common. Open Postman Console (⌥⌘C) and read the actual outgoing headers.
 
-# Recipient side: Verify the signature
-did_doc = resolve_did(signed_message["did"])
-public_key_b58 = did_doc["authentication"][0]["publicKeyBase58"]
-public_key = nacl.signing.VerifyKey(base58.b58decode(public_key_b58))
+### "I'm getting `crypto_mismatch`"
 
-try:
-    public_key.verify(message_bytes, base58.b58decode(signed_message["signature"]))
-    print("✓ Signature valid! Message is authentic.")
-except nacl.exceptions.BadSignatureError:
-    print("✗ Invalid signature! Message may be forged.")
-```
+This means Gate 4 tried to verify your signature and it didn't match. Four causes:
 
-**Real-World Impact:**
-- Financial agents can sign transaction approvals
-- Medical agents can sign diagnoses with legal validity
-- Research agents can sign findings with attribution
+- **Body bytes drifted.** Your signing code serialized a JSON object, then a middleware or HTTP client re-serialized the body before sending. The two serializations look the same but have different whitespace or key order. Fix by signing the exact string you'll put on the wire, not the parsed object.
+- **Wrong public key in Hydra.** You rotated your seed locally but forgot to update `metadata.public_key`. The server is verifying against the old public key. Fix by re-registering with the new key.
+- **Python-compat JSON mismatch.** JavaScript's `JSON.stringify` omits spaces after `:` and `,`. Python's default includes them. If you signed one and the server reconstructed the other, mismatch. Use `pythonSortedJson` from the gateway, or replicate its behavior.
+- **Actually a forged signature / wrong seed.** The seed you signed with doesn't match the public key in Hydra. Check `seed → pubkey → metadata` hasn't drifted.
 
-### DID Signatures in Task Responses
+### "I'm getting `timestamp_out_of_window`"
 
-When an agent completes a task, the response includes a cryptographic signature in the artifact metadata. This proves the message authenticity without requiring you to manually verify it.
+Two causes:
 
-**Example Task Response with DID Signature:**
+- **Your clock is wrong.** Check `date -u` against a known-good time server. Container clocks drift.
+- **Someone is replaying a captured request.** If you (or your logs) kept a request from 10 minutes ago and tried to resend it, the timestamp is stale. Sign fresh every time.
 
-```json
-{
-    "jsonrpc": "2.0",
-    "id": "550e8400-e29b-41d4-a716-446655440025",
-    "result": {
-        "id": "550e8400-e29b-41d4-a716-446655440302",
-        "context_id": "550e8400-e29b-41d4-a716-446655440038",
-        "kind": "task",
-        "status": {
-            "state": "completed",
-            "timestamp": "2026-02-11T13:33:28.151107+00:00"
-        },
-        "history": [
-            {
-                "kind": "message",
-                "role": "user",
-                "parts": [{"kind": "text", "text": "capital of india"}]
-            },
-            {
-                "kind": "message",
-                "role": "assistant",
-                "parts": [
-                    {
-                        "kind": "text",
-                        "text": "The capital of India is **New Delhi**."
-                    }
-                ]
-            }
-        ],
-        "artifacts": [
-            {
-                "name": "result",
-                "parts": [
-                    {
-                        "kind": "text",
-                        "text": "The capital of India is **New Delhi**.",
-                        "metadata": {
-                            "did.message.signature": "<base58-signature>"
-                        }
-                    }
-                ],
-                "artifact_id": "807e4218-155f-4ffb-b880-08f60f3b2c4b"
-            }
-        ]
-    }
-}
-```
+### "I'm getting `public_key_unavailable`"
 
-**Key Field: `did.message.signature`**
+The DID in `X-DID` doesn't have a public key registered with Hydra. Two paths:
 
-Located in `result.artifacts[].parts[].metadata`, this field contains:
-- **Base58-encoded signature** of the message content
-- **Signed by the agent's private key** (which only the agent possesses)
-- **Verifiable using the agent's public key** from their DID document
+- You haven't registered yet — do step 2 of "Setting up your own DID" above.
+- You registered but put the public key somewhere other than `metadata.public_key`. Look at the response from `GET /admin/clients/<did>` and confirm `metadata.public_key` is a non-empty base58 string.
 
-**What This Signature Proves:**
+### "I'm getting `missing_signature_headers`"
 
-1. **Authenticity** - The message definitely came from the agent with this DID
-2. **Integrity** - The message hasn't been tampered with since signing
-3. **Non-repudiation** - The agent cannot deny sending this message
-4. **Timestamp validity** - The message was created at the stated time
+You sent `Authorization: Bearer <token>` where the token's `client_id` is a DID, but you forgot to also send the three X-DID-* headers. Once the token's client is a DID, signing becomes mandatory — there's no "unsigned is fine" fallback. The gateway and frontend helpers always set all three.
 
-**Verifying the Signature:**
+---
 
-```python
-import nacl.signing
-import base58
-import json
+## Keeping your seed safe
 
-async def verify_task_response(task_response):
-    """Verify a task response signature"""
-    # Extract the signature
-    artifact = task_response["result"]["artifacts"][0]
-    part = artifact["parts"][0]
-    message_text = part["text"]
-    signature_b58 = part["metadata"]["did.message.signature"]
+The seed is the single thing that gives you authority over your DID. Treat it like a password, minus the recoverability (there's no "forgot seed" flow — once it's gone, the DID is gone).
 
-    # Get the agent's DID from the task (you'd get this from the agent card)
-    agent_did = "did:bindu:gaurikasethi88_at_gmail_com:echo_agent:352c17d030fb4bf1ab33d04b102aef3d"
+### Storage
 
-    # Resolve DID to get public key
-    did_doc = await resolve_did(agent_did)
-    public_key_b58 = did_doc["authentication"][0]["publicKeyBase58"]
-    public_key = nacl.signing.VerifyKey(base58.b58decode(public_key_b58))
+- **Secret manager** (1Password, AWS Secrets Manager, HashiCorp Vault) for individual developers and production.
+- **Environment variables loaded from `.env`** for local development, where `.env` is gitignored.
+- **Never** in source code. Never committed. Never in plaintext in logs.
 
-    # Verify the signature
-    try:
-        message_bytes = message_text.encode('utf-8')
-        signature_bytes = base58.b58decode(signature_b58)
-        public_key.verify(message_bytes, signature_bytes)
-        print("✓ Signature valid! Response is authentic.")
-        return True
-    except nacl.exceptions.BadSignatureError:
-        print("✗ Invalid signature! Response may be forged.")
-        return False
+### Permissions
 
-# Usage
-is_valid = await verify_task_response(task_response)
-```
-
-**When Signatures Are Added:**
-
-- **Automatically** - Bindu agents sign all responses by default when DID is configured
-- **Transparent** - No extra code needed in your agent implementation
-- **Optional verification** - Clients can verify signatures but don't have to
-- **Audit trail** - Signatures provide cryptographic proof for compliance/legal needs
-
-### 2. Agent Discovery - Finding the Right Agent
-
-**Scenario:** You need a PDF processing agent. How do you find trustworthy ones?
-
-```python
-import httpx
-
-async def find_pdf_agents():
-    # Search GetBindu.com
-    response = await httpx.get(
-        "https://getbindu.com/api/agents",
-        params={"skill": "pdf-processing", "verified": True}
-    )
-
-    agents = response.json()["agents"]
-
-    for agent in agents:
-        # Resolve DID to verify it's legitimate
-        did_doc = await resolve_did(agent["did"])
-
-        # Check creation date (prefer established agents)
-        created = datetime.fromisoformat(did_doc["created"])
-        age_days = (datetime.now(timezone.utc) - created).days
-
-        # Get agent manifest
-        manifest = await httpx.get(f"{agent['url']}/.well-known/agent.json")
-
-        print(f"Agent: {agent['name']}")
-        print(f"DID: {agent['did']}")
-        print(f"Age: {age_days} days")
-        print(f"Skills: {manifest.json()['skills']}")
-        print(f"Verified: ✓")
-        print()
-
-# Usage
-await find_pdf_agents()
-```
-
-**Output:**
-```
-Agent: PDF Pro
-DID: did:bindu:pdfpro_at_example_com:pdf_agent:xyz789
-Age: 245 days
-Skills: ['text_extraction', 'table_extraction', 'ocr']
-Verified: ✓
-
-Agent: Document Master
-DID: did:bindu:docmaster_at_example_com:doc_agent:def456
-Age: 89 days
-Skills: ['pdf_parsing', 'form_filling']
-Verified: ✓
-```
-
-### 3. Payment Verification - Secure Transactions
-
-**Scenario:** User pays agent for service. How do both parties prove the transaction?
-
-```python
-from decimal import Decimal
-import time
-
-class PaymentProof:
-    def __init__(self, from_did, to_did, amount, currency="USDC"):
-        self.from_did = from_did
-        self.to_did = to_did
-        self.amount = str(amount)
-        self.currency = currency
-        self.timestamp = int(time.time())
-        self.nonce = os.urandom(16).hex()
-
-    def to_dict(self):
-        return {
-            "from_did": self.from_did,
-            "to_did": self.to_did,
-            "amount": self.amount,
-            "currency": self.currency,
-            "timestamp": self.timestamp,
-            "nonce": self.nonce
-        }
-
-    def sign(self, private_key):
-        """User signs payment proof"""
-        message = json.dumps(self.to_dict(), sort_keys=True).encode()
-        signing_key = nacl.signing.SigningKey(private_key)
-        signature = signing_key.sign(message).signature
-        return base58.b58encode(signature).decode()
-
-    def verify(self, signature):
-        """Agent verifies payment came from claimed user"""
-        # Resolve user's DID
-        did_doc = resolve_did(self.from_did)
-        public_key_b58 = did_doc["authentication"][0]["publicKeyBase58"]
-        public_key = nacl.signing.VerifyKey(base58.b58decode(public_key_b58))
-
-        # Verify signature
-        message = json.dumps(self.to_dict(), sort_keys=True).encode()
-        try:
-            public_key.verify(message, base58.b58decode(signature))
-            return True
-        except:
-            return False
-
-# Usage
-payment = PaymentProof(
-    from_did="did:bindu:alice_at_example_com:user:123",
-    to_did="did:bindu:bob_at_example_com:agent:456",
-    amount=Decimal("0.0001")
-)
-
-signature = payment.sign(alice_private_key)
-
-if payment.verify(signature):
-    print("✓ Payment verified! Proceeding with service...")
-else:
-    print("✗ Invalid payment proof!")
-```
-
-### 4. Multi-Agent Orchestration - Task Routing
-
-**Scenario:** Complex task needs multiple specialized agents working together.
-
-```python
-class AgentOrchestrator:
-    def __init__(self):
-        self.agents = {}
-
-    async def register_agent(self, did):
-        """Register agent and verify its identity"""
-        # Resolve DID
-        did_doc = await resolve_did(did)
-
-        # Get agent capabilities
-        manifest = await self.get_manifest(did_doc)
-
-        self.agents[did] = {
-            "did": did,
-            "skills": manifest["skills"],
-            "public_key": did_doc["authentication"][0]["publicKeyBase58"],
-            "endpoint": manifest["deployment"]["url"]
-        }
-
-    async def route_task(self, task):
-        """Route task to best agent based on skills"""
-        # Find agents with required skills
-        candidates = [
-            agent for agent in self.agents.values()
-            if task["required_skill"] in agent["skills"]
-        ]
-
-        if not candidates:
-            raise ValueError(f"No agent found for skill: {task['required_skill']}")
-
-        # Use negotiation to select best agent
-        best_agent = await self.negotiate(candidates, task)
-
-        # Send task with cryptographic proof
-        result = await self.send_task(
-            to_did=best_agent["did"],
-            task=task,
-            signature=self.sign_task(task)
-        )
-
-        # Verify result came from expected agent
-        if not self.verify_result(result, best_agent["public_key"]):
-            raise SecurityError("Result signature invalid!")
-
-        return result
-
-# Usage
-orchestrator = AgentOrchestrator()
-
-# Register agents
-await orchestrator.register_agent("did:bindu:alice:pdf_agent:abc")
-await orchestrator.register_agent("did:bindu:bob:translate_agent:def")
-await orchestrator.register_agent("did:bindu:carol:summarize_agent:ghi")
-
-# Complex workflow
-task = {
-    "type": "process_document",
-    "steps": [
-        {"skill": "pdf_extraction", "input": "document.pdf"},
-        {"skill": "translation", "target_lang": "es"},
-        {"skill": "summarization", "max_length": 500}
-    ]
-}
-
-result = await orchestrator.route_task(task)
-print(f"Task completed! Result: {result}")
-```
-
-### 5. Audit Trails - Compliance and Accountability
-
-**Scenario:** Regulatory compliance requires proof of all agent actions.
-
-```python
-class AuditLog:
-    def __init__(self):
-        self.entries = []
-
-    def log_action(self, agent_did, action, data, signature):
-        """Log agent action with cryptographic proof"""
-        entry = {
-            "timestamp": datetime.utcnow().isoformat(),
-            "agent_did": agent_did,
-            "action": action,
-            "data": data,
-            "signature": signature
-        }
-
-        # Verify signature
-        if not self.verify_entry(entry):
-            raise SecurityError("Invalid signature in audit log!")
-
-        self.entries.append(entry)
-
-    def verify_entry(self, entry):
-        """Verify audit entry signature"""
-        did_doc = resolve_did(entry["agent_did"])
-        public_key_b58 = did_doc["authentication"][0]["publicKeyBase58"]
-        # ... verification logic ...
-        return True
-
-    def generate_report(self, start_date, end_date):
-        """Generate compliance report"""
-        filtered = [
-            e for e in self.entries
-            if start_date <= datetime.fromisoformat(e["timestamp"]) <= end_date
-        ]
-
-        report = {
-            "period": {"start": start_date, "end": end_date},
-            "total_actions": len(filtered),
-            "agents": list(set(e["agent_did"] for e in filtered)),
-            "entries": filtered,
-            "all_verified": all(self.verify_entry(e) for e in filtered)
-        }
-
-        return report
-
-# Usage
-audit = AuditLog()
-
-# Log actions
-audit.log_action(
-    agent_did="did:bindu:medical_agent:abc",
-    action="diagnosis",
-    data={"patient_id": "P123", "diagnosis": "..."},
-    signature="..."
-)
-
-# Generate compliance report
-report = audit.generate_report(
-    start_date=datetime(2026, 1, 1),
-    end_date=datetime(2026, 12, 31)
-)
-
-print(f"Total actions: {report['total_actions']}")
-print(f"All signatures valid: {report['all_verified']}")
-```
-
-## DID Generation
-
-When you create a Bindu agent, a DID is automatically generated. Let's walk through the entire process:
-
-### Automatic Generation
-
-```python
-config = {
-    "author": "your.email@example.com",
-    "name": "my_agent",
-    "description": "My AI agent"
-}
-
-bindufy(config, handler)
-# DID generated: did:bindu:your_email_at_example_com:my_agent:<hash>
-```
-
-### Step-by-Step Generation Process
-
-**Step 1: Sanitize Email**
-```python
-# Input
-author = "alice@example.com"
-
-# Sanitization
-# Replace @ with _at_
-# Replace . with _
-sanitized = "alice_at_example_com"
-```
-
-**Step 2: Generate Cryptographic Keys**
-```python
-import nacl.signing
-
-# Generate Ed25519 key pair
-signing_key = nacl.signing.SigningKey.generate()
-private_key = signing_key.encode()  # Keep this SECRET!
-public_key = signing_key.verify_key.encode()  # Share this
-```
-
-**Step 3: Create Unique Hash**
-```python
-import hashlib
-
-# Hash the public key to create unique identifier
-key_hash = hashlib.sha256(public_key).hexdigest()[:32]
-# Result: "<32-char-hex-hash>"
-```
-
-**Step 4: Construct DID**
-```python
-did = f"did:bindu:{sanitized}:{agent_name}:{key_hash}"
-# Result: "did:bindu:alice_at_example_com:my_agent:352c17d030fb4bf1ab33d04b102aef3d"
-```
-
-**Step 5: Create DID Document**
-```python
-did_document = {
-    "@context": [
-        "https://www.w3.org/ns/did/v1",
-        "https://getbindu.com/ns/v1"
-    ],
-    "id": did,
-    "created": datetime.utcnow().isoformat() + "+00:00",
-    "authentication": [{
-        "id": f"{did}#key-1",
-        "type": "Ed25519VerificationKey2020",
-        "controller": did,
-        "publicKeyBase58": base58.b58encode(public_key).decode()
-    }]
-}
-```
-
-### Why This Design?
-
-**Email in DID:**
-- Provides human-readable context
-- Helps with agent discovery
-- Links agent to creator (accountability)
-- Not used for authentication (just metadata)
-
-**Unique Hash:**
-- Guarantees global uniqueness
-- Prevents collisions (two agents with same name)
-- Derived from public key (cryptographic binding)
-- Makes DIDs unpredictable (security)
-
-**Best Practices:**
-- Use a dedicated email for agent creation
-- Choose descriptive agent names
-- Store private keys in secure vaults (not in code!)
-- Back up private keys (losing them = losing identity)
-
-## Security Considerations
-
-### Private Key Protection
-
-**Critical:** Your private key is your agent's identity. Losing it or exposing it is catastrophic.
-
-#### Storage Best Practices
-
-**❌ NEVER DO THIS:**
-```python
-# DON'T hardcode keys in code
-PRIVATE_KEY = "key_data_here" #pragma: allowlist secret
-
-# DON'T commit to git
-# .env file in repository
-AGENT_PRIVATE_KEY=<key-data> #pragma: allowlist secret
-
-# DON'T store in plain text files
-with open("private_key.txt", "w") as f:
-    f.write(private_key)
-```
-
-
-#### What If Private Key Is Compromised?
-
-**Immediate Actions:**
-1. **Stop using the compromised key immediately**
-2. **Generate new key pair**
-3. **Update DID document with new public key**
-4. **Notify all services using your agent**
-5. **Revoke old key** (mark as compromised)
-6. **Investigate how compromise occurred**
-
-
-### Key Rotation
-
-Regular key rotation is a security best practice, even without compromise.
-
-#### When to Rotate Keys
-
-- **Scheduled:** Every 90-180 days
-- **After team changes:** Employee leaves with key access
-- **Compliance requirements:** Industry regulations (PCI-DSS, HIPAA)
-- **Precautionary:** Suspected but unconfirmed compromise
-
-## DID Standards
-
-Bindu DIDs follow W3C standards:
-- [W3C DID Core Specification](https://www.w3.org/TR/did-core/)
-- [DID Method Registry](https://www.w3.org/TR/did-spec-registries/)
-- Ed25519 signature scheme (RFC 8032)
-
-## API Reference
-
-### Resolve DID
+On disk, the seed file should be readable only by the user running the agent: `chmod 600`. If you're on Linux/macOS, check:
 
 ```bash
-POST /did/resolve
-Content-Type: application/json
+ls -l ~/.bindu/oauth_credentials.json
+# should show -rw------- (600)
+```
 
-{
-    "did": "did:bindu:..."
+### Rotation
+
+Rotating keys regularly is good hygiene. The simplest rotation:
+
+1. Generate a new seed (the same one-liner from setup).
+2. Update Hydra with the new public key:
+   ```bash
+   curl -X PUT 'https://hydra-admin.getbindu.com/admin/clients/<your did>' \
+     -H 'Content-Type: application/json' \
+     -d '<full client record with updated metadata.public_key>'
+   ```
+3. Start your agent with the new seed.
+4. Discard the old seed.
+
+During the rotation window, old signatures will fail verification. Do it during a maintenance window, or orchestrate a dual-signature period (beyond this document's scope).
+
+### If you suspect compromise
+
+Assume the attacker has full signing authority until you've:
+
+- Rotated the seed (above).
+- Invalidated all outstanding bearer tokens (Hydra's admin API can revoke).
+- Audited recent requests signed by this DID to see what the attacker might have done.
+- Read your logs for unfamiliar `X-DID-Timestamp` values or request patterns.
+
+Don't just rotate — investigate. The seed didn't leak on its own.
+
+---
+
+## Bonus: signed responses from agents
+
+So far we've talked about you signing requests to agents. Agents also sign their responses — every artifact a Bindu agent produces is signed with the agent's seed. That way, when your client sees a task result, you can verify the result really came from the agent and wasn't tampered with in flight.
+
+Look for this field in a task response:
+
+```json
+"metadata": {
+  "did.message.signature": "<base58 signature>"
 }
 ```
 
-**Response:** DID Document (JSON-LD)
+To verify, resolve the agent's DID document, pull the `publicKeyBase58`, and verify the signature against the message bytes. The agent's DID itself is in its agent card at `/.well-known/agent.json`.
 
-### Get Agent DID
+You don't _have to_ verify — the server does the heavy lifting at ingest. But if you're building something compliance-heavy (legal, medical, financial), the client-side verification gives you a proof you can put in an audit log.
 
-```bash
-GET /.well-known/agent.json
-```
+---
 
-**Response:** Agent manifest including DID
+## Signing is not encryption
 
-## Inspiration
+One clarification that comes up often:
 
-[Atproto](https://atproto.com/specs/did)
+- **Signing** gives you authenticity ("really from this DID") and integrity ("not modified in transit"). It does **not** hide the contents. Anyone who sees the request on the wire can read the body as plaintext JSON.
+- **Encryption** hides the contents. For network transport, use HTTPS (TLS). In Bindu, the public Hydra and agent endpoints are HTTPS in production.
 
-## Related Documentation
+If you need messages to be unreadable even by gateways/proxies in the middle, that's **end-to-end encryption** — a separate feature, not part of the DID system. Bindu doesn't currently ship E2E message encryption; TLS + DID signing is the production model.
 
-- [Authentication Guide](./AUTHENTICATION.md) - OAuth2 and token-based auth
-- [Payment Integration](./PAYMENT.md) - X402 payment protocol with DIDs
-- [W3C DID Specification](https://www.w3.org/TR/did-core/)
-- [GetBindu.com](https://getbindu.com)
+---
+
+## Why Bindu chose Ed25519 specifically
+
+This is optional reading. The short version: Ed25519 is a modern elliptic-curve signature scheme that's:
+
+- **Small.** Keys are 32 bytes, signatures are 64 bytes. Fits in headers.
+- **Fast.** Sub-millisecond signing and verifying on modern CPUs.
+- **Deterministic.** The same input always produces the same signature. Makes testing easy (we can check exact fixture signatures across languages).
+- **Well-vetted.** Used in Signal, Tor, SSH, most modern crypto. Published in RFC 8032. No known practical attacks.
+
+The alternative was RSA. RSA keys are ten times larger, signatures are larger, signing is slower, and RSA has a long history of subtly broken implementations. For a protocol that signs on every request, Ed25519 is the right default.
+
+If you ever see a DID from outside Bindu using a different key type, the `authentication.type` field in the DID document tells you which algorithm to use. Bindu-native DIDs always use `Ed25519VerificationKey2020`.
+
+---
+
+## References and further reading
+
+Standards:
+
+- [W3C DID Core Specification](https://www.w3.org/TR/did-core/) — the governing standard for DIDs
+- [RFC 8032](https://datatracker.ietf.org/doc/html/rfc8032) — Ed25519 signature scheme
+- [did:bindu method spec](https://getbindu.com/ns/v1) — Bindu-specific DID method
+
+Related Bindu docs:
+
+- [AUTHENTICATION.md](./AUTHENTICATION.md) — the bearer-token side
+- [PAYMENT.md](./PAYMENT.md) — the x402 payment protocol, which also uses DIDs
+- `docs/GATEWAY_DID_SETUP.md` — operator guide for configuring the gateway's own DID (separate doc, in progress)
+
+Inspiration:
+
+- [Atproto DID spec](https://atproto.com/specs/did) — Bluesky's approach to DIDs, which shares many design decisions
+
+---
+
+## Summary in one paragraph
+
+A DID is a long identifier string that maps, through a public document, to a cryptographic public key. When you make a request, you sign specific bytes with your private key (Ed25519) and attach the signature as an HTTP header. The server resolves your DID to get the public key, reconstructs the same bytes, and verifies. If it matches, it knows the request really came from you and hasn't been modified. Combined with a bearer token from [AUTHENTICATION.md](./AUTHENTICATION.md), this gives Bindu two independent guarantees: _this request is permitted_ (token) and _this request is authentic_ (signature). Lose either and the request is rejected. Get both right and you have a system where identity and access are verifiable end-to-end, without trusting any single central authority.

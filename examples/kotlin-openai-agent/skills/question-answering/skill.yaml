@@ -1,0 +1,23 @@
+id: question-answering-v1
+name: question-answering
+description: |
+  General question answering capability using OpenAI GPT-4o.
+  Built with Kotlin and the Bindu SDK.
+version: 1.0.0
+author: dev@example.com
+
+tags:
+  - question-answering
+  - conversation
+  - assistant
+
+input_modes:
+  - text/plain
+
+output_modes:
+  - text/plain
+
+examples:
+  - "Explain coroutines in Kotlin"
+  - "What is the JVM garbage collector?"
+  - "Compare Kotlin and Java for backend development"

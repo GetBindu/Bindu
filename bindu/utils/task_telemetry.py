@@ -201,6 +201,10 @@ def track_active_task(func: F) -> F:
             if operation in ["cancel_task"]:
                 active_tasks.add(-1, {"operation": "cancel"})
 
+            # FIX: Ensure creation operations decrement when the request cycle completes
+            elif operation in create_operations:
+                active_tasks.add(-1, {"operation": "completed"})
+
             return result
 
         except Exception:

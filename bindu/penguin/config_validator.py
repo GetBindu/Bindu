@@ -7,9 +7,14 @@ ensuring they meet the required schema and have proper defaults.
 
 import os
 from typing import Any, Dict
+from urllib.parse import urlparse
 
 from bindu import __version__
 from bindu.common.protocol.types import AgentCapabilities, Skill
+
+
+class ConfigError(ValueError):
+    """Raised when bindufy configuration is invalid."""
 
 
 class ConfigValidator:
@@ -66,6 +71,11 @@ class ConfigValidator:
     @classmethod
     def validate_and_process(cls, config: Dict[str, Any]) -> Dict[str, Any]:
         """Validate and process agent configuration."""
+        if not isinstance(config, dict):
+            raise ConfigError(
+                "ConfigError: configuration must be a dictionary passed to bindufy(config=...)."
+            )
+
         # Validate required fields first (fail-fast)
         cls._validate_required_fields(config)
 
@@ -90,7 +100,7 @@ class ConfigValidator:
     @classmethod
     def _validate_required_fields(cls, config: Dict[str, Any]) -> None:
         """Validate required fields including nested fields."""
-        missing = []
+        missing: list[str] = []
 
         for field in cls.REQUIRED_FIELDS:
             keys = field.split(".")
@@ -108,13 +118,43 @@ class ConfigValidator:
                 missing.append(field)
 
         if missing:
-            formatted_fields = "\n".join(f"- {f}" for f in missing)
+            if len(missing) == 1:
+                field_name = missing[0]
+                raise ConfigError(
+                    f"ConfigError: '{field_name}' is a required field in the agent configuration."
+                )
 
-            raise ValueError(
-                f"Invalid Bindu configuration.\n\n"
-                f"Missing required field(s):\n"
+            formatted_fields = "\n".join(f"- {f}" for f in missing)
+            raise ConfigError(
+                f"ConfigError: missing required fields in the agent configuration:\n"
                 f"{formatted_fields}\n\n"
                 f"Example:\n{cls.EXAMPLE_CONFIG}"
+            )
+
+        cls._validate_deployment_url(config)
+
+    @classmethod
+    def _validate_deployment_url(cls, config: Dict[str, Any]) -> None:
+        """Validate deployment URL format when provided."""
+        deployment_config = config.get("deployment")
+        if deployment_config is None:
+            return
+
+        if not isinstance(deployment_config, dict):
+            raise ConfigError(
+                "ConfigError: 'deployment' must be a dictionary in the agent configuration."
+            )
+
+        deployment_url = deployment_config.get("url")
+        if not isinstance(deployment_url, str) or not deployment_url.strip():
+            raise ConfigError(
+                "ConfigError: 'deployment.url' is a required field in the agent configuration."
+            )
+
+        parsed = urlparse(deployment_url)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ConfigError(
+                f"ConfigError: 'deployment.url' must be a valid http(s) URL, got '{deployment_url}'."
             )
 
     # ------------------------------------------------------------------

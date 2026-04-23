@@ -9,6 +9,7 @@ from bindu.penguin.bindufy import (
     _normalize_execution_costs,
     _setup_x402_extension,
     _parse_deployment_url,
+    bindufy,
 )
 
 
@@ -179,3 +180,18 @@ class TestBindufyUtilities:
         extension = _setup_x402_extension(costs)
 
         assert extension.pay_to_address == "0x123"
+
+
+def test_bindufy_non_callable_handler_raises_clear_error():
+    """bindufy should fail fast with a clear handler validation message."""
+    config = {
+        "author": "test@example.com",
+        "name": "Test Agent",
+        "deployment": {"url": "http://localhost:3773"},
+    }
+
+    with pytest.raises(
+        TypeError,
+        match="callable function or coroutine function",
+    ):
+        bindufy(config=config, handler="not_callable", run_server=False)  # type: ignore[arg-type]

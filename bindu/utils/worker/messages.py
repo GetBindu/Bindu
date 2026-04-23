@@ -2,56 +2,142 @@
 
 from __future__ import annotations
 
+import base64
+import io
 from typing import Any, Optional, Union
 from uuid import UUID, uuid4
 
-from bindu.common.protocol.types import Message
+from pypdf import PdfReader
+from docx import Document
+
+from bindu.common.protocol.types import Message, Part
+from bindu.utils.logging import get_logger
 
 # Import PartConverter from same package
 from .parts import PartConverter
+
+logger = get_logger("bindu.utils.worker.messages")
 
 # Type aliases for better readability
 ChatMessage = dict[str, str]
 ProtocolMessage = Message
 
 
+class FileInterceptor:
+    """Native pipeline for intercepting and parsing Base64 file parts."""
+
+    SUPPORTED_MIME_TYPES = {
+        "application/pdf",
+        "text/plain",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    }
+
+    @staticmethod
+    def _extract_pdf(file_bytes: bytes) -> str:
+        """Extract text from a PDF buffer."""
+        try:
+            reader = PdfReader(io.BytesIO(file_bytes))
+            return "\n".join(page.extract_text() for page in reader.pages)
+        except Exception as e:
+            logger.error(f"Failed to parse PDF: {e}")
+            return "[Error: Could not parse PDF content]"
+
+    @staticmethod
+    def _extract_docx(file_bytes: bytes) -> str:
+        """Extract text from a DOCX buffer."""
+        try:
+            doc = Document(io.BytesIO(file_bytes))
+            return "\n".join(paragraph.text for paragraph in doc.paragraphs)
+        except Exception as e:
+            logger.error(f"Failed to parse DOCX: {e}")
+            return "[Error: Could not parse DOCX content]"
+
+    @classmethod
+    def intercept_and_parse(cls, parts: list[Part]) -> list[dict[str, Any]]:
+        """Intercept file parts, extract text, and replace with text parts."""
+        processed_parts = []
+
+        for part in parts:
+            if part.get("kind") != "file":
+                processed_parts.append(part)
+                continue
+
+            mime_type = part.get("mimeType", "")
+            base64_data = str(part.get("data", ""))
+
+            if mime_type not in cls.SUPPORTED_MIME_TYPES:
+                logger.warning(f"Unsupported MIME type rejected: {mime_type}")
+                processed_parts.append(
+                    {
+                        "kind": "text",
+                        "text": f"[Unsupported file type: {mime_type}]",
+                    }
+                )
+                continue
+
+            try:
+                # Decode the Base64 payload
+                file_bytes = base64.b64decode(base64_data)
+                extracted_text = ""
+
+                # Route to specific parser based on MIME type
+                if mime_type == "application/pdf":
+                    extracted_text = cls._extract_pdf(file_bytes)
+                elif mime_type == "text/plain":
+                    extracted_text = file_bytes.decode("utf-8")
+                elif (
+                    mime_type
+                    == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                ):
+                    extracted_text = cls._extract_docx(file_bytes)
+
+                # Inject the parsed document as a formatted text prompt
+                processed_parts.append(
+                    {
+                        "kind": "text",
+                        "text": f"--- Document Uploaded ---\n{extracted_text}\n--- End of Document ---",
+                    }
+                )
+
+            except Exception as e:
+                logger.error(f"Base64 decoding or routing failed: {e}")
+                processed_parts.append(
+                    {
+                        "kind": "text",
+                        "text": "[System: Failed to decode uploaded file data]",
+                    }
+                )
+
+        return processed_parts
+
+
 class MessageConverter:
     """Optimized converter for message format transformations."""
 
-    # Role mapping for chat format conversion
     ROLE_MAP = {"agent": "assistant", "user": "user"}
 
     @staticmethod
     def to_chat_format(history: list[Message]) -> list[ChatMessage]:
         """Convert protocol messages to standard chat format.
 
-        Preserves file parts so handlers can process uploaded documents.
-
-        Args:
-            history: List of protocol messages
-
-        Returns:
-            List of chat messages with role and content fields
+        Now intercepts Base64 files natively and converts them to text parts
+        before passing them to the agent framework.
         """
         result = []
         for msg in history:
-            parts = msg.get("parts", [])
-            if not parts:
+            original_parts = msg.get("parts", [])
+            if not original_parts:
                 continue
+
+            # INTERCEPTOR: Parse files into text natively
+            processed_parts = FileInterceptor.intercept_and_parse(original_parts)
 
             role = MessageConverter.ROLE_MAP.get(msg.get("role", "user"), "user")
 
-            # If message has only text parts, keep original string-content format
-            # for backwards compatibility with text-only agents
-            has_file = any(p.get("kind") == "file" for p in parts)
-
-            if has_file:
-                # Preserve full parts structure so handler can access file bytes
-                result.append({"role": role, "parts": parts})
-            else:
-                content = MessageConverter._extract_text_content(msg)
-                if content:
-                    result.append({"role": role, "content": content})
+            # Since all files are now parsed into text, we safely extract it
+            content = MessageConverter._extract_text_content(processed_parts)
+            if content:
+                result.append({"role": role, "content": content})
 
         return result
 
@@ -61,18 +147,7 @@ class MessageConverter:
         task_id: Optional[Union[str, UUID]] = None,
         context_id: Optional[Union[str, UUID]] = None,
     ) -> list[ProtocolMessage]:
-        """Convert manifest result to protocol messages.
-
-        Args:
-            result: Manifest execution result
-            task_id: Optional task ID
-            context_id: Optional context ID
-
-        Returns:
-            List of protocol messages
-        """
-        # Message TypedDict requires task_id and context_id as Required fields
-        # Use placeholder UUIDs if not provided
+        """Convert manifest result to protocol messages."""
         return [
             Message(
                 role="agent",
@@ -89,13 +164,11 @@ class MessageConverter:
         ]
 
     @staticmethod
-    def _extract_text_content(message: Message) -> str:
-        """Extract text content from protocol message."""
-        parts = message.get("parts", [])
+    def _extract_text_content(parts: list[dict[str, Any]]) -> str:
+        """Extract text content from processed parts."""
         if not parts:
             return ""
 
-        # Use generator for memory efficiency
         text_parts = (
             part["text"]
             for part in parts

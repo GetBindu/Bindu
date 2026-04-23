@@ -27,6 +27,9 @@ DID documents, enabling agents to establish trust in a decentralized network.
 
 from __future__ import annotations
 
+import os
+import platform
+
 from datetime import datetime, timezone
 from functools import cached_property
 from pathlib import Path
@@ -214,45 +217,28 @@ class DIDAgentExtension:
 
         private_pem, public_pem = self._generate_key_pair_data()
 
+        # Write keys using Path methods
+        if platform.system() == "Windows":
+            # Windows does not enforce POSIX permissions — write directly
+            self.private_key_path.write_bytes(private_pem)
+            self.public_key_path.write_bytes(public_pem)
+        else:
+            # POSIX: use os.open to set permissions atomically on creation
+            fd = os.open(
+                str(self.private_key_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600
+            )
+            with os.fdopen(fd, "wb") as f:
+                f.write(private_pem)
 
-
-        import os
-        import stat
-
-# Create private key 
-        fd = os.open(self.private_key_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "wb") as f:
-            f.write(private_pem)
-        
-        try:
-            os.chmod(self.private_key_path, 0o600)
-        except Exception:
-            pass    
-    
-
-# Public key
-        fd_pub = os.open(self.public_key_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644)
-        with os.fdopen(fd_pub, "wb") as f:
-            f.write(public_pem)
-    
-        try:
-            os.chmod(self.public_key_path, 0o644)
-        except Exception:
-            pass
-           
-        
-
-# Validation
-        if not self.private_key_path.exists():
-            raise OSError("Failed to create private key file")
-    
-        if not self.public_key_path.exists():
-            raise OSError("Failed to create public key file")
-    
+            fd = os.open(
+                str(self.public_key_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644
+            )
+            with os.fdopen(fd, "wb") as f:
+                f.write(public_pem)
 
         return {
             "private_key_path": str(self.private_key_path),
-            "public_key_path": str(self.public_key_path),   
+            "public_key_path": str(self.public_key_path),
         }
 
     def _load_key_from_file(self, key_path: Path, key_type: str) -> bytes:

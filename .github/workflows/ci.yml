@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ──────────────────────────────────────────────────────────────
+  # Unit tests — fast, hermetic, no network, no ports
+  # ──────────────────────────────────────────────────────────────
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: uv sync --locked --all-extras --dev
+
+      - name: Run pre-commit checks
+        run: uv run pre-commit run --all-files
+
+      - name: Run unit tests with coverage
+        run: |
+          uv run pytest tests/unit/ \
+            --cov=bindu \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage.xml \
+            --cov-fail-under=60 \
+            -v
+
+      - name: Upload coverage
+        if: matrix.python-version == '3.13'
+        uses: coverallsapp/github-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          file: coverage.xml
+
+  # ──────────────────────────────────────────────────────────────
+  # E2E gRPC tests — real servers, real ports, full round-trip
+  # ──────────────────────────────────────────────────────────────
+  e2e-grpc-tests:
+    name: E2E gRPC Tests
+    runs-on: ubuntu-latest
+    needs: unit-tests
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Set up Python 3.13
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: uv sync --locked --all-extras --dev
+
+      - name: Run E2E gRPC integration tests
+        run: |
+          uv run pytest tests/integration/grpc/ \
+            -v -m e2e \
+            --timeout=60
+
+  # ──────────────────────────────────────────────────────────────
+  # TypeScript SDK — build and verify
+  # ──────────────────────────────────────────────────────────────
+  typescript-sdk:
+    name: TypeScript SDK Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install and build SDK
+        working-directory: sdks/typescript
+        run: |
+          npm install
+          npm run build
+
+      - name: Verify example dependencies
+        working-directory: examples/typescript-openai-agent
+        run: npm install

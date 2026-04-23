@@ -39,10 +39,10 @@ def setup_opentelemetry_stubs():
             return False
 
     class _Tracer:
-        def start_as_current_span(self, name: str):
+        def start_as_current_span(self, name: str, **kwargs):
             return _SpanCtx()
 
-        def start_span(self, name: str):
+        def start_span(self, name: str, **kwargs):
             return _Span()
 
     class _StatusCode:

@@ -7,18 +7,18 @@
 </div>
 
 <p align="center">
-  <em>The identity, communication & payments layer for AI agents</em>
+  <em>AI முகவர்கள் için kimlik, iletişim ve ödeme katmanı</em>
 </p>
 
 <p align="center">
-  <a href="README.md">🇬🇧 English</a> •
-  <a href="README.de.md">🇩🇪 Deutsch</a> •
-  <a href="README.es.md">🇪🇸 Español</a> •
-  <a href="README.fr.md">🇫🇷 Français</a> •
-  <a href="README.hi.md">🇮🇳 हिंदी</a> •
-  <a href="README.bn.md">🇮🇳 বাংলা</a> •
-  <a href="README.zh.md">🇨🇳 中文</a> •
-  <a href="README.nl.md">🇳🇱 Nederlands</a> •
+  <a href="README.md">🇬🇧 ஆங்கிலம்</a> •
+  <a href="README.de.md">🇩🇪 ஜெர்மன்</a> •
+  <a href="README.es.md">🇪🇸 ஸ்பானிஷ்</a> •
+  <a href="README.fr.md">🇫🇷 பிரெஞ்சு</a> •
+  <a href="README.hi.md">🇮🇳 இந்தி</a> •
+  <a href="README.bn.md">🇮🇳 பங்காளி</a> •
+  <a href="README.zh.md">🇨🇳 சீன மொழி</a> •
+  <a href="README.nl.md">🇳🇱 நெதர்லாந்து</a> •
   <a href="README.ta.md">🇮🇳 தமிழ்</a>
 </p>
 
@@ -26,9 +26,7 @@
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
   <a href="https://hits.sh/github.com/Saptha-me/Bindu.svg"><img src="https://hits.sh/github.com/Saptha-me/Bindu.svg" alt="Hits"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="Python Version"></a>
-  <a href="https://pepy.tech/projects/bindu"><img src="https://static.pepy.tech/personalized-badge/bindu?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads" alt="PyPI Downloads"></a>
   <a href="https://pypi.org/project/bindu/"><img src="https://img.shields.io/pypi/v/bindu.svg" alt="PyPI version"></a>
-  <a href="https://pypi.org/project/bindu/"><img src="https://img.shields.io/pypi/dm/bindu" alt="PyPI Downloads"></a>
   <a href="https://coveralls.io/github/Saptha-me/Bindu?branch=v0.3.18"><img src="https://coveralls.io/repos/github/Saptha-me/Bindu/badge.svg?branch=v0.3.18" alt="Coverage"></a>
   <a href="https://github.com/getbindu/Bindu/actions/workflows/release.yml"><img src="https://github.com/getbindu/Bindu/actions/workflows/release.yml/badge.svg" alt="Tests"></a>
   <a href="https://discord.gg/3w5zuYUuwt"><img src="https://img.shields.io/badge/Join%20Discord-7289DA?logo=discord&logoColor=white" alt="Discord"></a>
@@ -42,7 +40,7 @@
 </p>
 
 <p align="center">
-  <em>"Like sunflowers turning toward the light, agents collaborate in swarms - each one independent, yet together they create something greater."</em>
+  <em>"சூரியக்கொம்புகள் ஒளிக்கு திரும்பும் போல், முகவர்கள் கூட்டங்களில் ஒத்துழைக்கிறார்கள் - ஒவ்வொருவரும் சுதந்திரமாக, ஆனால் அவர்கள் ஒன்றாக சேர்ந்து ஒரு பெரியதை உருவாக்குகிறார்கள்."</em>
 </p>
 
 <br/>
@@ -57,12 +55,10 @@
 
 ---
 
-**Bindu** (read: _binduu_) is an operating layer for AI agents that provides identity, communication, and payment capabilities. It delivers a production-ready service with a convenient API to connect, authenticate, and orchestrate agents across distributed systems using open protocols: **A2A**, **AP2**, and **X402**.
-
-Built with a distributed architecture (Task Manager, scheduler, storage), Bindu makes it fast to develop and easy to integrate with any AI framework. Transform any agent framework into a fully interoperable service for communication, collaboration, and commerce in the Internet of Agents.
+**Bindu** (படிக்க: _பிந்து_) என்பது AI முகவர்களுக்கு ஒரு செயல்பாட்டு அடுக்கு ஆகும், இது அடையாளம், தொடர்பு மற்றும் கட்டண திறன்களை வழங்குகிறது. இது திறந்த நெறிமுறைகளைப் பயன்படுத்தி, பரவலாக உள்ள அமைப்புகளில் முகவர்களை இணைக்க, அங்கீகாரம் அளிக்க மற்றும் ஒழுங்குபடுத்த ஒரு வசதியான API உடன் தயாரிப்பு-தயாரான சேவையை வழங்குகிறது: **A2A**, **AP2**, மற்றும் **X402**.வினியோகிக்கப்பட்ட கட்டமைப்புடன் (பணி மேலாளர், திட்டமிடுபவர், சேமிப்பு), பிந்து விரைவாக உருவாக்க மற்றும் எந்த AI கட்டமைப்புடன் இணைக்க எளிதாக இருக்கிறது. எந்த முகவர் கட்டமைப்பையும் இணையத்தில் தொடர்பு, ஒத்துழைப்பு மற்றும் வர்த்தகத்திற்கு முழுமையாக பரஸ்பர செயல்படும் சேவையாக மாற்றவும்.
 
 <p align="center">
-  <strong>🌟 <a href="https://getbindu.com">உங்கள் ஏஜென்ட்டைப் பதிவு செய்யுங்கள்</a> • 🌻 <a href="https://docs.getbindu.com">ஆவணங்கள்</a> • 💬 <a href="https://discord.gg/3w5zuYUuwt">Discord சமூகம்</a></strong>
+  <strong>🌟 <a href="https://getbindu.com">உங்கள் முகவரைப் பதிவு செய்யவும்</a> • 🌻 <a href="https://docs.getbindu.com">ஆவணங்கள்</a> • 💬 <a href="https://discord.gg/3w5zuYUuwt">Discord சமூகம்</a></strong>
 </p>
 
 
@@ -70,7 +66,7 @@ Built with a distributed architecture (Task Manager, scheduler, storage), Bindu 
 
 <br/>
 
-## 🎥 Watch Bindu in Action
+## 🎥 பிந்து செயல்பாட்டில் காண்க
 
 <div align="center">
   <a href="https://www.youtube.com/watch?v=qppafMuw_KI" target="_blank">
@@ -80,16 +76,16 @@ Built with a distributed architecture (Task Manager, scheduler, storage), Bindu 
 
 <br/>
 
-## 📋 Prerequisites
+## 📋 தேவைகள்
 
-Before installing Bindu, ensure you have:
+பிந்து நிறுவுவதற்கு முன், நீங்கள் கொண்டிருக்க வேண்டும்:
 
-- **Python 3.12 or higher** - [Download here](https://www.python.org/downloads/)
-- **UV package manager** - [Installation guide](https://github.com/astral-sh/uv)
-- **API Key Required**: Set `OPENROUTER_API_KEY` or `OPENAI_API_KEY` in your environment variables. Free OpenRouter models are available for testing.
+- **Python 3.12 அல்லது அதற்கு மேல்** - [Download here](https://www.python.org/downloads/)
+- **UV தொகுப்பாளர்** - [Installation guide](https://github.com/astral-sh/uv)
+- **API விசை தேவை**: உங்கள் சுற்றுப்புற மாறிலிகளில் `OPENROUTER_API_KEY` அல்லது `OPENAI_API_KEY` ஐ அமைக்கவும். சோதனைக்காக இலவச OpenRouter மாதிரிகள் கிடைக்கின்றன.
 
 
-### Verify Your Setup
+### உங்கள் அமைப்பை சரிபார்க்கவும்
 
 ```bash
 # Check Python version
@@ -103,20 +99,20 @@ uv --version
 
 <br/>
 
-## 📦 Installation
+## 📦 நிறுவல்
 <details>
-<summary><b>Users note (Git & GitHub Desktop)</b></summary>
+<summary><b>பயனர் குறிப்புகள் (Git & GitHub Desktop)</b></summary>
 
-On some Windows systems, git may not be recognized in Command Prompt even after installation due to PATH configuration issues.
+சில விண்டோஸ் அமைப்புகளில், PATH கட்டமைப்பு சிக்கல்களால் நிறுவலுக்குப் பிறகு கட்டளை உத்தியில் git அடையாளம் காணப்படாது.
 
-If you face this issue, you can use *GitHub Desktop* as an alternative:
+இந்த சிக்கலை நீங்கள் எதிர்கொண்டால், மாற்றாக *GitHub Desktop* ஐப் பயன்படுத்தலாம்:
 
-1. Install GitHub Desktop from https://desktop.github.com/
-2. Sign in with your GitHub account
-3. Clone the repository using the repository URL:
+1. https://desktop.github.com/ இல் இருந்து GitHub Desktop ஐ நிறுவவும்
+2. உங்கள் GitHub கணக்குடன் உள்நுழைக
+3. களஞ்சிய URL ஐப் பயன்படுத்தி களஞ்சியத்தை கிளோன் செய்யவும்:
    https://github.com/getbindu/Bindu.git
 
-GitHub Desktop allows you to clone, manage branches, commit changes, and open pull requests without using the command line.
+GitHub Desktop உங்களுக்கு கட்டளை வரியைப் பயன்படுத்தாமல் கிளோன் செய்ய, கிளைகளைக் கையாள, மாற்றங்களைச் செய்ய மற்றும் புல் கோரிக்கைகளை திறக்க அனுமதிக்கிறது.
 
 </details>
 
@@ -134,17 +130,16 @@ uv sync --dev
 ```
 
 <details>
-<summary><b>Common Installation Issues</b> (click to expand)</summary>
+<summary><b>பொது நிறுவல் சிக்கல்கள்</b> (விரிவாக்க கிளிக் செய்யவும்)</summary>
 
 <br/>
 
-| Issue | Solution |
-|-------|----------|
-| `uv: command not found` | Restart your terminal after installing UV. On Windows, use PowerShell |
-| `Python version not supported` | Install Python 3.12+ from [python.org](https://www.python.org/downloads/) |
-| Virtual environment not activating (Windows) | Use PowerShell and run `.venv\Scripts\activate` |
-| `Microsoft Visual C++ required` | Download [Visual C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) |
-| `ModuleNotFoundError` | Activate venv and run `uv sync --dev` |
+| சிக்கல் | தீர்வு |
+|-------|----------|| `uv: command not found` | UV ஐ நிறுவிய பிறகு உங்கள் டெர்மினலை மறுதொடக்கம் செய்யவும். விண்டோஸில், PowerShell ஐ பயன்படுத்தவும் |
+| `Python version not supported` | [python.org](https://www.python.org/downloads/) இலிருந்து Python 3.12+ ஐ நிறுவவும் |
+| Virtual environment not activating (Windows) | PowerShell ஐ பயன்படுத்தி `.venv\Scripts\activate` ஐ இயக்கவும் |
+| `Microsoft Visual C++ required` | [Visual C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) ஐ பதிவிறக்கம் செய்யவும் |
+| `ModuleNotFoundError` | venv ஐ செயல்படுத்தவும் மற்றும் `uv sync --dev` ஐ இயக்கவும் |
 
 </details>
 
@@ -152,11 +147,33 @@ uv sync --dev
 
 <br/>
 
-## 🚀 Quick Start
+## 🚀 விரைவு தொடக்கம்
 
-### Option 1: Manual Setup
+### விருப்பம் 1: Cookiecutter ஐப் பயன்படுத்துதல் (பரிந்துரைக்கப்படுகிறது)
 
-Create your agent script `my_agent.py`:
+**முதல் முகவரிக்கு நேரம்: ~2 நிமிடங்கள் ⏱️**
+
+```bash
+# Install cookiecutter
+uv add cookiecutter
+
+# Create your Bindu agent
+uvx cookiecutter https://github.com/getbindu/create-bindu-agent.git
+```
+
+<div align="center">
+  <a href="https://youtu.be/obY1bGOoWG8?si=uEeDb0XWrtYOQTL7" target="_blank">
+    <img src="https://img.youtube.com/vi/obY1bGOoWG8/maxresdefault.jpg" alt="Create Production Ready Agent" width="640" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
+  </a>
+</div>
+
+உங்கள் உள்ளூர் முகவர் ஒரு நேரடி, பாதுகாப்பான, கண்டறியக்கூடிய சேவையாக மாறுகிறது. [Learn more →](https://docs.getbindu.com/bindu/create-bindu-agent/overview)
+
+> **💡 தொழில்நுட்ப குறிப்புகள்:** Cookiecutter மூலம் உருவாக்கப்பட்ட முகவர்கள், உங்கள் முகவரியை [GetBindu.com](https://getbindu.com) இல் தானாகவே பதிவு செய்யும் GitHub செயல்களை உள்ளடக்குகின்றன, நீங்கள் உங்கள் சேமிப்பகத்திற்கு தள்ளும்போது.
+
+### விருப்பம் 2: கையேடு அமைப்பு
+
+உங்கள் முகவர் ஸ்கிரிப்டை `my_agent.py` உருவாக்கவும்:
 
 ```python
 import os
@@ -207,9 +224,9 @@ bindufy(config, handler)
 
 ![Sample Agent](assets/agno-simple.png)
 
-Your agent is now live at the URL configured in `deployment.url`.
+உங்கள் முகவர் இப்போது `deployment.url` இல் உள்ள URL இல் நேரில் உள்ளது.
 
-Set a custom port without code changes:
+கோடு மாற்றங்கள் இல்லாமல் தனிப்பயன் போர்ட்டை அமைக்கவும்:
 
 ```bash
 # Linux/macOS
@@ -219,23 +236,22 @@ export BINDU_PORT=4000
 $env:BINDU_PORT="4000"
 ```
 
-Existing examples that use `http://localhost:3773` are automatically overridden when `BINDU_PORT` is set.
+`http://localhost:3773` ஐப் பயன்படுத்தும் ஏற்கனவே உள்ள எடுத்துக்காட்டுகள் `BINDU_PORT` அமைக்கப்படும் போது தானாகவே மீறப்படும்.
 
-### Option 2: Zero-Config Local Agent
+### விருப்பம் 3: ஜீரோ-கொன்ஃபிக் உள்ளூர் முகவர்
 
-Try Bindu without setting up Postgres, Redis, or any cloud services. Runs entirely locally using in-memory storage and scheduler.
+Postgres, Redis, அல்லது எந்த மேக சேவைகளையும் அமைக்காமல் Bindu ஐ முயற்சிக்கவும். நினைவக சேமிப்பு மற்றும் திட்டமிடுபவரைப் பயன்படுத்தி முழுமையாக உள்ளூரில் இயக்குகிறது.
 
 ```bash
 python examples/beginner_zero_config_agent.py
 ```
 
-
-### Option 3: Minimal Echo Agent (Testing)
+### விருப்பம் 4: குறைந்த எக்கோ முகவர் (சோதனை)
 
 <details>
-<summary><b>View minimal example</b> (click to expand)</summary>
+<summary><b>குறைந்த எடுத்துக்காட்டைப் பார்வையிடவும்</b> (விரிவாக்க கிளிக் செய்யவும்)</summary>
 
-Smallest possible working agent:
+சிறியதாகக் கூடுதல் வேலை செய்யும் முகவர்:
 
 ```python
 import os
@@ -262,7 +278,7 @@ bindufy(config, handler)
 # bindufy(config, handler, launch=True)
 ```
 
-**Run the agent:**
+**முகவரியை இயக்கவும்:**
 
 ```bash
 # Start the agent
@@ -272,11 +288,11 @@ python examples/echo_agent.py
 </details>
 
 <details>
-<summary><b>Test the agent with curl</b> (click to expand)</summary>
+<summary><b>curl உடன் முகவரியை சோதிக்கவும்</b> (விரிவாக்க கிளிக் செய்யவும்)</summary>
 
 <br/>
 
-Input:
+உள்ளீடு:
 ```bash
 curl --location 'http://localhost:3773/' \
 --header 'Content-Type: application/json' \
@@ -307,7 +323,7 @@ curl --location 'http://localhost:3773/' \
 }'
 ```
 
-Output:
+வெளியீடு:
 ```bash
 {
     "jsonrpc": "2.0",
@@ -339,7 +355,7 @@ Output:
 }
 ```
 
-Check the status of the task
+பணியின் நிலையைச் சரிபார்க்கவும்
 ```bash
 curl --location 'http://localhost:3773/' \
 --header 'Content-Type: application/json' \
@@ -353,7 +369,7 @@ curl --location 'http://localhost:3773/' \
 }'
 ```
 
-Output:
+வெளியீடு:
 ```bash
 {
     "jsonrpc": "2.0",
@@ -421,22 +437,21 @@ Output:
 
  
 
-## 🚀 Core Features
-
+## 🚀 மைய அம்சங்கள்
 | Feature | Description | Documentation |
 |---------|-------------|---------------|
-|  **Authentication** | Secure API access with Ory Hydra OAuth2 (optional for development) | [Guide →](docs/AUTHENTICATION.md) |
-| 💰 **Payment Integration (X402)** | Accept USDC payments on Base blockchain before executing protected methods | [Guide →](docs/PAYMENT.md) |
-| 💾 **PostgreSQL Storage** | Persistent storage for production deployments (optional - InMemoryStorage by default) | [Guide →](docs/STORAGE.md) |
-| 📋 **Redis Scheduler** | Distributed task scheduling for multi-worker deployments (optional - InMemoryScheduler by default) | [Guide →](docs/SCHEDULER.md) |
-| 🎯 **Skills System** | Reusable capabilities that agents advertise and execute for intelligent task routing | [Guide →](docs/SKILLS.md) |
-| 🤝 **Agent Negotiation** | Capability-based agent selection for intelligent orchestration | [Guide →](docs/NEGOTIATION.md) |
-| 🌐 **Tunneling** | Expose local agents to the internet for testing (**local development only, not for production**) | [Guide →](docs/TUNNELING.md) |
-| 📬 **Push Notifications** | Real-time webhook notifications for task updates - no polling required | [Guide →](docs/NOTIFICATIONS.md) |
-| 📊 **Observability & Monitoring** | Track performance and debug issues with OpenTelemetry and Sentry | [Guide →](docs/OBSERVABILITY.md) |
-| 🔄 **Retry Mechanism** | Automatic retry with exponential backoff for resilient agents | [Guide →](https://docs.getbindu.com/bindu/learn/retry/overview) |
-| 🔑 **Decentralized Identifiers (DIDs)** | Cryptographic identity for verifiable, secure agent interactions and payment integration | [Guide →](docs/DID.md) |
-| 🏥 **Health Check & Metrics** | Monitor agent health and performance with built-in endpoints | [Guide →](docs/HEALTH_METRICS.md) |
+|  **Authentication** | Ory Hydra OAuth2 மூலம் பாதுகாப்பான API அணுகல் (வளர்ச்சிக்கான விருப்பம்) | [Guide →](docs/AUTHENTICATION.md) |
+| 💰 **Payment Integration (X402)** | பாதுகாக்கப்பட்ட முறைகளை செயல்படுத்துவதற்கு முன் Base blockchain இல் USDC பணங்களை ஏற்றுக்கொள்ளவும் | [Guide →](docs/PAYMENT.md) |
+| 💾 **PostgreSQL Storage** | உற்பத்தி செயல்பாடுகளுக்கான நிலையான சேமிப்பு (விருப்பம் - இயல்பாக InMemoryStorage) | [Guide →](docs/STORAGE.md) |
+| 📋 **Redis Scheduler** | பல தொழிலாளர்களுக்கான செயல்களை திட்டமிடுவதற்கான விநியோகிக்கப்பட்ட திட்டமிடல் (விருப்பம் - இயல்பாக InMemoryScheduler) | [Guide →](docs/SCHEDULER.md) |
+| 🎯 **Skills System** | முகவர்கள் விளம்பரம் செய்யும் மற்றும் புத்திசாலித்தனமான பணியாளர்களுக்கான செயல்களை செயல்படுத்தும் மறுபயன்படுத்தக்கூடிய திறன்கள் | [Guide →](docs/SKILLS.md) |
+| 🤝 **Agent Negotiation** | புத்திசாலித்தனமான ஒழுங்குபடுத்தலுக்கான திறன அடிப்படையிலான முகவர் தேர்வு | [Guide →](docs/NEGOTIATION.md) |
+| 🌐 **Tunneling** | சோதனைக்காக உள்ளூர் முகவர்களை இணையத்திற்கு வெளிப்படுத்தவும் (**உள்ளூர் வளர்ச்சி மட்டுமே, உற்பத்திக்காக அல்ல**) | [Guide →](docs/TUNNELING.md) |
+| 📬 **Push Notifications** | பணியாளர்களுக்கான புதுப்பிப்புகளுக்கான நேரடி webhook அறிவிப்புகள் - polling தேவை இல்லை | [Guide →](docs/NOTIFICATIONS.md) |
+| 📊 **Observability & Monitoring** | OpenTelemetry மற்றும் Sentry மூலம் செயல்திறனை கண்காணிக்கவும் மற்றும் பிழைகளை சரிசெய்யவும் | [Guide →](docs/OBSERVABILITY.md) |
+| 🔄 **Retry Mechanism** | நிலையான முகவர்களுக்கான தானியங்கி மீண்டும் முயற்சி மற்றும் பெருக்கம் கொண்ட பின்னடைவு | [Guide →](https://docs.getbindu.com/bindu/learn/retry/overview) |
+| 🔑 **Decentralized Identifiers (DIDs)** | உறுதிப்படுத்தக்கூடிய, பாதுகாப்பான முகவர் தொடர்புகள் மற்றும் பணம் ஒருங்கிணைப்புக்கான கிரிப்டோகிராஃபிக் அடையாளம் | [Guide →](docs/DID.md) |
+| 🏥 **Health Check & Metrics** | உள்ளமைக்கப்பட்ட முடிவுகளைப் பயன்படுத்தி முகவர்களின் ஆரோக்கியம் மற்றும் செயல்திறனை கண்காணிக்கவும் | [Guide →](docs/HEALTH_METRICS.md) |
 
 ---
 
@@ -444,25 +459,37 @@ Output:
 
 ## 🎨 Chat UI
 
-Bindu includes a beautiful chat interface at `http://localhost:5173`. Navigate to the `frontend` folder and run `npm run dev` to start the server.
+Bindu `http://localhost:5173` இல் அழகான உரையாடல் இடைமுகத்தை உள்ளடக்கியது. `frontend` கோப்புறைக்கு செல்லவும் மற்றும் சேவையகத்தை தொடங்க `npm run dev` ஐ இயக்கவும்.
 
 <p align="center">
-  <img src="assets/new-ui.png" alt="Bindu Agent UI" width="640" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
+  <img src="assets/agent-ui.png" alt="Bindu Agent UI" width="640" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
 </p>
 
 ---
 
 <br/>
 
-## 🌐 GetBindu.com
+## 🌐 GetBindu.com[**GetBindu.com**](https://getbindu.com) என்பது அனைத்து பிந்து முகவரிகளின் பொதுப் பதிவேடு ஆகும், இது அவற்றை கண்டுபிடிக்கவும் பரந்த முகவர் சூழலுக்கு அணுகக்கூடியதாகவும் செய்கிறது.
 
-[**GetBindu.com**](https://getbindu.com) என்பது அனைத்து Bindu ஏஜென்ட்களின் பொது பதிவேடு ஆகும், இது அவற்றை பரந்த ஏஜென்ட் சூழலியலில் கண்டுபிடிக்கக்கூடியதாகவும் அணுகக்கூடியதாகவும் ஆக்குகிறது.
+### ✨ குக்கீகட்டர் மூலம் தானியங்கி பதிவு
+
+நீங்கள் குக்கீகட்டர் மாதிரியைப் பயன்படுத்தி ஒரு முகவரியை உருவாக்கும் போது, இது உங்கள் முகவரியை அடைவு பதிவில் தானாகவே பதிவு செய்யும் முன்கூட்டியே கட்டமைக்கப்பட்ட GitHub செயல்பாட்டை உள்ளடக்குகிறது:
+
+1. **உங்கள் முகவரியை உருவாக்கவும்** குக்கீகட்டர் பயன்படுத்தி
+2. **GitHub க்கு தள்ளவும்** - GitHub செயல்பாடு தானாகவே செயல்படுகிறது
+3. **உங்கள் முகவரி தோன்றுகிறது** [GetBindu.com](https://getbindu.com) இல்
+
+> **குறிப்பு**: உங்கள் முகவரியை பதிவு செய்ய `BINDU_PAT_TOKEN` ஐ [getbindu.com](https://getbindu.com) இல் சேகரிக்கவும்.
+
+### 📝 கையேடு பதிவு
+
+கையேடு பதிவு செயல்முறை தற்போது மேம்பாட்டில் உள்ளது.
 
 ---
 
 <br/>
 
-## 🌌 The Vision
+## 🌌 கண்ணோட்டம்
 
 ```
 a peek into the night sky
@@ -486,38 +513,38 @@ a peek into the night sky
 {{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{
 ```
 
-_Each symbol is an agent — a spark of intelligence. The tiny dot is Bindu, the origin point in the Internet of Agents._
+_ஒவ்வொரு சின்னமும் ஒரு முகவர் - அறிவின் ஒரு மின்னல். சிறிய புள்ளி பிந்து, முகவர்களின் இணையத்தில் உள்ள மூலப் புள்ளி._
 
-### NightSky Connection (In Progress)
+### நைட் ஸ்கை இணைப்பு (முன்னேற்றத்தில்)
 
-NightSky enables swarms of agents. Each Bindu is a dot annotating agents with the shared language of A2A, AP2, and X402. Agents can be hosted anywhere—laptops, clouds, or clusters—yet speak the same protocol, trust each other by design, and work together as a single, distributed mind.
+நைட் ஸ்கை முகவரிகளின் கூட்டங்களை செயல்படுத்துகிறது. ஒவ்வொரு பிந்து ஒரு புள்ளியாகும், A2A, AP2 மற்றும் X402 இன் பகிரப்பட்ட மொழியுடன் முகவரிகளை குறிக்கிறது. முகவரிகள் எங்கு வேண்டுமானாலும் - லேப்டாப்கள், மேகங்கள் அல்லது கிளஸ்டர்கள் - விருந்தினர்களாக இருக்கலாம், ஆனால் ஒரே நெறிமுறையில் பேசுகின்றன, வடிவமைப்பினால் ஒருவருக்கொருவர் நம்புகின்றன, மற்றும் ஒரே, விநியோகிக்கப்பட்ட மனமாக ஒன்றிணைந்து வேலை செய்கின்றன.
 
-> **💭 A Goal Without a Plan Is Just a Wish.**
+> **💭 திட்டமின்றி ஒரு இலக்கு வெறும் ஆசை.**
 
 ---
 
 <br/>
 
-## 🛠️ Supported Agent Frameworks
+## 🛠️ ஆதரிக்கப்படும் முகவர் கட்டமைப்புகள்
 
-Bindu is **framework-agnostic** and tested with:
+பிந்து **கட்டமைப்பு-அறியாத** மற்றும் கீழ்காணும் மூலம் சோதிக்கப்பட்டது:
 
-- **AG2** (முன்னர் AutoGen)
+- **AG2** (முந்தைய AutoGen)
 - **Agno**
 - **CrewAI**
 - **LangChain**
 - **LlamaIndex**
 - **FastAgent**
 
-Want integration with your favorite framework? [Let us know on Discord](https://discord.gg/3w5zuYUuwt)!
+உங்கள் பிடித்த கட்டமைப்புடன் ஒருங்கிணைப்பை விரும்புகிறீர்களா? [Let us know on Discord](https://discord.gg/3w5zuYUuwt)!
 
 ---
 
 <br/>
 
-## 🧪 Testing
+## 🧪 சோதனை
 
-Bindu maintains **70%+ test coverage** (target: 80%+):
+பிந்து **70%+ சோதனை கவர்ச்சி** (இலக்கு: 80%+):
 
 ```bash
 uv run pytest -n auto --cov=bindu --cov-report=term-missing
@@ -528,23 +555,22 @@ uv run coverage report --skip-covered --fail-under=70
 
 <br/>
 
-## 🔧 Troubleshooting
+## 🔧 சிக்கல்களை தீர்க்குதல்
 
 <details>
-<summary>Common Issues</summary>
+<summary>பொதுவான சிக்கல்கள்</summary>
 
 <br/>
 
-| Issue | Solution |
+| சிக்கல் | தீர்வு |
 |-------|----------|
-| `Python 3.12 not found` | Install Python 3.12+ and set in PATH, or use `pyenv` |
-| `bindu: command not found` | Activate virtual environment: `source .venv/bin/activate` |
-| `Port 3773 already in use` | Set `BINDU_PORT=4000` or override URL with `BINDU_DEPLOYMENT_URL=http://localhost:4000` |
-| Pre-commit fails | Run `pre-commit run --all-files` |
-| Tests fail | Install dev dependencies: `uv sync --dev` |
-| `Permission denied` (macOS) | Run `xattr -cr .` to clear extended attributes |
+| `Python 3.12 not found` | Python 3.12+ ஐ நிறுவவும் மற்றும் PATH இல் அமைக்கவும், அல்லது `pyenv` ஐப் பயன்படுத்தவும் |
+| `bindu: command not found` | மெய்நிகர் சூழலை செயல்படுத்தவும்: `source .venv/bin/activate` || `Port 3773 already in use` | `BINDU_PORT=4000` ஐ அமைக்கவும் அல்லது `BINDU_DEPLOYMENT_URL=http://localhost:4000` உடன் URL ஐ மீறவும் |
+| Pre-commit தோல்வி | `pre-commit run --all-files` ஐ இயக்கவும் |
+| சோதனைகள் தோல்வி | மேம்பாட்டு சார்ந்தவை நிறுவவும்: `uv sync --dev` |
+| `Permission denied` (macOS) | நீட்டிக்கப்பட்ட பண்புகளை அழிக்க `xattr -cr .` ஐ இயக்கவும் |
 
-**Reset environment:**
+**சூழலை மீட்டமைக்கவும்:**
 ```bash
 rm -rf .venv
 uv venv --python 3.12.9
@@ -562,9 +588,9 @@ Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 <br/>
 
-## 🤝 Contributing
+## 🤝 பங்களிப்பு
 
-We welcome contributions! Join us on [Discord](https://discord.gg/3w5zuYUuwt). Pick the channel that best matches your contribution.
+நாங்கள் பங்களிப்புகளை வரவேற்கிறோம்! [Discord](https://discord.gg/3w5zuYUuwt) இல் எங்களுடன் சேருங்கள். உங்கள் பங்களிப்புக்கு சிறந்த முறையில் பொருந்தும் சேனலை தேர்ந்தெடுக்கவும்.
 
 ```bash
 git clone https://github.com/getbindu/Bindu.git
@@ -581,28 +607,28 @@ pre-commit run --all-files
 
 <br/>
 
-## 📜 License
+## 📜 உரிமம்
 
-Bindu is open-source under the [Apache License 2.0](https://choosealicense.com/licenses/apache-2.0/).
-
----
-
-<br/>
-
-## 💬 Community
-
-We 💛 contributions! Whether you're fixing bugs, improving documentation, or building demos—your contributions make Bindu better.
-
-- 💬 [Join Discord](https://discord.gg/3w5zuYUuwt) for discussions and support
-- ⭐ [Star the repository](https://github.com/getbindu/Bindu) if you find it useful!
+Bindu என்பது [Apache License 2.0](https://choosealicense.com/licenses/apache-2.0/) கீழ் திறந்த மூலமாக உள்ளது.
 
 ---
 
 <br/>
 
-## 👥 Active Moderators
+## 💬 சமூகம்
 
-Our dedicated moderators help maintain a welcoming and productive community:
+நாங்கள் 💛 பங்களிப்புகளை! நீங்கள் பிழைகளை சரிசெய்யுகிறீர்களா, ஆவணங்களை மேம்படுத்துகிறீர்களா, அல்லது டெமோக்களை உருவாக்குகிறீர்களா—உங்கள் பங்களிப்புகள் Bindu ஐ மேம்படுத்துகின்றன.
+
+- 💬 விவாதங்கள் மற்றும் ஆதரவு க்காக [Join Discord](https://discord.gg/3w5zuYUuwt)
+- ⭐ நீங்கள் இதைப் பயனுள்ளதாகக் கண்டால் [Star the repository](https://github.com/getbindu/Bindu)!
+
+---
+
+<br/>
+
+## 👥 செயலில் உள்ள மிதிவண்டிகள்
+
+எங்கள் அர்ப்பணிக்கப்பட்ட மிதிவண்டிகள் ஒரு வரவேற்கும் மற்றும் உற்பத்தி செய்யும் சமூதாயத்தை பராமரிக்க உதவுகின்றனர்:
 
 <table>
   <tr>
@@ -621,18 +647,27 @@ Our dedicated moderators help maintain a welcoming and productive community:
         <sub><b>Paras Chamoli</b></sub>
       </a>
       <br />
-    </tr>
+    </td>
+    <td align="center">
+      <a href="https://github.com/chandan-1427">
+        <img src="https://avatars.githubusercontent.com/u/202320492?v=4" width="100px;" alt="Chandan"/>
+        <br />
+        <sub><b>Chandan</b></sub>
+      </a>
+      <br />
+    </td>
+  </tr>
 </table>
 
-> Want to become a moderator? Reach out on [Discord](https://discord.gg/3w5zuYUuwt)!
+> மிதிவண்டியாக ஆக விரும்புகிறீர்களா? [Discord](https://discord.gg/3w5zuYUuwt) இல் தொடர்பு கொள்ளவும்!
 
 ---
 
 <br/>
 
-## 🙏 Acknowledgements
+## 🙏 நன்றி
 
-Grateful to these projects:
+இந்த திட்டங்களுக்கு நன்றி:
 
 - [FastA2A](https://github.com/pydantic/fasta2a)
 - [12 Factor Agents](https://github.com/humanlayer/12-factor-agents/blob/main/content/factor-11-trigger-from-anywhere.md)
@@ -647,14 +682,13 @@ Grateful to these projects:
 
 <br/>
 
-## 🗺️ Roadmap
+## 🗺️ சாலை வரைபடம்
 
-- [ ] GRPC transport support
-- [ ] Increase test coverage to 80% (in progress)
-- [ ] AP2 end-to-end support
-- [ ] DSPy integration (in progress)
-- [ ] MLTS support
-- [ ] X402 support with other facilitators
+- [ ] GRPC போக்குவரத்து ஆதரவு- [ ] சோதனை பரப்பை 80% ஆக அதிகரிக்கவும் (நடப்பு)
+- [ ] AP2 முடிவுக்கு முடிவு ஆதரவு
+- [ ] DSPy ஒருங்கிணைப்பு (நடப்பு)
+- [ ] MLTS ஆதரவு
+- [ ] மற்ற வசதியாளர்களுடன் X402 ஆதரவு
 
 > 💡 [Suggest features on Discord](https://discord.gg/3w5zuYUuwt)!
 
@@ -668,34 +702,34 @@ Grateful to these projects:
 
 <br/>
 
-## 🎓 Workshops
+## 🎓 வேலைக்கூடங்கள்
 
-- [AI Native in Action: Agent Symphony](https://www.meetup.com/ai-native-amsterdam/events/311066899/) - [Slides](https://docs.google.com/presentation/d/1SqGXI0Gv_KCWZ1Mw2SOx_kI0u-LLxwZq7lMSONdl8oQ/edit)
+- [AI Native in Action: Agent Symphony](https://www.meetup.com/ai-native-Amsterdam && India/events/311066899/) - [Slides](https://docs.google.com/presentation/d/1SqGXI0Gv_KCWZ1Mw2SOx_kI0u-LLxwZq7lMSONdl8oQ/edit)
 
 ---
 
 <br/>
 
-## ⭐ Star History
+## ⭐ நட்சத்திர வரலாறு
 
 [![Star History Chart](https://api.star-history.com/svg?repos=getbindu/Bindu&type=Date)](https://www.star-history.com/#getbindu/Bindu&Date)
 
 ---
 
 <p align="center">
-  <strong>Amsterdam && India அணியால் 💛 உடன் கட்டமைக்கப்பட்டது</strong><br/>
-  <em>Happy Bindu! 🌻🚀✨</em>
+  <strong>💛 அம்பர்டாம் && இந்தியா குழுவால் உருவாக்கப்பட்டது </strong><br/>
+  <em>இனிய பிந்து! 🌻🚀✨</em>
 </p>
 
 <p align="center">
-  <strong>From idea to Internet of Agents in 2 minutes.</strong><br/>
-  <em>Your agent. Your framework. Universal protocols.</em>
+  <strong>கருத்திலிருந்து முகவரிகளின் இணையத்திற்கு 2 நிமிடங்களில்.</strong><br/>
+  <em>உங்கள் முகவர். உங்கள் கட்டமைப்பு. உலகளாவிய நெறிமுறைகள்.</em>
 </p>
 
 <p align="center">
-  <a href="https://github.com/getbindu/Bindu">⭐ Star us on GitHub</a> •
-  <a href="https://discord.gg/3w5zuYUuwt">💬 Join Discord</a> •
-  <a href="https://docs.getbindu.com">🌻 Read the Docs</a>
+  <a href="https://github.com/getbindu/Bindu">⭐ GitHub இல் எங்களை நட்சத்திரமாக்கவும்</a> •
+  <a href="https://discord.gg/3w5zuYUuwt">💬 Discord இல் சேரவும்</a> •
+  <a href="https://docs.getbindu.com">🌻 ஆவணங்களை படிக்கவும்</a>
 </p>
 
 <br/>
@@ -705,5 +739,5 @@ Grateful to these projects:
 </p>
 
 <p align="center">
-  <em>"We believe in the sunflower theory - standing tall together, bringing hope and light to the Internet of Agents."</em>
+  <em>"நாங்கள் சூரியகாந்தி கோட்பாட்டில் நம்புகிறோம் - ஒன்றாக உயரமாக நிற்க, முகவரிகளின் இணையத்திற்கு நம்பிக்கையும் ஒளியையும் கொண்டு வருகிறோம்."</em>
 </p>

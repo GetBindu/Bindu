@@ -8,6 +8,7 @@ from typing import Annotated, Any, Generic, Literal, TypeVar
 
 from pydantic import Discriminator
 from typing_extensions import Self, TypedDict
+from opentelemetry.trace import Span
 
 from bindu.common.protocol.types import TaskIdParams, TaskSendParams
 from bindu.utils.logging import get_logger
@@ -64,14 +65,14 @@ ParamsT = TypeVar("ParamsT")
 class _TaskOperation(TypedDict, Generic[OperationT, ParamsT]):
     """A task operation.
 
-    Refactored to use primitive trace_id/span_id instead of a live OpenTelemetry
-    Span object to support distributed JSON serialization safely.
+    Carries a live OpenTelemetry Span so the worker can restore trace context.
+    The Redis scheduler uses a separate trace_id/span_id serialization approach
+    (see redis_scheduler.py) since live Span objects cannot cross process boundaries.
     """
 
     operation: OperationT
     params: ParamsT
-    trace_id: str | None
-    span_id: str | None
+    _current_span: Span
 
 
 _RunTask = _TaskOperation[Literal["run"], TaskSendParams]

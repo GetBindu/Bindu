@@ -48,8 +48,17 @@ class TaskHandlers:
     error_response_creator: Any = None
 
     @trace_task_operation("get_task")
-    async def get_task(self, request: GetTaskRequest) -> GetTaskResponse:
-        """Get a task and return it to the client."""
+    async def get_task(
+        self,
+        request: GetTaskRequest,
+        caller_did: str | None = None,
+    ) -> GetTaskResponse:
+        """Get a task and return it to the client.
+
+        Returns ``TaskNotFoundError`` for both "truly missing" and "exists but
+        owned by another caller" — the error shape intentionally cannot be
+        used to probe for task IDs across tenants.
+        """
         task_id = request["params"]["task_id"]
         history_length = request["params"].get("history_length")
         task = await self.storage.load_task(task_id, history_length)
@@ -59,16 +68,34 @@ class TaskHandlers:
                 GetTaskResponse, request["id"], TaskNotFoundError, "Task not found"
             )
 
+        owner = await self.storage.get_task_owner(task_id)
+        if owner != caller_did:
+            return self.error_response_creator(
+                GetTaskResponse, request["id"], TaskNotFoundError, "Task not found"
+            )
+
         return GetTaskResponse(jsonrpc="2.0", id=request["id"], result=task)
 
     @trace_task_operation("cancel_task")
     @track_active_task
-    async def cancel_task(self, request: CancelTaskRequest) -> CancelTaskResponse:
+    async def cancel_task(
+        self,
+        request: CancelTaskRequest,
+        caller_did: str | None = None,
+    ) -> CancelTaskResponse:
         """Cancel a running task."""
         task_id = request["params"]["task_id"]
         task = await self.storage.load_task(task_id)
 
         if task is None:
+            return self.error_response_creator(
+                CancelTaskResponse, request["id"], TaskNotFoundError, "Task not found"
+            )
+
+        owner = await self.storage.get_task_owner(task_id)
+        if owner != caller_did:
+            # Same error as "not found" so a caller cannot discover which
+            # task IDs belong to other tenants by trying to cancel them.
             return self.error_response_creator(
                 CancelTaskResponse, request["id"], TaskNotFoundError, "Task not found"
             )
@@ -95,9 +122,20 @@ class TaskHandlers:
         return CancelTaskResponse(jsonrpc="2.0", id=request["id"], result=task)
 
     @trace_task_operation("list_tasks", include_params=False)
-    async def list_tasks(self, request: ListTasksRequest) -> ListTasksResponse:
-        """List all tasks in storage."""
-        tasks = await self.storage.list_tasks(request["params"].get("length"))
+    async def list_tasks(
+        self,
+        request: ListTasksRequest,
+        caller_did: str | None = None,
+    ) -> ListTasksResponse:
+        """List tasks owned by the caller.
+
+        When ``caller_did`` is non-None, the storage layer filters at the
+        index so only the caller's tasks are returned. When ``caller_did`` is
+        None (auth disabled), the current unfiltered behavior is preserved.
+        """
+        tasks = await self.storage.list_tasks(
+            request["params"].get("length"), owner_did=caller_did
+        )
 
         if tasks is None:
             return self.error_response_creator(
@@ -107,12 +145,25 @@ class TaskHandlers:
         return ListTasksResponse(jsonrpc="2.0", id=request["id"], result=tasks)
 
     @trace_task_operation("task_feedback")
-    async def task_feedback(self, request: TaskFeedbackRequest) -> TaskFeedbackResponse:
-        """Submit feedback for a completed task."""
+    async def task_feedback(
+        self,
+        request: TaskFeedbackRequest,
+        caller_did: str | None = None,
+    ) -> TaskFeedbackResponse:
+        """Submit feedback for a completed task.
+
+        Only the task owner can submit feedback.
+        """
         task_id = request["params"]["task_id"]
         task = await self.storage.load_task(task_id)
 
         if task is None:
+            return self.error_response_creator(
+                TaskFeedbackResponse, request["id"], TaskNotFoundError, "Task not found"
+            )
+
+        owner = await self.storage.get_task_owner(task_id)
+        if owner != caller_did:
             return self.error_response_creator(
                 TaskFeedbackResponse, request["id"], TaskNotFoundError, "Task not found"
             )

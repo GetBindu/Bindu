@@ -344,72 +344,45 @@ def _create_deployment_config(
     )
 
 
-def bindufy(
+def _bindufy_core(
     config: Dict[str, Any],
-    handler: Callable[[list[dict[str, str]]], Any],
+    handler_callable: Callable,
     run_server: bool = True,
     key_dir: str | Path | None = None,
     launch: bool = False,
+    caller_dir: Path | None = None,
+    skills_override: list | None = None,
+    skip_handler_validation: bool = False,
+    run_server_in_background: bool = False,
 ) -> AgentManifest:
-    """Transform an agent instance and handler into a bindu-compatible agent.
+    """Core bindufy logic shared by both Python and gRPC registration paths.
+
+    This is the internal engine that transforms a config + callable into a
+    fully running Bindu microservice with DID, auth, x402, A2A, scheduler,
+    and storage. Both bindufy() (Python path) and BinduServiceImpl.RegisterAgent()
+    (gRPC path) delegate to this function.
 
     Args:
-        config: Configuration dictionary containing:
-            - author: Agent author email (required for Hibiscus registration)
-            - name: Human-readable agent name
-            - id: Unique agent identifier (optional, auto-generated if not provided)
-            - description: Agent description
-            - version: Agent version string (default: "1.0.0")
-            - recreate_keys: Force regeneration of existing keys (default: True)
-            - skills: List of agent skills/capabilities
-            - env_file: Path to .env file (optional, for local development)
-            - capabilities: Technical capabilities (streaming, notifications, etc.)
-            - agent_trust: Trust and security configuration
-            - kind: Agent type ('agent', 'team', or 'workflow') (default: "agent")
-            - debug_mode: Enable debug logging (default: False)
-            - debug_level: Debug verbosity level (default: 1)
-            - monitoring: Enable monitoring/metrics (default: False)
-            - telemetry: Enable telemetry collection (default: True)
-            - num_history_sessions: Number of conversation histories to maintain (default: 10)
-            - documentation_url: URL to agent documentation
-            - extra_metadata: Additional metadata dictionary
-            - deployment: Deployment configuration dict
-            - storage: Storage backend configuration dict
-            - scheduler: Task scheduler configuration dict
-            - global_webhook_url: Default webhook URL for all tasks (optional)
-            - global_webhook_token: Authentication token for global webhook (optional)
-        handler: The handler function that processes messages and returns responses.
-                Must have signature: (messages: str) -> str
-        run_server: If True, starts the uvicorn server (blocking). If False, returns manifest
-                   immediately for testing/programmatic usage (default: True)
-        key_dir: Directory for storing DID keys. If None, attempts to detect from caller's
-                directory (may fail in REPL/notebooks). Falls back to current working directory.
-        launch: If True, creates a public tunnel via FRP to expose the server to the internet
-               with an auto-generated subdomain (default: False)
+        config: Raw or pre-validated configuration dictionary.
+        handler_callable: The handler to execute tasks. Either a Python function
+            (from bindufy()) or a GrpcAgentClient (from gRPC registration).
+        run_server: If True, starts the uvicorn HTTP server.
+        key_dir: Directory for storing DID keys.
+        launch: If True, creates a public tunnel via FRP.
+        caller_dir: Directory of the calling file (for skill/key resolution).
+            Required for Python path, optional for gRPC path.
+        skills_override: Pre-loaded skills list (from gRPC path where SDK sends
+            skill content). If None, skills are loaded from config paths.
+        skip_handler_validation: If True, skip validate_agent_function().
+            Used for gRPC path where handler is a GrpcAgentClient.
+        run_server_in_background: If True, start uvicorn in a background thread
+            instead of blocking. Used by gRPC service so RegisterAgent can return.
 
     Returns:
-        AgentManifest: The manifest for the bindufied agent
-
-    Example:
-        def my_handler(messages: str) -> str:
-            result = agent.run(input=messages)
-            return result.to_dict()["content"]
-
-        config = {
-            "author": "user@example.com",
-            "name": "my-agent",
-            "description": "A helpful assistant",
-            "capabilities": {"streaming": True},
-            "deployment": {"url": "http://localhost:3773", "protocol_version": "1.0.0"},
-        }
-
-        manifest = bindufy(agent, config, my_handler)
+        AgentManifest: The manifest for the bindufied agent.
     """
     if not isinstance(config, dict):
         raise TypeError("config must be a dictionary")
-
-    if not callable(handler):
-        raise TypeError("handler must be callable")
 
     # Load capability-specific configs from environment variables (webhooks, negotiation)
     config = load_config_from_env(config)
@@ -460,23 +433,20 @@ def bindufy(
     if auth_config is not None:
         update_auth_settings(auth_config)
 
-    # Validate that this is a protocol-compliant function
-    handler_name = getattr(handler, "__name__", "<unknown>")
-    logger.info(f"Validating handler function: {handler_name}")
-    validate_agent_function(handler)
+    # Validate handler if required (skipped for gRPC path)
+    if not skip_handler_validation:
+        handler_name = getattr(handler_callable, "__name__", "<unknown>")
+        logger.info(f"Validating handler function: {handler_name}")
+        validate_agent_function(handler_callable)
+
     logger.info(f"Agent ID: {agent_id}")
 
-    # Get caller information for file paths
-    frame = inspect.currentframe()
-    if not frame or not frame.f_back:
-        raise RuntimeError("Unable to determine caller file path")
-
-    caller_file = inspect.getframeinfo(frame.f_back).filename
-    caller_dir = Path(os.path.abspath(caller_file)).parent
-
     # Determine key directory with fallback strategy
+    effective_key_dir = key_dir or caller_dir
     resolved_key_dir = resolve_key_directory(
-        explicit_dir=key_dir, caller_dir=caller_dir, subdir=app_settings.did.pki_dir
+        explicit_dir=effective_key_dir,
+        caller_dir=caller_dir or Path.cwd(),
+        subdir=app_settings.did.pki_dir,
     )
 
     # Initialize DID extension with key management
@@ -489,12 +459,15 @@ def bindufy(
         key_password=validated_config.get("key_password"),
     )
 
-    # Load skills from configuration (supports both file-based and inline)
+    # Load skills: use override (gRPC path) or load from config paths (Python path)
     logger.info("Loading agent skills...")
-    skills_list = load_skills(
-        validated_config.get("skills") or [],
-        caller_dir,  # Always set at this point
-    )
+    if skills_override is not None:
+        skills_list = skills_override
+    else:
+        skills_list = load_skills(
+            validated_config.get("skills") or [],
+            caller_dir or Path.cwd(),
+        )
 
     # Set agent metadata for DID document
     agent_url = (
@@ -522,7 +495,7 @@ def bindufy(
 
     # Create agent manifest with loaded skills
     _manifest = create_manifest(
-        agent_function=handler,
+        agent_function=handler_callable,
         id=agent_id,
         did_extension=did_extension,
         name=validated_config["name"],
@@ -563,16 +536,17 @@ def bindufy(
 
     # Register agent in Hydra if authentication is enabled with Hydra provider
     credentials = _register_in_hydra(
-        agent_id_str, validated_config, agent_url, did_extension, caller_dir
+        agent_id_str,
+        validated_config,
+        agent_url,
+        did_extension,
+        caller_dir or Path.cwd(),
     )
 
     logger.info(f"Starting deployment for agent: {agent_id}")
 
     # Import server components (deferred to avoid circular import)
     from bindu.server import BinduApplication
-
-    # Storage and scheduler will be initialized in BinduApplication's lifespan
-    # No need to create instances here - just pass the config
 
     # Create telemetry configuration
     telemetry_config = _create_telemetry_config(validated_config)
@@ -596,7 +570,7 @@ def bindufy(
     # Create tunnel if enabled
     tunnel_url = _setup_tunnel(tunnel_config, port, _manifest, bindu_app)
 
-    # Start server if requested (blocking), otherwise return manifest immediately
+    # Start server if requested
     if run_server:
         # Display server startup banner
         prepare_server_display(
@@ -609,11 +583,113 @@ def bindufy(
             tunnel_url=tunnel_url,
         )
 
-        # Run server with graceful shutdown handling
-        start_uvicorn_server(bindu_app, host=host, port=port, display_info=True)
+        if run_server_in_background:
+            # Start uvicorn in a background thread (used by gRPC service)
+            import threading
+
+            server_thread = threading.Thread(
+                target=start_uvicorn_server,
+                args=(bindu_app,),
+                kwargs={"host": host, "port": port, "display_info": True},
+                daemon=True,
+                name=f"uvicorn-{validated_config['name']}",
+            )
+            server_thread.start()
+            logger.info(f"HTTP server started in background thread on {host}:{port}")
+        else:
+            # Run server blocking (normal Python bindufy path)
+            start_uvicorn_server(bindu_app, host=host, port=port, display_info=True)
     else:
         logger.info(
             "Server not started (run_server=False). Manifest returned for programmatic use."
         )
 
     return _manifest
+
+
+def bindufy(
+    config: Dict[str, Any],
+    handler: Callable[[list[dict[str, str]]], Any],
+    run_server: bool = True,
+    key_dir: str | Path | None = None,
+    launch: bool = False,
+) -> AgentManifest:
+    """Transform an agent handler into a Bindu microservice.
+
+    This is the main entry point for Python agents. It validates the handler,
+    resolves the caller directory, and delegates to _bindufy_core() which
+    handles DID, auth, x402, manifest creation, and server startup.
+
+    Args:
+        config: Configuration dictionary containing:
+            - author: Agent author email (required)
+            - name: Human-readable agent name
+            - id: Unique agent identifier (optional, auto-generated if not provided)
+            - description: Agent description
+            - version: Agent version string (default: "1.0.0")
+            - recreate_keys: Force regeneration of existing keys (default: True)
+            - skills: List of agent skills/capabilities
+            - env_file: Path to .env file (optional, for local development)
+            - capabilities: Technical capabilities (streaming, notifications, etc.)
+            - agent_trust: Trust and security configuration
+            - kind: Agent type ('agent', 'team', or 'workflow') (default: "agent")
+            - debug_mode: Enable debug logging (default: False)
+            - debug_level: Debug verbosity level (default: 1)
+            - monitoring: Enable monitoring/metrics (default: False)
+            - telemetry: Enable telemetry collection (default: True)
+            - num_history_sessions: Number of conversation histories to maintain (default: 10)
+            - documentation_url: URL to agent documentation
+            - extra_metadata: Additional metadata dictionary
+            - deployment: Deployment configuration dict
+            - storage: Storage backend configuration dict
+            - scheduler: Task scheduler configuration dict
+            - global_webhook_url: Default webhook URL for all tasks (optional)
+            - global_webhook_token: Authentication token for global webhook (optional)
+        handler: The handler function that processes messages and returns responses.
+                Must have signature: (messages: list[dict[str, str]]) -> Any
+        run_server: If True, starts the uvicorn server (blocking). If False, returns manifest
+                   immediately for testing/programmatic usage (default: True)
+        key_dir: Directory for storing DID keys. If None, attempts to detect from caller's
+                directory (may fail in REPL/notebooks). Falls back to current working directory.
+        launch: If True, creates a public tunnel via FRP to expose the server to the internet
+               with an auto-generated subdomain (default: False)
+
+    Returns:
+        AgentManifest: The manifest for the bindufied agent
+
+    Example:
+        def my_handler(messages: list[dict[str, str]]) -> str:
+            result = agent.run(input=messages)
+            return result.to_dict()["content"]
+
+        config = {
+            "author": "user@example.com",
+            "name": "my-agent",
+            "description": "A helpful assistant",
+            "capabilities": {"streaming": True},
+            "deployment": {"url": "http://localhost:3773", "protocol_version": "1.0.0"},
+        }
+
+        manifest = bindufy(config, my_handler)
+    """
+    if not callable(handler):
+        raise TypeError(
+            "HandlerError: 'handler' must be a callable function or coroutine function."
+        )
+
+    # Get caller information for file paths
+    frame = inspect.currentframe()
+    if not frame or not frame.f_back:
+        raise RuntimeError("Unable to determine caller file path")
+
+    caller_file = inspect.getframeinfo(frame.f_back).filename
+    caller_dir = Path(os.path.abspath(caller_file)).parent
+
+    return _bindufy_core(
+        config=config,
+        handler_callable=handler,
+        run_server=run_server,
+        key_dir=key_dir,
+        launch=launch,
+        caller_dir=caller_dir,
+    )

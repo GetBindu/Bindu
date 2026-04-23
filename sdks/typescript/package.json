@@ -1,0 +1,41 @@
+{
+  "name": "@bindu/sdk",
+  "version": "0.1.0",
+  "description": "Bindu SDK for TypeScript — transform any agent into a microservice",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "generate-proto": "bash ../../scripts/generate_protos.sh typescript",
+    "dev": "tsc --watch"
+  },
+  "keywords": [
+    "bindu",
+    "agent",
+    "microservice",
+    "a2a",
+    "grpc"
+  ],
+  "author": "Bindu <raahul@getbindu.com>",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GetBindu/Bindu"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.10.0",
+    "@grpc/proto-loader": "^0.7.0",
+    "yaml": "^2.4.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/node": "^20.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist/",
+    "proto/"
+  ]
+}

@@ -13,19 +13,19 @@ repos:
     hooks:
       - id: ruff
         args: ["--fix"]
-        exclude: ^examples/
+        exclude: ^(examples/|bindu/grpc/generated/)
       - id: ruff-format
-        exclude: ^examples/
+        exclude: ^(examples/|bindu/grpc/generated/)
 
   - repo: local
     hooks:
       - id: ty
         name: ty type checker
-        entry: uv run ty check bindu/ tests/
+        entry: uv run ty check bindu/ tests/ --exclude bindu/grpc/generated/
         language: system
         types: [python]
         pass_filenames: false
-        exclude: ^examples/
+        exclude: ^(examples/|bindu/grpc/generated/)
 
       - id: pytest
         name: pytest with coverage
@@ -84,4 +84,4 @@ repos:
     rev: 6.3.0
     hooks:
       - id: pydocstyle
-        exclude: ^examples/
+        exclude: ^(examples/|bindu/grpc/generated/)

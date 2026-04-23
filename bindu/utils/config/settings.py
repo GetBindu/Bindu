@@ -11,6 +11,11 @@ from bindu.utils.logging import get_logger
 logger = get_logger("bindu.utils.config.settings")
 
 
+def _remove_none_values(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Return a copy of the dictionary without None-valued entries."""
+    return {key: value for key, value in data.items() if value is not None}
+
+
 def prepare_auth_settings(auth_config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Prepare auth settings from configuration.
 
@@ -49,10 +54,7 @@ def prepare_auth_settings(auth_config: Dict[str, Any]) -> Optional[Dict[str, Any
             "auto_register_agents": auth_config.get("auto_register_agents"),
             "agent_client_prefix": auth_config.get("agent_client_prefix"),
         }
-        # Remove None values
-        settings_to_apply["hydra"] = {
-            k: v for k, v in settings_to_apply["hydra"].items() if v is not None
-        }
+        settings_to_apply["hydra"] = _remove_none_values(settings_to_apply["hydra"])
     else:
         logger.warning(f"Unknown authentication provider: {provider}")
 
@@ -82,10 +84,7 @@ def prepare_vault_settings(vault_config: Dict[str, Any]) -> Optional[Dict[str, A
         }
     }
 
-    # Remove None values
-    settings_to_apply["vault"] = {
-        k: v for k, v in settings_to_apply["vault"].items() if v is not None
-    }
+    settings_to_apply["vault"] = _remove_none_values(settings_to_apply["vault"])
 
     if settings_to_apply["vault"].get("enabled"):
         logger.info(

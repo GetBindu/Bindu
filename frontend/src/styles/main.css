@@ -9,11 +9,52 @@ body {
 	font-family: 'JetBrains Mono', monospace;
 	overscroll-behavior: none;
 	touch-action: pan-x pan-y;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	text-rendering: optimizeLegibility;
+}
+
+:root {
+	--sidebar-width: 280px;
+
+	/* Design System Tokens (Light Mode - Refined) */
+	--page-bg: #ffffff;
+	--sidebar-bg: #f8fafc;
+	--composer-bg: rgba(255, 255, 255, 0.9);
+	--composer-border: rgba(15, 23, 42, 0.08);
+	--text: #0f172a;
+	--placeholder: #64748b;
+	--pill-bg: #f1f5f9;
+	--pill-border: #e2e8f0;
+	--orange: #f97316;
+	--blue: #3b82f6;
+	--purple: #8b5cf6;
+	--pink: #ec4899;
+}
+
+.dark {
+	/* Design System Tokens (Dark Mode) */
+	--page-bg: #0b0c10;
+	--sidebar-bg: #0d0f14;
+	--composer-bg: rgba(10, 12, 18, 0.96);
+	--composer-border: rgba(255, 255, 255, 0.08);
+	--text: #eef1f7;
+	--placeholder: rgba(161, 170, 188, 0.62);
+	--pill-bg: rgba(255, 255, 255, 0.03);
+	--pill-border: rgba(255, 255, 255, 0.08);
+
+	background-color: var(--page-bg);
+	color: var(--text);
+}
+
+body {
+	background-color: var(--page-bg);
+	color: var(--text);
 }
 
 @layer components {
 	.btn {
-		@apply inline-flex flex-shrink-0 cursor-pointer select-none items-center justify-center whitespace-nowrap outline-none transition-all focus:ring disabled:cursor-default;
+		@apply inline-flex flex-shrink-0 cursor-pointer select-none items-center justify-center whitespace-nowrap outline-none transition-all duration-150 focus:ring disabled:cursor-default;
 	}
 
 	.active-model {
@@ -35,7 +76,6 @@ body {
 }
 
 @layer utilities {
-	/* your existing utilities */
 	.scrollbar-custom {
 		@apply scrollbar-thin scrollbar-track-transparent scrollbar-thumb-black/10 scrollbar-thumb-rounded-full scrollbar-w-1 hover:scrollbar-thumb-black/20 dark:scrollbar-thumb-white/10 dark:hover:scrollbar-thumb-white/20;
 	}
@@ -84,9 +124,6 @@ body {
 		@apply block max-w-full overflow-x-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-black/10 scrollbar-thumb-rounded-full scrollbar-w-1 hover:scrollbar-thumb-black/20 dark:scrollbar-thumb-white/10 dark:hover:scrollbar-thumb-white/20;
 	}
 
-	/* .scrollbar-custom {
-		@apply scrollbar-thin scrollbar-track-transparent scrollbar-thumb-black/10 scrollbar-thumb-rounded-full scrollbar-w-1 hover:scrollbar-thumb-black/20 dark:scrollbar-thumb-white/10 dark:hover:scrollbar-thumb-white/20;
-	} */
 	.prose hr {
 		@apply my-4;
 	}
@@ -96,7 +133,7 @@ body {
 	}
 
 	.prose pre {
-		@apply border-[0.5px] bg-white text-gray-600 dark:border-gray-700 dark:!bg-gray-900 dark:bg-inherit dark:text-inherit;
+		@apply border-[0.5px] bg-gray-50 text-gray-800 dark:border-gray-700 dark:!bg-gray-900 dark:bg-inherit dark:text-inherit;
 	}
 
 	/* Override prose-sm title sizes - 75% of original */

@@ -7,28 +7,26 @@
 </div>
 
 <p align="center">
-  <em>The identity, communication & payments layer for AI agents</em>
+  <em>AI代理的身份、通信和支付层</em>
 </p>
 
 <p align="center">
-  <a href="README.md">🇬🇧 English</a> •
-  <a href="README.de.md">🇩🇪 Deutsch</a> •
-  <a href="README.es.md">🇪🇸 Español</a> •
-  <a href="README.fr.md">🇫🇷 Français</a> •
-  <a href="README.hi.md">🇮🇳 हिंदी</a> •
-  <a href="README.bn.md">🇮🇳 বাংলা</a> •
+  <a href="README.md">🇬🇧 英语</a> •
+  <a href="README.de.md">🇩🇪 德语</a> •
+  <a href="README.es.md">🇪🇸 西班牙语</a> •
+  <a href="README.fr.md">🇫🇷 法语</a> •
+  <a href="README.hi.md">🇮🇳 印地语</a> •
+  <a href="README.bn.md">🇮🇳 孟加拉语</a> •
   <a href="README.zh.md">🇨🇳 中文</a> •
-  <a href="README.nl.md">🇳🇱 Nederlands</a> •
-  <a href="README.ta.md">🇮🇳 தமிழ்</a>
+  <a href="README.nl.md">🇳🇱 荷兰语</a> •
+  <a href="README.ta.md">🇮🇳 泰米尔语</a>
 </p>
 
 <p align="center">
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
   <a href="https://hits.sh/github.com/Saptha-me/Bindu.svg"><img src="https://hits.sh/github.com/Saptha-me/Bindu.svg" alt="Hits"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="Python Version"></a>
-  <a href="https://pepy.tech/projects/bindu"><img src="https://static.pepy.tech/personalized-badge/bindu?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads" alt="PyPI Downloads"></a>
   <a href="https://pypi.org/project/bindu/"><img src="https://img.shields.io/pypi/v/bindu.svg" alt="PyPI version"></a>
-  <a href="https://pypi.org/project/bindu/"><img src="https://img.shields.io/pypi/dm/bindu" alt="PyPI Downloads"></a>
   <a href="https://coveralls.io/github/Saptha-me/Bindu?branch=v0.3.18"><img src="https://coveralls.io/repos/github/Saptha-me/Bindu/badge.svg?branch=v0.3.18" alt="Coverage"></a>
   <a href="https://github.com/getbindu/Bindu/actions/workflows/release.yml"><img src="https://github.com/getbindu/Bindu/actions/workflows/release.yml/badge.svg" alt="Tests"></a>
   <a href="https://discord.gg/3w5zuYUuwt"><img src="https://img.shields.io/badge/Join%20Discord-7289DA?logo=discord&logoColor=white" alt="Discord"></a>
@@ -42,7 +40,7 @@
 </p>
 
 <p align="center">
-  <em>"Like sunflowers turning toward the light, agents collaborate in swarms - each one independent, yet together they create something greater."</em>
+  <em>"就像向阳花转向光明，代理以群体形式协作——每个代理都是独立的，但它们共同创造了更伟大的东西。"</em>
 </p>
 
 <br/>
@@ -57,9 +55,7 @@
 
 ---
 
-**Bindu** (read: _binduu_) is an operating layer for AI agents that provides identity, communication, and payment capabilities. It delivers a production-ready service with a convenient API to connect, authenticate, and orchestrate agents across distributed systems using open protocols: **A2A**, **AP2**, and **X402**.
-
-Built with a distributed architecture (Task Manager, scheduler, storage), Bindu makes it fast to develop and easy to integrate with any AI framework. Transform any agent framework into a fully interoperable service for communication, collaboration, and commerce in the Internet of Agents.
+**Bindu**（读作：_binduu_）是一个为AI代理提供身份、通信和支付能力的操作层。它提供了一个生产就绪的服务，具有方便的API，可以使用开放协议连接、认证和编排分布式系统中的代理：**A2A**、**AP2**和**X402**。构建于分布式架构之上（任务管理器、调度程序、存储），Bindu 使得开发快速且易于与任何 AI 框架集成。将任何代理框架转变为一个完全互操作的服务，以便在代理互联网中进行通信、协作和商业。
 
 <p align="center">
   <strong>🌟 <a href="https://getbindu.com">注册您的代理</a> • 🌻 <a href="https://docs.getbindu.com">文档</a> • 💬 <a href="https://discord.gg/3w5zuYUuwt">Discord 社区</a></strong>
@@ -70,7 +66,7 @@ Built with a distributed architecture (Task Manager, scheduler, storage), Bindu 
 
 <br/>
 
-## 🎥 Watch Bindu in Action
+## 🎥 观看 Bindu 的实际操作
 
 <div align="center">
   <a href="https://www.youtube.com/watch?v=qppafMuw_KI" target="_blank">
@@ -80,16 +76,16 @@ Built with a distributed architecture (Task Manager, scheduler, storage), Bindu 
 
 <br/>
 
-## 📋 Prerequisites
+## 📋 先决条件
 
-Before installing Bindu, ensure you have:
+在安装 Bindu 之前，请确保您具备：
 
-- **Python 3.12 or higher** - [Download here](https://www.python.org/downloads/)
-- **UV package manager** - [Installation guide](https://github.com/astral-sh/uv)
-- **API Key Required**: Set `OPENROUTER_API_KEY` or `OPENAI_API_KEY` in your environment variables. Free OpenRouter models are available for testing.
+- **Python 3.12 或更高版本** - [Download here](https://www.python.org/downloads/)
+- **UV 包管理器** - [Installation guide](https://github.com/astral-sh/uv)
+- **需要 API 密钥**：在您的环境变量中设置 `OPENROUTER_API_KEY` 或 `OPENAI_API_KEY`。可用于测试的免费 OpenRouter 模型可用。
 
 
-### Verify Your Setup
+### 验证您的设置
 
 ```bash
 # Check Python version
@@ -103,20 +99,20 @@ uv --version
 
 <br/>
 
-## 📦 Installation
+## 📦 安装
 <details>
-<summary><b>Users note (Git & GitHub Desktop)</b></summary>
+<summary><b>用户注意（Git 和 GitHub Desktop）</b></summary>
 
-On some Windows systems, git may not be recognized in Command Prompt even after installation due to PATH configuration issues.
+在某些 Windows 系统上，由于 PATH 配置问题，即使安装后，命令提示符中可能无法识别 git。
 
-If you face this issue, you can use *GitHub Desktop* as an alternative:
+如果您遇到此问题，可以使用 *GitHub Desktop* 作为替代：
 
-1. Install GitHub Desktop from https://desktop.github.com/
-2. Sign in with your GitHub account
-3. Clone the repository using the repository URL:
+1. 从 https://desktop.github.com/ 安装 GitHub Desktop
+2. 使用您的 GitHub 账户登录
+3. 使用仓库 URL 克隆仓库：
    https://github.com/getbindu/Bindu.git
 
-GitHub Desktop allows you to clone, manage branches, commit changes, and open pull requests without using the command line.
+GitHub Desktop 允许您克隆、管理分支、提交更改和打开拉取请求，而无需使用命令行。
 
 </details>
 
@@ -134,17 +130,16 @@ uv sync --dev
 ```
 
 <details>
-<summary><b>Common Installation Issues</b> (click to expand)</summary>
+<summary><b>常见安装问题</b>（点击展开）</summary>
 
 <br/>
 
-| Issue | Solution |
-|-------|----------|
-| `uv: command not found` | Restart your terminal after installing UV. On Windows, use PowerShell |
-| `Python version not supported` | Install Python 3.12+ from [python.org](https://www.python.org/downloads/) |
-| Virtual environment not activating (Windows) | Use PowerShell and run `.venv\Scripts\activate` |
-| `Microsoft Visual C++ required` | Download [Visual C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) |
-| `ModuleNotFoundError` | Activate venv and run `uv sync --dev` |
+| 问题 | 解决方案 |
+|-------|----------|| `uv: command not found` | 安装 UV 后重启您的终端。在 Windows 上，使用 PowerShell |
+| `Python version not supported` | 从 [python.org](https://www.python.org/downloads/) 安装 Python 3.12+ |
+| 虚拟环境未激活（Windows） | 使用 PowerShell 并运行 `.venv\Scripts\activate` |
+| `Microsoft Visual C++ required` | 下载 [Visual C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) |
+| `ModuleNotFoundError` | 激活 venv 并运行 `uv sync --dev` |
 
 </details>
 
@@ -152,11 +147,33 @@ uv sync --dev
 
 <br/>
 
-## 🚀 Quick Start
+## 🚀 快速开始
 
-### Option 1: Manual Setup
+### 选项 1：使用 Cookiecutter（推荐）
 
-Create your agent script `my_agent.py`:
+**首次代理所需时间：约 2 分钟 ⏱️**
+
+```bash
+# Install cookiecutter
+uv add cookiecutter
+
+# Create your Bindu agent
+uvx cookiecutter https://github.com/getbindu/create-bindu-agent.git
+```
+
+<div align="center">
+  <a href="https://youtu.be/obY1bGOoWG8?si=uEeDb0XWrtYOQTL7" target="_blank">
+    <img src="https://img.youtube.com/vi/obY1bGOoWG8/maxresdefault.jpg" alt="Create Production Ready Agent" width="640" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
+  </a>
+</div>
+
+您的本地代理变成一个实时、安全、可发现的服务。 [Learn more →](https://docs.getbindu.com/bindu/create-bindu-agent/overview)
+
+> **💡 专业提示：** 使用 cookiecutter 创建的代理包括 GitHub Actions，当您推送到您的代码库时，会自动在 [GetBindu.com](https://getbindu.com) 中注册您的代理。
+
+### 选项 2：手动设置
+
+创建您的代理脚本 `my_agent.py`：
 
 ```python
 import os
@@ -207,9 +224,9 @@ bindufy(config, handler)
 
 ![Sample Agent](assets/agno-simple.png)
 
-Your agent is now live at the URL configured in `deployment.url`.
+您的代理现在在 `deployment.url` 中配置的 URL 上实时运行。
 
-Set a custom port without code changes:
+在不更改代码的情况下设置自定义端口：
 
 ```bash
 # Linux/macOS
@@ -219,23 +236,22 @@ export BINDU_PORT=4000
 $env:BINDU_PORT="4000"
 ```
 
-Existing examples that use `http://localhost:3773` are automatically overridden when `BINDU_PORT` is set.
+使用 `http://localhost:3773` 的现有示例在设置 `BINDU_PORT` 时会被自动覆盖。
 
-### Option 2: Zero-Config Local Agent
+### 选项 3：零配置本地代理
 
-Try Bindu without setting up Postgres, Redis, or any cloud services. Runs entirely locally using in-memory storage and scheduler.
+尝试 Bindu，而无需设置 Postgres、Redis 或任何云服务。完全在本地运行，使用内存存储和调度程序。
 
 ```bash
 python examples/beginner_zero_config_agent.py
 ```
 
-
-### Option 3: Minimal Echo Agent (Testing)
+### 选项 4：最小回声代理（测试）
 
 <details>
-<summary><b>View minimal example</b> (click to expand)</summary>
+<summary><b>查看最小示例</b>（点击展开）</summary>
 
-Smallest possible working agent:
+可能的最小工作代理：
 
 ```python
 import os
@@ -262,7 +278,7 @@ bindufy(config, handler)
 # bindufy(config, handler, launch=True)
 ```
 
-**Run the agent:**
+**运行代理：**
 
 ```bash
 # Start the agent
@@ -272,11 +288,11 @@ python examples/echo_agent.py
 </details>
 
 <details>
-<summary><b>Test the agent with curl</b> (click to expand)</summary>
+<summary><b>使用 curl 测试代理</b>（点击展开）</summary>
 
 <br/>
 
-Input:
+输入：
 ```bash
 curl --location 'http://localhost:3773/' \
 --header 'Content-Type: application/json' \
@@ -307,7 +323,7 @@ curl --location 'http://localhost:3773/' \
 }'
 ```
 
-Output:
+输出：
 ```bash
 {
     "jsonrpc": "2.0",
@@ -339,7 +355,7 @@ Output:
 }
 ```
 
-Check the status of the task
+检查任务状态
 ```bash
 curl --location 'http://localhost:3773/' \
 --header 'Content-Type: application/json' \
@@ -353,7 +369,7 @@ curl --location 'http://localhost:3773/' \
 }'
 ```
 
-Output:
+输出：
 ```bash
 {
     "jsonrpc": "2.0",
@@ -421,52 +437,59 @@ Output:
 
  
 
-## 🚀 Core Features
-
-| Feature | Description | Documentation |
-|---------|-------------|---------------|
-|  **Authentication** | Secure API access with Ory Hydra OAuth2 (optional for development) | [Guide →](docs/AUTHENTICATION.md) |
-| 💰 **Payment Integration (X402)** | Accept USDC payments on Base blockchain before executing protected methods | [Guide →](docs/PAYMENT.md) |
-| 💾 **PostgreSQL Storage** | Persistent storage for production deployments (optional - InMemoryStorage by default) | [Guide →](docs/STORAGE.md) |
-| 📋 **Redis Scheduler** | Distributed task scheduling for multi-worker deployments (optional - InMemoryScheduler by default) | [Guide →](docs/SCHEDULER.md) |
-| 🎯 **Skills System** | Reusable capabilities that agents advertise and execute for intelligent task routing | [Guide →](docs/SKILLS.md) |
-| 🤝 **Agent Negotiation** | Capability-based agent selection for intelligent orchestration | [Guide →](docs/NEGOTIATION.md) |
-| 🌐 **Tunneling** | Expose local agents to the internet for testing (**local development only, not for production**) | [Guide →](docs/TUNNELING.md) |
-| 📬 **Push Notifications** | Real-time webhook notifications for task updates - no polling required | [Guide →](docs/NOTIFICATIONS.md) |
-| 📊 **Observability & Monitoring** | Track performance and debug issues with OpenTelemetry and Sentry | [Guide →](docs/OBSERVABILITY.md) |
-| 🔄 **Retry Mechanism** | Automatic retry with exponential backoff for resilient agents | [Guide →](https://docs.getbindu.com/bindu/learn/retry/overview) |
-| 🔑 **Decentralized Identifiers (DIDs)** | Cryptographic identity for verifiable, secure agent interactions and payment integration | [Guide →](docs/DID.md) |
-| 🏥 **Health Check & Metrics** | Monitor agent health and performance with built-in endpoints | [Guide →](docs/HEALTH_METRICS.md) |
+## 🚀 核心功能
+| 特性 | 描述 | 文档 |
+| :--- | :--- | :--- |
+| **身份验证** | 使用 Ory Hydra OAuth2 进行安全的 API 访问（开发时可选） | [Guide →](docs/AUTHENTICATION.md) |
+| 💰 **支付集成 (X402)** | 在执行受保护的方法之前接受 Base 区块链上的 USDC 支付 | [Guide →](docs/PAYMENT.md) |
+| 💾 **PostgreSQL 存储** | 生产部署的持久存储（可选 - 默认使用 InMemoryStorage） | [Guide →](docs/STORAGE.md) |
+| 📋 **Redis 调度器** | 用于多工作者部署的分布式任务调度（可选 - 默认使用 InMemoryScheduler） | [Guide →](docs/SCHEDULER.md) |
+| 🎯 **技能系统** | 代理宣传和执行的可重用能力，用于智能任务路由 | [Guide →](docs/SKILLS.md) |
+| 🤝 **代理协商** | 基于能力的代理选择，用于智能编排 | [Guide →](docs/NEGOTIATION.md) |
+| 🌐 **隧道** | 将本地代理暴露到互联网以进行测试（**仅限本地开发，不适用于生产**） | [Guide →](docs/TUNNELING.md) |
+| 📬 **推送通知** | 实时 webhook 通知任务更新 - 无需轮询 | [Guide →](docs/NOTIFICATIONS.md) |
+| 📊 **可观察性与监控** | 使用 OpenTelemetry 和 Sentry 跟踪性能和调试问题 | [Guide →](docs/OBSERVABILITY.md) |
+| 🔄 **重试机制** | 自动重试，采用指数退避策略以增强代理的韧性 | [Guide →](docs.getbindu.com/bindu/learn/retry/overview) |
+| 🔑 **去中心化标识符 (DIDs)** | 用于可验证、安全的代理交互和支付集成的加密身份 | [Guide →](docs/DID.md) |
+| 🏥 **健康检查与指标** | 通过内置端点监控代理的健康和性能 | [Guide →](docs/HEALTH_METRICS.md) |
 
 ---
 
 <br/>
 
-## 🎨 Chat UI
+## 🎨 聊天 UI
 
-Bindu includes a beautiful chat interface at `http://localhost:5173`. Navigate to the `frontend` folder and run `npm run dev` to start the server.
+Bindu 包含一个美观的聊天界面，位于 `http://localhost:5173`。导航到 `frontend` 文件夹并运行 `npm run dev` 启动服务器。
 
 <p align="center">
-  <img src="assets/new-ui.png" alt="Bindu Agent UI" width="640" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
+  <img src="assets/agent-ui.png" alt="Bindu Agent UI" width="640" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
 </p>
 
 ---
 
 <br/>
 
-## 🌐 GetBindu.com
+## 🌐 GetBindu.com[**GetBindu.com**](https://getbindu.com) 是所有 Bindu 代理的公共注册表，使其可被更广泛的代理生态系统发现和访问。
 
-[**GetBindu.com**](https://getbindu.com) 是所有 Bindu 代理的公共注册表，使它们在更广泛的代理生态系统中可被发现和访问。
+### ✨ 使用 Cookiecutter 自动注册
 
-### 📝 Manual Registration
+当您使用 cookiecutter 模板创建代理时，它包含一个预配置的 GitHub Action，自动将您的代理注册到目录中：
 
-Manual registration process is currently in development.
+1. **使用 cookiecutter 创建您的代理**
+2. **推送到 GitHub** - GitHub Action 自动触发
+3. **您的代理出现在** [GetBindu.com](https://getbindu.com)
+
+> **注意**：从 [getbindu.com](https://getbindu.com) 收集您的 `BINDU_PAT_TOKEN` 以注册您的代理。
+
+### 📝 手动注册
+
+手动注册过程目前正在开发中。
 
 ---
 
 <br/>
 
-## 🌌 The Vision
+## 🌌 远景
 
 ```
 a peek into the night sky
@@ -490,38 +513,38 @@ a peek into the night sky
 {{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{
 ```
 
-_Each symbol is an agent — a spark of intelligence. The tiny dot is Bindu, the origin point in the Internet of Agents._
+_每个符号都是一个代理——一个智能的火花。这个小点是 Bindu，代理互联网的起点。_
 
-### NightSky Connection (In Progress)
+### NightSky 连接（进行中）
 
-NightSky enables swarms of agents. Each Bindu is a dot annotating agents with the shared language of A2A, AP2, and X402. Agents can be hosted anywhere—laptops, clouds, or clusters—yet speak the same protocol, trust each other by design, and work together as a single, distributed mind.
+NightSky 使代理群体能够协作。每个 Bindu 是一个点，用 A2A、AP2 和 X402 的共享语言注释代理。代理可以托管在任何地方——笔记本电脑、云或集群——但使用相同的协议，按设计相互信任，并作为一个单一的分布式思维共同工作。
 
-> **💭 A Goal Without a Plan Is Just a Wish.**
+> **💭 没有计划的目标只是一个愿望。**
 
 ---
 
 <br/>
 
-## 🛠️ Supported Agent Frameworks
+## 🛠️ 支持的代理框架
 
-Bindu is **framework-agnostic** and tested with:
+Bindu 是 **框架无关的**，并经过以下测试：
 
-- **AG2**（原 AutoGen）
+- **AG2**（前身为 AutoGen）
 - **Agno**
 - **CrewAI**
 - **LangChain**
 - **LlamaIndex**
 - **FastAgent**
 
-Want integration with your favorite framework? [Let us know on Discord](https://discord.gg/3w5zuYUuwt)!
+想要与您最喜欢的框架集成？ [Let us know on Discord](https://discord.gg/3w5zuYUuwt)！
 
 ---
 
 <br/>
 
-## 🧪 Testing
+## 🧪 测试
 
-Bindu maintains **70%+ test coverage** (target: 80%+):
+Bindu 维护 **70%+ 的测试覆盖率**（目标：80%+）：
 
 ```bash
 uv run pytest -n auto --cov=bindu --cov-report=term-missing
@@ -532,30 +555,29 @@ uv run coverage report --skip-covered --fail-under=70
 
 <br/>
 
-## 🔧 Troubleshooting
+## 🔧 故障排除
 
 <details>
-<summary>Common Issues</summary>
+<summary>常见问题</summary>
 
 <br/>
 
-| Issue | Solution |
+| 问题 | 解决方案 |
 |-------|----------|
-| `Python 3.12 not found` | Install Python 3.12+ and set in PATH, or use `pyenv` |
-| `bindu: command not found` | Activate virtual environment: `source .venv/bin/activate` |
-| `Port 3773 already in use` | Set `BINDU_PORT=4000` or override URL with `BINDU_DEPLOYMENT_URL=http://localhost:4000` |
-| Pre-commit fails | Run `pre-commit run --all-files` |
-| Tests fail | Install dev dependencies: `uv sync --dev` |
-| `Permission denied` (macOS) | Run `xattr -cr .` to clear extended attributes |
+| `Python 3.12 not found` | 安装 Python 3.12+ 并设置在 PATH 中，或使用 `pyenv` |
+| `bindu: command not found` | 激活虚拟环境：`source .venv/bin/activate` || `Port 3773 already in use` | 设置 `BINDU_PORT=4000` 或用 `BINDU_DEPLOYMENT_URL=http://localhost:4000` 覆盖 URL |
+| 提交前失败 | 运行 `pre-commit run --all-files` |
+| 测试失败 | 安装开发依赖： `uv sync --dev` |
+| `Permission denied` (macOS) | 运行 `xattr -cr .` 清除扩展属性 |
 
-**Reset environment:**
+**重置环境：**
 ```bash
 rm -rf .venv
 uv venv --python 3.12.9
 uv sync --dev
 ```
 
-**Windows PowerShell:**
+**Windows PowerShell：**
 ```bash
 Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
@@ -566,9 +588,9 @@ Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 <br/>
 
-## 🤝 Contributing
+## 🤝 贡献
 
-We welcome contributions! Join us on [Discord](https://discord.gg/3w5zuYUuwt). Pick the channel that best matches your contribution.
+我们欢迎贡献！加入我们在 [Discord](https://discord.gg/3w5zuYUuwt)。选择最符合您贡献的频道。
 
 ```bash
 git clone https://github.com/getbindu/Bindu.git
@@ -585,28 +607,28 @@ pre-commit run --all-files
 
 <br/>
 
-## 📜 License
+## 📜 许可证
 
-Bindu is open-source under the [Apache License 2.0](https://choosealicense.com/licenses/apache-2.0/).
-
----
-
-<br/>
-
-## 💬 Community
-
-We 💛 contributions! Whether you're fixing bugs, improving documentation, or building demos—your contributions make Bindu better.
-
-- 💬 [Join Discord](https://discord.gg/3w5zuYUuwt) for discussions and support
-- ⭐ [Star the repository](https://github.com/getbindu/Bindu) if you find it useful!
+Bindu 是在 [Apache License 2.0](https://choosealicense.com/licenses/apache-2.0/) 下开源的。
 
 ---
 
 <br/>
 
-## 👥 Active Moderators
+## 💬 社区
 
-Our dedicated moderators help maintain a welcoming and productive community:
+我们 💛 贡献！无论您是在修复错误、改善文档，还是构建演示——您的贡献使 Bindu 更好。
+
+- 💬 [Join Discord](https://discord.gg/3w5zuYUuwt) 进行讨论和支持
+- ⭐ [Star the repository](https://github.com/getbindu/Bindu) 如果您觉得它有用！
+
+---
+
+<br/>
+
+## 👥 活跃的版主
+
+我们专注的版主帮助维护一个友好和高效的社区：
 
 <table>
   <tr>
@@ -625,18 +647,27 @@ Our dedicated moderators help maintain a welcoming and productive community:
         <sub><b>Paras Chamoli</b></sub>
       </a>
       <br />
-    </tr>
+    </td>
+    <td align="center">
+      <a href="https://github.com/chandan-1427">
+        <img src="https://avatars.githubusercontent.com/u/202320492?v=4" width="100px;" alt="Chandan"/>
+        <br />
+        <sub><b>Chandan</b></sub>
+      </a>
+      <br />
+    </td>
+  </tr>
 </table>
 
-> Want to become a moderator? Reach out on [Discord](https://discord.gg/3w5zuYUuwt)!
+> 想成为版主吗？请在 [Discord](https://discord.gg/3w5zuYUuwt) 联系我们！
 
 ---
 
 <br/>
 
-## 🙏 Acknowledgements
+## 🙏 致谢
 
-Grateful to these projects:
+感谢这些项目：
 
 - [FastA2A](https://github.com/pydantic/fasta2a)
 - [12 Factor Agents](https://github.com/humanlayer/12-factor-agents/blob/main/content/factor-11-trigger-from-anywhere.md)
@@ -651,14 +682,13 @@ Grateful to these projects:
 
 <br/>
 
-## 🗺️ Roadmap
+## 🗺️ 路线图
 
-- [ ] GRPC transport support
-- [ ] Increase test coverage to 80% (in progress)
-- [ ] AP2 end-to-end support
-- [ ] DSPy integration (in progress)
-- [ ] MLTS support
-- [ ] X402 support with other facilitators
+- [ ] GRPC 传输支持- [ ] 将测试覆盖率提高到80%（进行中）
+- [ ] AP2端到端支持
+- [ ] DSPy集成（进行中）
+- [ ] MLTS支持
+- [ ] 与其他促进者一起支持X402
 
 > 💡 [Suggest features on Discord](https://discord.gg/3w5zuYUuwt)!
 
@@ -668,32 +698,38 @@ Grateful to these projects:
 
 ## [We will make this agents bidufied and we do need your help.](https://www.notion.so/getbindu/305d3bb65095808eac2bf720368e9804?v=305d3bb6509580189941000cfad83ae7&source=copy_link)
 
-- [AI Native in Action: Agent Symphony](https://www.meetup.com/ai-native-Amsterdam && India/events/311066899/) - [幻灯片](https://docs.google.com/presentation/d/1SqGXI0Gv_KCWZ1Mw2SOx_kI0u-LLxwZq7lMSONdl8oQ/edit)
+---
+
+<br/>
+
+## 🎓 工作坊
+
+- [AI Native in Action: Agent Symphony](https://www.meetup.com/ai-native-Amsterdam && India/events/311066899/) - [Slides](https://docs.google.com/presentation/d/1SqGXI0Gv_KCWZ1Mw2SOx_kI0u-LLxwZq7lMSONdl8oQ/edit)
 
 ---
 
 <br/>
 
-## ⭐ Star History
+## ⭐ 星级历史
 
 [![Star History Chart](https://api.star-history.com/svg?repos=getbindu/Bindu&type=Date)](https://www.star-history.com/#getbindu/Bindu&Date)
 
 ---
 
 <p align="center">
-  <strong>Built with 💛 by the team from Amsterdam </strong><br/>
-  <em>Happy Bindu! 🌻🚀✨</em>
+  <strong>由阿姆斯特丹和印度的团队用💛构建 </strong><br/>
+  <em>快乐的Bindu！🌻🚀✨</em>
 </p>
 
 <p align="center">
-  <strong>From idea to Internet of Agents in 2 minutes.</strong><br/>
-  <em>Your agent. Your framework. Universal protocols.</em>
+  <strong>从想法到代理互联网只需2分钟。</strong><br/>
+  <em>你的代理。你的框架。通用协议。</em>
 </p>
 
 <p align="center">
-  <a href="https://github.com/getbindu/Bindu">⭐ Star us on GitHub</a> •
-  <a href="https://discord.gg/3w5zuYUuwt">💬 Join Discord</a> •
-  <a href="https://docs.getbindu.com">🌻 Read the Docs</a>
+  <a href="https://github.com/getbindu/Bindu">⭐ 在GitHub上给我们加星</a> •
+  <a href="https://discord.gg/3w5zuYUuwt">💬 加入Discord</a> •
+  <a href="https://docs.getbindu.com">🌻 阅读文档</a>
 </p>
 
 <br/>
@@ -703,5 +739,5 @@ Grateful to these projects:
 </p>
 
 <p align="center">
-  <em>"We believe in the sunflower theory - standing tall together, bringing hope and light to the Internet of Agents."</em>
+  <em>“我们相信向日葵理论——共同高高站立，为代理互联网带来希望和光明。”</em>
 </p>

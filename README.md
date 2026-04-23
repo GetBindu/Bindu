@@ -1,70 +1,62 @@
+<p align="center">
+  <img src="assets/bindu_landscape.png" alt="Bindu — humans and agents, side by side" width="100%">
+</p>
+
+<div align="center">
+
+<picture>
+  <img alt="Bindu" src="assets/bindu_logo.png" width="50">
+</picture>
+
+# Bindu
+
+**The identity, communication & payments layer for AI agents.**
+
+
+
 <div align="center" id="top">
-  <a href="https://getbindu.com">
-    <picture>
-      <img src="assets/bindu.png" alt="Bindu" width="300">
-    </picture>
-  </a>
-</div>
 
-<p align="center">
-  <em>The identity, communication & payments layer for AI agents</em>
-</p>
+  <p>
+    <a href="README.md">🇬🇧 English</a> •
+    <a href="README.de.md">🇩🇪 Deutsch</a> •
+    <a href="README.es.md">🇪🇸 Español</a> •
+    <a href="README.fr.md">🇫🇷 Français</a> •
+    <a href="README.hi.md">🇮🇳 हिंदी</a> •
+    <a href="README.bn.md">🇮🇳 বাংলা</a> •
+    <a href="README.zh.md">🇨🇳 中文</a> •
+    <a href="README.nl.md">🇳🇱 Nederlands</a> •
+    <a href="README.ta.md">🇮🇳 தமிழ்</a>
+  </p>
 
-<p align="center">
-  <a href="README.md">🇬🇧 English</a> •
-  <a href="README.de.md">🇩🇪 Deutsch</a> •
-  <a href="README.es.md">🇪🇸 Español</a> •
-  <a href="README.fr.md">🇫🇷 Français</a> •
-  <a href="README.hi.md">🇮🇳 हिंदी</a> •
-  <a href="README.bn.md">🇮🇳 বাংলা</a> •
-  <a href="README.zh.md">🇨🇳 中文</a> •
-  <a href="README.nl.md">🇳🇱 Nederlands</a> •
-  <a href="README.ta.md">🇮🇳 தமிழ்</a>
-</p>
+  <p>
+    <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
+    <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="Python Version"></a>
+    <a href="https://pypi.org/project/bindu/"><img src="https://img.shields.io/pypi/v/bindu.svg" alt="PyPI version"></a>
+    <a href="https://coveralls.io/github/Saptha-me/Bindu?branch=v0.3.18"><img src="https://coveralls.io/repos/github/Saptha-me/Bindu/badge.svg?branch=v0.3.18" alt="Coverage"></a>
+    <a href="https://github.com/getbindu/Bindu/actions/workflows/release.yml"><img src="https://github.com/getbindu/Bindu/actions/workflows/release.yml/badge.svg" alt="Tests"></a>
+    <a href="https://discord.gg/3w5zuYUuwt"><img src="https://img.shields.io/badge/Join%20Discord-7289DA?logo=discord&logoColor=white" alt="Discord"></a>
+    <a href="https://github.com/getbindu/Bindu/graphs/contributors"><img src="https://img.shields.io/github/contributors/getbindu/Bindu" alt="Contributors"></a>
+    <a href="https://hits.sh/github.com/Saptha-me/Bindu.svg"><img src="https://hits.sh/github.com/Saptha-me/Bindu.svg" alt="Hits"></a>
+  </p>
 
-<p align="center">
-  <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
-  <a href="https://hits.sh/github.com/Saptha-me/Bindu.svg"><img src="https://hits.sh/github.com/Saptha-me/Bindu.svg" alt="Hits"></a>
-  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="Python Version"></a>
-  <a href="https://pepy.tech/projects/bindu"><img src="https://static.pepy.tech/personalized-badge/bindu?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads" alt="PyPI Downloads"></a>
-  <a href="https://pypi.org/project/bindu/"><img src="https://img.shields.io/pypi/v/bindu.svg" alt="PyPI version"></a>
-  <a href="https://pypi.org/project/bindu/"><img src="https://img.shields.io/pypi/dm/bindu" alt="PyPI Downloads"></a>
-  <a href="https://coveralls.io/github/Saptha-me/Bindu?branch=v0.3.18"><img src="https://coveralls.io/repos/github/Saptha-me/Bindu/badge.svg?branch=v0.3.18" alt="Coverage"></a>
-  <a href="https://github.com/getbindu/Bindu/actions/workflows/release.yml"><img src="https://github.com/getbindu/Bindu/actions/workflows/release.yml/badge.svg" alt="Tests"></a>
-  <a href="https://discord.gg/3w5zuYUuwt"><img src="https://img.shields.io/badge/Join%20Discord-7289DA?logo=discord&logoColor=white" alt="Discord"></a>
-  <a href="https://github.com/getbindu/Bindu/graphs/contributors"><img src="https://img.shields.io/github/contributors/getbindu/Bindu" alt="Contributors"></a>
-</p>
+  <br/>
 
-<br/>
-
-<p align="center">
-  <img src="assets/sunflower-mountains.jpeg" alt="Bindu — The Internet of Agents" width="720" />
-</p>
-
-<p align="center">
-  <em>"Like sunflowers turning toward the light, agents collaborate in swarms - each one independent, yet together they create something greater."</em>
-</p>
-
-<br/>
-
-<div align="center">
   <h3>Onboard your agent in one line</h3>
-</div>
 
-<div align="center">
   <pre><code>curl -fsSL https://getbindu.com/install-bindu.sh | bash</code></pre>
+
+  <p>
+    <a href="https://getbindu.com"><strong>🌟 Register your agent</strong></a> •
+    <a href="https://docs.getbindu.com"><strong>🌻 Documentation</strong></a> •
+    <a href="https://discord.gg/3w5zuYUuwt"><strong>💬 Discord</strong></a>
+  </p>
 </div>
 
 ---
 
-**Bindu** (read: _binduu_) is an operating layer for AI agents that provides identity, communication, and payment capabilities. It delivers a production-ready service with a convenient API to connect, authenticate, and orchestrate agents across distributed systems using open protocols: **A2A**, **AP2**, and **X402**.
+**Bindu** (read: _binduu_) turns any AI agent into a production microservice. Build your agent in any framework — Agno, LangChain, OpenAI SDK, even plain TypeScript — call `bindufy()`, and get a service with DID identity, A2A protocol, OAuth2 auth, and crypto payments. No infrastructure code. No rewriting.
 
-Built with a distributed architecture (Task Manager, scheduler, storage), Bindu makes it fast to develop and easy to integrate with any AI framework. Transform any agent framework into a fully interoperable service for communication, collaboration, and commerce in the Internet of Agents.
-
-<p align="center">
-  <strong>🌟 <a href="https://getbindu.com">Register your agent</a> • 🌻 <a href="https://docs.getbindu.com">Documentation</a> • 💬 <a href="https://discord.gg/3w5zuYUuwt">Discord Community</a></strong>
-</p>
-
+Works with Python, TypeScript, and Kotlin. Built on open protocols: **A2A**, **AP2**, and **X402**.
 
 ---
 
@@ -86,7 +78,7 @@ Before installing Bindu, ensure you have:
 
 - **Python 3.12 or higher** - [Download here](https://www.python.org/downloads/)
 - **UV package manager** - [Installation guide](https://github.com/astral-sh/uv)
-- **API Key Required**: Set `OPENROUTER_API_KEY` or `OPENAI_API_KEY` in your environment variables. Free OpenRouter models are available for testing.
+- **API Key Required**: Set `OPENROUTER_API_KEY`, `OPENAI_API_KEY`, or `MINIMAX_API_KEY` in your environment variables. Free OpenRouter models are available for testing. [MiniMax AI](https://platform.minimaxi.com) offers M2.7 with 1M context window.
 
 
 ### Verify Your Setup
@@ -221,7 +213,46 @@ $env:BINDU_PORT="4000"
 
 Existing examples that use `http://localhost:3773` are automatically overridden when `BINDU_PORT` is set.
 
-### Option 2: Zero-Config Local Agent
+### Option 2: TypeScript Agent
+
+Same pattern, different language. Create `index.ts`:
+
+```typescript
+import { bindufy } from "@bindu/sdk";
+import OpenAI from "openai";
+
+const openai = new OpenAI();
+
+bindufy({
+  author: "your.email@example.com",
+  name: "research_agent",
+  description: "A research assistant agent",
+  deployment: { url: "http://localhost:3773", expose: true },
+  skills: ["skills/question-answering"],
+}, async (messages) => {
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: messages.map(m => ({
+      role: m.role as "user" | "assistant" | "system",
+      content: m.content,
+    })),
+  });
+  return response.choices[0].message.content || "";
+});
+```
+
+Run it:
+
+```bash
+npm install @bindu/sdk openai
+npx tsx index.ts
+```
+
+The SDK launches the Bindu core automatically in the background. Your agent is live at `http://localhost:3773` — same A2A protocol, same DID, same everything.
+
+> See [examples/typescript-openai-agent/](examples/typescript-openai-agent/) for the full working example with setup instructions.
+
+### Option 3: Zero-Config Local Agent
 
 Try Bindu without setting up Postgres, Redis, or any cloud services. Runs entirely locally using in-memory storage and scheduler.
 
@@ -229,8 +260,7 @@ Try Bindu without setting up Postgres, Redis, or any cloud services. Runs entire
 python examples/beginner_zero_config_agent.py
 ```
 
-
-### Option 3: Minimal Echo Agent (Testing)
+### Option 4: Minimal Echo Agent (Testing)
 
 <details>
 <summary><b>View minimal example</b> (click to expand)</summary>
@@ -425,7 +455,7 @@ Output:
 
 | Feature | Description | Documentation |
 |---------|-------------|---------------|
-|  **Authentication** | Secure API access with Ory Hydra OAuth2 (optional for development) | [Guide →](docs/AUTHENTICATION.md) |
+| 🔐 **Authentication** | Secure API access with Ory Hydra OAuth2 (optional for development) | [Guide →](docs/AUTHENTICATION.md) |
 | 💰 **Payment Integration (X402)** | Accept USDC payments on Base blockchain before executing protected methods | [Guide →](docs/PAYMENT.md) |
 | 💾 **PostgreSQL Storage** | Persistent storage for production deployments (optional - InMemoryStorage by default) | [Guide →](docs/STORAGE.md) |
 | 📋 **Redis Scheduler** | Distributed task scheduling for multi-worker deployments (optional - InMemoryScheduler by default) | [Guide →](docs/SCHEDULER.md) |
@@ -437,6 +467,7 @@ Output:
 | 🔄 **Retry Mechanism** | Automatic retry with exponential backoff for resilient agents | [Guide →](https://docs.getbindu.com/bindu/learn/retry/overview) |
 | 🔑 **Decentralized Identifiers (DIDs)** | Cryptographic identity for verifiable, secure agent interactions and payment integration | [Guide →](docs/DID.md) |
 | 🏥 **Health Check & Metrics** | Monitor agent health and performance with built-in endpoints | [Guide →](docs/HEALTH_METRICS.md) |
+| 🌍 **Language-Agnostic (gRPC)** | Bindufy agents written in TypeScript, Kotlin, Rust, or any language via gRPC adapter | [Guide →](docs/GRPC_LANGUAGE_AGNOSTIC.md) |
 
 ---
 
@@ -447,7 +478,7 @@ Output:
 Bindu includes a beautiful chat interface at `http://localhost:5173`. Navigate to the `frontend` folder and run `npm run dev` to start the server.
 
 <p align="center">
-  <img src="assets/new-ui.png" alt="Bindu Agent UI" width="640" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
+  <img src="assets/agent-ui.png" alt="Bindu Agent UI" width="640" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
 </p>
 
 ---
@@ -456,47 +487,7 @@ Bindu includes a beautiful chat interface at `http://localhost:5173`. Navigate t
 
 ## 🌐 GetBindu.com
 
-The [**GetBindu.com**](https://getbindu.com) is a public registry of all Bindu agents, making them discoverable and accessible to the broader agent ecosystem.
-
-### 📝 Manual Registration
-
-Manual registration process is currently in development.
-
----
-
-<br/>
-
-## 🌌 The Vision
-
-```
-a peek into the night sky
-}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}
-{{            +             +                  +   @          {{
-}}   |                *           o     +                .    }}
-{{  -O-    o               .               .          +       {{
-}}   |                    _,.-----.,_         o    |          }}
-{{           +    *    .-'.         .'-.          -O-         {{
-}}      *            .'.-'   .---.   `'.'.         |     *    }}
-{{ .                /_.-'   /     \   .'-.\.                   {{
-}}         ' -=*<  |-._.-  |   @   |   '-._|  >*=-    .     + }}
-{{ -- )--           \`-.    \     /    .-'/                   }}
-}}       *     +     `.'.    '---'    .'.'    +       o       }}
-{{                  .  '-._         _.-'  .                   }}
-}}         |               `~~~~~~~`       - --===D       @   }}
-{{   o    -O-      *   .                  *        +          {{
-}}         |                      +         .            +    }}
-{{ jgs          .     @      o                        *       {{
-}}       o                          *          o           .  }}
-{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{
-```
-
-_Each symbol is an agent — a spark of intelligence. The tiny dot is Bindu, the origin point in the Internet of Agents._
-
-### NightSky Connection (In Progress)
-
-NightSky enables swarms of agents. Each Bindu is a dot annotating agents with the shared language of A2A, AP2, and X402. Agents can be hosted anywhere—laptops, clouds, or clusters—yet speak the same protocol, trust each other by design, and work together as a single, distributed mind.
-
-> **💭 A Goal Without a Plan Is Just a Wish.**
+[**GetBindu.com**](https://getbindu.com) is a public registry of Bindu agents — discoverable and accessible to the broader agent ecosystem. Register your agent and make it available to other agents and orchestrators.
 
 ---
 
@@ -506,12 +497,27 @@ NightSky enables swarms of agents. Each Bindu is a dot annotating agents with th
 
 Bindu is **framework-agnostic** and tested with:
 
+**Python:**
 - **AG2** (formerly AutoGen)
 - **Agno**
 - **CrewAI**
 - **LangChain**
 - **LlamaIndex**
 - **FastAgent**
+
+**TypeScript:**
+- **OpenAI SDK**
+- **LangChain.js**
+
+**Kotlin:**
+- **OpenAI Kotlin SDK**
+
+Bindu is language-agnostic via gRPC — see [docs/grpc/](docs/grpc/) for how it works and how to add new languages.
+
+**Compatible LLM Providers:**
+- **OpenRouter** — Access 100+ models through a single API
+- **OpenAI** — GPT-4o, GPT-5, and more
+- **[MiniMax AI](https://platform.minimaxi.com)** — M2.7 (1M context), M2.5, M2.5-highspeed (204K context) via OpenAI-compatible API
 
 Want integration with your favorite framework? [Let us know on Discord](https://discord.gg/3w5zuYUuwt)!
 
@@ -524,9 +530,18 @@ Want integration with your favorite framework? [Let us know on Discord](https://
 Bindu maintains **70%+ test coverage** (target: 80%+):
 
 ```bash
+# Unit tests (fast, in pre-commit)
+uv run pytest tests/unit/ -v
+
+# E2E gRPC integration tests (real servers, full round-trip)
+uv run pytest tests/integration/grpc/ -v -m e2e
+
+# All tests with coverage
 uv run pytest -n auto --cov=bindu --cov-report=term-missing
 uv run coverage report --skip-covered --fail-under=70
 ```
+
+**CI runs automatically on every PR** — unit tests, E2E gRPC tests, and TypeScript SDK build verification. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 ---
 
@@ -561,6 +576,50 @@ Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
 </details>
+
+---
+
+<br/>
+
+## ⚠️ Known Issues
+
+Before running Bindu in production you should read
+[`bugs/known-issues.md`](./bugs/known-issues.md) — a per-subsystem
+catalog of current limitations and sharp edges, with workarounds
+for each. Postmortems for already-fixed bugs live alongside it
+under [`bugs/core/`](./bugs/core/), [`bugs/gateway/`](./bugs/gateway/),
+[`bugs/sdk/`](./bugs/sdk/), and [`bugs/frontend/`](./bugs/frontend/).
+
+### Current high-severity issues
+
+These are the ones most likely to bite you. Each links to a
+story-format entry in `known-issues.md` explaining the scenario,
+the root cause, and the workaround.
+
+| Subsystem | Slug | What it looks like from outside |
+|---|---|---|
+| Core | [`x402-middleware-fails-open-on-body-parse`](./bugs/known-issues.md#x402-middleware-fails-open-on-body-parse) | Malformed JSON body bypasses payment check |
+| Core | [`x402-no-replay-prevention`](./bugs/known-issues.md#x402-no-replay-prevention) | One payment buys unlimited work until `validBefore` |
+| Core | [`x402-no-signature-verification`](./bugs/known-issues.md#x402-no-signature-verification) | EIP-3009 authorization signature is never verified |
+| Core | [`x402-balance-check-skipped-on-missing-contract-code`](./bugs/known-issues.md#x402-balance-check-skipped-on-missing-contract-code) | Misconfigured RPC silently skips balance check |
+| Gateway | [`context-window-hardcoded`](./bugs/known-issues.md#context-window-hardcoded) | Compaction threshold assumes 200k-token window |
+| Gateway | [`poll-budget-unbounded-wall-clock`](./bugs/known-issues.md#poll-budget-unbounded-wall-clock) | `sendAndPoll` can stall 5 minutes per tool call |
+| Gateway | [`no-session-concurrency-guard`](./bugs/known-issues.md#no-session-concurrency-guard) | Two `/plan` calls on the same session tangle histories |
+
+### Issue counts by subsystem
+
+| Subsystem | High | Medium | Low | Nit |
+|---|---:|---:|---:|---:|
+| Gateway | 3 | 11 | 13 | 4 |
+| Bindu Core (Python) | 4 | 7 | 2 | 0 |
+| SDKs (TypeScript) | — | — | — | — |
+| Frontend | — | — | — | — |
+
+**Found a new issue?** Open a GitHub Issue referencing the slug
+(e.g. *"Fixes `context-window-hardcoded`"*). **Fixed one?** Remove
+its entry from `known-issues.md` and add a dated postmortem under
+the matching `bugs/<subsystem>/` folder — see
+[`bugs/README.md`](./bugs/README.md) for the template.
 
 ---
 
@@ -625,6 +684,15 @@ Our dedicated moderators help maintain a welcoming and productive community:
         <sub><b>Paras Chamoli</b></sub>
       </a>
       <br />
+    </td>
+    <td align="center">
+      <a href="https://github.com/chandan-1427">
+        <img src="https://avatars.githubusercontent.com/u/202320492?v=4" width="100px;" alt="Chandan"/>
+        <br />
+        <sub><b>Chandan</b></sub>
+      </a>
+      <br />
+    </td>
     </tr>
 </table>
 
@@ -651,12 +719,47 @@ Grateful to these projects:
 
 <br/>
 
+## 🌌 The Vision
+
+```
+a peek into the night sky
+}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}
+{{            +             +                  +   @          {{
+}}   |                *           o     +                .    }}
+{{  -O-    o               .               .          +       {{
+}}   |                    _,.-----.,_         o    |          }}
+{{           +    *    .-'.         .'-.          -O-         {{
+}}      *            .'.-'   .---.   `'.'.         |     *    }}
+{{ .                /_.-'   /     \   .'-.\.                   {{
+}}         ' -=*<  |-._.-  |   @   |   '-._|  >*=-    .     + }}
+{{ -- )--           \`-.    \     /    .-'/                   }}
+}}       *     +     `.'.    '---'    .'.'    +       o       }}
+{{                  .  '-._         _.-'  .                   }}
+}}         |               `~~~~~~~`       - --===D       @   }}
+{{   o    -O-      *   .                  *        +          {{
+}}         |                      +         .            +    }}
+{{ jgs          .     @      o                        *       {{
+}}       o                          *          o           .  }}
+{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{
+```
+
+_Each symbol is an agent — a spark of intelligence. The tiny dot is Bindu, the origin point in the Internet of Agents._
+
+### NightSky Connection (In Progress)
+
+NightSky enables swarms of agents. Each Bindu is a dot annotating agents with the shared language of A2A, AP2, and X402. Agents can be hosted anywhere — laptops, clouds, or clusters — yet speak the same protocol, trust each other by design, and work together as a single, distributed mind.
+
+---
+
+<br/>
+
 ## 🗺️ Roadmap
 
-- [ ] GRPC transport support
+- [x] gRPC transport + language-agnostic SDKs (TypeScript, Kotlin)
 - [ ] Increase test coverage to 80% (in progress)
 - [ ] AP2 end-to-end support
 - [ ] DSPy integration (in progress)
+- [ ] Rust SDK
 - [ ] MLTS support
 - [ ] X402 support with other facilitators
 

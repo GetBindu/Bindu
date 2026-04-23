@@ -1,0 +1,150 @@
+id: research-team-skill
+name: research-team-skill
+version: 1.0.0
+author: ag2-community
+description: |
+  Multi-agent research team powered by AG2 (formerly AutoGen) that
+  produces comprehensive research reports through collaborative AI agents.
+
+  This skill orchestrates three specialized agents:
+  - **Researcher**: Gathers information, facts, and sources
+  - **Analyst**: Evaluates findings, identifies trends and implications
+  - **Writer**: Synthesizes into structured reports
+
+  The team uses LLM-driven speaker selection to coordinate
+  collaboration and deliver structured research outputs on any topic.
+
+  Features:
+  - Multi-agent collaboration with dynamic speaker selection
+  - Structured report generation (Executive Summary, Key Findings, Analysis, Recommendations)
+  - Stateless per-request processing for data privacy
+  - Comprehensive research with source attribution
+  - Trend analysis and risk assessment
+
+tags:
+  - research
+  - multi-agent
+  - collaboration
+  - analysis
+  - reporting
+  - ag2
+  - autogen
+  - team-work
+  - structured-output
+
+input_modes:
+  - text/plain
+  - application/json
+
+output_modes:
+  - text/plain
+  - application/json
+
+examples:
+  - "Research and analyze the impact of AI on healthcare"
+  - "Produce a report on renewable energy trends"
+  - "Analyze the current state of quantum computing"
+  - "Research the future of autonomous vehicles"
+  - "Generate a report on blockchain adoption in finance"
+
+capabilities_detail:
+  multi_agent_research:
+    supported: true
+    description: "Three-agent collaboration for comprehensive research"
+    features:
+      - dynamic_speaker_selection
+      - role_specialization
+      - collaborative_synthesis
+
+  structured_reporting:
+    supported: true
+    description: "Produces structured reports with standard sections"
+    output_structure:
+      - executive_summary
+      - key_findings
+      - analysis
+      - recommendations
+
+  source_gathering:
+    supported: true
+    description: "Research agent gathers facts and sources"
+    methodology: "Systematic information collection with verification"
+
+  trend_analysis:
+    supported: true
+    description: "Analyst agent identifies trends and implications"
+    analysis_types:
+      - market_trends
+      - technological_trends
+      - risk_assessment
+
+  report_synthesis:
+    supported: true
+    description: "Writer agent creates cohesive final reports"
+    features:
+      - concise_synthesis
+      - structured_format
+      - action-oriented_recommendations
+
+requirements:
+  packages:
+    - "ag2[openai]>=0.11.0"
+    - "python-dotenv>=1.0.0"
+  system:
+    - internet_connection
+  api_keys:
+    - OPENROUTER_API_KEY
+
+performance:
+  avg_processing_time_ms: 30000
+  max_concurrent_requests: 3
+  context_window_tokens: 128000
+  scalability: horizontal
+
+assessment:
+  keywords:
+    - research
+    - analyze
+    - report
+    - investigate
+    - study
+    - examine
+    - multi-agent
+    - team
+    - collaborate
+    - findings
+    - analysis
+    - trends
+    - recommendations
+
+  specializations:
+    - domain: research
+      confidence_boost: 0.4
+    - domain: analysis
+      confidence_boost: 0.3
+    - domain: reporting
+      confidence_boost: 0.3
+    - domain: multi-agent
+      confidence_boost: 0.5
+
+  anti_patterns:
+    - "real-time data"
+    - "image generation"
+    - "file processing"
+    - "database queries"
+    - "code execution"
+    - "live monitoring"
+
+  complexity_indicators:
+    simple:
+      - "research"
+      - "analyze"
+      - "report on"
+    medium:
+      - "comprehensive analysis"
+      - "detailed report"
+      - "investigate trends"
+    complex:
+      - "multi-domain research"
+      - "comprehensive study"
+      - "cross-disciplinary analysis"

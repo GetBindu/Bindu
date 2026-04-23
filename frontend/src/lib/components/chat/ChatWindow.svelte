@@ -27,6 +27,7 @@
 	import { shareModal } from "$lib/stores/shareModal";
 	import LucideHammer from "~icons/lucide/hammer";
 	import ReplyIndicator from "./ReplyIndicator.svelte";
+	import { agentInspector, resetAgentInspector } from "$lib/stores/agentInspector";
 
 	import { fly } from "svelte/transition";
 	import { cubicInOut } from "svelte/easing";
@@ -58,6 +59,10 @@
 		onReplyToTask?: (taskId: string) => void;
 		replyToTaskId?: string | null;
 		onClearReply?: () => void;
+		/** Optional override for what we show as "Session" identity */
+		sessionId?: string | null;
+		onClearContext?: () => void | Promise<void>;
+		onClearTasks?: () => void | Promise<void>;
 		draft?: string;
 	}
 
@@ -79,9 +84,48 @@
 		onReplyToTask,
 		replyToTaskId = null,
 		onClearReply,
+		sessionId = null,
+		onClearContext,
+		onClearTasks,
 	}: Props = $props();
 
 	let isReadOnly = $derived(!models.some((model) => model.id === currentModel.id));
+
+	let agentContextId = $derived.by(() => {
+		// Derive from message task metadata when available (works for both normal and agent mode).
+		for (let i = messages.length - 1; i >= 0; i -= 1) {
+			const cid = messages[i]?.taskMetadata?.contextId;
+			if (cid) return cid;
+		}
+		return null;
+	});
+
+	let agentTaskCount = $derived.by(() => {
+		const ids = new Set<string>();
+		for (const m of messages) {
+			const tid = m.taskMetadata?.taskId;
+			if (tid) ids.add(tid);
+		}
+		return ids.size;
+	});
+
+	let agentSessionId = $derived.by(() => {
+		// Prefer an explicit session id, then the derived context id, then route param id if present.
+		return sessionId ?? agentContextId ?? (page.params as Record<string, string> | undefined)?.id ?? null;
+	});
+
+	// Publish agent state + clear handlers for the sidebar inspector.
+	$effect(() => {
+		agentInspector.set({
+			agentName: currentModel.displayName,
+			contextId: agentContextId,
+			sessionId: agentSessionId,
+			taskCount: agentTaskCount,
+			disabled: loading,
+			onClearContext,
+			onClearTasks,
+		});
+	});
 
 	let shareModalOpen = $state(false);
 	let editMsdgId: Message["id"] | null = $state(null);
@@ -224,6 +268,7 @@
 	onDestroy(() => {
 		unsubscribeShareModal();
 		shareModal.close();
+		resetAgentInspector();
 	});
 
 	let chatContainer: HTMLElement | undefined = $state();
@@ -261,12 +306,13 @@
 	);
 
 	// Always allow common text-like files; add images only when model is multimodal
-	import { TEXT_MIME_ALLOWLIST, IMAGE_MIME_ALLOWLIST_DEFAULT } from "$lib/constants/mime";
+	import { TEXT_MIME_ALLOWLIST, IMAGE_MIME_ALLOWLIST_DEFAULT, DOCUMENT_MIME_ALLOWLIST } from "$lib/constants/mime";
 
 	let activeMimeTypes = $derived(
 		Array.from(
 			new Set([
 				...TEXT_MIME_ALLOWLIST,
+				...DOCUMENT_MIME_ALLOWLIST,
 				...(modelIsMultimodal
 					? (currentModel.multimodalAcceptedMimetypes ?? [...IMAGE_MIME_ALLOWLIST_DEFAULT])
 					: []),
@@ -355,15 +401,17 @@
 	}}
 />
 
-<div class="relative min-h-0 min-w-0">
+<div class="relative flex h-full min-h-0 min-w-0 flex-col">
+
 	{#if shareModalOpen}
 		<ShareConversationModal open={shareModalOpen} onclose={() => shareModal.close()} />
 	{/if}
 	<div
-		class="scrollbar-custom h-full overflow-y-auto"
+		class="scrollbar-custom flex-1 overflow-y-auto"
 		use:snapScrollToBottom={scrollDependency}
 		bind:this={chatContainer}
 	>
+
 		{#if replyToTaskId}
 			<ReplyIndicator taskId={replyToTaskId} onClear={onClearReply ?? (() => {})} />
 		{/if}
@@ -375,7 +423,7 @@
 			{/if}
 
 			{#if messages.length > 0}
-				<div class="flex h-max flex-col gap-8 pb-52">
+				<div class="flex h-max flex-col gap-8 pb-40">
 					{#each messages as message, idx (message.id)}
 						<ChatMessage
 							{loading}
@@ -404,12 +452,41 @@
 					readOnly={isReadOnly}
 				/>
 			{:else}
-				<ChatIntroduction
-					{currentModel}
-					onmessage={(content) => {
-						onmessage?.(content);
-					}}
-				/>
+				<div class="intro-container my-auto flex flex-1 flex-col items-center justify-center py-6 pb-52 sm:py-12 sm:pb-64">
+					<ChatIntroduction
+						{currentModel}
+						onmessage={(content) => {
+							onmessage?.(content);
+						}}
+					/>
+					{#if !loading && !pending}
+						<div
+							class="intro-pills mt-10 flex flex-wrap items-center justify-center gap-2.5 px-4 transition-opacity duration-300"
+							transition:fade
+						>
+							{#each [
+								{ text: "Generate an image", icon: "🎨" },
+								{ text: "Latest world news", icon: "📰" },
+								{ text: "Trending models", icon: "🚀" },
+								{ text: "Plan a trip", icon: "🗺️" },
+								{ text: "Compare technologies", icon: "💻" },
+								{ text: "Find a dataset", icon: "📊" },
+								{ text: "Gift ideas", icon: "🎁" }
+							] as prompt}
+								<button
+									type="button"
+									class="prompt-pill flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-bold transition-all"
+									onclick={() => {
+										draft = prompt.text;
+										handleSubmit();
+									}}
+								>
+									{prompt.text}
+								</button>
+							{/each}
+						</div>
+					{/if}
+				</div>
 			{/if}
 		</div>
 
@@ -420,12 +497,11 @@
 
 	<div
 		class="pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full
-			max-w-3xl flex-col items-center justify-center bg-gradient-to-t from-white
-			via-white/100 to-white/0 px-3.5 pt-2 dark:border-gray-800
-			dark:from-gray-900 dark:via-gray-900/100
-			dark:to-gray-900/0 max-sm:py-0 sm:px-5 md:pb-4 xl:max-w-4xl [&>*]:pointer-events-auto"
+			max-w-3xl flex-col items-center justify-end bg-transparent
+			px-3.5 pt-2 pb-6 sm:px-5 md:pb-8 xl:max-w-4xl [&>*]:pointer-events-auto"
 	>
-				{#if sources?.length && !loading}
+
+		{#if sources?.length && !loading}
 			<div
 				in:fly|local={sources.length === 1 ? { y: -20, easing: cubicInOut } : undefined}
 				class="flex flex-row flex-wrap justify-center gap-2.5 rounded-xl pb-3"
@@ -444,6 +520,8 @@
 		{/if}
 
 		<div class="w-full">
+			<!-- pills removed from here to prevent absolute overlap -->
+
 			<div class="flex w-full *:mb-3">
 				{#if !loading && lastIsError}
 					<RetryBtn
@@ -458,6 +536,13 @@
 					/>
 				{/if}
 			</div>
+		<!-- Chat composer wrapper with glow effects -->
+		<div class="composer-wrap">
+			<!-- Left orange glow -->
+			<div class="composer-glow composer-glow-left"></div>
+			<!-- Right blue glow -->
+			<div class="composer-glow composer-glow-right"></div>
+
 			<form
 				tabindex="-1"
 				aria-label={isFileUploadEnabled ? "file dropzone" : undefined}
@@ -465,11 +550,7 @@
 					e.preventDefault();
 					handleSubmit();
 				}}
-				class={{
-					"relative flex w-full max-w-4xl flex-1 items-center rounded-xl border bg-gray-100 dark:border-gray-700 dark:bg-gray-800": true,
-					"opacity-30": isReadOnly,
-					"max-sm:mb-4": focused && isVirtualKeyboard(),
-				}}
+				class="composer {isReadOnly ? 'opacity-30' : ''} {focused && isVirtualKeyboard() ? 'max-sm:mb-4' : ''} {pastedLongContent ? 'paste-glow' : ''}"
 			>
 				{#if isRecording || isTranscribing}
 					<VoiceRecorder
@@ -485,72 +566,61 @@
 				{:else if onDrag && isFileUploadEnabled}
 					<FileDropzone bind:files bind:onDrag mimeTypes={activeMimeTypes} />
 				{:else}
-					<div
-						class="flex w-full flex-1 rounded-xl border-none bg-transparent"
-						class:paste-glow={pastedLongContent}
-					>
-						{#if lastIsError}
-							<ChatInput value="Sorry, something went wrong. Please try again." disabled={true} />
-						{:else}
-							<ChatInput
-								placeholder={isReadOnly ? "This conversation is read-only." : "Imagine and Question"}
-								{loading}
-								bind:value={draft}
-								bind:files
-								mimeTypes={activeMimeTypes}
-								onsubmit={handleSubmit}
-								{onPaste}
-								disabled={isReadOnly || lastIsError}
-								{modelIsMultimodal}
-								{modelSupportsTools}
-								bind:focused
-							/>
-						{/if}
-
-						{#if loading}
-							<StopGeneratingBtn
-								onClick={() => onstop?.()}
-								showBorder={true}
-								classNames="absolute bottom-2 right-2 size-8 sm:size-7 self-end rounded-full border bg-white text-black shadow transition-none dark:border-transparent dark:bg-gray-600 dark:text-white"
-							/>
-						{:else}
-							{#if transcriptionEnabled}
+					{#if lastIsError}
+						<ChatInput value="Sorry, something went wrong. Please try again." disabled={true} />
+					{:else}
+						<ChatInput
+							placeholder={isReadOnly ? "This conversation is read-only." : "Ask anything"}
+							{loading}
+							bind:value={draft}
+							bind:files
+							mimeTypes={activeMimeTypes}
+							onsubmit={handleSubmit}
+							{onPaste}
+							disabled={isReadOnly || lastIsError}
+							{modelIsMultimodal}
+							{modelSupportsTools}
+							bind:focused
+						>
+							{#if loading}
+								<StopGeneratingBtn
+									onClick={() => onstop?.()}
+									showBorder={true}
+									classNames="composer-btn icon-btn"
+								/>
+							{:else}
+								{#if transcriptionEnabled}
+									<button
+										type="button"
+										class="composer-btn"
+										disabled={isReadOnly}
+										onclick={() => {
+											isRecording = true;
+										}}
+										aria-label="Start voice recording"
+									>
+										<IconMic class="size-3.5" />
+										<span>Voice</span>
+									</button>
+								{/if}
 								<button
-									type="button"
-									class="btn absolute bottom-2 right-10 mr-1.5 size-8 self-end rounded-full border bg-white/50 text-gray-500 transition-none hover:bg-gray-50 hover:text-gray-700 dark:border-transparent dark:bg-gray-600/50 dark:text-gray-300 dark:hover:bg-gray-500 dark:hover:text-white sm:right-9 sm:size-7"
-									disabled={isReadOnly}
-									onclick={() => {
-										isRecording = true;
-									}}
-									aria-label="Start voice recording"
+									class="send-btn"
+									disabled={!draft || isReadOnly}
+									type="submit"
+									aria-label="Send message"
+									name="submit"
 								>
-									<IconMic class="size-4" />
+									<IconArrowUp class="size-4" />
 								</button>
 							{/if}
-							<button
-								class="btn absolute bottom-2 right-2 size-8 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:enabled:bg-black sm:size-7 {!draft ||
-								isReadOnly
-									? ''
-									: '!bg-black !text-white dark:!bg-white dark:!text-black'}"
-								disabled={!draft || isReadOnly}
-								type="submit"
-								aria-label="Send message"
-								name="submit"
-							>
-								<IconArrowUp />
-							</button>
-						{/if}
-					</div>
+						</ChatInput>
+					{/if}
 				{/if}
 			</form>
-			<div
-				class={{
-					"mt-1.5 flex h-5 items-center self-stretch whitespace-nowrap px-0.5 text-xs text-gray-400/90 max-md:mb-2 max-sm:gap-2": true,
-					"max-sm:hidden": focused && isVirtualKeyboard(),
-				}}
-			>
+		</div>
+			<div class="mt-2 flex h-5 items-center justify-center self-stretch whitespace-nowrap px-0.5 text-[10px] text-gray-450 dark:text-gray-500 max-md:mb-2 {focused && isVirtualKeyboard() ? 'max-sm:hidden' : ''}">
 				{#if loading && streamingToolCallName}
-					<span class="inline-flex items-center gap-1 whitespace-nowrap text-xs">
+					<span class="inline-flex items-center gap-1 whitespace-nowrap">
 						<LucideHammer class="size-3" />
 						Calling tool
 						<span class="loading-dots font-medium">
@@ -559,52 +629,305 @@
 						</span>
 					</span>
 				{:else}
-					<span class="inline-flex items-center gap-1">
-						{currentModel.displayName}
-					</span>
-				{/if}
-				{#if !messages.length && !loading}
-					<span class="max-sm:hidden">Generated content may be inaccurate or false.</span>
+					<div class="flex items-center gap-1.5 uppercase tracking-wider">
+						<span>{currentModel.displayName}</span>
+						{#if !messages.length && !loading}
+							<span class="mx-1 opacity-50">•</span>
+							<span>Generated content may be inaccurate or false.</span>
+						{/if}
+					</div>
 				{/if}
 			</div>
 		</div>
+
 	</div>
 </div>
 
 <style lang="postcss">
+	@media (max-height: 580px) {
+		.intro-pills {
+			display: none !important;
+		}
+		.intro-container {
+			padding-top: 1rem !important;
+			padding-bottom: 1rem !important;
+			margin-top: 2rem !important;
+		}
+	}
+
+	/* Wrapper */
+	.composer-wrap {
+		position: relative;
+		width: min(760px, 92vw);
+		margin: 0 auto;
+		padding: 80px 0 60px;
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		isolation: isolate;
+	}
+
+	/* Glow Layers */
+	.composer-glow {
+		position: absolute;
+		inset: -120px;
+		z-index: 0;
+		pointer-events: none;
+		filter: blur(90px);
+		opacity: 0.95;
+		transition: opacity 0.3s ease;
+	}
+
+	:global(html:not(.dark)) .composer-glow {
+		opacity: 0.25;
+		filter: blur(120px);
+	}
+
+	/* TOP-LEFT — ORANGE */
+	.composer-glow-left {
+		background:
+			radial-gradient(circle at 16% 45%,
+				rgba(255, 110, 60, 0.95) 0%,
+				rgba(255, 110, 60, 0.4) 12%,
+				rgba(255, 110, 60, 0.1) 25%,
+				transparent 45%);
+	}
+
+	/* BOTTOM-RIGHT — BLUE */
+	.composer-glow-right {
+		background:
+			radial-gradient(circle at 84% 55%,
+				rgba(90, 140, 255, 0.95) 0%,
+				rgba(90, 140, 255, 0.4) 12%,
+				rgba(96, 92, 255, 0.1) 25%,
+				transparent 45%);
+	}
+
+	/* Glass Core */
+	.composer {
+		position: relative;
+		z-index: 2;
+		width: 100%;
+		height: 84px;
+		border-radius: 22px;
+		background: rgba(8, 9, 14, 0.97);
+		border: 1px solid rgba(255, 255, 255, 0.06);
+		backdrop-filter: blur(20px);
+		-webkit-backdrop-filter: blur(20px);
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.03),
+			0 20px 60px rgba(0, 0, 0, 0.8);
+		overflow: hidden;
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		padding: 10px 14px;
+		gap: 6px;
+	}
+
+	:global(html:not(.dark)) .composer {
+		background: #ffffff;
+		border-color: rgba(15, 23, 42, 0.08);
+		box-shadow:
+			0 1px 2px rgba(15, 23, 42, 0.05),
+			0 12px 24px -4px rgba(15, 23, 42, 0.04),
+			0 20px 48px -8px rgba(15, 23, 42, 0.1);
+	}
+
+	/* Gradient Rim */
+	.composer::before {
+		content: "";
+		position: absolute;
+		inset: 0;
+		border-radius: inherit;
+		padding: 1px;
+		background: linear-gradient(
+			135deg,
+			rgba(255, 110, 60, 0.8) 0%,
+			rgba(255, 255, 255, 0.02) 40%,
+			rgba(255, 255, 255, 0.02) 60%,
+			rgba(90, 140, 255, 0.8) 100%
+		);
+		-webkit-mask:
+			linear-gradient(#fff 0 0) content-box,
+			linear-gradient(#fff 0 0);
+		-webkit-mask-composite: xor;
+		        mask-composite: exclude;
+		pointer-events: none;
+	}
+
+	:global(html:not(.dark)) .composer::before {
+		background: linear-gradient(
+			135deg,
+			rgba(99, 102, 241, 0.2) 0%,
+			rgba(15, 23, 42, 0.02) 40%,
+			rgba(15, 23, 42, 0.02) 60%,
+			rgba(236, 72, 153, 0.2) 100%
+		);
+	}
+
+	/* Font Fixes */
+	.composer :global(textarea),
+	.composer :global(input[type="text"]) {
+		font-family: Inter, system-ui, -apple-system, sans-serif !important;
+		color: #111827;
+		font-size: 15px;
+		line-height: 1.5;
+	}
+
+	:global(.dark) .composer :global(textarea),
+	:global(.dark) .composer :global(input[type="text"]) {
+		color: #eef1f7;
+	}
+
+	.composer :global(textarea::placeholder) {
+		color: rgba(71, 85, 105, 0.6);
+	}
+
+	:global(.dark) .composer :global(textarea::placeholder) {
+		color: rgba(168, 177, 197, 0.62);
+	}
+
+
+
+	/* Pill Buttons */
+	:global(.composer-btn) {
+		height: 28px;
+		padding: 0 12px;
+		border-radius: 999px;
+		background: rgba(0, 0, 0, 0.04);
+		border: 1px solid rgba(0, 0, 0, 0.08);
+		color: rgba(51, 65, 85, 0.8);
+		font-family: Inter, system-ui, sans-serif;
+		font-size: 12.5px;
+		line-height: 1;
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		cursor: pointer;
+		white-space: nowrap;
+		outline: none;
+		transition: background 0.15s, color 0.15s;
+		flex-shrink: 0;
+	}
+
+	:global(.dark) :global(.composer-btn) {
+		background: rgba(255, 255, 255, 0.03);
+		border: 1px solid rgba(255, 255, 255, 0.08);
+		color: rgba(210, 218, 235, 0.75);
+	}
+
+	:global(.composer-btn:hover:not(:disabled)) {
+		background: rgba(0, 0, 0, 0.08);
+		color: rgba(15, 23, 42, 0.95);
+	}
+
+	:global(.dark) :global(.composer-btn:hover:not(:disabled)) {
+		background: rgba(255, 255, 255, 0.07);
+		color: rgba(225, 232, 248, 0.95);
+	}
+
+	:global(.composer-btn:disabled) {
+		opacity: 0.45;
+		cursor: not-allowed;
+	}
+
+	/* Icon-only pill (+ button) */
+	:global(.icon-btn) {
+		width: 28px;
+		height: 28px;
+		padding: 0;
+		display: grid;
+		place-items: center;
+	}
+
+	/* Send Button */
+	.send-btn {
+		width: 32px;
+		height: 32px;
+		flex-shrink: 0;
+		border: none;
+		border-radius: 50%;
+		color: #fff;
+		background: linear-gradient(135deg, #8c4cff, #ff4fd8);
+		box-shadow:
+			0 0 12px rgba(140, 76, 255, 0.6),
+			0 0 22px rgba(255, 79, 216, 0.4);
+		display: grid;
+		place-items: center;
+		cursor: pointer;
+		outline: none;
+		transition: transform 0.15s, box-shadow 0.15s;
+	}
+
+	.send-btn:disabled {
+		opacity: 0.45;
+		box-shadow: none;
+		cursor: not-allowed;
+	}
+
+	.send-btn:not(:disabled):hover {
+		transform: scale(1.08);
+		box-shadow:
+			0 0 16px rgba(140, 76, 255, 0.8),
+			0 0 28px rgba(255, 79, 216, 0.55);
+	}
+
+	/* Paste Glow Animation */
 	.paste-glow {
-		animation: glow 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-		will-change: box-shadow;
+		animation: paste-pulse 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 	}
 
-	@keyframes glow {
-		0% {
-			box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.8);
-		}
-		50% {
-			box-shadow: 0 0 20px 4px rgba(59, 130, 246, 0.6);
-		}
-		100% {
-			box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
-		}
+	@keyframes paste-pulse {
+		0%   { box-shadow: 0 0 0 0 rgba(140, 76, 255, 0.8); }
+		50%  { box-shadow: 0 0 20px 4px rgba(140, 76, 255, 0.6); }
+		100% { box-shadow: 0 0 0 0 rgba(140, 76, 255, 0); }
 	}
 
+	/* Prompt Pills (suggestions) */
+	.prompt-pill {
+		background: var(--pill-bg);
+		border: 1px solid var(--pill-border);
+		color: #475569;
+		font-family: Inter, system-ui, sans-serif;
+		font-size: 12px;
+		transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+		box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+	}
+
+	:global(.dark) .prompt-pill {
+		background: rgba(255, 255, 255, 0.03);
+		border: 1px solid rgba(255, 255, 255, 0.08);
+		color: rgba(210, 218, 235, 0.7);
+		box-shadow: none;
+	}
+
+	.prompt-pill:hover {
+		background: #ffffff;
+		color: #0f172a;
+		border-color: #cbd5e1;
+		transform: translateY(-1px);
+		box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.1);
+	}
+
+	:global(.dark) .prompt-pill:hover {
+		background: rgba(255, 255, 255, 0.07);
+		color: rgba(225, 232, 248, 0.9);
+		border-color: rgba(255, 255, 255, 0.15);
+		transform: none;
+		box-shadow: none;
+	}
+
+	/* Loading Dots */
 	.loading-dots::after {
 		content: "";
 		animation: dots-content 0.9s steps(1, end) infinite;
 	}
+
 	@keyframes dots-content {
-		0% {
-			content: "";
-		}
-		33% {
-			content: ".";
-		}
-		66% {
-			content: "..";
-		}
-		88% {
-			content: "...";
-		}
+		0%  { content: ""; }
+		33% { content: "."; }
+		66% { content: ".."; }
+		88% { content: "..."; }
 	}
 </style>

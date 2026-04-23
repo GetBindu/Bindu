@@ -502,6 +502,8 @@
 	$effect(() => {
 		if (browser && messagesPath.at(-1)?.id) {
 			localStorage.setItem("leafId", messagesPath.at(-1)?.id as string);
+			// Also save the current conversation ID for session restoration
+			localStorage.setItem("lastConversationId", page.params.id!);
 		}
 	});
 

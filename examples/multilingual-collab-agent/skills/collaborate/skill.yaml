@@ -1,0 +1,154 @@
+id: collaborate-v1
+name: collaborate
+version: 1.0.0
+author: dassubhojit750075@gmail.com
+
+description: |
+  Assists users with collaborative writing tasks in English, Hindi, and Bengali.
+  Helps draft messages, emails, documents, and responses. Uses Mem0 persistent
+  memory to maintain context across sessions and build a user knowledge base.
+  Designed to enable cross-language collaboration between users and agents.
+
+tags:
+  - collaborate
+  - writing
+  - multilingual
+  - memory
+  - drafting
+  - communication
+
+input_modes:
+  - text/plain
+  - application/json
+
+output_modes:
+  - text/plain
+  - application/json
+
+examples:
+  - "Help me write an email to my team about the Bindu integration"
+  - "मेरी टीम को हिंदी में एक संदेश लिखने में मदद करें"
+  - "আমাকে বাংলায় একটি ইমেইল লিখতে সাহায্য করুন"
+  - "Draft a summary of our conversation so far"
+  - "Help me explain the Internet of Agents to a non-technical audience"
+
+capabilities_detail:
+  document_drafting:
+    supported: true
+    description: "Draft emails, messages, reports, and documents in any supported language"
+    features:
+      - "Email and message drafting in EN, HI, BN"
+      - "Tone adjustment (formal, informal, technical)"
+      - "Context-aware drafting using Mem0 memory"
+      - "Iterative refinement based on feedback"
+      - "Summary generation from conversation history"
+
+  cross_language_collaboration:
+    supported: true
+    description: "Bridge communication between users of different languages"
+    features:
+      - "Draft a message in one language for a recipient in another"
+      - "Provide cultural context and communication tips"
+      - "Adapt formality level to cultural norms (EN vs HI vs BN)"
+
+  memory_assisted_collaboration:
+    supported: true
+    description: "Use Mem0 to remember user preferences and past context"
+    features:
+      - "Remembers user's name, role, and preferences"
+      - "References past conversations for continuity"
+      - "Builds a persistent knowledge base per user"
+
+requirements:
+  packages:
+    - "agno>=2.5.2"
+    - "mem0ai>=0.1.0"
+  system: []
+  min_memory_mb: 256
+
+performance:
+  avg_processing_time_ms: 2500
+  max_concurrent_requests: 8
+  memory_per_request_mb: 128
+  scalability: horizontal
+
+allowed_tools:
+  - Read
+  - Write
+
+documentation:
+  overview: |
+    The collaborate skill enables the multilingual agent to assist users with
+    writing and communication tasks. It leverages Mem0 persistent memory to
+    maintain context across sessions, making it feel like a true collaborative
+    partner rather than a stateless assistant.
+
+    This skill demonstrates one of the core Internet of Agents use cases:
+    agents that remember, learn, and collaborate with users over time.
+
+  use_cases:
+    when_to_use:
+      - "User needs help writing or drafting content"
+      - "User wants to communicate across language barriers"
+      - "User wants the agent to remember context from past sessions"
+      - "User needs a summary or recap of previous work"
+
+    when_not_to_use:
+      - "User wants factual research — use research skill instead"
+      - "User wants pure translation without collaboration context"
+
+  input_structure: |
+    Natural language request describing the collaboration task.
+
+    English: "Help me write an email to my team about X"
+    Hindi:   "मुझे X के बारे में एक ईमेल लिखने में मदद करें"
+    Bengali: "আমাকে X সম্পর্কে একটি ইমেইল লিখতে সাহায্য করুন"
+
+  output_format: |
+    Drafted content in the requested language and format.
+    Includes optional notes on tone, cultural considerations, or
+    suggested improvements.
+
+  error_handling:
+    - "Mem0 unavailable: continues without memory, informs user"
+    - "Ambiguous task: asks clarifying questions before drafting"
+    - "Unsupported language: informs user and offers EN/HI/BN alternatives"
+
+assessment:
+  keywords:
+    - "help me write"
+    - "draft"
+    - "compose"
+    - "collaborate"
+    - "लिखने में मदद"
+    - "लिखें"
+    - "লিখতে সাহায্য"
+    - "ড্রাফট"
+    - "email"
+    - "message"
+    - "document"
+    - "summary"
+
+  specializations:
+    - domain: "email-drafting"
+      confidence_boost: 0.35
+    - domain: "cross-language-communication"
+      confidence_boost: 0.3
+    - domain: "document-creation"
+      confidence_boost: 0.25
+
+  anti_patterns:
+    - "search for information"
+    - "translate this text"
+    - "what is the definition of"
+
+  complexity_indicators:
+    simple:
+      - "Write a short message"
+      - "Draft a one-line reply"
+    medium:
+      - "Write a professional email"
+      - "Draft a project update"
+    complex:
+      - "Write a detailed technical proposal"
+      - "Draft a cross-cultural communication strategy"

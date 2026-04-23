@@ -48,6 +48,7 @@ For full URL override, use `BINDU_DEPLOYMENT_URL` (e.g. `http://127.0.0.1:5001`)
 - `beginner/faq_agent.py` - Documentation search agent
 - `beginner/agno_notion_agent.py` - Notion integration
 - `beginner/ag2_simple_example.py` - AG2 (AutoGen) simple agent
+- `beginner/minimax_example.py` - MiniMax AI research agent (OpenAI-compatible)
 - `beginner/dspy_agent.py` - DSPy framework integration
 - `beginner/agno_paywall_example.py` - Paywall-protected agent
 - `beginner/echo_agent_behind_paywall.py` - Echo agent with payment requirement
@@ -63,11 +64,18 @@ For full URL override, use `BINDU_DEPLOYMENT_URL` (e.g. `http://127.0.0.1:5001`)
 - `ai-data-analysis-agent/` - Autonomous data analyst with CSV profiling and visualization
 - `cybersecurity-newsletter/` - Security news aggregator with CVE tracking
 
+### TypeScript (Language-Agnostic via gRPC)
+- `typescript-openai-agent/` - OpenAI SDK agent bindufied with TypeScript SDK
+- `typescript-langchain-agent/` - LangChain.js agent bindufied with TypeScript SDK
+
+> TypeScript agents use `@bindu/sdk` which automatically launches the Bindu Python core in the background. Same A2A protocol, same DID, same everything — just a different language. See the [gRPC documentation](../docs/GRPC_LANGUAGE_AGNOSTIC.md) for details.
+
 ### Advanced
 - `agent_swarm/` - Multi-agent collaboration system
 - `cerina_bindu/cbt/` - CBT therapy protocol generator
 - `ag2_research_team/` - Multi-agent research pipeline using AG2 (AutoGen)
 - `langgraph_blog_writing_agent/` - Map-Reduce blog writing with LangGraph
+- `hermes_agent/` - Nous Research's tool-using coding/research agent (web, file, code-exec) bindufied with tiered safety controls
 
 ### Components
 - `skills/` - Reusable agent capabilities
@@ -75,8 +83,9 @@ For full URL override, use `BINDU_DEPLOYMENT_URL` (e.g. `http://127.0.0.1:5001`)
 ## Environment Variables
 
 ```bash
-# Required
+# Required (at least one LLM provider)
 OPENROUTER_API_KEY=sk-or-v1-your-api-key-here
+MINIMAX_API_KEY=your-minimax-api-key  # Alternative: MiniMax AI (https://platform.minimaxi.com)
 
 # Optional
 PORT=4000
@@ -133,6 +142,8 @@ if __name__ == "__main__":
 ## Documentation
 
 - [Bindu Docs](https://docs.getbindu.com)
+- [gRPC Language-Agnostic Guide](../docs/GRPC_LANGUAGE_AGNOSTIC.md)
+- [TypeScript SDK](../sdks/typescript/README.md)
 - [Payment Guide](../docs/PAYMENT.md)
 - [DID Guide](../docs/DID.md)
 - [Skills Guide](../docs/SKILLS.md)

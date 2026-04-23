@@ -1,0 +1,16 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/did/v1",
+    "https://getbindu.com/ns/v1"
+  ],
+  "id": "did:bindu:gaurikasethi88_at_gmail_com:echo_agent:438b4815-7ebe-d853-b95d-48b32b68fa3a",
+  "created": "2026-04-17T18:08:17.821594+00:00",
+  "authentication": [
+    {
+      "id": "did:bindu:gaurikasethi88_at_gmail_com:echo_agent:438b4815-7ebe-d853-b95d-48b32b68fa3a#key-1",
+      "type": "Ed25519VerificationKey2020",
+      "controller": "did:bindu:gaurikasethi88_at_gmail_com:echo_agent:438b4815-7ebe-d853-b95d-48b32b68fa3a",
+      "publicKeyBase58": "7dNzT2ZzYKsibUFirPVWZheh2TGKZuy3fGdCkcq2f2RM"
+    }
+  ]
+}

@@ -2,12 +2,12 @@
 
 from __future__ import annotations as _annotations
 
-import math
 from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack
 from typing import Any
 
 import anyio
+from opentelemetry.trace import get_current_span
 
 from bindu.common.protocol.types import TaskIdParams, TaskSendParams
 from bindu.server.scheduler.base import (
@@ -20,7 +20,6 @@ from bindu.server.scheduler.base import (
 )
 from bindu.utils.logging import get_logger
 from bindu.utils.retry import retry_scheduler_operation
-from bindu.utils.tracing import get_trace_context
 
 logger = get_logger("bindu.server.scheduler.memory_scheduler")
 
@@ -38,12 +37,12 @@ class InMemoryScheduler(Scheduler):
         self.aexit_stack = AsyncExitStack()
         await self.aexit_stack.__aenter__()
 
-        # FIX: Added math.inf to create a buffered stream.
-        # Without this, the stream defaults to 0 (unbuffered), which causes
-        # the API server to deadlock/hang waiting for a worker to receive the task.
+        # Buffer of 100 prevents deadlock: without buffering the sender blocks
+        # until a worker is ready to receive, which stalls the API server.
+        # math.inf was previously used here but removed to restore backpressure.
         self._write_stream, self._read_stream = anyio.create_memory_object_stream[
             TaskOperation
-        ](math.inf)
+        ](100)
         await self.aexit_stack.enter_async_context(self._read_stream)
         await self.aexit_stack.enter_async_context(self._write_stream)
 
@@ -59,16 +58,15 @@ class InMemoryScheduler(Scheduler):
         operation: str,
         params: TaskSendParams | TaskIdParams,
     ) -> None:
-        """Send task operation with trace context.
+        """Send task operation with live span for trace context.
 
         Args:
             operation_class: The operation class to instantiate
             operation: Operation type string
             params: Task parameters
         """
-        trace_id, span_id = get_trace_context()
         task_op = operation_class(
-            operation=operation, params=params, trace_id=trace_id, span_id=span_id
+            operation=operation, params=params, _current_span=get_current_span()
         )
         await self._write_stream.send(task_op)
 
