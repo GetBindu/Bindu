@@ -195,7 +195,7 @@ class TestCreateTTSService:
             mock_settings.voice.tts_fallback_provider = "none"
 
             with pytest.raises(
-                ImportError, match="Piper TTS requires pipecat\[piper\]"
+                ImportError, match=r"Piper TTS requires pipecat\[piper\]"
             ):
                 create_tts_service(ext)
 
@@ -216,7 +216,7 @@ class TestCreateTTSService:
             mock_settings.voice.tts_fallback_provider = "none"
 
             with pytest.raises(
-                ImportError, match="ElevenLabs TTS requires pipecat\[elevenlabs\]"
+                ImportError, match=r"ElevenLabs TTS requires pipecat\[elevenlabs\]"
             ):
                 create_tts_service(ext)
 
@@ -267,7 +267,7 @@ class TestCreateTTSService:
             mock_settings.voice.azure_tts_voice = "en-US-SaraNeural"
 
             with pytest.raises(
-                ImportError, match="Azure TTS requires pipecat\[azure\]"
+                ImportError, match=r"Azure TTS requires pipecat\[azure\]"
             ):
                 create_tts_service(ext)
 
