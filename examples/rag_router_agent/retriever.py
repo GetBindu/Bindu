@@ -1,32 +1,28 @@
 import re
+import logging
+
+logger = logging.getLogger(__name__)
+
+STOPWORDS = {"the", "is", "a", "an", "what", "are", "of", "in", "on"}
 
 
-def retrieve_docs(db_path: str, query: str, k: int = 2):
+def retrieve_docs(db_path, query, k=2):
     try:
-        # ✅ Explicit encoding (fix cross-platform issues)
         with open(db_path, "r", encoding="utf-8") as f:
             docs = f.readlines()
-    except FileNotFoundError:
+    except (OSError, UnicodeDecodeError) as e:
+        logger.warning(f"Failed to read DB: {e}")
         return []
 
-    # 🔤 Normalize query into tokens (true token-based)
-    query_words = set(re.findall(r"\w+", query.lower()))
+    query_words = {w for w in re.findall(r"\w+", query.lower()) if w not in STOPWORDS}
 
     scored = []
-
     for doc in docs:
-        # 🔤 Tokenize document
-        doc_words = set(re.findall(r"\w+", doc.lower()))
-
-        # 📊 True token-based score (intersection)
+        doc_words = {w for w in re.findall(r"\w+", doc.lower()) if w not in STOPWORDS}
         score = len(query_words & doc_words)
 
-        # ❗ Keep only relevant docs
         if score > 0:
             scored.append((score, doc))
 
-    # 📈 Sort by relevance (highest score first)
-    scored.sort(key=lambda x: x[0], reverse=True)
-
-    # 📦 Return top-k results
+    scored.sort(reverse=True)
     return [doc for _, doc in scored[:k]]
