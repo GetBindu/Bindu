@@ -157,7 +157,7 @@ async def test_voice_websocket_accepts_subprotocol_session_token(
         websocket = AsyncMock()
         websocket.app = app
         websocket.path_params = {"session_id": session.id}
-        websocket.headers = {"sec-websocket-protocol": "token-abc"}
+        websocket.headers = {"sec-websocket-protocol": "bindu.voice.v1, token-abc"}
         websocket.client_state = WebSocketState.CONNECTED
         websocket.send_text = AsyncMock()
 
@@ -172,8 +172,166 @@ async def test_voice_websocket_accepts_subprotocol_session_token(
         await voice_websocket(websocket)
 
         websocket.accept.assert_awaited()
-        # Should select the token as the negotiated subprotocol.
-        assert websocket.accept.await_args.kwargs.get("subprotocol") == "token-abc"
+        # Should negotiate the fixed voice websocket protocol, not the token.
+        assert (
+            websocket.accept.await_args.kwargs.get("subprotocol")
+            == "bindu.voice.v1"
+        )
+
+        sent = [
+            json.loads(call.args[0]) for call in websocket.send_text.await_args_list
+        ]
+        assert any(
+            item.get("type") == "state" and item.get("state") == "listening"
+            for item in sent
+        )
+        assert any(
+            item.get("type") == "state" and item.get("state") == "ended"
+            for item in sent
+        )
+    finally:
+        module.app_settings.voice.session_auth_required = original_required
+        module.app_settings.voice.session_timeout = original_timeout
+        module.app_settings.voice.enabled = original_enabled
+        module.app_settings.voice.stt_api_key = original_stt
+        module.app_settings.voice.tts_api_key = original_tts
+
+
+@pytest.mark.asyncio
+async def test_voice_websocket_rejects_invalid_subprotocol_label(
+    monkeypatch, mock_pipecat_modules
+):
+    pipeline_builder = __import__(
+        "bindu.extensions.voice.pipeline_builder", fromlist=["build_voice_pipeline"]
+    )
+
+    dummy_bridge = MagicMock()
+    dummy_bridge.cleanup_background_tasks = AsyncMock()
+    dummy_bridge.process_transcription = AsyncMock(return_value="ok")
+
+    def fake_build_voice_pipeline(**_kwargs):
+        return {"stt": object(), "tts": object(), "bridge": dummy_bridge, "vad": None}
+
+    monkeypatch.setattr(
+        pipeline_builder, "build_voice_pipeline", fake_build_voice_pipeline
+    )
+
+    from bindu.server.endpoints import voice_endpoints as module
+
+    original_required = module.app_settings.voice.session_auth_required
+    original_timeout = module.app_settings.voice.session_timeout
+    original_enabled = module.app_settings.voice.enabled
+    original_stt = module.app_settings.voice.stt_api_key
+    original_tts = module.app_settings.voice.tts_api_key
+    try:
+        module.app_settings.voice.session_auth_required = True
+        module.app_settings.voice.session_timeout = 300
+        module.app_settings.voice.enabled = True
+        module.app_settings.voice.stt_api_key = (
+            "unit-test-stt-token"  # pragma: allowlist secret
+        )
+        module.app_settings.voice.tts_api_key = (
+            "unit-test-tts-token"  # pragma: allowlist secret
+        )
+
+        manager = VoiceSessionManager(max_sessions=5, session_timeout=300)
+        session = await manager.create_session(
+            "ctx",
+            session_token="token-abc",  # noqa: S106
+            session_token_expires_at=1e12,
+        )
+
+        app = MagicMock()
+        app._voice_session_manager = manager
+        app._voice_ext = MagicMock(allow_interruptions=True)
+        app.manifest = MagicMock(run=lambda _h: "ok")
+
+        websocket = AsyncMock()
+        websocket.app = app
+        websocket.path_params = {"session_id": session.id}
+        websocket.headers = {"sec-websocket-protocol": "wrong.label, token-abc"}
+        websocket.client_state = WebSocketState.CONNECTED
+        websocket.send_text = AsyncMock()
+        websocket.receive = AsyncMock()
+        websocket.close = AsyncMock()
+        websocket.accept = AsyncMock()
+
+        await voice_websocket(websocket)
+
+        websocket.accept.assert_not_awaited()
+        websocket.close.assert_awaited()
+        assert websocket.close.await_args.kwargs.get("code") == 1008
+    finally:
+        module.app_settings.voice.session_auth_required = original_required
+        module.app_settings.voice.session_timeout = original_timeout
+        module.app_settings.voice.enabled = original_enabled
+        module.app_settings.voice.stt_api_key = original_stt
+        module.app_settings.voice.tts_api_key = original_tts
+
+
+@pytest.mark.asyncio
+async def test_voice_websocket_accepts_legacy_token_only_subprotocol(
+    monkeypatch, mock_pipecat_modules
+):
+    pipeline_builder = __import__(
+        "bindu.extensions.voice.pipeline_builder", fromlist=["build_voice_pipeline"]
+    )
+
+    dummy_bridge = MagicMock()
+    dummy_bridge.cleanup_background_tasks = AsyncMock()
+    dummy_bridge.process_transcription = AsyncMock(return_value="ok")
+
+    def fake_build_voice_pipeline(**_kwargs):
+        return {"stt": object(), "tts": object(), "bridge": dummy_bridge, "vad": None}
+
+    monkeypatch.setattr(
+        pipeline_builder, "build_voice_pipeline", fake_build_voice_pipeline
+    )
+
+    from bindu.server.endpoints import voice_endpoints as module
+
+    original_required = module.app_settings.voice.session_auth_required
+    original_timeout = module.app_settings.voice.session_timeout
+    original_enabled = module.app_settings.voice.enabled
+    original_stt = module.app_settings.voice.stt_api_key
+    original_tts = module.app_settings.voice.tts_api_key
+    try:
+        module.app_settings.voice.session_auth_required = True
+        module.app_settings.voice.session_timeout = 300
+        module.app_settings.voice.enabled = True
+        module.app_settings.voice.stt_api_key = (
+            "unit-test-stt-token"  # pragma: allowlist secret
+        )
+        module.app_settings.voice.tts_api_key = (
+            "unit-test-tts-token"  # pragma: allowlist secret
+        )
+
+        manager = VoiceSessionManager(max_sessions=5, session_timeout=300)
+        session = await manager.create_session(
+            "ctx",
+            session_token="token-abc",  # noqa: S106
+            session_token_expires_at=1e12,
+        )
+
+        app = MagicMock()
+        app._voice_session_manager = manager
+        app._voice_ext = MagicMock(allow_interruptions=True)
+        app.manifest = MagicMock(run=lambda _h: "ok")
+
+        websocket = AsyncMock()
+        websocket.app = app
+        websocket.path_params = {"session_id": session.id}
+        websocket.headers = {"sec-websocket-protocol": "token-abc"}
+        websocket.client_state = WebSocketState.CONNECTED
+        websocket.send_text = AsyncMock()
+        websocket.receive = AsyncMock()
+        websocket.close = AsyncMock()
+        websocket.accept = AsyncMock()
+
+        await voice_websocket(websocket)
+
+        websocket.accept.assert_awaited()
+        assert websocket.accept.await_args.kwargs.get("subprotocol") is None
 
         sent = [
             json.loads(call.args[0]) for call in websocket.send_text.await_args_list

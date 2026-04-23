@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import asyncio
+import hmac
 import importlib
 import secrets
 import time
@@ -37,6 +38,7 @@ _VOICE_RATE_LIMIT_LOCK = asyncio.Lock()
 _VOICE_RATE_LIMIT_IP_BUCKET: dict[str, list[float]] = {}
 _VOICE_RATE_LIMIT_REDIS_LOCK = asyncio.Lock()
 _VOICE_RATE_LIMIT_REDIS_CLIENT: Any | None = None
+_VOICE_WS_SUBPROTOCOL = "bindu.voice.v1"
 
 try:
     import redis.asyncio as _redis_async  # type: ignore[import-not-found]
@@ -325,21 +327,32 @@ def _extract_bearer_token(value: str | None) -> str | None:
     return None
 
 
-def _extract_ws_session_token(websocket: WebSocket) -> str | None:
-    """Extract session token from WS headers (subprotocol or Authorization)."""
+def _extract_ws_session_token(websocket: WebSocket) -> tuple[str | None, str | None]:
+    """Extract the WS protocol label and session token from headers."""
+    label: str | None = None
+    token: str | None = None
     subprotocols = websocket.headers.get("sec-websocket-protocol")
     if subprotocols:
         # Starlette exposes the raw comma-separated list.
-        for item in subprotocols.split(","):
-            token = item.strip()
-            if token:
-                return token
+        items = [item.strip() for item in subprotocols.split(",") if item.strip()]
+        if items:
+            label = items[0]
+        if len(items) > 1:
+            token = items[1]
 
-    return _extract_bearer_token(websocket.headers.get("authorization"))
+    if not token:
+        token = _extract_bearer_token(websocket.headers.get("authorization"))
+
+    return label, token
 
 
 def _has_ws_subprotocols(websocket: WebSocket) -> bool:
-    return bool(websocket.headers.get("sec-websocket-protocol"))
+    subprotocols = websocket.headers.get("sec-websocket-protocol")
+    if not subprotocols:
+        return False
+    return any(
+        item.strip() == _VOICE_WS_SUBPROTOCOL for item in subprotocols.split(",")
+    )
 
 
 def _classify_voice_pipeline_error(exc: Exception) -> tuple[str, int]:
@@ -724,27 +737,40 @@ async def voice_websocket(websocket: WebSocket) -> None:
     if app_settings.voice.session_auth_required:
         expected = getattr(session, "session_token", None)
         expires_at = getattr(session, "session_token_expires_at", None)
-        provided = _extract_ws_session_token(websocket)
+        subprotocols = websocket.headers.get("sec-websocket-protocol")
+        subprotocol_items = (
+            [item.strip() for item in subprotocols.split(",") if item.strip()]
+            if subprotocols
+            else []
+        )
+        label, provided = _extract_ws_session_token(websocket)
 
-        # If the client sent Sec-WebSocket-Protocol, the server should select one.
-        # We select the token itself as the negotiated subprotocol.
-        if provided and _has_ws_subprotocols(websocket):
-            await websocket.accept(subprotocol=provided)
-        else:
-            await websocket.accept()
-        if not provided:
+        if len(subprotocol_items) > 1 and label != _VOICE_WS_SUBPROTOCOL:
+            await websocket.close(code=1008, reason="Invalid session token")
+            return
+
+        if len(subprotocol_items) == 1 and provided is None:
+            # Legacy compatibility: older clients may still send only the token.
+            provided = subprotocol_items[0]
+
+        if provided is None:
             try:
                 provided = (await websocket.receive_text()).strip()
             except Exception:
                 await websocket.close(code=1008, reason="Missing session token")
                 return
 
-        if not expected or provided != expected:
+        if not expected or not hmac.compare_digest(provided, expected):
             await websocket.close(code=1008, reason="Invalid session token")
             return
         if isinstance(expires_at, (int, float)) and time.time() > float(expires_at):
             await websocket.close(code=1008, reason="Session token expired")
             return
+
+        if len(subprotocol_items) > 1:
+            await websocket.accept(subprotocol=_VOICE_WS_SUBPROTOCOL)
+        else:
+            await websocket.accept()
     else:
         await websocket.accept()
 
