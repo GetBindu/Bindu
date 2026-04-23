@@ -10,7 +10,11 @@ FACILITATOR_URL = os.getenv(
 )
 
 SKIP_TLS = os.getenv("FACILITATOR_SKIP_TLS_VERIFY", "false").lower() == "true"
-
+if SKIP_TLS:
+    logger.warning(
+        "FACILITATOR_SKIP_TLS_VERIFY=true — TLS certificate verification is disabled (INSECURE) for %s",
+        FACILITATOR_URL,
+    )
 
 def call_skale_facilitator():
     """
