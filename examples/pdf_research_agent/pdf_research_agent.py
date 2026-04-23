@@ -17,7 +17,7 @@ Usage
 
 The agent will be live at http://localhost:3775
 Send it a message like:
-    {"role": "user", "content": "/path/to/paper.pdf"}
+    {"role": "user", "content": "<ALLOWED_BASE_DIR>/paper.pdf"}
 or paste raw text directly as the message content.
 """
 from bindu.penguin.bindufy import bindufy
@@ -28,29 +28,56 @@ import os
 
 load_dotenv()
 
+DEFAULT_ALLOWED_BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+ALLOWED_BASE_DIR = os.path.abspath(
+    os.environ.get("ALLOWED_BASE_DIR", DEFAULT_ALLOWED_BASE_DIR)
+)
+EXAMPLE_PDF_PATH = os.path.join(ALLOWED_BASE_DIR, "paper.pdf")
+EXAMPLE_MESSAGE = f'{{"role": "user", "content": "{EXAMPLE_PDF_PATH}"}}'
+
 # ---------------------------------------------------------------------------
 # 1. Helper — extract text from a PDF path or pass raw text straight through
 # ---------------------------------------------------------------------------
 
 def _read_content(source: str) -> str:
     """Return plain text from a PDF file path, or the source string itself."""
-    if source.strip().endswith(".pdf") and os.path.isfile(source.strip()):
+    normalized_path = _normalize_pdf_path(source)
+    if normalized_path and os.path.isfile(normalized_path):
         try:
             from pypdf import PdfReader  # optional dependency
-            reader = PdfReader(source.strip())
+            reader = PdfReader(normalized_path)
             pages = [page.extract_text() or "" for page in reader.pages]
             text = "\n\n".join(pages)
             if len(text.strip()) < 100:
-                return f"PDF file '{source.strip()}' appears to be empty or contains very little text."
+                return (
+                    f"PDF file '{normalized_path}' appears to be empty or "
+                    "contains very little text."
+                )
             return text
         except ImportError:
             return (
-                f"[pypdf not installed — cannot read '{source.strip()}'. "
+                f"[pypdf not installed — cannot read '{normalized_path}'. "
                 "Run: uv add pypdf]"
             )
         except Exception as e:
-            return f"Error reading PDF '{source.strip()}': {str(e)}"
+            return f"Error reading PDF '{normalized_path}': {str(e)}"
     return source  # treat as raw document text
+
+
+def _normalize_pdf_path(source: str) -> str | None:
+    """Return a validated absolute PDF path within ALLOWED_BASE_DIR."""
+    candidate = source.strip()
+    if not candidate.endswith(".pdf"):
+        return None
+
+    normalized = os.path.abspath(os.path.realpath(candidate))
+    try:
+        if os.path.commonpath([normalized, ALLOWED_BASE_DIR]) != ALLOWED_BASE_DIR:
+            return None
+    except ValueError:
+        return None
+
+    return normalized
 
 
 # ---------------------------------------------------------------------------
@@ -111,7 +138,7 @@ def handler(messages: list[dict[str, str]]):
 
     Args:
         messages: Standard A2A message list, e.g.
-                  [{"role": "user", "content": "/path/to/doc.pdf"}]
+                  [{"role": "user", "content": "<ALLOWED_BASE_DIR>/paper.pdf"}]
 
     Returns:
         Agent response with the document summary.
@@ -120,11 +147,19 @@ def handler(messages: list[dict[str, str]]):
         # Grab the most recent user message
         user_messages = [m for m in messages if m.get("role") == "user"]
         if not user_messages:
-            return "No user message found. Please send a PDF path or document text."
+            return (
+                "No user message found. Please send a PDF path under "
+                f"ALLOWED_BASE_DIR ({ALLOWED_BASE_DIR}) or document text. "
+                f"Example: {EXAMPLE_MESSAGE}"
+            )
 
         user_input = user_messages[-1].get("content", "").strip()
         if not user_input:
-            return "Empty message received. Please provide a PDF path or document text."
+            return (
+                "Empty message received. Please provide a PDF path under "
+                f"ALLOWED_BASE_DIR ({ALLOWED_BASE_DIR}) or document text. "
+                f"Example: {EXAMPLE_MESSAGE}"
+            )
 
         document_text = _read_content(user_input)
 
@@ -154,5 +189,6 @@ def handler(messages: list[dict[str, str]]):
 if __name__ == "__main__":
     print("🚀 PDF Research Agent running at http://localhost:3773")
     print("📄 Send PDF paths or paste document text to get summaries")
-    print("🔧 Example: {\"role\": \"user\", \"content\": \"/path/to/paper.pdf\"}")
+    print(f"🧱 ALLOWED_BASE_DIR: {ALLOWED_BASE_DIR}")
+    print(f"🔧 Example: {EXAMPLE_MESSAGE}")
     bindufy(config, handler)
