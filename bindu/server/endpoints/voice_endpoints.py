@@ -57,12 +57,12 @@ _RATE_LIMIT_LUA = """
 -- ARGV[3] = member (unique)
 -- ARGV[4] = limit (int)
 redis.call('ZREMRANGEBYSCORE', KEYS[1], 0, tonumber(ARGV[2]))
-redis.call('ZADD', KEYS[1], tonumber(ARGV[1]), ARGV[3])
 local count = redis.call('ZCARD', KEYS[1])
 redis.call('EXPIRE', KEYS[1], 120)
-if count > tonumber(ARGV[4]) then
+if count >= tonumber(ARGV[4]) then
   return 0
 end
+redis.call('ZADD', KEYS[1], tonumber(ARGV[1]), ARGV[3])
 return 1
 """
 
