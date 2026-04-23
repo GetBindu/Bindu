@@ -18,6 +18,7 @@ import base64
 import pytest
 import os
 import sys
+from types import SimpleNamespace
 from unittest.mock import patch
 
 
@@ -221,7 +222,7 @@ def make_text_part(text: str) -> dict:
 @pytest.fixture
 def mock_agent():
     with patch("document_analyzer.agent") as m:
-        m.run.return_value = MOCK_AGENT_RESPONSE
+        m.run.return_value = SimpleNamespace(content=MOCK_AGENT_RESPONSE)
         yield m
 
 
