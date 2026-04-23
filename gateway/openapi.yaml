@@ -674,8 +674,24 @@ components:
             the gateway allows. Phase 2+ enforced; currently informational.
         timeout_ms:
           type: integer
-          minimum: 1
-          description: Hard timeout for the whole plan, in milliseconds.
+          minimum: 1000
+          maximum: 21600000
+          description: |
+            Overall wall-clock budget for the `/plan` call, in
+            milliseconds. Applies to the entire planner loop including
+            LLM calls, compaction, and every downstream peer call
+            combined. When the budget expires, in-flight peer polls
+            are aborted and a best-effort `tasks/cancel` is dispatched
+            to each peer; the gateway then returns
+            `BinduError(-32040, AbortedByCaller)` with
+            `data.reason = "deadline"`.
+
+            Default when unset: **1,800,000** ms (30 minutes).
+            Minimum: 1,000 ms. Maximum: 21,600,000 ms (6 hours).
+            Requests above the ceiling are rejected at the API
+            boundary as `invalid_request` — callers with genuine
+            multi-hour workloads set it explicitly.
+          example: 1800000
         max_steps:
           type: integer
           minimum: 1

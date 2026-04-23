@@ -111,6 +111,24 @@ describe("PlanPreferences — keys must be snake_case (matches PLAN.md)", () => 
     expect(PlanPreferences.safeParse({ max_steps: 0 }).success).toBe(false)
     expect(PlanPreferences.safeParse({ max_steps: -5 }).success).toBe(false)
   })
+
+  it("rejects timeout_ms below the 1s floor", () => {
+    // 1000 ms min is the floor. Zero, negative, or sub-second values
+    // are almost certainly bugs (someone passed seconds instead of ms,
+    // or a default-zero leaked through). Fail loudly at the boundary.
+    expect(PlanPreferences.safeParse({ timeout_ms: 0 }).success).toBe(false)
+    expect(PlanPreferences.safeParse({ timeout_ms: 500 }).success).toBe(false)
+    expect(PlanPreferences.safeParse({ timeout_ms: -1 }).success).toBe(false)
+  })
+
+  it("rejects timeout_ms above the 6h ceiling", () => {
+    // 6 hours (21_600_000 ms) is the hard ceiling. Research plans at
+    // the boundary are allowed; anything over must be escalated so
+    // we're not silently running multi-day plans.
+    expect(PlanPreferences.safeParse({ timeout_ms: 21_600_000 }).success).toBe(true)
+    expect(PlanPreferences.safeParse({ timeout_ms: 21_600_001 }).success).toBe(false)
+    expect(PlanPreferences.safeParse({ timeout_ms: 24 * 60 * 60 * 1000 }).success).toBe(false)
+  })
 })
 
 describe("PlanRequest — full end-to-end shape a docs-compliant client sends", () => {
