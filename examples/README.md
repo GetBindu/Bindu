@@ -75,6 +75,7 @@ For full URL override, use `BINDU_DEPLOYMENT_URL` (e.g. `http://127.0.0.1:5001`)
 - `cerina_bindu/cbt/` - CBT therapy protocol generator
 - `ag2_research_team/` - Multi-agent research pipeline using AG2 (AutoGen)
 - `langgraph_blog_writing_agent/` - Map-Reduce blog writing with LangGraph
+- `hermes_agent/` - Nous Research's tool-using coding/research agent (web, file, code-exec) bindufied with tiered safety controls
 
 ### Components
 - `skills/` - Reusable agent capabilities

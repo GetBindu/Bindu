@@ -1,0 +1,62 @@
+{
+  "id": "438b4815-7ebe-d853-b95d-48b32b68fa3a",
+  "name": "echo_agent",
+  "description": "A basic echo agent for quick testing.",
+  "url": "http://localhost",
+  "version": "2026.12.6.dev74+g7bc46c0bc.d20260412",
+  "protocolVersion": "1.0.0",
+  "skills": [
+    {
+      "id": "question-answering-v1",
+      "name": "question-answering",
+      "documentationPath": "http://localhost/agent/skills/question-answering-v1"
+    },
+    {
+      "id": "pdf-processing-v1",
+      "name": "pdf-processing",
+      "documentationPath": "http://localhost/agent/skills/pdf-processing-v1"
+    }
+  ],
+  "capabilities": {
+    "extensions": [
+      {
+        "uri": "did:bindu:gaurikasethi88_at_gmail_com:echo_agent:438b4815-7ebe-d853-b95d-48b32b68fa3a",
+        "description": "DID-based identity for echo_agent",
+        "required": false,
+        "params": {
+          "author": "gaurikasethi88@gmail.com",
+          "agent_name": "echo_agent",
+          "agent_id": "438b4815-7ebe-d853-b95d-48b32b68fa3a"
+        }
+      }
+    ],
+    "pushNotifications": false,
+    "streaming": false
+  },
+  "kind": "agent",
+  "numHistorySessions": 10,
+  "extraData": {
+    "created": 1776449308,
+    "server_info": "bindu Agent Server"
+  },
+  "debugMode": false,
+  "debugLevel": 1,
+  "monitoring": false,
+  "telemetry": true,
+  "agentTrust": {
+    "identityProvider": "custom",
+    "inheritedRoles": [],
+    "creatorId": "system",
+    "creationTimestamp": 1776449298,
+    "trustVerificationRequired": false,
+    "allowedOperations": {}
+  },
+  "defaultInputModes": [
+    "text/plain",
+    "application/json"
+  ],
+  "defaultOutputModes": [
+    "text/plain",
+    "application/json"
+  ]
+}

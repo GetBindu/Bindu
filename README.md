@@ -1,58 +1,55 @@
+<p align="center">
+  <img src="assets/bindu_landscape.png" alt="Bindu — humans and agents, side by side" width="100%">
+</p>
+
+<div align="center">
+
+<picture>
+  <img alt="Bindu" src="assets/bindu_logo.png" width="50">
+</picture>
+
+# Bindu
+
+**The identity, communication & payments layer for AI agents.**
+
+
+
 <div align="center" id="top">
-  <a href="https://getbindu.com">
-    <picture>
-      <img src="assets/bindu.png" alt="Bindu" width="300">
-    </picture>
-  </a>
-</div>
 
-<p align="center">
-  <em>The identity, communication & payments layer for AI agents</em>
-</p>
+  <p>
+    <a href="README.md">🇬🇧 English</a> •
+    <a href="README.de.md">🇩🇪 Deutsch</a> •
+    <a href="README.es.md">🇪🇸 Español</a> •
+    <a href="README.fr.md">🇫🇷 Français</a> •
+    <a href="README.hi.md">🇮🇳 हिंदी</a> •
+    <a href="README.bn.md">🇮🇳 বাংলা</a> •
+    <a href="README.zh.md">🇨🇳 中文</a> •
+    <a href="README.nl.md">🇳🇱 Nederlands</a> •
+    <a href="README.ta.md">🇮🇳 தமிழ்</a>
+  </p>
 
-<p align="center">
-  <a href="README.md">🇬🇧 English</a> •
-  <a href="README.de.md">🇩🇪 Deutsch</a> •
-  <a href="README.es.md">🇪🇸 Español</a> •
-  <a href="README.fr.md">🇫🇷 Français</a> •
-  <a href="README.hi.md">🇮🇳 हिंदी</a> •
-  <a href="README.bn.md">🇮🇳 বাংলা</a> •
-  <a href="README.zh.md">🇨🇳 中文</a> •
-  <a href="README.nl.md">🇳🇱 Nederlands</a> •
-  <a href="README.ta.md">🇮🇳 தமிழ்</a>
-</p>
+  <p>
+    <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
+    <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="Python Version"></a>
+    <a href="https://pypi.org/project/bindu/"><img src="https://img.shields.io/pypi/v/bindu.svg" alt="PyPI version"></a>
+    <a href="https://coveralls.io/github/Saptha-me/Bindu?branch=v0.3.18"><img src="https://coveralls.io/repos/github/Saptha-me/Bindu/badge.svg?branch=v0.3.18" alt="Coverage"></a>
+    <a href="https://github.com/getbindu/Bindu/actions/workflows/release.yml"><img src="https://github.com/getbindu/Bindu/actions/workflows/release.yml/badge.svg" alt="Tests"></a>
+    <a href="https://discord.gg/3w5zuYUuwt"><img src="https://img.shields.io/badge/Join%20Discord-7289DA?logo=discord&logoColor=white" alt="Discord"></a>
+    <a href="https://github.com/getbindu/Bindu/graphs/contributors"><img src="https://img.shields.io/github/contributors/getbindu/Bindu" alt="Contributors"></a>
+    <a href="https://hits.sh/github.com/Saptha-me/Bindu.svg"><img src="https://hits.sh/github.com/Saptha-me/Bindu.svg" alt="Hits"></a>
+  </p>
 
-<p align="center">
-  <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
-  <a href="https://hits.sh/github.com/Saptha-me/Bindu.svg"><img src="https://hits.sh/github.com/Saptha-me/Bindu.svg" alt="Hits"></a>
-  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="Python Version"></a>
-  <a href="https://pepy.tech/projects/bindu"><img src="https://static.pepy.tech/personalized-badge/bindu?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads" alt="PyPI Downloads"></a>
-  <a href="https://pypi.org/project/bindu/"><img src="https://img.shields.io/pypi/v/bindu.svg" alt="PyPI version"></a>
-  <a href="https://pypi.org/project/bindu/"><img src="https://img.shields.io/pypi/dm/bindu" alt="PyPI Downloads"></a>
-  <a href="https://coveralls.io/github/Saptha-me/Bindu?branch=v0.3.18"><img src="https://coveralls.io/repos/github/Saptha-me/Bindu/badge.svg?branch=v0.3.18" alt="Coverage"></a>
-  <a href="https://github.com/getbindu/Bindu/actions/workflows/release.yml"><img src="https://github.com/getbindu/Bindu/actions/workflows/release.yml/badge.svg" alt="Tests"></a>
-  <a href="https://discord.gg/3w5zuYUuwt"><img src="https://img.shields.io/badge/Join%20Discord-7289DA?logo=discord&logoColor=white" alt="Discord"></a>
-  <a href="https://github.com/getbindu/Bindu/graphs/contributors"><img src="https://img.shields.io/github/contributors/getbindu/Bindu" alt="Contributors"></a>
-</p>
+  <br/>
 
-<br/>
-
-<p align="center">
-  <img src="assets/sunflower-mountains.jpeg" alt="Bindu — The Internet of Agents" width="720" />
-</p>
-
-<p align="center">
-  <em>"Like sunflowers turning toward the light, agents collaborate in swarms - each one independent, yet together they create something greater."</em>
-</p>
-
-<br/>
-
-<div align="center">
   <h3>Onboard your agent in one line</h3>
-</div>
 
-<div align="center">
   <pre><code>curl -fsSL https://getbindu.com/install-bindu.sh | bash</code></pre>
+
+  <p>
+    <a href="https://getbindu.com"><strong>🌟 Register your agent</strong></a> •
+    <a href="https://docs.getbindu.com"><strong>🌻 Documentation</strong></a> •
+    <a href="https://discord.gg/3w5zuYUuwt"><strong>💬 Discord</strong></a>
+  </p>
 </div>
 
 ---
@@ -60,11 +57,6 @@
 **Bindu** (read: _binduu_) turns any AI agent into a production microservice. Build your agent in any framework — Agno, LangChain, OpenAI SDK, even plain TypeScript — call `bindufy()`, and get a service with DID identity, A2A protocol, OAuth2 auth, and crypto payments. No infrastructure code. No rewriting.
 
 Works with Python, TypeScript, and Kotlin. Built on open protocols: **A2A**, **AP2**, and **X402**.
-
-<p align="center">
-  <strong>🌟 <a href="https://getbindu.com">Register your agent</a> • 🌻 <a href="https://docs.getbindu.com">Documentation</a> • 💬 <a href="https://discord.gg/3w5zuYUuwt">Discord Community</a></strong>
-</p>
-
 
 ---
 
@@ -584,6 +576,50 @@ Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
 </details>
+
+---
+
+<br/>
+
+## ⚠️ Known Issues
+
+Before running Bindu in production you should read
+[`bugs/known-issues.md`](./bugs/known-issues.md) — a per-subsystem
+catalog of current limitations and sharp edges, with workarounds
+for each. Postmortems for already-fixed bugs live alongside it
+under [`bugs/core/`](./bugs/core/), [`bugs/gateway/`](./bugs/gateway/),
+[`bugs/sdk/`](./bugs/sdk/), and [`bugs/frontend/`](./bugs/frontend/).
+
+### Current high-severity issues
+
+These are the ones most likely to bite you. Each links to a
+story-format entry in `known-issues.md` explaining the scenario,
+the root cause, and the workaround.
+
+| Subsystem | Slug | What it looks like from outside |
+|---|---|---|
+| Core | [`x402-middleware-fails-open-on-body-parse`](./bugs/known-issues.md#x402-middleware-fails-open-on-body-parse) | Malformed JSON body bypasses payment check |
+| Core | [`x402-no-replay-prevention`](./bugs/known-issues.md#x402-no-replay-prevention) | One payment buys unlimited work until `validBefore` |
+| Core | [`x402-no-signature-verification`](./bugs/known-issues.md#x402-no-signature-verification) | EIP-3009 authorization signature is never verified |
+| Core | [`x402-balance-check-skipped-on-missing-contract-code`](./bugs/known-issues.md#x402-balance-check-skipped-on-missing-contract-code) | Misconfigured RPC silently skips balance check |
+| Gateway | [`context-window-hardcoded`](./bugs/known-issues.md#context-window-hardcoded) | Compaction threshold assumes 200k-token window |
+| Gateway | [`poll-budget-unbounded-wall-clock`](./bugs/known-issues.md#poll-budget-unbounded-wall-clock) | `sendAndPoll` can stall 5 minutes per tool call |
+| Gateway | [`no-session-concurrency-guard`](./bugs/known-issues.md#no-session-concurrency-guard) | Two `/plan` calls on the same session tangle histories |
+
+### Issue counts by subsystem
+
+| Subsystem | High | Medium | Low | Nit |
+|---|---:|---:|---:|---:|
+| Gateway | 3 | 11 | 13 | 4 |
+| Bindu Core (Python) | 4 | 7 | 2 | 0 |
+| SDKs (TypeScript) | — | — | — | — |
+| Frontend | — | — | — | — |
+
+**Found a new issue?** Open a GitHub Issue referencing the slug
+(e.g. *"Fixes `context-window-hardcoded`"*). **Fixed one?** Remove
+its entry from `known-issues.md` and add a dated postmortem under
+the matching `bugs/<subsystem>/` folder — see
+[`bugs/README.md`](./bugs/README.md) for the template.
 
 ---
 

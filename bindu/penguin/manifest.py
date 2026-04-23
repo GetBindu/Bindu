@@ -38,12 +38,33 @@ REQUIRED_PARAM_NAME = "messages"
 def _create_default_agent_trust() -> AgentTrust:
     """Create a default AgentTrust configuration with minimal required fields.
 
+    The ``identity_provider`` field is derived from the active auth
+    configuration rather than hardcoded. If Hydra OAuth2 is enabled at
+    runtime (``AUTH__ENABLED=true`` and ``AUTH__PROVIDER=hydra``), the agent
+    card advertises ``"hydra"`` — matching what the middleware layer actually
+    enforces. Otherwise it advertises ``"custom"`` (the previous default).
+
+    Users who pass an explicit ``agent_trust`` to the config still override
+    this default entirely; see ``create_agent_manifest``.
+
     Returns:
         AgentTrust: A minimal valid AgentTrust instance for agents without
                     explicit trust configuration.
     """
+    # Lazy import to avoid a circular dependency between penguin/manifest.py
+    # and anything that settings might reach into at import time.
+    from bindu.settings import app_settings
+
+    identity_provider: Literal["hydra", "custom"] = "custom"
+    configured_provider = getattr(app_settings.auth, "provider", None) or ""
+    if (
+        getattr(app_settings.auth, "enabled", False)
+        and configured_provider.lower() == "hydra"
+    ):
+        identity_provider = "hydra"
+
     return AgentTrust(
-        identity_provider="custom",
+        identity_provider=identity_provider,
         inherited_roles=[],
         creator_id="system",
         creation_timestamp=int(datetime.now(UTC).timestamp()),

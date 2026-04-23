@@ -364,10 +364,10 @@ class AgentSettings(BaseSettings):
         "contexts/clear": "clear_context",
         "tasks/feedback": "task_feedback",
         # Push-notification config methods (A2A protocol extension)
-        "tasks/pushNotification/set": "set_task_push_notification",
-        "tasks/pushNotification/get": "get_task_push_notification",
-        "tasks/pushNotification/list": "list_task_push_notifications",
-        "tasks/pushNotification/delete": "delete_task_push_notification",
+        "tasks/pushNotificationConfig/set": "set_task_push_notification",
+        "tasks/pushNotificationConfig/get": "get_task_push_notification",
+        "tasks/pushNotificationConfig/list": "list_task_push_notifications",
+        "tasks/pushNotificationConfig/delete": "delete_task_push_notification",
     }
 
     # Task State Configuration (A2A Protocol)

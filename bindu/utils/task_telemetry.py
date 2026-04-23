@@ -200,7 +200,7 @@ def track_active_task(func: F) -> F:
             # Decrement active tasks for completion/cancellation operations
             if operation in ["cancel_task"]:
                 active_tasks.add(-1, {"operation": "cancel"})
-                
+
             # FIX: Ensure creation operations decrement when the request cycle completes
             elif operation in create_operations:
                 active_tasks.add(-1, {"operation": "completed"})

@@ -204,6 +204,9 @@ bindu/penguin/.bindu/private.pem
 bindu/penguin/.bindu/public.pem
 .bindu/
 
+# Claude Code worktrees (local agent scratch space, not for version control)
+.claude/worktrees/
+
 postman/*
 node_modules/
 **/node_modules/
@@ -216,3 +219,6 @@ sdks/typescript/node_modules/
 sdks/kotlin/build/
 sdks/kotlin/.gradle/
 sdks/kotlin/bin/
+examples/gateway_test_fleet/pids/
+examples/gateway_test_fleet/logs/
+examples/gateway_test_fleet/.fleet.env

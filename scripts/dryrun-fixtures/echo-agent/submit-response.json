@@ -1,0 +1,29 @@
+{
+  "jsonrpc": "2.0",
+  "id": "b3b9dd27-238c-4cb5-a78b-f7aab2264db3",
+  "result": {
+    "id": "ef6cb76c-65ff-4e36-833c-345e9d7c75df",
+    "context_id": "365cbee3-f502-41da-afb4-32d75009ac38",
+    "kind": "task",
+    "status": {
+      "state": "submitted",
+      "timestamp": "2026-04-17T18:10:44.708460+00:00"
+    },
+    "history": [
+      {
+        "message_id": "1f0a6b5c-e8f7-4be3-811a-c096b8f8960b",
+        "context_id": "365cbee3-f502-41da-afb4-32d75009ac38",
+        "task_id": "ef6cb76c-65ff-4e36-833c-345e9d7c75df",
+        "kind": "message",
+        "parts": [
+          {
+            "kind": "text",
+            "text": "hello from dry-run"
+          }
+        ],
+        "role": "user",
+        "metadata": {}
+      }
+    ]
+  }
+}

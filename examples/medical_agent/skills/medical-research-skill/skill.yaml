@@ -1,0 +1,57 @@
+id: medical-research-skill
+name: medical-research-skill
+version: 1.0.0
+author: bindu.builder@getbindu.com
+description: |
+  Advanced medical research skill that provides comprehensive health information,
+  symptom analysis, and wellness guidance for educational purposes.
+
+  Features:
+  - Real-time medical information via web search
+  - Symptom analysis and preliminary assessment
+  - Drug information and interaction details
+  - Health and wellness recommendations
+  - Medical research and study summaries
+  - Preventive care guidance
+  - Lifestyle and nutrition advice
+
+  Uses DuckDuckGo search to find current medical information
+  and provides detailed analysis with appropriate medical disclaimers.
+tags:
+  - medical
+  - health
+  - symptoms
+  - wellness
+  - research
+  - healthcare
+  - medicine
+input_modes:
+  - application/json
+output_modes:
+  - application/json
+examples:
+  - "What are the symptoms of flu?"
+  - "Provide information about ibuprofen side effects"
+  - "How to prevent common cold?"
+  - "What are the benefits of regular exercise?"
+  - "Explain the symptoms of diabetes"
+  - "Give tips for better sleep hygiene"
+capabilities_detail:
+  medical_research:
+    supported: true
+    description: "Comprehensive medical research and health information retrieval"
+  symptom_analysis:
+    supported: true
+    description: "Preliminary symptom analysis and assessment guidance"
+  drug_information:
+    supported: true
+    description: "Medication details, side effects, and interaction information"
+  wellness_guidance:
+    supported: true
+    description: "Health and wellness recommendations and lifestyle advice"
+  search_integration:
+    supported: true
+    description: "Real-time medical information search via DuckDuckGo"
+  preventive_care:
+    supported: true
+    description: "Preventive health measures and screening recommendations"

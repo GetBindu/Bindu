@@ -26,9 +26,7 @@
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
   <a href="https://hits.sh/github.com/Saptha-me/Bindu.svg"><img src="https://hits.sh/github.com/Saptha-me/Bindu.svg" alt="Hits"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="Python Version"></a>
-  <a href="https://pepy.tech/projects/bindu"><img src="https://static.pepy.tech/personalized-badge/bindu?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads" alt="PyPI Downloads"></a>
   <a href="https://pypi.org/project/bindu/"><img src="https://img.shields.io/pypi/v/bindu.svg" alt="PyPI version"></a>
-  <a href="https://pypi.org/project/bindu/"><img src="https://img.shields.io/pypi/dm/bindu" alt="PyPI Downloads"></a>
   <a href="https://coveralls.io/github/Saptha-me/Bindu?branch=v0.3.18"><img src="https://coveralls.io/repos/github/Saptha-me/Bindu/badge.svg?branch=v0.3.18" alt="Coverage"></a>
   <a href="https://github.com/getbindu/Bindu/actions/workflows/release.yml"><img src="https://github.com/getbindu/Bindu/actions/workflows/release.yml/badge.svg" alt="Tests"></a>
   <a href="https://discord.gg/3w5zuYUuwt"><img src="https://img.shields.io/badge/Join%20Discord-7289DA?logo=discord&logoColor=white" alt="Discord"></a>
@@ -621,7 +619,7 @@ Bindu என்பது [Apache License 2.0](https://choosealicense.com/license
 
 நாங்கள் 💛 பங்களிப்புகளை! நீங்கள் பிழைகளை சரிசெய்யுகிறீர்களா, ஆவணங்களை மேம்படுத்துகிறீர்களா, அல்லது டெமோக்களை உருவாக்குகிறீர்களா—உங்கள் பங்களிப்புகள் Bindu ஐ மேம்படுத்துகின்றன.
 
-- 💬 விவாதங்கள் மற்றும் ஆதரவு க்காக [Join Discord](https://discord.gg/3w5zuYUuwt) 
+- 💬 விவாதங்கள் மற்றும் ஆதரவு க்காக [Join Discord](https://discord.gg/3w5zuYUuwt)
 - ⭐ நீங்கள் இதைப் பயனுள்ளதாகக் கண்டால் [Star the repository](https://github.com/getbindu/Bindu)!
 
 ---

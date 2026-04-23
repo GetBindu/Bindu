@@ -1,0 +1,2144 @@
+openapi: 3.1.0
+info:
+  title: Bindu Agent API
+  version: "1.0.0"
+  summary: A2A-protocol agent over JSON-RPC 2.0, with DID identity, OAuth2 authentication, and optional x402 payments.
+  description: |
+    # Bindu Agent — canonical OpenAPI
+
+    This specification describes the HTTP surface every Bindu-built agent
+    exposes. Agents built with [`bindufy()`](https://docs.getbindu.com/bindu/reference/bindufy)
+    answer to these endpoints out of the box; no per-agent route code is
+    written by the handler author.
+
+    The spec is **generic** — it intentionally avoids any one domain
+    (stock analysis, weather, etc.). Use it as the source of truth for
+    clients calling *any* Bindu agent; domain-specific overlays belong
+    in a per-agent OpenAPI that `$ref`s the schemas here.
+
+    ---
+
+    ## Mental model: one endpoint, many methods
+
+    Every call goes to `POST /`. The `jsonrpc.method` field in the body
+    selects what you want to do:
+
+    | Method | What you're doing |
+    |---|---|
+    | `message/send` | Kick off work. Returns a `Task` object. |
+    | `tasks/get` | Poll that task by id until it terminates. |
+    | `tasks/list` | See the caller's task history. |
+    | `tasks/cancel` | Stop a running task. |
+    | `tasks/feedback` | Rate a completed task. |
+    | `contexts/list` | See active conversation contexts. |
+    | `contexts/clear` | Reset a context. |
+    | `message/stream` | *(Experimental)* SSE stream of task deltas. |
+
+    Auxiliary endpoints (skills, DID resolution, negotiation, payment)
+    use conventional REST paths — see the *Paths* section.
+
+    ---
+
+    ## Task-first architecture
+
+    Every interaction creates a trackable **Task** with a unique
+    `id`. This matters even for "quick" agents because:
+
+    - **Tasks are pollable** — long-running work (5–10 minutes of
+      multi-agent analysis, say) doesn't block your HTTP connection.
+    - **Tasks chain** — pass `referenceTaskIds` to build Task B on
+      top of Task A's results. The server orchestrates the ordering
+      automatically.
+    - **Tasks share context** — pass the same `contextId` to keep
+      conversation history across calls.
+    - **Tasks have states** — you always know where the work is.
+
+    ### State machine
+
+    Non-terminal (work still possible):
+    - `submitted` — queued, not yet picked up
+    - `working` — agent is actively processing
+    - `input-required` — paused, waiting for user clarification
+    - `auth-required` — paused, waiting for an auth flow
+
+    Terminal (task frozen, cannot be resumed):
+    - `completed` — success, artifacts available
+    - `failed` — processing error (check `status.message`)
+    - `canceled` — user terminated via `tasks/cancel`
+    - `rejected` — invalid input / agent declined (check `status.message`)
+
+    **Terminal tasks are immutable.** To refine a completed answer,
+    submit a new `message/send` with `referenceTaskIds: [<old-task-id>]`
+    — the new task can read the old task's artifacts and build from
+    there.
+
+    ---
+
+    ## Authentication
+
+    ### Layer 1 — bearer token (required on writable methods)
+
+    ```
+    Authorization: Bearer <hydra-issued access token>
+    ```
+
+    The server introspects the token against Ory Hydra. Scopes map to
+    methods:
+
+    | Scope | Unlocks |
+    |---|---|
+    | `agent:read` | `tasks/get`, `tasks/list`, `contexts/list`, all `GET`s |
+    | `agent:write` | `message/send`, `tasks/cancel`, `tasks/feedback`, `contexts/clear` |
+
+    `agent:execute` (legacy) implies both.
+
+    ### Layer 2 — DID request signing (optional, recommended for agent-to-agent)
+
+    When you're an agent calling another agent, sign each request:
+
+    | Header | Value |
+    |---|---|
+    | `X-DID` | Your full DID string |
+    | `X-DID-Timestamp` | Unix seconds (must be within ±300s of server clock) |
+    | `X-DID-Signature` | base58(Ed25519 signature over the payload) |
+
+    The payload is Python's `json.dumps({"body":body,"did":did,"timestamp":ts}, sort_keys=True)`
+    — note default separators include spaces after `:` and `,`. The
+    body is the exact UTF-8 bytes you send — any re-serialization by
+    middleware breaks the signature and the server responds
+    `reason: "crypto_mismatch"`.
+
+    Signature verification is:
+    1. Gate 1 — introspect bearer → `client_id` must start with `did:`
+    2. Gate 2 — `X-DID` header must equal the token's `client_id`
+    3. Gate 3 — Hydra metadata for that client must have `public_key` set
+    4. Gate 4 — Ed25519 verify + timestamp within window
+
+    See [`docs/DID.md`](./DID.md) for the full walk-through and common
+    failure modes.
+
+    ### Layer 3 — x402 payment (optional, on paid endpoints only)
+
+    Send a base64-encoded x402 payload as `X-PAYMENT` on
+    `message/send`, or obtain a session-based grant via
+    `POST /api/start-payment-session` first.
+
+    ---
+
+    ## Error catalog
+
+    Errors come back in the JSON-RPC envelope as
+    `{ jsonrpc, id, error: { code, message, data? } }`.
+
+    ### Standard JSON-RPC (per RFC)
+
+    | Code | Name | HTTP | When |
+    |---|---|---|---|
+    | `-32700` | Parse error | 400 | Body isn't valid JSON |
+    | `-32600` | Invalid Request | 400 | Body is JSON but not a valid JSON-RPC request |
+    | `-32601` | Method not found | 404 | `method` isn't one this agent supports |
+    | `-32602` | Invalid params | 400 | `params` fails schema validation |
+    | `-32603` | Internal error | 500 | Server-side bug; file a GH issue |
+
+    ### A2A protocol
+
+    | Code | Name | HTTP | When |
+    |---|---|---|---|
+    | `-32001` | TaskNotFound | 404 | `taskId` doesn't exist or isn't yours |
+    | `-32002` | TaskNotCancelable | 400 | Task already in a terminal state |
+    | `-32003` | PushNotificationNotSupported | 400 | Agent doesn't do push |
+    | `-32004` | UnsupportedOperation | 400 | e.g. `message/stream` on a non-streaming agent |
+    | `-32005` | ContentTypeNotSupported | 400 | `acceptedOutputModes` doesn't overlap agent capabilities |
+    | `-32006` | InvalidAgentResponse | 500 | Agent produced a malformed result (bug in agent) |
+    | `-32007` | AuthenticatedExtendedCardNotConfigured | 400 | Extended card requested but agent didn't publish one |
+
+    ### Bindu extensions
+
+    | Code | Name | HTTP | When |
+    |---|---|---|---|
+    | `-32008` | TaskImmutable | 400 | Attempted to modify a terminal task |
+    | `-32009` | AuthenticationRequired | 401 | No bearer token on a protected method |
+    | `-32010` | InvalidToken | 401 | Token introspection returned `active: false` |
+    | `-32011` | TokenExpired | 401 | `exp` in the past |
+    | `-32012` | InvalidTokenSignature | 403 | X-DID-Signature failed verification |
+    | `-32013` | InsufficientPermissions | 403 | Token valid but scope doesn't cover this method |
+    | `-32020` | ContextNotFound | 404 | `contextId` doesn't exist |
+    | `-32021` | ContextNotCancelable | 400 | Tried to clear a context still in use |
+    | `-32030` | SkillNotFound | 404 | `skillId` in the URL doesn't exist |
+
+    ---
+
+    ## Versioning
+
+    - Path shape is stable. New methods may be added under `POST /`
+      but existing methods don't break compatibility.
+    - Schema fields may be added (backward-compatible). Renames or
+      removals go through a deprecation window announced in the
+      [changelog](https://docs.getbindu.com/changelog).
+    - Error code numeric values are permanent once assigned.
+
+  contact:
+    name: Bindu
+    url: https://docs.getbindu.com
+    email: support@getbindu.com
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+
+servers:
+  - url: http://localhost:3773
+    description: Default local-development server (first `bindufy()` agent on a host)
+  - url: http://localhost:{port}
+    description: Local agent on a custom port (set via `BINDU_PORT`)
+    variables:
+      port:
+        default: "3773"
+        description: Any unused port 3773–3780
+  - url: https://{agent}.bindu-agents.bindus.directory
+    description: Hosted agent on bindus.directory
+    variables:
+      agent:
+        default: your-agent
+        description: Agent subdomain (matches the agent's `name` in config)
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: JSON-RPC
+    description: |
+      The central endpoint (`POST /`). Every task, message, and context
+      operation goes here, differentiated by the `method` field inside
+      the body.
+    externalDocs:
+      url: https://docs.getbindu.com/bindu/reference/json-rpc-methods
+      description: Method reference with request/response shapes
+
+  - name: Agent Discovery
+    description: |
+      How clients learn what an agent can do. The agent card
+      (`/.well-known/agent.json`) is the canonical A2A discovery
+      surface. Skills endpoints expose per-capability metadata.
+
+  - name: DID Resolution
+    description: |
+      Turn a `did:bindu:...` identifier into a DID Document (the
+      public key + verification method + controller). Used by peers
+      that want to verify signatures without hitting Hydra directly.
+
+  - name: Skills
+    description: |
+      Each agent has zero or more `Skill`s. A skill is one specific
+      thing the agent can do — with structured input/output types,
+      description, and documentation.
+
+  - name: Negotiation
+    description: |
+      Capability-matching endpoint for orchestrators. Given a task
+      summary and constraints, the agent scores whether it can
+      handle the task and returns a confidence.
+
+  - name: Payment (x402)
+    description: |
+      For paid agents. Implements the x402 payment protocol over
+      USDC on Base. Session-based so clients don't have to sign
+      every request.
+
+  - name: Health & Monitoring
+    description: |
+      Operator-facing endpoints. `/health` returns 503 when the
+      agent is degraded (dependency down, scheduler paused);
+      `/metrics` exposes Prometheus text.
+
+paths:
+  /:
+    get:
+      tags: [Agent Discovery]
+      summary: Root redirect to agent card
+      description: |
+        A convenience: `GET /` returns `302 Found` pointing at the
+        agent card. Useful for humans browsing to the agent's base
+        URL — they end up at something meaningful instead of a 404.
+      security: []
+      responses:
+        '302':
+          description: Redirect to `/.well-known/agent.json`
+          headers:
+            Location:
+              schema:
+                type: string
+                example: /.well-known/agent.json
+
+    post:
+      tags: [JSON-RPC]
+      summary: JSON-RPC 2.0 endpoint (all agent operations dispatch here)
+      description: |
+        Every write or read operation on tasks, messages, and contexts
+        uses this endpoint. The `method` field in the body selects the
+        operation. See the *Error catalog* in the top-level description
+        for every possible `error.code`.
+
+        **Accepted methods:** `message/send`, `message/stream`
+        *(experimental)*, `tasks/get`, `tasks/list`, `tasks/cancel`,
+        `tasks/feedback`, `contexts/list`, `contexts/clear`.
+
+        **Casing tolerance:** the server accepts both camelCase
+        (`taskId`) and snake_case (`task_id`) in `params` — pick one
+        and stick with it per-call. Responses are always snake_case
+        for legacy consistency (see
+        [`bugs/known-issues.md#wire-field-casing-is-mixed`](../bugs/known-issues.md)).
+
+        **Size limit:** request bodies over 10 MB return `413
+        Payload Too Large` at the ASGI layer (does not use the
+        JSON-RPC error envelope).
+
+        **Idempotency:** `message/send` is NOT idempotent — a repeat
+        call creates a new task. If you need idempotency, have your
+        client generate a stable `messageId` and use `contexts/list`
+        + `tasks/list` to check whether you've already sent it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JsonRpcRequest'
+            examples:
+              messageSend:
+                summary: Kick off a task (simplest form)
+                value:
+                  jsonrpc: "2.0"
+                  method: "message/send"
+                  id: "550e8400-e29b-41d4-a716-446655440001"
+                  params:
+                    message:
+                      role: "user"
+                      parts:
+                        - kind: "text"
+                          text: "What is the capital of France?"
+                      kind: "message"
+                      message_id: "550e8400-e29b-41d4-a716-446655440002"
+                      contextId: "550e8400-e29b-41d4-a716-446655440003"
+                      taskId: "550e8400-e29b-41d4-a716-446655440004"
+                    configuration:
+                      acceptedOutputModes: ["application/json", "text/plain", "text/markdown"]
+
+              messageSendChained:
+                summary: Continue from an earlier task (Task A → Task B)
+                description: |
+                  Pass `referenceTaskIds` to make this task depend on
+                  a previous one. The server propagates the earlier
+                  task's artifacts into this task's context.
+                value:
+                  jsonrpc: "2.0"
+                  method: "message/send"
+                  id: "550e8400-e29b-41d4-a716-446655440005"
+                  params:
+                    message:
+                      role: "user"
+                      parts:
+                        - kind: "text"
+                          text: "Summarize the previous analysis in three bullets."
+                      kind: "message"
+                      message_id: "550e8400-e29b-41d4-a716-446655440006"
+                      contextId: "550e8400-e29b-41d4-a716-446655440003"
+                      taskId: "550e8400-e29b-41d4-a716-446655440007"
+                      referenceTaskIds: ["550e8400-e29b-41d4-a716-446655440004"]
+                    configuration:
+                      acceptedOutputModes: ["application/json"]
+
+              messageSendWithPayment:
+                summary: Paid agent (x402 payload inline in metadata)
+                description: |
+                  When the agent requires payment and you've already
+                  executed the x402 flow, embed the payload in
+                  `message.metadata.x402.payment` with
+                  `status: "payment-submitted"`. The server's
+                  middleware auto-injects the verified context into
+                  `message.metadata._payment_context` before the
+                  handler sees the message — don't set
+                  `_payment_context` yourself.
+                value:
+                  jsonrpc: "2.0"
+                  method: "message/send"
+                  id: "550e8400-e29b-41d4-a716-446655440008"
+                  params:
+                    message:
+                      role: "user"
+                      parts:
+                        - kind: "text"
+                          text: "Run the full premium analysis."
+                      kind: "message"
+                      message_id: "550e8400-e29b-41d4-a716-446655440009"
+                      contextId: "550e8400-e29b-41d4-a716-446655440003"
+                      taskId: "550e8400-e29b-41d4-a716-446655440010"
+                      metadata:
+                        x402:
+                          payment:
+                            status: "payment-submitted"
+                            payload:
+                              resource: "https://agent.example.com/premium"
+                              scheme: "exact"
+                              network: "base-sepolia"
+                              asset: "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+                              payTo: "0x2654bb8B272f117c514aAc3d4032B1795366BA5d"
+                              amount: "100"
+                              signature: "0x860d5fc4507efdfaef30b37c475c1fcd609aed8b5f0624f7e3e1ec56b0a2cd2e"
+                              timestamp: 1776607158
+                              payer: "0x5eE83F6DfF98F3DAf1B8a43DBd4B837e7E04e4Dc"
+                    configuration:
+                      acceptedOutputModes: ["application/json"]
+
+              tasksGet:
+                summary: Poll a task by id
+                value:
+                  jsonrpc: "2.0"
+                  method: "tasks/get"
+                  id: "550e8400-e29b-41d4-a716-446655440011"
+                  params:
+                    taskId: "550e8400-e29b-41d4-a716-446655440004"
+
+              tasksGetWithHistory:
+                summary: Poll and trim history to the last N turns
+                description: |
+                  `historyLength` caps the returned `history` array
+                  to the most recent N messages. Useful for polling
+                  loops where you only want the newest updates.
+                value:
+                  jsonrpc: "2.0"
+                  method: "tasks/get"
+                  id: "550e8400-e29b-41d4-a716-446655440012"
+                  params:
+                    taskId: "550e8400-e29b-41d4-a716-446655440004"
+                    historyLength: 5
+
+              tasksList:
+                summary: List the caller's recent tasks
+                description: |
+                  Returns tasks scoped to the caller's DID (when
+                  auth is on). `history_length` caps the `history`
+                  array inside each returned task — it does NOT
+                  cap the number of tasks returned. *Spec bug we've
+                  flagged — see below.*
+                value:
+                  jsonrpc: "2.0"
+                  method: "tasks/list"
+                  id: "550e8400-e29b-41d4-a716-446655440013"
+                  params:
+                    history_length: 10
+
+              tasksCancel:
+                summary: Cancel a running task
+                value:
+                  jsonrpc: "2.0"
+                  method: "tasks/cancel"
+                  id: "550e8400-e29b-41d4-a716-446655440014"
+                  params:
+                    taskId: "550e8400-e29b-41d4-a716-446655440004"
+
+              tasksFeedback:
+                summary: Rate a completed task
+                description: |
+                  Feedback is advisory — stored against the task row
+                  for later analytics. Does NOT modify the task's
+                  state (it's already terminal).
+                value:
+                  jsonrpc: "2.0"
+                  method: "tasks/feedback"
+                  id: "550e8400-e29b-41d4-a716-446655440015"
+                  params:
+                    taskId: "550e8400-e29b-41d4-a716-446655440004"
+                    feedback: "Answer was accurate but slow."
+                    rating: 4
+                    metadata:
+                      category: "quality"
+                      helpful: true
+
+              contextsList:
+                summary: List active contexts
+                description: |
+                  `history_length` caps tasks-per-context in the
+                  returned view. Does not cap number of contexts.
+                value:
+                  jsonrpc: "2.0"
+                  method: "contexts/list"
+                  id: "550e8400-e29b-41d4-a716-446655440016"
+                  params:
+                    history_length: 10
+
+              contextsClear:
+                summary: Clear a context (all non-running tasks purged)
+                description: |
+                  Running tasks inside the context are NOT affected.
+                  The agent may refuse with `-32021 ContextNotCancelable`
+                  if any task is still `working`.
+                value:
+                  jsonrpc: "2.0"
+                  method: "contexts/clear"
+                  id: "550e8400-e29b-41d4-a716-446655440017"
+                  params:
+                    contextId: "550e8400-e29b-41d4-a716-446655440003"
+
+      responses:
+        '200':
+          description: |
+            Successful JSON-RPC response. `result` contains the typed
+            output per method — see `components/schemas/*Result`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonRpcResponse'
+              examples:
+                messageSendSubmitted:
+                  summary: "message/send → state: submitted"
+                  description: Task created and queued. Poll `tasks/get` for progress.
+                  value:
+                    jsonrpc: "2.0"
+                    id: "550e8400-e29b-41d4-a716-446655440001"
+                    result:
+                      id: "550e8400-e29b-41d4-a716-446655440004"
+                      context_id: "550e8400-e29b-41d4-a716-446655440003"
+                      kind: "task"
+                      status:
+                        state: "submitted"
+                        timestamp: "2026-04-19T18:30:00.000000+00:00"
+                      history:
+                        - kind: "message"
+                          role: "user"
+                          parts:
+                            - kind: "text"
+                              text: "What is the capital of France?"
+                          task_id: "550e8400-e29b-41d4-a716-446655440004"
+                          context_id: "550e8400-e29b-41d4-a716-446655440003"
+                          message_id: "550e8400-e29b-41d4-a716-446655440002"
+                      artifacts: []
+                      metadata: {}
+
+                tasksGetWorking:
+                  summary: "tasks/get → state: working"
+                  value:
+                    jsonrpc: "2.0"
+                    id: "550e8400-e29b-41d4-a716-446655440011"
+                    result:
+                      id: "550e8400-e29b-41d4-a716-446655440004"
+                      context_id: "550e8400-e29b-41d4-a716-446655440003"
+                      kind: "task"
+                      status:
+                        state: "working"
+                        timestamp: "2026-04-19T18:30:15.000000+00:00"
+                      history: []
+                      artifacts: []
+                      metadata: {}
+
+                tasksGetInputRequired:
+                  summary: "tasks/get → state: input-required (paused)"
+                  description: |
+                    The agent paused and needs clarification. Look at
+                    `status.message` for the question; send a new
+                    `message/send` on the same context to continue.
+                  value:
+                    jsonrpc: "2.0"
+                    id: "550e8400-e29b-41d4-a716-446655440011"
+                    result:
+                      id: "550e8400-e29b-41d4-a716-446655440004"
+                      context_id: "550e8400-e29b-41d4-a716-446655440003"
+                      kind: "task"
+                      status:
+                        state: "input-required"
+                        timestamp: "2026-04-19T18:30:30.000000+00:00"
+                        message:
+                          role: "agent"
+                          parts:
+                            - kind: "text"
+                              text: "Which period should I analyze — last 30 days or year-to-date?"
+                      history: []
+                      artifacts: []
+                      metadata: {}
+
+                tasksGetCompleted:
+                  summary: "tasks/get → state: completed"
+                  description: |
+                    Work finished. The answer is in `artifacts[]`.
+                    `metadata.did.message.signature` (when present)
+                    is the agent's Ed25519 signature over the artifact
+                    text — clients can verify authenticity via DID
+                    resolution.
+                  value:
+                    jsonrpc: "2.0"
+                    id: "550e8400-e29b-41d4-a716-446655440011"
+                    result:
+                      id: "550e8400-e29b-41d4-a716-446655440004"
+                      context_id: "550e8400-e29b-41d4-a716-446655440003"
+                      kind: "task"
+                      status:
+                        state: "completed"
+                        timestamp: "2026-04-19T18:31:00.000000+00:00"
+                      history:
+                        - kind: "message"
+                          role: "user"
+                          parts:
+                            - kind: "text"
+                              text: "What is the capital of France?"
+                          task_id: "550e8400-e29b-41d4-a716-446655440004"
+                          context_id: "550e8400-e29b-41d4-a716-446655440003"
+                          message_id: "550e8400-e29b-41d4-a716-446655440002"
+                        - kind: "message"
+                          role: "assistant"
+                          parts:
+                            - kind: "text"
+                              text: "Paris."
+                          task_id: "550e8400-e29b-41d4-a716-446655440004"
+                          context_id: "550e8400-e29b-41d4-a716-446655440003"
+                          message_id: "589ef550-fefa-4d3a-a5ed-ee9936a20992"
+                      artifacts:
+                        - name: "result"
+                          parts:
+                            - kind: "text"
+                              text: "Paris."
+                              metadata:
+                                did.message.signature: "2M1qbfLcyoQhSAfTzDghw15PMTfmv3jUoigk7KRuiowkEWZpU7aYLHTnqwamjEo4SxNskq15PZANNLuhJ7omzsxg"
+                          artifact_id: "985b4f37-ee2e-48a4-bd6f-c66472e67b85"
+                      metadata: {}
+
+                tasksGetFailed:
+                  summary: "tasks/get → state: failed"
+                  description: |
+                    Processing error. `status.message` carries the
+                    human-readable cause. Task is terminal — can't
+                    be resumed; submit a fresh message if you want
+                    to retry.
+                  value:
+                    jsonrpc: "2.0"
+                    id: "550e8400-e29b-41d4-a716-446655440011"
+                    result:
+                      id: "550e8400-e29b-41d4-a716-446655440004"
+                      context_id: "550e8400-e29b-41d4-a716-446655440003"
+                      kind: "task"
+                      status:
+                        state: "failed"
+                        timestamp: "2026-04-19T18:30:45.000000+00:00"
+                        message:
+                          role: "agent"
+                          parts:
+                            - kind: "text"
+                              text: "Upstream data source unavailable; tried 3 times."
+                      history: []
+                      artifacts: []
+                      metadata: {}
+
+                tasksGetRejected:
+                  summary: "tasks/get → state: rejected"
+                  description: |
+                    Agent declined to process the input (e.g., outside
+                    its capability scope, invalid format). Check
+                    `status.message` for the decline reason.
+                  value:
+                    jsonrpc: "2.0"
+                    id: "550e8400-e29b-41d4-a716-446655440011"
+                    result:
+                      id: "550e8400-e29b-41d4-a716-446655440004"
+                      context_id: "550e8400-e29b-41d4-a716-446655440003"
+                      kind: "task"
+                      status:
+                        state: "rejected"
+                        timestamp: "2026-04-19T18:30:01.000000+00:00"
+                        message:
+                          role: "agent"
+                          parts:
+                            - kind: "text"
+                              text: "Request is outside this agent's declared capabilities."
+                      history: []
+                      artifacts: []
+                      metadata: {}
+
+                tasksListResult:
+                  summary: "tasks/list result"
+                  value:
+                    jsonrpc: "2.0"
+                    id: "550e8400-e29b-41d4-a716-446655440013"
+                    result:
+                      - id: "550e8400-e29b-41d4-a716-446655440004"
+                        context_id: "550e8400-e29b-41d4-a716-446655440003"
+                        kind: "task"
+                        status:
+                          state: "completed"
+                          timestamp: "2026-04-19T18:31:00.000000+00:00"
+                        history: []
+                        artifacts: []
+                        metadata: {}
+
+                tasksCancelResult:
+                  summary: "tasks/cancel result (state flips to 'canceled')"
+                  value:
+                    jsonrpc: "2.0"
+                    id: "550e8400-e29b-41d4-a716-446655440014"
+                    result:
+                      id: "550e8400-e29b-41d4-a716-446655440004"
+                      context_id: "550e8400-e29b-41d4-a716-446655440003"
+                      kind: "task"
+                      status:
+                        state: "canceled"
+                        timestamp: "2026-04-19T18:30:50.000000+00:00"
+                      history: []
+                      artifacts: []
+                      metadata: {}
+
+                tasksFeedbackResult:
+                  summary: "tasks/feedback result"
+                  value:
+                    jsonrpc: "2.0"
+                    id: "550e8400-e29b-41d4-a716-446655440015"
+                    result:
+                      success: true
+
+                contextsListResult:
+                  summary: "contexts/list result"
+                  value:
+                    jsonrpc: "2.0"
+                    id: "550e8400-e29b-41d4-a716-446655440016"
+                    result:
+                      - context_id: "550e8400-e29b-41d4-a716-446655440003"
+                        kind: "context"
+                        role: "user"
+                        tasks:
+                          - "550e8400-e29b-41d4-a716-446655440004"
+                        status: "active"
+                        created_at: "2026-04-19T18:29:00.000000+00:00"
+                        updated_at: "2026-04-19T18:31:00.000000+00:00"
+                        name: "France capitals inquiry"
+                        metadata: {}
+
+                contextsClearResult:
+                  summary: "contexts/clear result"
+                  value:
+                    jsonrpc: "2.0"
+                    id: "550e8400-e29b-41d4-a716-446655440017"
+                    result:
+                      success: true
+
+                errorTaskNotFound:
+                  summary: Error — TaskNotFound (-32001)
+                  value:
+                    jsonrpc: "2.0"
+                    id: "550e8400-e29b-41d4-a716-446655440011"
+                    error:
+                      code: -32001
+                      message: "Task not found"
+                      data:
+                        taskId: "550e8400-e29b-41d4-a716-446655440099"
+
+                errorTaskNotCancelable:
+                  summary: Error — TaskNotCancelable (-32002)
+                  description: Cannot cancel a task that's already terminal.
+                  value:
+                    jsonrpc: "2.0"
+                    id: "550e8400-e29b-41d4-a716-446655440014"
+                    error:
+                      code: -32002
+                      message: "Task is already in terminal state 'completed' and cannot be canceled"
+
+                errorInvalidParams:
+                  summary: Error — Invalid params (-32602)
+                  description: params didn't match the method's schema
+                  value:
+                    jsonrpc: "2.0"
+                    id: "550e8400-e29b-41d4-a716-446655440001"
+                    error:
+                      code: -32602
+                      message: "Invalid params: missing 'message.parts'"
+
+                errorAuthRequired:
+                  summary: Error — AuthenticationRequired (-32009)
+                  value:
+                    jsonrpc: "2.0"
+                    id: "550e8400-e29b-41d4-a716-446655440001"
+                    error:
+                      code: -32009
+                      message: "Authentication required for method 'message/send'"
+
+                errorInsufficientPermissions:
+                  summary: Error — InsufficientPermissions (-32013)
+                  description: Valid token but scope doesn't cover the method.
+                  value:
+                    jsonrpc: "2.0"
+                    id: "550e8400-e29b-41d4-a716-446655440001"
+                    error:
+                      code: -32013
+                      message: "Scope 'agent:read' does not permit method 'message/send'; requires 'agent:write'"
+
+                errorInvalidSignature:
+                  summary: Error — InvalidTokenSignature (-32012)
+                  description: X-DID-Signature failed Ed25519 verification.
+                  value:
+                    jsonrpc: "2.0"
+                    id: "550e8400-e29b-41d4-a716-446655440001"
+                    error:
+                      code: -32012
+                      message: "Invalid DID signature"
+                      data:
+                        reason: "crypto_mismatch"
+
+        '400':
+          description: Invalid JSON-RPC request (malformed body)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonRpcResponse'
+              example:
+                jsonrpc: "2.0"
+                id: null
+                error:
+                  code: -32700
+                  message: "Parse error"
+
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              example:
+                error: "Unauthorized"
+
+        '403':
+          description: Token valid but DID signature failed (when DID signing is required)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+                  details:
+                    type: object
+                    properties:
+                      did_verified: { type: boolean }
+                      reason:
+                        type: string
+                        enum:
+                          - missing_signature_headers
+                          - did_mismatch
+                          - public_key_unavailable
+                          - timestamp_out_of_window
+                          - crypto_mismatch
+                          - malformed_input
+              example:
+                error: "Invalid DID signature"
+                details:
+                  did_verified: false
+                  reason: "did_mismatch"
+
+        '413':
+          description: Request body exceeded the 10 MB limit
+
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonRpcResponse'
+              example:
+                jsonrpc: "2.0"
+                id: "550e8400-e29b-41d4-a716-446655440001"
+                error:
+                  code: -32603
+                  message: "Internal error"
+      security:
+        - bearerAuth: []
+        - bearerAuth: []
+          didSignature: []
+
+  /.well-known/agent.json:
+    get:
+      tags: [Agent Discovery]
+      summary: Get the agent card
+      description: |
+        The A2A standard discovery document. Any client that knows the
+        agent's base URL can `GET` this to learn the agent's DID,
+        capabilities, published skills, and where to send requests.
+
+        `OPTIONS` and `HEAD` are also accepted — useful for CORS
+        preflight and liveness probes respectively.
+      security: []
+      responses:
+        '200':
+          description: Agent card
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentCard'
+              example:
+                name: "example-agent"
+                description: "A generic example agent."
+                version: "1.0.0"
+                protocolVersion: "0.3.0"
+                did: "did:bindu:example_at_getbindu_com:example-agent:a1b2c3d4-e5f6-7890-abcd-1234567890ab"
+                url: "https://example-agent.bindu-agents.bindus.directory"
+                defaultInputModes: ["text/plain"]
+                defaultOutputModes: ["application/json", "text/markdown"]
+                capabilities:
+                  streaming: false
+                  pushNotifications: false
+                  stateTransitionHistory: true
+                skills:
+                  - id: "example-v1"
+                    name: "Example Skill"
+                    description: "One thing the agent can do."
+                    tags: ["demo"]
+                    inputModes: ["text/plain"]
+                    outputModes: ["application/json"]
+                extensions:
+                  - name: "DID"
+                    version: "1.0.0"
+                    description: "Ed25519-backed cryptographic identity"
+    head:
+      tags: [Agent Discovery]
+      summary: HEAD agent card (liveness probe)
+      security: []
+      responses:
+        '200':
+          description: Agent is reachable
+    options:
+      tags: [Agent Discovery]
+      summary: CORS preflight for agent card
+      security: []
+      responses:
+        '204':
+          description: CORS preflight OK
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: string
+                example: "*"
+            Access-Control-Allow-Methods:
+              schema:
+                type: string
+                example: "GET, HEAD, OPTIONS"
+
+  /did/resolve:
+    get:
+      tags: [DID Resolution]
+      summary: Resolve a DID (via query string)
+      description: |
+        Return the DID Document for a `did:bindu:...` identifier. The
+        document contains the agent's public key, which peers use to
+        verify signatures on artifacts and requests.
+      security: []
+      parameters:
+        - name: did
+          in: query
+          required: true
+          description: Full DID string
+          schema:
+            type: string
+            pattern: "^did:bindu:.+"
+          example: "did:bindu:example_at_getbindu_com:example-agent:a1b2c3d4-e5f6-7890-abcd-1234567890ab"
+      responses:
+        '200':
+          description: DID Document
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DidDocument'
+        '404':
+          description: DID not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+              example:
+                error: "DID not found"
+
+    post:
+      tags: [DID Resolution]
+      summary: Resolve a DID (via JSON body)
+      description: |
+        Alternate form for clients that prefer POST (keeps the DID
+        out of URL logs). Returns the same document `GET` would.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                did:
+                  type: string
+                  pattern: "^did:bindu:.+"
+              required: [did]
+            example:
+              did: "did:bindu:example_at_getbindu_com:example-agent:a1b2c3d4-e5f6-7890-abcd-1234567890ab"
+      responses:
+        '200':
+          description: DID Document
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DidDocument'
+        '400':
+          description: Missing or malformed `did` field
+        '404':
+          description: DID not found
+
+  /agent/skills:
+    get:
+      tags: [Skills]
+      summary: List all skills this agent publishes
+      security: []
+      responses:
+        '200':
+          description: Array of skill summaries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SkillSummary'
+              example:
+                - id: "example-v1"
+                  name: "Example Skill"
+                  description: "One thing the agent can do."
+                  tags: ["demo"]
+                  version: "1.0.0"
+
+  /agent/skills/{skillId}:
+    get:
+      tags: [Skills]
+      summary: Get details for one skill
+      security: []
+      parameters:
+        - name: skillId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "example-v1"
+      responses:
+        '200':
+          description: Full skill metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillDetail'
+        '404':
+          description: SkillNotFound
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+                  code: { type: integer }
+              example:
+                error: "Skill 'unknown-skill' not found"
+                code: -32030
+
+  /agent/skills/{skillId}/documentation:
+    get:
+      tags: [Skills]
+      summary: Get skill documentation (Markdown)
+      description: |
+        The authoritative user-facing doc for this skill. Returns the
+        frontmatter-ed Markdown file the agent shipped. Use this
+        instead of the short `description` when you need full usage
+        guidance, examples, or input schemas.
+      security: []
+      parameters:
+        - name: skillId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Skill documentation
+          content:
+            text/markdown:
+              schema:
+                type: string
+              example: |
+                ---
+                name: Example Skill
+                version: 1.0.0
+                ---
+                # Example
+
+                Usage...
+        '404':
+          description: Skill not found
+
+  /agent/negotiation:
+    post:
+      tags: [Negotiation]
+      summary: Ask whether this agent can handle a task
+      description: |
+        Orchestrators use this to pick the best agent for a task
+        before sending a real `message/send`. The agent returns a
+        capability score (0–1) weighted across skill match, I/O
+        compatibility, performance, load, and cost.
+
+        A score below the caller's `min_score` is interpreted as
+        "decline" — the orchestrator should route the task
+        elsewhere. This endpoint never actually performs the task;
+        it's advisory.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NegotiationRequest'
+            example:
+              task_summary: "Summarize a 4-page PDF in 200 words."
+              task_details: "Reader is a non-technical manager. Output should be plain English Markdown."
+              input_mime_types: ["application/pdf"]
+              output_mime_types: ["text/markdown"]
+              max_latency_ms: 20000
+              max_cost_amount: "0.05"
+              required_tools: []
+              forbidden_tools: []
+              min_score: 0.7
+              weights:
+                skill_match: 0.55
+                io_compatibility: 0.20
+                performance: 0.15
+                load: 0.05
+                cost: 0.05
+      responses:
+        '200':
+          description: Negotiation response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NegotiationResponse'
+              example:
+                can_handle: true
+                score: 0.84
+                reasons:
+                  - "Skill 'pdf_summarize' matches task summary closely"
+                  - "Output MIME 'text/markdown' within declared modes"
+                  - "Current load at 12%, well below threshold"
+                estimated_latency_ms: 12000
+                estimated_cost_amount: "0.02"
+
+  /api/start-payment-session:
+    post:
+      tags: [Payment (x402)]
+      summary: Start an x402 payment session
+      description: |
+        Initiates a payment session for agents that charge per
+        request. Returns a session handle the caller uses with
+        `message/send` (via the `X-PAYMENT` header or session-linked
+        metadata) until the session is spent or expired.
+
+        Paid agents only. Unpaid agents return `404`.
+      responses:
+        '200':
+          description: Payment session opened
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentSession'
+              example:
+                session_id: "ps_01H8..."
+                status: "pending"
+                amount: "0.01"
+                asset: "USDC"
+                network: "base-sepolia"
+                pay_to: "0x2654bb8B272f117c514aAc3d4032B1795366BA5d"
+                created_at: "2026-04-19T18:00:00+00:00"
+                expires_at: "2026-04-19T18:05:00+00:00"
+                capture_url: "https://agent.example.com/payment-capture?session_id=ps_01H8..."
+
+  /api/payment-status/{sessionId}:
+    get:
+      tags: [Payment (x402)]
+      summary: Poll (or long-poll) a payment session
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "ps_01H8..."
+        - name: wait
+          in: query
+          required: false
+          description: |
+            When `true`, the server blocks up to 60 seconds waiting
+            for the session to transition to a terminal state
+            (`completed`, `failed`, `expired`). Useful to avoid
+            tight-loop polling.
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Payment session state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentStatus'
+        '404':
+          description: Session not found or expired
+
+  /payment-capture:
+    get:
+      tags: [Payment (x402)]
+      summary: Browser-facing payment capture page (HTML)
+      description: |
+        HTML page users browse to in order to complete payment via a
+        browser wallet. Not a machine-callable endpoint — clients that
+        want programmatic payment should use the x402 flow directly.
+      security: []
+      parameters:
+        - name: session_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: HTML form
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /health:
+    get:
+      tags: [Health & Monitoring]
+      summary: Liveness + readiness probe
+      description: |
+        Returns 200 when healthy, 503 when any mandatory dependency
+        (storage, scheduler, message bus, grpc) is degraded. The body
+        carries per-component status so orchestrators can show which
+        specific thing is broken.
+      security: []
+      responses:
+        '200':
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: "healthy"
+                checks:
+                  storage: "ok"
+                  scheduler: "ok"
+                  bus: "ok"
+                  grpc: "ok"
+                  extensions: "ok"
+                timestamp: "2026-04-19T18:00:00+00:00"
+        '503':
+          description: Degraded — at least one critical component failing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: "degraded"
+                checks:
+                  storage: "error: connection refused"
+                  scheduler: "ok"
+                  bus: "ok"
+                  grpc: "ok"
+                  extensions: "ok"
+                timestamp: "2026-04-19T18:00:00+00:00"
+
+  /metrics:
+    get:
+      tags: [Health & Monitoring]
+      summary: Prometheus metrics (text exposition)
+      description: |
+        Standard Prometheus text format. Key series include:
+
+        - `http_requests_total{method, path, status}` — request counts
+        - `http_request_duration_seconds` — latency histogram
+        - `agent_tasks_active` — count by state
+        - `agent_tasks_completed_total{state}` — lifetime terminal counts
+        - `agent_llm_tokens_total{direction, model}` — token usage
+      security: []
+      responses:
+        '200':
+          description: Prometheus text
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |
+                # HELP http_requests_total Total HTTP requests.
+                # TYPE http_requests_total counter
+                http_requests_total{method="POST",path="/",status="200"} 42
+                # HELP agent_tasks_active Active tasks by state.
+                # TYPE agent_tasks_active gauge
+                agent_tasks_active{state="working"} 3
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Ory Hydra-issued OAuth 2.0 access token
+        (opaque `ory_at_...`). Required on all writable JSON-RPC
+        methods and on paid endpoints. Scopes map to methods
+        (see the top-level description).
+
+    didSignature:
+      type: apiKey
+      in: header
+      name: X-DID
+      description: |
+        Optional DID-based request signing. When `X-DID` is sent, the
+        request body is signed with the DID holder's Ed25519 private
+        key. **Three headers** must all be present:
+
+        | Header | Value |
+        |---|---|
+        | `X-DID` | Full DID string (the same as the bearer token's `client_id`) |
+        | `X-DID-Timestamp` | Unix seconds, ±300s of server clock |
+        | `X-DID-Signature` | base58(Ed25519 over payload) |
+
+        Payload is Python's `json.dumps({"body":<raw-body-bytes>,"did":<did>,"timestamp":<ts>}, sort_keys=True)`.
+        Default Python separators include spaces after `:` and `,` —
+        match exactly. Any re-serialization of the body between the
+        signer and the wire breaks verification.
+
+    x402Payment:
+      type: apiKey
+      in: header
+      name: X-PAYMENT
+      description: |
+        Base64-encoded x402 payment payload. Required on paid
+        endpoints when you haven't started a session via
+        `POST /api/start-payment-session` first. The decoded payload is:
+
+        ```json
+        {
+          "x402Version": 1,
+          "scheme": "exact",
+          "network": "base-sepolia",
+          "payload": {
+            "signature": "0x...",
+            "authorization": {
+              "from": "0x...",
+              "to": "0x...",
+              "value": "100",
+              "validAfter": "...",
+              "validBefore": "...",
+              "nonce": "0x..."
+            }
+          }
+        }
+        ```
+
+        See [x402.org](https://x402.org) for the full spec.
+
+  parameters:
+    TaskIdInPath:
+      name: taskId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      example: "550e8400-e29b-41d4-a716-446655440004"
+
+    ContextIdInPath:
+      name: contextId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    # ========================================================================
+    # JSON-RPC envelope
+    # ========================================================================
+
+    JsonRpcRequest:
+      description: |
+        JSON-RPC 2.0 request envelope. One of the per-method
+        `params` shapes must be supplied via the `method` field.
+      type: object
+      required: [jsonrpc, method, id]
+      properties:
+        jsonrpc:
+          type: string
+          const: "2.0"
+        method:
+          type: string
+          enum:
+            - "message/send"
+            - "message/stream"
+            - "tasks/get"
+            - "tasks/list"
+            - "tasks/cancel"
+            - "tasks/feedback"
+            - "contexts/list"
+            - "contexts/clear"
+        id:
+          oneOf:
+            - type: string
+            - type: integer
+          description: Caller-chosen request id. The response echoes it back.
+        params:
+          description: Method-specific params (see per-method schemas below)
+          oneOf:
+            - $ref: '#/components/schemas/MessageSendParams'
+            - $ref: '#/components/schemas/TasksGetParams'
+            - $ref: '#/components/schemas/TasksListParams'
+            - $ref: '#/components/schemas/TasksCancelParams'
+            - $ref: '#/components/schemas/TasksFeedbackParams'
+            - $ref: '#/components/schemas/ContextsListParams'
+            - $ref: '#/components/schemas/ContextsClearParams'
+
+    JsonRpcResponse:
+      description: |
+        JSON-RPC 2.0 response envelope. Exactly one of `result` or
+        `error` is present.
+      type: object
+      required: [jsonrpc, id]
+      properties:
+        jsonrpc:
+          type: string
+          const: "2.0"
+        id:
+          oneOf:
+            - type: string
+            - type: integer
+            - type: "null"
+        result:
+          description: Method-specific result (see per-method result schemas)
+          oneOf:
+            - $ref: '#/components/schemas/Task'
+            - type: array
+              items:
+                $ref: '#/components/schemas/Task'
+            - type: array
+              items:
+                $ref: '#/components/schemas/Context'
+            - $ref: '#/components/schemas/TasksFeedbackResult'
+            - $ref: '#/components/schemas/ContextsClearResult'
+        error:
+          $ref: '#/components/schemas/JsonRpcError'
+
+    JsonRpcError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: integer
+          description: |
+            Error code. See the *Error catalog* in the top-level
+            description for the full list.
+        message:
+          type: string
+        data:
+          description: Optional structured detail — varies per error.
+          type: object
+          additionalProperties: true
+
+    # ========================================================================
+    # message/send
+    # ========================================================================
+
+    MessageSendParams:
+      type: object
+      required: [message]
+      properties:
+        message:
+          $ref: '#/components/schemas/UserMessage'
+        configuration:
+          $ref: '#/components/schemas/MessageSendConfiguration'
+        metadata:
+          type: object
+          additionalProperties: true
+
+    UserMessage:
+      type: object
+      required: [role, parts, kind, message_id]
+      properties:
+        role:
+          type: string
+          enum: [user]
+        parts:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/MessagePart'
+        kind:
+          type: string
+          const: "message"
+        message_id:
+          type: string
+          format: uuid
+        contextId:
+          type: string
+          format: uuid
+          description: |
+            Conversation context. New contexts are created
+            automatically when omitted; pass a previous
+            `contextId` to continue the same conversation.
+        taskId:
+          type: string
+          format: uuid
+          description: |
+            Caller-provided task id. The server uses this as the
+            outbound task's id — lets clients correlate before a
+            response arrives.
+        referenceTaskIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: |
+            Earlier tasks this task depends on. The server fetches
+            their artifacts and makes them available to the handler
+            as context.
+        metadata:
+          type: object
+          additionalProperties: true
+          description: |
+            Free-form. Two reserved keys:
+            - `x402.payment` — inline x402 payment submission (see
+              the `message/send - With Payment` example).
+            - `_payment_context` — server-injected, read-only; the
+              verified x402 context. Do not set this yourself.
+
+    MessagePart:
+      oneOf:
+        - type: object
+          required: [kind, text]
+          properties:
+            kind: { type: string, const: "text" }
+            text: { type: string }
+            metadata:
+              type: object
+              additionalProperties: true
+        - type: object
+          required: [kind, data]
+          properties:
+            kind: { type: string, const: "data" }
+            data:
+              type: object
+              additionalProperties: true
+            metadata:
+              type: object
+              additionalProperties: true
+        - type: object
+          required: [kind, file]
+          properties:
+            kind: { type: string, const: "file" }
+            file:
+              type: object
+              properties:
+                mime_type: { type: string }
+                uri: { type: string, format: uri }
+                bytes: { type: string, format: byte, description: Base64-encoded inline content }
+            metadata:
+              type: object
+              additionalProperties: true
+
+    MessageSendConfiguration:
+      type: object
+      required: [acceptedOutputModes]
+      properties:
+        acceptedOutputModes:
+          type: array
+          minItems: 1
+          items:
+            type: string
+          description: |
+            MIME types the client accepts in artifacts. Common
+            values: `application/json`, `text/plain`,
+            `text/markdown`. If the agent can't produce any of
+            these, it returns `-32005 ContentTypeNotSupported`.
+          example: ["application/json", "text/markdown"]
+        blocking:
+          type: boolean
+          default: false
+          description: |
+            If `true`, the server holds the HTTP connection open
+            until the task reaches a terminal state. Use sparingly
+            — most agents work asynchronously and blocking defeats
+            that design. Short tasks (<1s) only.
+        historyLength:
+          type: integer
+          minimum: 0
+          description: Cap `history` array in the returned task.
+        pushNotificationConfig:
+          type: object
+          description: "[Reserved] Push-notification webhook config. Currently unsupported."
+        longRunning:
+          type: boolean
+          default: false
+          description: |
+            Hint that the task will take >60s. Some agents use this
+            to pre-check resources before acknowledging.
+
+    # ========================================================================
+    # tasks/* params
+    # ========================================================================
+
+    TasksGetParams:
+      type: object
+      required: [taskId]
+      properties:
+        taskId:
+          type: string
+          format: uuid
+        historyLength:
+          type: integer
+          minimum: 0
+          description: Cap `history` array in the returned task.
+        metadata:
+          type: object
+          additionalProperties: true
+
+    TasksListParams:
+      type: object
+      description: |
+        **Note on naming:** `history_length` is snake_case per the
+        server code. Older reference specs (and the current Postman
+        collection) use `limit`/`offset` — those are ignored. The
+        server returns all tasks scoped to the caller's DID (or the
+        whole agent's tasks if auth is off); pagination is tracked
+        in [known-issues.md](../bugs/known-issues.md).
+      properties:
+        history_length:
+          type: integer
+          minimum: 0
+          description: Cap `history` array per returned task.
+        metadata:
+          type: object
+          additionalProperties: true
+
+    TasksCancelParams:
+      type: object
+      required: [taskId]
+      properties:
+        taskId:
+          type: string
+          format: uuid
+
+    TasksFeedbackParams:
+      type: object
+      required: [taskId, feedback]
+      properties:
+        taskId:
+          type: string
+          format: uuid
+        feedback:
+          type: string
+          description: Human-readable feedback text.
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: 1 (worst) – 5 (best).
+        metadata:
+          type: object
+          additionalProperties: true
+
+    TasksFeedbackResult:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+
+    # ========================================================================
+    # contexts/* params
+    # ========================================================================
+
+    ContextsListParams:
+      type: object
+      description: |
+        **Note on naming:** `history_length` is snake_case per the
+        server code. Reference specs and Postman show `length` —
+        that field is silently ignored.
+      properties:
+        history_length:
+          type: integer
+          minimum: 0
+        metadata:
+          type: object
+          additionalProperties: true
+
+    ContextsClearParams:
+      type: object
+      required: [contextId]
+      properties:
+        contextId:
+          type: string
+          format: uuid
+
+    ContextsClearResult:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+
+    # ========================================================================
+    # Task + supporting types
+    # ========================================================================
+
+    Task:
+      type: object
+      required: [id, context_id, kind, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        context_id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          const: "task"
+        status:
+          $ref: '#/components/schemas/TaskStatus'
+        history:
+          type: array
+          description: Conversation history for this task
+          items:
+            $ref: '#/components/schemas/HistoryMessage'
+        artifacts:
+          type: array
+          description: |
+            Work product. Populated as work proceeds; final result
+            is here when state = `completed`.
+          items:
+            $ref: '#/components/schemas/Artifact'
+        metadata:
+          type: object
+          additionalProperties: true
+
+    TaskStatus:
+      type: object
+      required: [state, timestamp]
+      properties:
+        state:
+          type: string
+          enum:
+            - submitted
+            - working
+            - input-required
+            - auth-required
+            - completed
+            - failed
+            - canceled
+            - rejected
+          description: |
+            See the top-level description for the state machine.
+            Terminal states (`completed`, `failed`, `canceled`,
+            `rejected`) are immutable.
+        timestamp:
+          type: string
+          format: date-time
+          description: ISO 8601 with UTC offset, of the last state transition.
+        message:
+          $ref: '#/components/schemas/HistoryMessage'
+          description: |
+            Optional status-change annotation. For `input-required`
+            / `auth-required`, this is the agent's question. For
+            `failed`/`rejected`, the reason.
+
+    HistoryMessage:
+      type: object
+      required: [kind, role, parts]
+      properties:
+        kind:
+          type: string
+          const: "message"
+        role:
+          type: string
+          enum: [user, assistant, agent]
+        parts:
+          type: array
+          items:
+            $ref: '#/components/schemas/MessagePart'
+        task_id:
+          type: string
+          format: uuid
+        context_id:
+          type: string
+          format: uuid
+        message_id:
+          type: string
+          format: uuid
+
+    Artifact:
+      type: object
+      required: [artifact_id, parts]
+      properties:
+        artifact_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          description: Short display label, e.g. `"result"`, `"summary"`, `"sources"`.
+        description:
+          type: string
+        parts:
+          type: array
+          items:
+            $ref: '#/components/schemas/MessagePart'
+          description: |
+            Each part has its own MIME kind. The `metadata` on a
+            part may include `did.message.signature` — a base58
+            Ed25519 signature the agent made over `parts[i].text`
+            (or `data`), verifiable via the agent's DID document.
+        metadata:
+          type: object
+          additionalProperties: true
+
+    # ========================================================================
+    # Context
+    # ========================================================================
+
+    Context:
+      type: object
+      required: [context_id, kind, role, created_at, updated_at]
+      properties:
+        context_id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          const: "context"
+        role:
+          type: string
+          description: |
+            Conversation participant role. Typically `"user"`. Some
+            agents use `"system"` for system-managed contexts.
+        name:
+          type: string
+          description: Short label for UIs.
+        description:
+          type: string
+        tasks:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: IDs of every task in this context.
+        status:
+          type: string
+          enum: [active, paused, completed, archived]
+        tags:
+          type: array
+          items: { type: string }
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        parent_context_id:
+          type: string
+          format: uuid
+          description: For nested conversations (threads within a thread).
+        reference_context_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        extensions:
+          type: object
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true
+
+    # ========================================================================
+    # Agent discovery
+    # ========================================================================
+
+    AgentCard:
+      type: object
+      required: [name, version, protocolVersion, did, url, skills]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        version:
+          type: string
+          description: Agent's own version string.
+        protocolVersion:
+          type: string
+          description: A2A protocol version the agent speaks.
+        did:
+          type: string
+          pattern: "^did:bindu:.+"
+        url:
+          type: string
+          format: uri
+          description: Canonical URL where the agent serves requests.
+        documentationUrl:
+          type: string
+          format: uri
+        defaultInputModes:
+          type: array
+          items: { type: string }
+        defaultOutputModes:
+          type: array
+          items: { type: string }
+        capabilities:
+          type: object
+          properties:
+            streaming:
+              type: boolean
+              description: |
+                True when this agent supports `message/stream`.
+                When false, that method returns `-32004`.
+            pushNotifications:
+              type: boolean
+            stateTransitionHistory:
+              type: boolean
+        skills:
+          type: array
+          items:
+            $ref: '#/components/schemas/SkillSummary'
+        extensions:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              version: { type: string }
+              description: { type: string }
+        author:
+          type: string
+        tags:
+          type: array
+          items: { type: string }
+
+    # ========================================================================
+    # DID
+    # ========================================================================
+
+    DidDocument:
+      type: object
+      required: [id, authentication]
+      properties:
+        "@context":
+          type: array
+          items: { type: string }
+          example:
+            - "https://www.w3.org/ns/did/v1"
+            - "https://getbindu.com/ns/v1"
+        id:
+          type: string
+          pattern: "^did:bindu:.+"
+        created:
+          type: string
+          format: date-time
+        authentication:
+          type: array
+          items:
+            $ref: '#/components/schemas/VerificationMethod'
+        verificationMethod:
+          type: array
+          items:
+            $ref: '#/components/schemas/VerificationMethod'
+
+    VerificationMethod:
+      type: object
+      required: [id, type, controller, publicKeyBase58]
+      properties:
+        id:
+          type: string
+          description: DID-URL, typically `<did>#key-1`.
+        type:
+          type: string
+          enum: [Ed25519VerificationKey2020]
+        controller:
+          type: string
+          description: DID of the entity that controls this key.
+        publicKeyBase58:
+          type: string
+          description: Base58-encoded 32-byte Ed25519 public key.
+
+    # ========================================================================
+    # Skills
+    # ========================================================================
+
+    SkillSummary:
+      type: object
+      required: [id, name, description]
+      properties:
+        id:
+          type: string
+          description: Stable identifier, e.g. `"pdf-summarize-v1"`.
+        name:
+          type: string
+          description: Human-readable display name.
+        description:
+          type: string
+        tags:
+          type: array
+          items: { type: string }
+        version:
+          type: string
+
+    SkillDetail:
+      allOf:
+        - $ref: '#/components/schemas/SkillSummary'
+        - type: object
+          properties:
+            inputModes:
+              type: array
+              items: { type: string }
+            outputModes:
+              type: array
+              items: { type: string }
+            inputSchema:
+              type: object
+              description: JSON-Schema for expected `message.parts`.
+              additionalProperties: true
+            outputSchema:
+              type: object
+              description: JSON-Schema describing artifacts this skill produces.
+              additionalProperties: true
+            examples:
+              type: array
+              items:
+                type: object
+                properties:
+                  input: { type: object }
+                  output: { type: object }
+
+    # ========================================================================
+    # Negotiation
+    # ========================================================================
+
+    NegotiationRequest:
+      type: object
+      required: [task_summary, weights]
+      properties:
+        task_summary:
+          type: string
+          description: One-sentence description of the work.
+        task_details:
+          type: string
+          description: Longer context, audience, constraints.
+        input_mime_types:
+          type: array
+          items: { type: string }
+        output_mime_types:
+          type: array
+          items: { type: string }
+        max_latency_ms:
+          type: integer
+          description: Client's latency tolerance.
+        max_cost_amount:
+          type: string
+          description: Client's cost tolerance (currency-agnostic; agreed per-agent).
+        required_tools:
+          type: array
+          items: { type: string }
+        forbidden_tools:
+          type: array
+          items: { type: string }
+        min_score:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Decline threshold. Scores below this are treated as "no".
+        weights:
+          type: object
+          description: |
+            How much each factor contributes to the overall score.
+            Must sum to 1.0 (not enforced; callers should normalize).
+          properties:
+            skill_match: { type: number, minimum: 0, maximum: 1 }
+            io_compatibility: { type: number, minimum: 0, maximum: 1 }
+            performance: { type: number, minimum: 0, maximum: 1 }
+            load: { type: number, minimum: 0, maximum: 1 }
+            cost: { type: number, minimum: 0, maximum: 1 }
+
+    NegotiationResponse:
+      type: object
+      required: [can_handle, score]
+      properties:
+        can_handle:
+          type: boolean
+        score:
+          type: number
+          minimum: 0
+          maximum: 1
+        reasons:
+          type: array
+          items: { type: string }
+          description: Short bullet rationale for the score.
+        estimated_latency_ms:
+          type: integer
+        estimated_cost_amount:
+          type: string
+
+    # ========================================================================
+    # Payment (x402)
+    # ========================================================================
+
+    PaymentSession:
+      type: object
+      required: [session_id, status, amount, asset, network, pay_to, created_at]
+      properties:
+        session_id: { type: string }
+        status:
+          type: string
+          enum: [pending, completed, failed, expired]
+        amount: { type: string, description: "Amount as string to avoid float precision" }
+        asset: { type: string, example: "USDC" }
+        network: { type: string, example: "base-sepolia" }
+        pay_to: { type: string, description: Wallet address to pay }
+        created_at: { type: string, format: date-time }
+        expires_at: { type: string, format: date-time }
+        capture_url: { type: string, format: uri, description: Human-facing payment URL }
+
+    PaymentStatus:
+      allOf:
+        - $ref: '#/components/schemas/PaymentSession'
+        - type: object
+          properties:
+            payer:
+              type: string
+              description: Payer wallet address, set on completion.
+            tx_hash:
+              type: string
+              description: On-chain transaction hash (when `status = completed`).
+            completed_at:
+              type: string
+              format: date-time
+
+    # ========================================================================
+    # Health
+    # ========================================================================
+
+    HealthResponse:
+      type: object
+      required: [status, checks, timestamp]
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded]
+        checks:
+          type: object
+          description: 'Per-component status — "ok" or "error: <reason>".'
+          additionalProperties:
+            type: string
+        timestamp:
+          type: string
+          format: date-time

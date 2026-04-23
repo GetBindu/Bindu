@@ -414,6 +414,7 @@ class PushNotificationManager:
         request: SetTaskPushNotificationRequest,
         task_loader,
         persist: bool = False,
+        caller_did: str | None = None,
     ) -> SetTaskPushNotificationResponse:
         """Set push notification settings for a task.
 
@@ -421,6 +422,9 @@ class PushNotificationManager:
             request: The JSON-RPC request
             task_loader: Async function to load a task by ID
             persist: Deprecated parameter, now reads from request params
+            caller_did: Authenticated caller identity. The caller must own
+                the referenced task; otherwise TaskNotFoundError is returned
+                (same as a truly missing task — no existence leak).
         """
         if not self.is_push_supported():
             return self._push_not_supported_response(
@@ -441,6 +445,16 @@ class PushNotificationManager:
                 TaskNotFoundError,
                 "Task not found",
             )
+
+        if self.storage is not None:
+            owner = await self.storage.get_task_owner(task_id)
+            if owner != caller_did:
+                return self._create_error_response(
+                    SetTaskPushNotificationResponse,
+                    request["id"],
+                    TaskNotFoundError,
+                    "Task not found",
+                )
 
         # A2A Protocol: Read long_running flag from request params
         # If True, persist webhook config to survive server restarts
@@ -469,9 +483,11 @@ class PushNotificationManager:
         )
 
     async def get_task_push_notification(
-        self, request: GetTaskPushNotificationRequest
+        self,
+        request: GetTaskPushNotificationRequest,
+        caller_did: str | None = None,
     ) -> GetTaskPushNotificationResponse:
-        """Get push notification settings for a task."""
+        """Get push notification settings for a task. Only the task owner may read."""
         if not self.is_push_supported():
             return self._push_not_supported_response(
                 GetTaskPushNotificationResponse, request["id"]
@@ -485,6 +501,15 @@ class PushNotificationManager:
                 PUSH_CONFIG_NOT_FOUND_MESSAGE,
             )
 
+        if self.storage is not None:
+            owner = await self.storage.get_task_owner(task_id)
+            if owner != caller_did:
+                return self._jsonrpc_error(
+                    GetTaskPushNotificationResponse,
+                    request["id"],
+                    PUSH_CONFIG_NOT_FOUND_MESSAGE,
+                )
+
         return GetTaskPushNotificationResponse(
             jsonrpc=JSONRPC_VERSION,
             id=request["id"],
@@ -492,9 +517,11 @@ class PushNotificationManager:
         )
 
     async def list_task_push_notifications(
-        self, request: ListTaskPushNotificationConfigRequest
+        self,
+        request: ListTaskPushNotificationConfigRequest,
+        caller_did: str | None = None,
     ) -> ListTaskPushNotificationConfigResponse:
-        """List push notification configurations for a task."""
+        """List push notification configurations for a task. Only the task owner may read."""
         if not self.is_push_supported():
             return self._push_not_supported_response(
                 ListTaskPushNotificationConfigResponse, request["id"]
@@ -508,6 +535,15 @@ class PushNotificationManager:
                 PUSH_CONFIG_NOT_FOUND_MESSAGE,
             )
 
+        if self.storage is not None:
+            owner = await self.storage.get_task_owner(task_id)
+            if owner != caller_did:
+                return self._jsonrpc_error(
+                    ListTaskPushNotificationConfigResponse,
+                    request["id"],
+                    PUSH_CONFIG_NOT_FOUND_MESSAGE,
+                )
+
         return ListTaskPushNotificationConfigResponse(
             jsonrpc=JSONRPC_VERSION,
             id=request["id"],
@@ -518,12 +554,14 @@ class PushNotificationManager:
         self,
         request: DeleteTaskPushNotificationConfigRequest,
         delete_from_storage: bool = False,
+        caller_did: str | None = None,
     ) -> DeleteTaskPushNotificationConfigResponse:
         """Delete a push notification configuration for a task.
 
         Args:
             request: The JSON-RPC request
             delete_from_storage: If True, also remove from persistent storage
+            caller_did: Authenticated caller. Only the task owner may delete.
         """
         if not self.is_push_supported():
             return self._push_not_supported_response(
@@ -541,6 +579,15 @@ class PushNotificationManager:
                 request["id"],
                 PUSH_CONFIG_NOT_FOUND_MESSAGE,
             )
+
+        if self.storage is not None:
+            owner = await self.storage.get_task_owner(task_id)
+            if owner != caller_did:
+                return self._jsonrpc_error(
+                    DeleteTaskPushNotificationConfigResponse,
+                    request["id"],
+                    PUSH_CONFIG_NOT_FOUND_MESSAGE,
+                )
 
         if existing.get("id") != config_id:
             return self._jsonrpc_error(
