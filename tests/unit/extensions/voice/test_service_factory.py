@@ -96,6 +96,7 @@ class TestCreateTTSService:
         )
         mock_tts_cls = MagicMock()
         mock_tts_settings = MagicMock()
+        mock_tts_cls.Settings = mock_tts_settings
         with (
             patch(
                 "bindu.extensions.voice.service_factory.app_settings"
@@ -105,7 +106,6 @@ class TestCreateTTSService:
                 {
                     "pipecat.services.elevenlabs.tts": MagicMock(
                         ElevenLabsTTSService=mock_tts_cls,
-                        ElevenLabsTTSSettings=mock_tts_settings,
                     )
                 },
             ),
@@ -220,6 +220,33 @@ class TestCreateTTSService:
             ):
                 create_tts_service(ext)
 
+    def test_elevenlabs_missing_nested_settings_raises_importerror(self):
+        ext = VoiceAgentExtension(tts_provider="elevenlabs", tts_voice_id="voice-abc")
+        mock_tts_cls = MagicMock()
+        del mock_tts_cls.Settings
+        with (
+            patch(
+                "bindu.extensions.voice.service_factory.app_settings"
+            ) as mock_settings,
+            patch.dict(
+                "sys.modules",
+                {
+                    "pipecat.services.elevenlabs.tts": MagicMock(
+                        ElevenLabsTTSService=mock_tts_cls
+                    )
+                },
+            ),
+        ):
+            mock_settings.voice.tts_api_key = (
+                "unit-test-tts-token"  # pragma: allowlist secret
+            )
+            mock_settings.voice.tts_fallback_provider = "none"
+
+            with pytest.raises(
+                ImportError, match="ElevenLabs TTS requires a nested Settings class"
+            ):
+                create_tts_service(ext)
+
     def test_azure_import_error_raises_importerror(self):
         ext = VoiceAgentExtension(tts_provider="azure", tts_voice_id="en-US-SaraNeural")
         with (
@@ -244,6 +271,34 @@ class TestCreateTTSService:
             ):
                 create_tts_service(ext)
 
+    def test_azure_missing_nested_settings_raises_importerror(self):
+        ext = VoiceAgentExtension(tts_provider="azure", tts_voice_id="en-US-SaraNeural")
+        mock_tts_cls = MagicMock()
+        del mock_tts_cls.Settings
+        with (
+            patch(
+                "bindu.extensions.voice.service_factory.app_settings"
+            ) as mock_settings,
+            patch.dict(
+                "sys.modules",
+                {
+                    "pipecat.services.azure.tts": MagicMock(AzureTTSService=mock_tts_cls)
+                },
+            ),
+        ):
+            mock_settings.voice.tts_api_key = ""
+            mock_settings.voice.tts_fallback_provider = "none"
+            mock_settings.voice.azure_tts_api_key = (
+                "unit-test-azure-token"  # pragma: allowlist secret
+            )
+            mock_settings.voice.azure_tts_region = "eastus"
+            mock_settings.voice.azure_tts_voice = "en-US-SaraNeural"
+
+            with pytest.raises(
+                ImportError, match="Azure TTS requires a nested Settings class"
+            ):
+                create_tts_service(ext)
+
     def test_azure_fallback_when_elevenlabs_fails(self):
         ext = VoiceAgentExtension(
             tts_provider="elevenlabs",
@@ -251,6 +306,8 @@ class TestCreateTTSService:
         )
         mock_azure_cls = MagicMock()
         mock_azure_settings = MagicMock()
+        mock_azure_cls.Settings = mock_azure_settings
+        mock_elevenlabs_cls = MagicMock()
 
         with (
             patch(
@@ -260,12 +317,10 @@ class TestCreateTTSService:
                 "sys.modules",
                 {
                     "pipecat.services.elevenlabs.tts": MagicMock(
-                        ElevenLabsTTSService=MagicMock(),
-                        ElevenLabsTTSSettings=MagicMock(),
+                        ElevenLabsTTSService=mock_elevenlabs_cls,
                     ),
                     "pipecat.services.azure.tts": MagicMock(
                         AzureTTSService=mock_azure_cls,
-                        AzureTTSSettings=mock_azure_settings,
                     ),
                 },
             ),

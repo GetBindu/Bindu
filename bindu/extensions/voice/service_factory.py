@@ -147,29 +147,27 @@ def _create_tts_service_for_provider(provider: str, config: VoiceAgentExtension)
                 "pipecat.services.elevenlabs.tts"
             )
             ElevenLabsTTSService = getattr(elevenlabs_module, "ElevenLabsTTSService")
-            ElevenLabsTTSSettings = getattr(
-                elevenlabs_module, "ElevenLabsTTSSettings", None
-            )
         except (ImportError, AttributeError) as e:
             raise ImportError(
                 "ElevenLabs TTS requires pipecat[elevenlabs]. "
                 "Install with: pip install 'bindu[voice]'"
             ) from e
 
-        if ElevenLabsTTSSettings is not None:
-            tts = ElevenLabsTTSService(
-                api_key=api_key,
-                settings=ElevenLabsTTSSettings(
-                    voice=config.tts_voice_id,
-                    model=config.tts_model,
-                ),
-            )
-        else:
-            tts = ElevenLabsTTSService(
-                api_key=api_key,
-                voice_id=config.tts_voice_id,
+        try:
+            elevenlabs_settings_cls = ElevenLabsTTSService.Settings
+        except AttributeError as e:
+            raise ImportError(
+                "ElevenLabs TTS requires a nested Settings class. "
+                "Install with: pip install 'bindu[voice]'"
+            ) from e
+
+        tts = ElevenLabsTTSService(
+            api_key=api_key,
+            settings=elevenlabs_settings_cls(
+                voice=config.tts_voice_id,
                 model=config.tts_model,
-            )
+            ),
+        )
         logger.info(
             f"Created ElevenLabs TTS: voice={config.tts_voice_id}, model={config.tts_model}"
         )
@@ -195,27 +193,26 @@ def _create_tts_service_for_provider(provider: str, config: VoiceAgentExtension)
         try:
             azure_module = importlib.import_module("pipecat.services.azure.tts")
             AzureTTSService = getattr(azure_module, "AzureTTSService")
-            AzureTTSSettings = getattr(azure_module, "AzureTTSSettings", None)
         except (ImportError, AttributeError) as e:
             raise ImportError(
                 "Azure TTS requires pipecat[azure]. "
                 "Install with: pip install 'bindu[voice]'"
             ) from e
 
-        if AzureTTSSettings is not None:
-            tts = AzureTTSService(
-                api_key=azure_api_key,
-                region=azure_region,
-                settings=AzureTTSSettings(voice=azure_voice),
-                sample_rate=config.sample_rate,
-            )
-        else:
-            tts = AzureTTSService(
-                api_key=azure_api_key,
-                region=azure_region,
-                voice=azure_voice,
-                sample_rate=config.sample_rate,
-            )
+        try:
+            azure_settings_cls = AzureTTSService.Settings
+        except AttributeError as e:
+            raise ImportError(
+                "Azure TTS requires a nested Settings class. "
+                "Install with: pip install 'bindu[voice]'"
+            ) from e
+
+        tts = AzureTTSService(
+            api_key=azure_api_key,
+            region=azure_region,
+            settings=azure_settings_cls(voice=azure_voice),
+            sample_rate=config.sample_rate,
+        )
 
         logger.info(f"Created Azure TTS: voice={azure_voice}, region={azure_region}")
         return tts
