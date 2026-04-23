@@ -178,7 +178,14 @@ def handler(messages: list[dict[str, str]]):
         enriched_messages = [{"role": "user", "content": prompt}]
 
         result = agent.run(input=enriched_messages)
-        return result
+        if hasattr(result, "content"):
+            unwrapped = result.content
+        elif hasattr(result, "response"):
+            unwrapped = result.response
+        else:
+            unwrapped = result
+
+        return {"success": True, "data": unwrapped, "error": None}
 
     except DocumentReadError as e:
         return str(e)
