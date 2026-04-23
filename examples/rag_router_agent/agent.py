@@ -34,10 +34,14 @@ if api_key:
 
 
 def handler(messages):
-    if not messages or "content" not in messages[-1]:
+    if not messages or not isinstance(messages[-1], dict):
         return _error("Invalid input")
 
-    query = messages[-1]["content"].strip()
+    content = messages[-1].get("content")
+    if not isinstance(content, str) or not content.strip():
+        return _error("Invalid input")
+
+    query = content.strip()
 
     intent = classify_intent(query)
     if not intent:
