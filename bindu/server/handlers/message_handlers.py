@@ -147,12 +147,16 @@ class MessageHandlers:
 
         config = request_params.get("configuration", {})
         if "history_length" in config:
-            history_length = self._parse_non_negative_history_length(
-                config["history_length"]
-            )
+            try:
+                history_length = self._parse_non_negative_history_length(
+                    config["history_length"]
+                )
+            except ValueError as exc:
+                from bindu.common.protocol.types import InvalidParamsError
+                raise InvalidParamsError(str(exc)) from exc
             if history_length is not None:
                 scheduler_params["history_length"] = history_length
-
+                
         push_config = config.get("push_notification_config")
         if push_config and self.push_manager:
             is_long_running = config.get("long_running", False)

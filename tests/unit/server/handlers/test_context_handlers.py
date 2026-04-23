@@ -72,7 +72,7 @@ class TestContextHandlers:
         response = await handler.list_contexts(request)
 
         assert response["result"] == []
-        mock_storage.list_contexts.assert_called_once_with(0)
+        mock_storage.list_contexts.assert_called_once_with(0, owner_did=None)
 
     @pytest.mark.asyncio
     async def test_list_contexts_rejects_invalid_length_type(self):
