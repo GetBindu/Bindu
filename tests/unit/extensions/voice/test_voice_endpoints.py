@@ -13,6 +13,8 @@ from starlette.responses import JSONResponse
 
 from bindu.extensions.voice.session_manager import VoiceSessionManager
 from bindu.server.endpoints.voice_endpoints import (
+    _extract_ws_session_token,
+    _has_ws_subprotocols,
     _send_json,
     _trim_overlap_text,
     _VoiceControlState,
@@ -347,6 +349,36 @@ class TestVoicePipelineErrorClassification:
         msg, code = _classify_voice_pipeline_error(ConnectionClosedError("closed"))
         assert "connection closed" in msg.lower()
         assert code == 1011
+
+
+class TestVoiceWebSocketSubprotocolParsing:
+    def test_extract_ws_session_token_parses_label_and_token(self):
+        websocket = MagicMock()
+        websocket.headers = {
+            "sec-websocket-protocol": "bindu.voice.v1, token-abc"
+        }
+
+        label, token = _extract_ws_session_token(websocket)
+
+        assert label == "bindu.voice.v1"
+        assert token == "token-abc"
+
+    def test_extract_ws_session_token_falls_back_to_bearer(self):
+        websocket = MagicMock()
+        websocket.headers = {"authorization": "Bearer token-xyz"}
+
+        label, token = _extract_ws_session_token(websocket)
+
+        assert label is None
+        assert token == "token-xyz"
+
+    def test_has_ws_subprotocols_requires_fixed_label(self):
+        websocket = MagicMock()
+        websocket.headers = {"sec-websocket-protocol": "bindu.voice.v1, token-abc"}
+        assert _has_ws_subprotocols(websocket) is True
+
+        websocket.headers = {"sec-websocket-protocol": "other.proto, token-abc"}
+        assert _has_ws_subprotocols(websocket) is False
 
 
 class TestVoiceRateLimiter:

@@ -94,16 +94,18 @@ export class VoiceClient {
 	async connect(wsUrl: string, sessionId: string, sessionToken?: string): Promise<void> {
 		this.setState("connecting");
 		this.sessionId = sessionId;
+		const voiceWsSubprotocol = "bindu.voice.v1";
 
 		await new Promise<void>((resolve, reject) => {
 			this.pendingConnectResolve = resolve;
 			this.pendingConnectReject = reject;
 			try {
 				const resolved = this.resolveWebSocketUrl(wsUrl);
-				// If the backend requires session auth, it expects the token either as:
-				// - Sec-WebSocket-Protocol header (preferred), or
-				// - first text frame after connect (fallback).
-				this.ws = sessionToken ? new WebSocket(resolved, [sessionToken]) : new WebSocket(resolved);
+				// Negotiate the fixed voice subprotocol and pass the session token as
+				// the second subprotocol item so the backend can validate both parts.
+				this.ws = sessionToken
+					? new WebSocket(resolved, [voiceWsSubprotocol, sessionToken])
+					: new WebSocket(resolved);
 			} catch (err) {
 				this.pendingConnectResolve = null;
 				this.pendingConnectReject = null;
@@ -124,19 +126,6 @@ export class VoiceClient {
 				this.isStopping = false;
 				this.pendingConnectResolve = null;
 				this.pendingConnectReject = null;
-				if (sessionToken) {
-					// Only send the token as a first text frame if subprotocol negotiation
-					// did not succeed. Otherwise the server will treat this as a malformed
-					// JSON control frame and close the connection.
-					const negotiatedProtocol = this.ws?.protocol;
-					if (!negotiatedProtocol) {
-						try {
-							this.ws?.send(sessionToken);
-						} catch {
-							// Ignore and proceed; server may already have token via headers.
-						}
-					}
-				}
 				this.sendControl({ type: "start", config: { sampleRate: 16000 } });
 				this.setState("active");
 				resolve();
