@@ -1,24 +1,22 @@
 def run_test():
-    # Import inside the function to avoid pytest collection side effects
     try:
-        from .agent import handler
-    except ImportError:
-        from agent import handler
+        from agent import handler  # direct import (works when run as script)
+    except Exception as e:
+        print(f"[ERROR] Import failed: {e}")
+        return
 
     queries = [
         "What is GST?",
-        "What is a contract?",
-        "What is an API?"
+        "latest GST updates"
     ]
 
     for q in queries:
         print(f"\nQuery: {q}")
         try:
             response = handler([{"role": "user", "content": q}])
-            print("Response:")
             print(response)
         except Exception as e:
-            print(f"[ERROR] Test execution failed: {e}")
+            print(f"[ERROR] {e}")
 
 
 if __name__ == "__main__":

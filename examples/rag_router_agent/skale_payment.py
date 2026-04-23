@@ -1,44 +1,37 @@
-import os
 import requests
-
+import os
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 FACILITATOR_URL = os.getenv(
     "SKALE_FACILITATOR_URL",
     "https://facilitator.x402.fi"
 )
 
 
-def call_skale_facilitator() -> dict:
-    """
-    Prototype: checks facilitator reachability (NOT full x402 payment flow).
-
-    This intentionally uses a simple GET request to verify connectivity only.
-    """
-
+def call_skale_facilitator():
     try:
-        response = requests.get(FACILITATOR_URL, timeout=5)
-        status_code = response.status_code
+        response = requests.get(FACILITATOR_URL, timeout=5, verify=False)  # ⚠️ disable SSL check
 
-        if status_code == 200:
+        if response.status_code == 200:
             return {
                 "status": "success",
-                "message": "Facilitator reachable",
-                "code": status_code
+                "code": 200
             }
 
-        elif status_code == 401:
+        elif response.status_code == 401:
             return {
                 "status": "reachable",
-                "code": status_code,
-                "note": "Authentication required (expected for prototype)"
+                "code": 401,
+                "note": "Authentication required (expected)"
             }
 
         else:
             return {
                 "status": "unexpected_response",
-                "code": status_code
+                "code": response.status_code
             }
 
-    except requests.RequestException as e:
+    except Exception as e:
         return {
             "status": "error",
             "message": str(e)
