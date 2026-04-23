@@ -169,10 +169,6 @@ def handler(messages: list[dict[str, str]]):
 
         document_text = _read_content(user_input)
 
-        # Check if document processing failed
-        if document_text.startswith("[") or document_text.startswith("Error"):
-            return document_text
-
         # Limit document size to prevent token overflow
         if len(document_text) > 50000:
             document_text = document_text[:50000] + "\n\n[Document truncated for processing...]"
