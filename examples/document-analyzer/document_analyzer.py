@@ -199,15 +199,16 @@ Document Content:
 
 Provide analysis based on the prompt.
 """)
+    result_content = result.content
 
     if errors:
         return (
-            f"{result}\n\n"
+            f"{result_content}\n\n"
             "Warning: Some files could not be processed:\n"
             f"{'\n'.join(errors)}"
         )
 
-    return result
+    return result_content
 
 
 # Bindu config
