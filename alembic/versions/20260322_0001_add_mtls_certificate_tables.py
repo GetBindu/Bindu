@@ -1,7 +1,7 @@
 """Add mTLS certificate tables for agent identity and audit logging.
 
 Revision ID: 20260322_0001
-Revises: 20250614_0001
+Revises: 20260119_0001
 Create Date: 2026-03-22 00:00:00.000000
 
 This migration adds two tables to support the mTLS transport layer security

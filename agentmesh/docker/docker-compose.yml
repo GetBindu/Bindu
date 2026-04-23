@@ -7,7 +7,7 @@ services:
     restart: always
     environment:
       POSTGRES_USER: bindu_user
-      POSTGRES_PASSWORD: bindu_pass
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bindu_pass}
       POSTGRES_DB: bindu_db
     ports:
       - "5432:5432"
