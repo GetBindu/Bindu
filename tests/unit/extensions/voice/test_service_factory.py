@@ -146,7 +146,7 @@ class TestCreateTTSService:
             ),
         ):
             mock_settings.voice.tts_api_key = ""
-            mock_settings.voice.tts_fallback_provider = "none"
+            mock_settings.voice.tts_fallback_provider = "unexpected-provider"
             result = create_tts_service(ext)
             mock_tts_settings.assert_called_once_with(voice="en_US-ryan-high")
             mock_tts_cls.assert_called_once_with(
@@ -154,6 +154,70 @@ class TestCreateTTSService:
                 sample_rate=16000,
             )
             assert result == mock_tts_cls.return_value
+
+    def test_piper_import_error_raises_importerror(self):
+        ext = VoiceAgentExtension(tts_provider="piper", tts_voice_id="en_US-ryan-high")
+        with (
+            patch(
+                "bindu.extensions.voice.service_factory.app_settings"
+            ) as mock_settings,
+            patch(
+                "bindu.extensions.voice.service_factory.importlib.import_module",
+                side_effect=ImportError("missing piper"),
+            ),
+        ):
+            mock_settings.voice.tts_api_key = ""
+            mock_settings.voice.tts_fallback_provider = "none"
+
+            with pytest.raises(
+                ImportError, match="Piper TTS requires pipecat\[piper\]"
+            ):
+                create_tts_service(ext)
+
+    def test_elevenlabs_import_error_raises_importerror(self):
+        ext = VoiceAgentExtension(tts_provider="elevenlabs", tts_voice_id="voice-abc")
+        with (
+            patch(
+                "bindu.extensions.voice.service_factory.app_settings"
+            ) as mock_settings,
+            patch(
+                "bindu.extensions.voice.service_factory.importlib.import_module",
+                side_effect=ImportError("missing elevenlabs"),
+            ),
+        ):
+            mock_settings.voice.tts_api_key = (
+                "unit-test-tts-token"  # pragma: allowlist secret
+            )
+            mock_settings.voice.tts_fallback_provider = "none"
+
+            with pytest.raises(
+                ImportError, match="ElevenLabs TTS requires pipecat\[elevenlabs\]"
+            ):
+                create_tts_service(ext)
+
+    def test_azure_import_error_raises_importerror(self):
+        ext = VoiceAgentExtension(tts_provider="azure", tts_voice_id="en-US-SaraNeural")
+        with (
+            patch(
+                "bindu.extensions.voice.service_factory.app_settings"
+            ) as mock_settings,
+            patch(
+                "bindu.extensions.voice.service_factory.importlib.import_module",
+                side_effect=ImportError("missing azure"),
+            ),
+        ):
+            mock_settings.voice.tts_api_key = ""
+            mock_settings.voice.tts_fallback_provider = "none"
+            mock_settings.voice.azure_tts_api_key = (
+                "unit-test-azure-token"  # pragma: allowlist secret
+            )
+            mock_settings.voice.azure_tts_region = "eastus"
+            mock_settings.voice.azure_tts_voice = "en-US-SaraNeural"
+
+            with pytest.raises(
+                ImportError, match="Azure TTS requires pipecat\[azure\]"
+            ):
+                create_tts_service(ext)
 
     def test_azure_fallback_when_elevenlabs_fails(self):
         ext = VoiceAgentExtension(
