@@ -724,6 +724,15 @@ async def voice_websocket(websocket: WebSocket) -> None:
         await websocket.close(code=1008, reason="Invalid session ID")
         return
 
+    async def _end_session_best_effort() -> None:
+        try:
+            await session_manager.end_session(session_id)
+        except Exception:
+            logger.debug(
+                "Failed to end voice session during websocket handshake cleanup",
+                exc_info=True,
+            )
+
     # Per-IP rate limit on websocket connects (best-effort)
     client_host = websocket.client.host if websocket.client else None
     if client_host:
@@ -732,6 +741,7 @@ async def voice_websocket(websocket: WebSocket) -> None:
             limit_per_minute=int(app_settings.voice.rate_limit_per_ip_per_minute),
         )
         if not allowed:
+            await _end_session_best_effort()
             await websocket.close(code=1008, reason="Rate limit exceeded")
             return
 
@@ -747,6 +757,7 @@ async def voice_websocket(websocket: WebSocket) -> None:
         label, provided = _extract_ws_session_token(websocket)
 
         if len(subprotocol_items) > 1 and label != _VOICE_WS_SUBPROTOCOL:
+            await _end_session_best_effort()
             await websocket.close(code=1008, reason="Invalid session token")
             return
 
@@ -758,13 +769,16 @@ async def voice_websocket(websocket: WebSocket) -> None:
             try:
                 provided = (await websocket.receive_text()).strip()
             except Exception:
+                await _end_session_best_effort()
                 await websocket.close(code=1008, reason="Missing session token")
                 return
 
         if not expected or not hmac.compare_digest(provided, expected):
+            await _end_session_best_effort()
             await websocket.close(code=1008, reason="Invalid session token")
             return
         if isinstance(expires_at, (int, float)) and time.time() > float(expires_at):
+            await _end_session_best_effort()
             await websocket.close(code=1008, reason="Session token expired")
             return
 
@@ -780,6 +794,7 @@ async def voice_websocket(websocket: WebSocket) -> None:
     voice_ext = getattr(app, "_voice_ext", None)
     manifest = getattr(app, "manifest", None)
     if voice_ext is None or manifest is None or not hasattr(manifest, "run"):
+        await _end_session_best_effort()
         await websocket.send_text(
             json.dumps({"type": "error", "message": "Agent not configured for voice"})
         )
