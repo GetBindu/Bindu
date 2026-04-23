@@ -119,6 +119,7 @@ def handler(messages: list[dict]):
 
     prompt = ""
     extracted_docs = []
+    errors = []
 
     for msg in messages:
         # if a role is provided, only process user messages; treat missing
@@ -156,12 +157,14 @@ def handler(messages: list[dict]):
                             or file_info.get("path")
                             or "unknown"
                         )
+                        error_reason = "Empty or whitespace-only extracted content"
                         logger.warning(
                             "Skipping extracted document because parsed content is empty",
                             file=file_ref,
                             mime_type=mime_type,
                             reason="empty_or_whitespace_content",
                         )
+                        errors.append(f"{file_ref}: {error_reason}")
                         continue
                     extracted_docs.append(doc_text)
 
@@ -178,6 +181,10 @@ def handler(messages: list[dict]):
                         mime_type=file_info.get("mimeType", ""),
                         reason=str(e),
                     )
+                    errors.append(f"{file_ref}: {str(e)}")
+
+    if errors and not extracted_docs:
+        return "Failed to process uploaded files:\n" + "\n".join(errors)
 
     if not extracted_docs:
         return "No valid document found in the messages."
@@ -192,6 +199,14 @@ Document Content:
 
 Provide analysis based on the prompt.
 """)
+
+    if errors:
+        return (
+            f"{result}\n\n"
+            "Warning: Some files could not be processed:\n"
+            f"{'\n'.join(errors)}"
+        )
+
     return result
 
 
