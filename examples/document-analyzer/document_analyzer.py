@@ -9,6 +9,7 @@ Features:
 """
 
 from bindu.penguin.bindufy import bindufy
+from bindu.utils.logging import get_logger
 from agno.agent import Agent
 from agno.models.openrouter import OpenRouter
 from dotenv import load_dotenv
@@ -21,6 +22,8 @@ from pypdf import PdfReader
 from docx import Document
 
 load_dotenv()
+
+logger = get_logger("examples.document_analyzer")
 
 # Define LLM agent
 agent = Agent(
@@ -146,10 +149,35 @@ def handler(messages: list[dict]):
                         else b64_data
                     )
                     doc_text = extract_document_text(file_bytes, mime_type)
+                    if not doc_text or not doc_text.strip():
+                        file_ref = (
+                            file_info.get("name")
+                            or file_info.get("filename")
+                            or file_info.get("path")
+                            or "unknown"
+                        )
+                        logger.warning(
+                            "Skipping extracted document because parsed content is empty",
+                            file=file_ref,
+                            mime_type=mime_type,
+                            reason="empty_or_whitespace_content",
+                        )
+                        continue
                     extracted_docs.append(doc_text)
 
                 except Exception as e:
-                    extracted_docs.append(f"Error processing file: {str(e)}")
+                    file_ref = (
+                        file_info.get("name")
+                        or file_info.get("filename")
+                        or file_info.get("path")
+                        or "unknown"
+                    )
+                    logger.error(
+                        "Failed to process uploaded file",
+                        file=file_ref,
+                        mime_type=file_info.get("mimeType", ""),
+                        reason=str(e),
+                    )
 
     if not extracted_docs:
         return "No valid document found in the messages."
