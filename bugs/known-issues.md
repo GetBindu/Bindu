@@ -41,7 +41,7 @@ Issue referencing the slug (e.g. "Fixes `context-window-hardcoded`").
 
 | Subsystem | High | Medium | Low | Nit |
 |---|---:|---:|---:|---:|
-| [Gateway](#gateway) | 3 | 15 | 19 | 9 |
+| [Gateway](#gateway) | 2 | 14 | 19 | 9 |
 | [Bindu Core (Python)](#bindu-core-python) | 4 | 7 | 2 | 0 |
 | [SDKs (TypeScript)](#sdks-typescript) | — | — | — | — |
 | [Frontend](#frontend) | — | — | — | — |
@@ -55,9 +55,7 @@ Issue referencing the slug (e.g. "Fixes `context-window-hardcoded`").
 | Slug | Severity | One-line |
 |---|---|---|
 | [`context-window-hardcoded`](#context-window-hardcoded) | high | Compaction threshold assumes a 200k-token context window |
-| [`poll-budget-unbounded-wall-clock`](#poll-budget-unbounded-wall-clock) | high | `sendAndPoll` can stall 5 minutes per tool call |
 | [`no-session-concurrency-guard`](#no-session-concurrency-guard) | high | Two `/plan` calls on the same session tangle their histories |
-| [`abort-signal-not-propagated-to-bindu-client`](#abort-signal-not-propagated-to-bindu-client) | medium | Client disconnect doesn't cancel in-flight peer polls |
 | [`permission-rules-not-enforced-for-tool-calls`](#permission-rules-not-enforced-for-tool-calls) | medium | Permission service exists but is never called for tool calls |
 | [`parse-agent-from-tool-greedy-mismatch`](#parse-agent-from-tool-greedy-mismatch) | medium | SSE `agent` field wrong when agent names contain underscores |
 | [`agent-catalog-overwrite`](#agent-catalog-overwrite) | medium | Each `/plan` wholesale-overwrites the session's agent catalog |
@@ -147,34 +145,6 @@ actual model into account. Guarded by
 
 **Tracking:** _(no issue yet)_
 
-### poll-budget-unbounded-wall-clock
-
-**Severity:** high
-
-> **Scenario.** A `/plan` request makes one tool call to a Bindu
-> peer. The peer is stuck in `working` state and never advances.
-> `sendAndPoll` retries 60 times with exponential backoff —
-> **five minutes worst case, per tool call.** Meanwhile the SSE
-> stream to the user stays open, the session row stays locked,
-> and the user's browser eventually gives up. The peer poll keeps
-> running.
-
-**What's wrong.** `sendAndPoll` in
-[`gateway/src/bindu/client/poll.ts`](../gateway/src/bindu/client/poll.ts)
-defaults to 60 polls × backoff up to 10 s. There's no
-overall `/plan` deadline, only a per-HTTP timeout on the
-individual JSON-RPC round trip. A single hung peer can stall an
-entire plan indefinitely.
-
-**Workaround:** Pass an explicit `maxPolls` or shorter
-`backoffMs` schedule when instantiating the Bindu client. Client
-disconnects don't help — see
-`abort-signal-not-propagated-to-bindu-client` below. For
-request-level deadlines the caller must enforce them externally
-(e.g. client-side timeout on the SSE `fetch`).
-
-**Tracking:** _(no issue yet)_
-
 ### no-session-concurrency-guard
 
 **Severity:** high
@@ -204,19 +174,6 @@ externally.
 **Tracking:** _(no issue yet)_
 
 ### Medium
-
-### abort-signal-not-propagated-to-bindu-client
-
-**Severity:** medium
-**Summary:** When a client disconnects mid-`/plan`, the gateway's
-SSE handler aborts — but in-flight polling loops against downstream
-Bindu agents ([`gateway/src/bindu/client/poll.ts`](../gateway/src/bindu/client/poll.ts))
-do not cancel. Each in-flight tool call continues for up to 60
-attempts × backoff (≈ 5 minutes worst case) after the user is gone.
-**Workaround:** None client-side. Accept that aborted `/plan`
-requests may leave stragglers consuming gateway + peer compute for
-several minutes.
-**Tracking:** _(no issue yet)_ (related to `poll-budget-unbounded-wall-clock`)
 
 ### permission-rules-not-enforced-for-tool-calls
 

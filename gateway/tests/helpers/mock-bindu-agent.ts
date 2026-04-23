@@ -25,6 +25,10 @@ export interface MockAgentConfig {
   skills?: Array<{ id: string; description: string }>
   /** DID to expose in capabilities.extensions (optional). */
   did?: string
+  /** When true, ``tasks/get`` always returns ``working`` — simulates a
+   *  stuck peer that never reaches a terminal state. Used to exercise
+   *  the gateway's abort + deadline paths. */
+  stuck?: boolean
 }
 
 export interface MockAgentHandle {
@@ -116,6 +120,23 @@ export async function startMockBinduAgent(cfg: MockAgentConfig): Promise<MockAge
         return
       }
       const t = tasks.get(taskId)!
+      if (cfg.stuck) {
+        // Simulate a hung peer — return working forever until canceled.
+        setJson()
+        res.end(
+          JSON.stringify({
+            jsonrpc: "2.0",
+            id: rpc.id,
+            result: {
+              id: taskId,
+              context_id: t.contextId,
+              kind: "task",
+              status: { state: "working", timestamp: new Date().toISOString() },
+            },
+          }),
+        )
+        return
+      }
       t.state = "completed"
 
       setJson()

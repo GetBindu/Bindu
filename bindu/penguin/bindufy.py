@@ -441,10 +441,12 @@ def _bindufy_core(
 
     logger.info(f"Agent ID: {agent_id}")
 
-    # Determine key directory with fallback strategy
-    effective_key_dir = key_dir or caller_dir
+    # Determine key directory with fallback strategy.
+    # resolve_key_directory returns the *parent* dir — initialize_did_extension
+    # appends app_settings.did.pki_dir itself, so keys land at
+    # <resolved_key_dir>/<pki_dir>.
     resolved_key_dir = resolve_key_directory(
-        explicit_dir=effective_key_dir,
+        explicit_dir=key_dir,
         caller_dir=caller_dir or Path.cwd(),
         subdir=app_settings.did.pki_dir,
     )
@@ -454,7 +456,7 @@ def _bindufy_core(
         agent_id=agent_id,
         author=validated_config.get("author"),
         agent_name=validated_config.get("name"),
-        key_dir=resolved_key_dir.parent,  # Parent because initialize_did_extension adds pki_dir
+        key_dir=resolved_key_dir,
         recreate_keys=validated_config["recreate_keys"],
         key_password=validated_config.get("key_password"),
     )

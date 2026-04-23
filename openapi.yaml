@@ -595,7 +595,7 @@ paths:
                             - kind: "text"
                               text: "Paris."
                               metadata:
-                                did.message.signature: "2M1qbfLcyoQhSAfTzDghw15PMTfmv3jUoigk7KRuiowkEWZpU7aYLHTnqwamjEo4SxNskq15PZANNLuhJ7omzsxg"
+                                did.message.signature: "2M1qbfLcyoQhSAfTzDghw15PMTfmv3jUoigk7KRuiowkEWZpU7aYLHTnqwamjEo4SxNskq15PZANNLuhJ7omzsxg"  # pragma: allowlist secret
                           artifact_id: "985b4f37-ee2e-48a4-bd6f-c66472e67b85"
                       metadata: {}
 

@@ -106,15 +106,42 @@ export type AgentRequest = z.infer<typeof AgentRequest>
 // to ``plannerAgent.steps``. Aligning the schema with the docs fixes
 // the silent discard. ``.passthrough()`` stays so forward-compat
 // extra keys don't break old clients.
+//
+// ``timeout_ms`` semantics: overall wall-clock budget for the /plan
+// call. On expiry, the planner aborts in-flight LLM + peer calls and
+// returns ``BinduError.aborted("deadline", …)``. Defaults and ceiling
+// are enforced in ``runPlan`` (see DEFAULT_PLAN_DEADLINE_MS /
+// MAX_PLAN_DEADLINE_MS below). Validation ensures requests above the
+// ceiling fail fast at the API boundary rather than being silently
+// clamped — callers with genuine multi-hour workloads know to ask.
 export const PlanPreferences = z
   .object({
     response_format: z.string().optional(),
     max_hops: z.number().int().positive().optional(),
-    timeout_ms: z.number().int().positive().optional(),
+    timeout_ms: z
+      .number()
+      .int()
+      .min(1000, "timeout_ms must be at least 1000 ms")
+      .max(21_600_000, "timeout_ms cannot exceed 21600000 ms (6 hours)")
+      .optional(),
     max_steps: z.number().int().positive().optional(),
   })
   .partial()
   .passthrough()
+
+/** Default overall plan deadline when ``preferences.timeout_ms`` is
+ *  unset. 30 min covers ordinary multi-step plans; research workloads
+ *  that need longer must set ``timeout_ms`` explicitly. Omission must
+ *  still be bounded — otherwise a single hung peer reintroduces the
+ *  ``poll-budget-unbounded-wall-clock`` bug. */
+export const DEFAULT_PLAN_DEADLINE_MS = 30 * 60 * 1000
+
+/** Hard ceiling on ``preferences.timeout_ms``. Matches the schema
+ *  validator above — declared twice on purpose: the Zod cap rejects
+ *  over-ceiling requests at the API boundary, this constant documents
+ *  the contract for internal callers constructing PlanRequests
+ *  programmatically. */
+export const MAX_PLAN_DEADLINE_MS = 6 * 60 * 60 * 1000
 
 export const PlanRequest = z.object({
   // Non-empty — Anthropic (and some other providers) reject an empty
@@ -217,67 +244,92 @@ export const layer = Layer.effect(
           return yield* Effect.fail(new Error('planner: no "planner" agent configured'))
         }
 
+        // Build the plan-level abort signal: client-disconnect (opts.abort)
+        // OR deadline expiry, whichever fires first. The merged signal is
+        // threaded into compaction, the prompt loop, and — transitively
+        // via ctx.abort in each tool's execute() — every peer call's
+        // sendAndPoll. A single abort stops the entire plan.
+        const deadlineMs = Math.min(
+          request.preferences?.timeout_ms ?? DEFAULT_PLAN_DEADLINE_MS,
+          MAX_PLAN_DEADLINE_MS,
+        )
+        const deadline = makePlanDeadline(opts?.abort, deadlineMs)
+
         const model = plannerAgent.model ?? "openrouter/anthropic/claude-sonnet-4.6"
-        yield* compaction
-          .compactIfNeeded({
-            sessionID: ctx.sessionID,
-            model,
-            abortSignal: opts?.abort,
-          })
-          .pipe(
-            Effect.catch((e: Error) =>
-              bus.publish(
-                { type: "planner.compaction.failed", properties: z.object({ message: z.string() }) } as any,
-                { message: e.message } as any,
+        try {
+          yield* compaction
+            .compactIfNeeded({
+              sessionID: ctx.sessionID,
+              model,
+              abortSignal: deadline.signal,
+            })
+            .pipe(
+              Effect.catch((e: Error) =>
+                bus.publish(
+                  { type: "planner.compaction.failed", properties: z.object({ message: z.string() }) } as any,
+                  { message: e.message } as any,
+                ),
               ),
-            ),
+            )
+
+          const contextId = ctx.sessionID
+          const tasksRecorded: string[] = []
+          const tools: Def[] = []
+
+          for (const ag of request.agents) {
+            const peer: PeerDescriptor = {
+              name: ag.name,
+              url: ag.endpoint,
+              auth: ag.auth as PeerAuth | undefined,
+              trust: ag.trust,
+            }
+            for (const sk of ag.skills) {
+              tools.push(buildSkillTool(peer, sk, { client, db, contextId, tasksRecorded }))
+            }
+          }
+
+          // Recipes (progressive-disclosure playbooks) are filtered through
+          // the planner agent's permission rules; an empty list means either
+          // no recipes on disk or all denied. In either case we skip the
+          // system-prompt block and the tool description falls back to
+          // "no recipes available" — no noise injected.
+          const recipeList = yield* recipes.available(plannerAgent)
+          tools.push(buildLoadRecipeTool(recipes, recipeList))
+          const recipeSummary =
+            recipeList.length > 0 ? Recipe.fmt(recipeList, { verbose: true }) : undefined
+
+          const message = yield* prompt.prompt({
+            sessionID: ctx.sessionID,
+            agent: "planner",
+            parts: [
+              {
+                id: randomUUID() as any,
+                type: "text",
+                text: request.question,
+                time: { start: Date.now() },
+              },
+            ],
+            tools,
+            modelOverride: plannerAgent.model,
+            stepsOverride: request.preferences?.max_steps ?? plannerAgent.steps,
+            abort: deadline.signal,
+            recipeSummary,
+          }).pipe(
+            // Re-label a generic abort error with the deadline reason so
+            // the SSE handler can tell "user gave up" from "budget
+            // exceeded". Anything else passes through.
+            Effect.mapError((e) => {
+              if (deadline.reason === "deadline" && isAbortLikeError(e)) {
+                return new PlanDeadlineExceededError(deadlineMs, e)
+              }
+              return e
+            }),
           )
 
-        const contextId = ctx.sessionID
-        const tasksRecorded: string[] = []
-        const tools: Def[] = []
-
-        for (const ag of request.agents) {
-          const peer: PeerDescriptor = {
-            name: ag.name,
-            url: ag.endpoint,
-            auth: ag.auth as PeerAuth | undefined,
-            trust: ag.trust,
-          }
-          for (const sk of ag.skills) {
-            tools.push(buildSkillTool(peer, sk, { client, db, contextId, tasksRecorded }))
-          }
+          return { message, tasksRecorded }
+        } finally {
+          deadline.cleanup()
         }
-
-        // Recipes (progressive-disclosure playbooks) are filtered through
-        // the planner agent's permission rules; an empty list means either
-        // no recipes on disk or all denied. In either case we skip the
-        // system-prompt block and the tool description falls back to
-        // "no recipes available" — no noise injected.
-        const recipeList = yield* recipes.available(plannerAgent)
-        tools.push(buildLoadRecipeTool(recipes, recipeList))
-        const recipeSummary =
-          recipeList.length > 0 ? Recipe.fmt(recipeList, { verbose: true }) : undefined
-
-        const message = yield* prompt.prompt({
-          sessionID: ctx.sessionID,
-          agent: "planner",
-          parts: [
-            {
-              id: randomUUID() as any,
-              type: "text",
-              text: request.question,
-              time: { start: Date.now() },
-            },
-          ],
-          tools,
-          modelOverride: plannerAgent.model,
-          stepsOverride: request.preferences?.max_steps ?? plannerAgent.steps,
-          abort: opts?.abort,
-          recipeSummary,
-        })
-
-        return { message, tasksRecorded }
       })
 
     const startPlan: Interface["startPlan"] = (request, opts) =>
@@ -295,3 +347,92 @@ export const layer = Layer.effect(
     return Service.of({ prepareSession, runPlan, startPlan })
   }),
 )
+
+// --------------------------------------------------------------------
+// Plan-level deadline helpers
+// --------------------------------------------------------------------
+
+/**
+ * Thrown when the plan's wall-clock budget
+ * (``preferences.timeout_ms``, clamped to ``MAX_PLAN_DEADLINE_MS``)
+ * expired before the planner loop completed. The SSE handler turns this
+ * into a typed error frame so callers can distinguish a budget-exceeded
+ * failure from a client-disconnect abort or a peer error.
+ */
+export class PlanDeadlineExceededError extends Error {
+  readonly deadlineMs: number
+  constructor(deadlineMs: number, cause?: unknown) {
+    super(`plan deadline exceeded after ${deadlineMs} ms`, cause ? { cause } : undefined)
+    this.name = "PlanDeadlineExceededError"
+    this.deadlineMs = deadlineMs
+  }
+}
+
+interface PlanDeadline {
+  signal: AbortSignal
+  /** ``"deadline"`` once the timer fired; ``"signal"`` if the caller's
+   *  abort fired first; ``null`` until something fires. */
+  reason: "signal" | "deadline" | null
+  cleanup: () => void
+}
+
+/**
+ * Merge the caller's optional abort signal with an internal deadline
+ * timer into a single ``AbortSignal``. Whichever fires first wins —
+ * ``reason`` records which one so the caller can pick the right error
+ * shape on the way out.
+ *
+ * Semantically parallel to ``mergeAbort`` in
+ * ``gateway/src/bindu/client/poll.ts`` but operates at the plan level,
+ * not a single peer call.
+ */
+function makePlanDeadline(
+  caller: AbortSignal | undefined,
+  deadlineMs: number,
+): PlanDeadline {
+  const ac = new AbortController()
+  const state: PlanDeadline = { signal: ac.signal, reason: null, cleanup: () => {} }
+
+  const onCallerAbort = () => {
+    if (state.reason === null) state.reason = "signal"
+    ac.abort()
+  }
+  if (caller) {
+    if (caller.aborted) {
+      state.reason = "signal"
+      ac.abort()
+    } else {
+      caller.addEventListener("abort", onCallerAbort, { once: true })
+    }
+  }
+
+  let timer: ReturnType<typeof setTimeout> | null = null
+  if (!ac.signal.aborted && deadlineMs > 0) {
+    timer = setTimeout(() => {
+      if (state.reason === null) state.reason = "deadline"
+      ac.abort()
+    }, deadlineMs)
+  }
+
+  state.cleanup = () => {
+    if (timer) clearTimeout(timer)
+    if (caller) caller.removeEventListener("abort", onCallerAbort)
+  }
+  return state
+}
+
+/**
+ * Detect an error that likely originated from an abort — covers the
+ * BinduError.aborted() we raise inside sendAndPoll, the generic
+ * AbortError from fetch(), and Error("aborted") from abortableSleep.
+ * Used by runPlan to decide whether to re-label the error as a
+ * deadline exceeded when the deadline timer fired.
+ */
+function isAbortLikeError(e: unknown): boolean {
+  if (!e || typeof e !== "object") return false
+  const err = e as { name?: string; code?: number; message?: string }
+  if (err.name === "AbortError") return true
+  if (err.code === -32040 /* ErrorCode.AbortedByCaller */) return true
+  if (typeof err.message === "string" && /abort/i.test(err.message)) return true
+  return false
+}

@@ -1,7 +1,7 @@
 <div align="center" id="top">
   <a href="https://getbindu.com">
     <picture>
-      <img src="assets/bindu.png" alt="Bindu" width="300">
+      <img src="../assets/bindu.png" alt="Bindu" width="300">
     </picture>
   </a>
 </div>
@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="README.md">🇬🇧 ஆங்கிலம்</a> •
+  <a href="../README.md">🇬🇧 ஆங்கிலம்</a> •
   <a href="README.de.md">🇩🇪 ஜெர்மன்</a> •
   <a href="README.es.md">🇪🇸 ஸ்பானிஷ்</a> •
   <a href="README.fr.md">🇫🇷 பிரெஞ்சு</a> •
@@ -36,7 +36,7 @@
 <br/>
 
 <p align="center">
-  <img src="assets/sunflower-mountains.jpeg" alt="Bindu — The Internet of Agents" width="720" />
+  <img src="../assets/sunflower-mountains.jpeg" alt="Bindu — The Internet of Agents" width="720" />
 </p>
 
 <p align="center">
@@ -222,7 +222,7 @@ bindufy(config, handler)
 # bindufy(config, handler, launch=True)
 ```
 
-![Sample Agent](assets/agno-simple.png)
+![Sample Agent](../assets/agno-simple.png)
 
 உங்கள் முகவர் இப்போது `deployment.url` இல் உள்ள URL இல் நேரில் உள்ளது.
 
@@ -440,18 +440,18 @@ curl --location 'http://localhost:3773/' \
 ## 🚀 மைய அம்சங்கள்
 | Feature | Description | Documentation |
 |---------|-------------|---------------|
-|  **Authentication** | Ory Hydra OAuth2 மூலம் பாதுகாப்பான API அணுகல் (வளர்ச்சிக்கான விருப்பம்) | [Guide →](docs/AUTHENTICATION.md) |
-| 💰 **Payment Integration (X402)** | பாதுகாக்கப்பட்ட முறைகளை செயல்படுத்துவதற்கு முன் Base blockchain இல் USDC பணங்களை ஏற்றுக்கொள்ளவும் | [Guide →](docs/PAYMENT.md) |
-| 💾 **PostgreSQL Storage** | உற்பத்தி செயல்பாடுகளுக்கான நிலையான சேமிப்பு (விருப்பம் - இயல்பாக InMemoryStorage) | [Guide →](docs/STORAGE.md) |
-| 📋 **Redis Scheduler** | பல தொழிலாளர்களுக்கான செயல்களை திட்டமிடுவதற்கான விநியோகிக்கப்பட்ட திட்டமிடல் (விருப்பம் - இயல்பாக InMemoryScheduler) | [Guide →](docs/SCHEDULER.md) |
-| 🎯 **Skills System** | முகவர்கள் விளம்பரம் செய்யும் மற்றும் புத்திசாலித்தனமான பணியாளர்களுக்கான செயல்களை செயல்படுத்தும் மறுபயன்படுத்தக்கூடிய திறன்கள் | [Guide →](docs/SKILLS.md) |
-| 🤝 **Agent Negotiation** | புத்திசாலித்தனமான ஒழுங்குபடுத்தலுக்கான திறன அடிப்படையிலான முகவர் தேர்வு | [Guide →](docs/NEGOTIATION.md) |
-| 🌐 **Tunneling** | சோதனைக்காக உள்ளூர் முகவர்களை இணையத்திற்கு வெளிப்படுத்தவும் (**உள்ளூர் வளர்ச்சி மட்டுமே, உற்பத்திக்காக அல்ல**) | [Guide →](docs/TUNNELING.md) |
-| 📬 **Push Notifications** | பணியாளர்களுக்கான புதுப்பிப்புகளுக்கான நேரடி webhook அறிவிப்புகள் - polling தேவை இல்லை | [Guide →](docs/NOTIFICATIONS.md) |
-| 📊 **Observability & Monitoring** | OpenTelemetry மற்றும் Sentry மூலம் செயல்திறனை கண்காணிக்கவும் மற்றும் பிழைகளை சரிசெய்யவும் | [Guide →](docs/OBSERVABILITY.md) |
+|  **Authentication** | Ory Hydra OAuth2 மூலம் பாதுகாப்பான API அணுகல் (வளர்ச்சிக்கான விருப்பம்) | [Guide →](../docs/AUTHENTICATION.md) |
+| 💰 **Payment Integration (X402)** | பாதுகாக்கப்பட்ட முறைகளை செயல்படுத்துவதற்கு முன் Base blockchain இல் USDC பணங்களை ஏற்றுக்கொள்ளவும் | [Guide →](../docs/PAYMENT.md) |
+| 💾 **PostgreSQL Storage** | உற்பத்தி செயல்பாடுகளுக்கான நிலையான சேமிப்பு (விருப்பம் - இயல்பாக InMemoryStorage) | [Guide →](../docs/STORAGE.md) |
+| 📋 **Redis Scheduler** | பல தொழிலாளர்களுக்கான செயல்களை திட்டமிடுவதற்கான விநியோகிக்கப்பட்ட திட்டமிடல் (விருப்பம் - இயல்பாக InMemoryScheduler) | [Guide →](../docs/SCHEDULER.md) |
+| 🎯 **Skills System** | முகவர்கள் விளம்பரம் செய்யும் மற்றும் புத்திசாலித்தனமான பணியாளர்களுக்கான செயல்களை செயல்படுத்தும் மறுபயன்படுத்தக்கூடிய திறன்கள் | [Guide →](../docs/SKILLS.md) |
+| 🤝 **Agent Negotiation** | புத்திசாலித்தனமான ஒழுங்குபடுத்தலுக்கான திறன அடிப்படையிலான முகவர் தேர்வு | [Guide →](../docs/NEGOTIATION.md) |
+| 🌐 **Tunneling** | சோதனைக்காக உள்ளூர் முகவர்களை இணையத்திற்கு வெளிப்படுத்தவும் (**உள்ளூர் வளர்ச்சி மட்டுமே, உற்பத்திக்காக அல்ல**) | [Guide →](../docs/TUNNELING.md) |
+| 📬 **Push Notifications** | பணியாளர்களுக்கான புதுப்பிப்புகளுக்கான நேரடி webhook அறிவிப்புகள் - polling தேவை இல்லை | [Guide →](../docs/NOTIFICATIONS.md) |
+| 📊 **Observability & Monitoring** | OpenTelemetry மற்றும் Sentry மூலம் செயல்திறனை கண்காணிக்கவும் மற்றும் பிழைகளை சரிசெய்யவும் | [Guide →](../docs/OBSERVABILITY.md) |
 | 🔄 **Retry Mechanism** | நிலையான முகவர்களுக்கான தானியங்கி மீண்டும் முயற்சி மற்றும் பெருக்கம் கொண்ட பின்னடைவு | [Guide →](https://docs.getbindu.com/bindu/learn/retry/overview) |
-| 🔑 **Decentralized Identifiers (DIDs)** | உறுதிப்படுத்தக்கூடிய, பாதுகாப்பான முகவர் தொடர்புகள் மற்றும் பணம் ஒருங்கிணைப்புக்கான கிரிப்டோகிராஃபிக் அடையாளம் | [Guide →](docs/DID.md) |
-| 🏥 **Health Check & Metrics** | உள்ளமைக்கப்பட்ட முடிவுகளைப் பயன்படுத்தி முகவர்களின் ஆரோக்கியம் மற்றும் செயல்திறனை கண்காணிக்கவும் | [Guide →](docs/HEALTH_METRICS.md) |
+| 🔑 **Decentralized Identifiers (DIDs)** | உறுதிப்படுத்தக்கூடிய, பாதுகாப்பான முகவர் தொடர்புகள் மற்றும் பணம் ஒருங்கிணைப்புக்கான கிரிப்டோகிராஃபிக் அடையாளம் | [Guide →](../docs/DID.md) |
+| 🏥 **Health Check & Metrics** | உள்ளமைக்கப்பட்ட முடிவுகளைப் பயன்படுத்தி முகவர்களின் ஆரோக்கியம் மற்றும் செயல்திறனை கண்காணிக்கவும் | [Guide →](../docs/HEALTH_METRICS.md) |
 
 ---
 
@@ -462,7 +462,7 @@ curl --location 'http://localhost:3773/' \
 Bindu `http://localhost:5173` இல் அழகான உரையாடல் இடைமுகத்தை உள்ளடக்கியது. `frontend` கோப்புறைக்கு செல்லவும் மற்றும் சேவையகத்தை தொடங்க `npm run dev` ஐ இயக்கவும்.
 
 <p align="center">
-  <img src="assets/agent-ui.png" alt="Bindu Agent UI" width="640" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
+  <img src="../assets/agent-ui.png" alt="Bindu Agent UI" width="640" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
 </p>
 
 ---
@@ -601,7 +601,7 @@ uv sync --dev
 pre-commit run --all-files
 ```
 
-> 📖 [Contributing Guidelines](.github/contributing.md)
+> 📖 [Contributing Guidelines](../.github/contributing.md)
 
 ---
 
@@ -735,7 +735,7 @@ Bindu என்பது [Apache License 2.0](https://choosealicense.com/license
 <br/>
 
 <p align="center">
-  <img src="assets/sunflower-footer.jpeg" alt="Bindu" width="720" />
+  <img src="../assets/sunflower-footer.jpeg" alt="Bindu" width="720" />
 </p>
 
 <p align="center">

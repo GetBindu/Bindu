@@ -1,7 +1,7 @@
 <div align="center" id="top">
   <a href="https://getbindu.com">
     <picture>
-      <img src="assets/bindu.png" alt="Bindu" width="300">
+      <img src="../assets/bindu.png" alt="Bindu" width="300">
     </picture>
   </a>
 </div>
@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="README.md">🇬🇧 ইংরেজি</a> •
+  <a href="../README.md">🇬🇧 ইংরেজি</a> •
   <a href="README.de.md">🇩🇪 জার্মান</a> •
   <a href="README.es.md">🇪🇸 স্প্যানিশ</a> •
   <a href="README.fr.md">🇫🇷 ফরাসি</a> •
@@ -36,7 +36,7 @@
 <br/>
 
 <p align="center">
-  <img src="assets/sunflower-mountains.jpeg" alt="Bindu — The Internet of Agents" width="720" />
+  <img src="../assets/sunflower-mountains.jpeg" alt="Bindu — The Internet of Agents" width="720" />
 </p>
 
 <p align="center">
@@ -220,7 +220,7 @@ bindufy(config, handler)
 # bindufy(config, handler, launch=True)
 ```
 
-![Sample Agent](assets/agno-simple.png)
+![Sample Agent](../assets/agno-simple.png)
 
 আপনার এজেন্ট এখন `deployment.url` এ কনফিগার করা URL এ লাইভ।
 
@@ -438,18 +438,18 @@ curl --location 'http://localhost:3773/' \
 ## 🚀 মূল বৈশিষ্ট্যসমূহ
 | ফিচার | বর্ণনা | ডকুমেন্টেশন |
 | :--- | :--- | :--- |
-| **প্রমাণীকরণ** | Ory Hydra OAuth2 এর মাধ্যমে নিরাপদ API 액세스 (উন্নয়নের জন্য ঐচ্ছিক) | [Guide →](docs/AUTHENTICATION.md) |
-| 💰 **পেমেন্ট ইন্টিগ্রেশন (X402)** | সুরক্ষিত পদ্ধতিগুলি কার্যকর করার আগে বেস ব্লকচেইনে USDC পেমেন্ট গ্রহণ করুন | [Guide →](docs/PAYMENT.md) |
-| 💾 **PostgreSQL স্টোরেজ** | উৎপাদন স্থাপনার জন্য স্থায়ী স্টোরেজ (ঐচ্ছিক - ডিফল্টভাবে InMemoryStorage) | [Guide →](docs/STORAGE.md) |
-| 📋 **Redis শিডিউলার** | বহু-কর্মী স্থাপনার জন্য বিতরণকৃত কাজের সময়সূচী (ঐচ্ছিক - ডিফল্টভাবে InMemoryScheduler) | [Guide →](docs/SCHEDULER.md) |
-| 🎯 **দক্ষতা সিস্টেম** | পুনঃব্যবহারযোগ্য শক্তি যা এজেন্টগুলি বিজ্ঞাপন দেয় এবং বুদ্ধিমান কাজের রাউটিংয়ের জন্য কার্যকর করে | [Guide →](docs/SKILLS.md) |
-| 🤝 **এজেন্ট আলোচনা** | বুদ্ধিমান অর্কেস্ট্রেশনের জন্য ক্ষমতা-ভিত্তিক এজেন্ট নির্বাচন | [Guide →](docs/NEGOTIATION.md) |
-| 🌐 **টানেলিং** | পরীক্ষার জন্য স্থানীয় এজেন্টগুলিকে ইন্টারনেটে প্রকাশ করুন (**স্থানীয় উন্নয়ন শুধুমাত্র, উৎপাদনের জন্য নয়**) | [Guide →](docs/TUNNELING.md) |
-| 📬 **পুশ বিজ্ঞপ্তি** | কাজের আপডেটের জন্য রিয়েল-টাইম ওয়েবহুক বিজ্ঞপ্তি - কোন পোলিং প্রয়োজন নেই | [Guide →](docs/NOTIFICATIONS.md) |
-| 📊 **অবজারভেবিলিটি ও মনিটরিং** | OpenTelemetry এবং Sentry এর মাধ্যমে কর্মক্ষমতা ট্র্যাক করুন এবং সমস্যা ডিবাগ করুন | [Guide →](docs/OBSERVABILITY.md) |
+| **প্রমাণীকরণ** | Ory Hydra OAuth2 এর মাধ্যমে নিরাপদ API 액세스 (উন্নয়নের জন্য ঐচ্ছিক) | [Guide →](../docs/AUTHENTICATION.md) |
+| 💰 **পেমেন্ট ইন্টিগ্রেশন (X402)** | সুরক্ষিত পদ্ধতিগুলি কার্যকর করার আগে বেস ব্লকচেইনে USDC পেমেন্ট গ্রহণ করুন | [Guide →](../docs/PAYMENT.md) |
+| 💾 **PostgreSQL স্টোরেজ** | উৎপাদন স্থাপনার জন্য স্থায়ী স্টোরেজ (ঐচ্ছিক - ডিফল্টভাবে InMemoryStorage) | [Guide →](../docs/STORAGE.md) |
+| 📋 **Redis শিডিউলার** | বহু-কর্মী স্থাপনার জন্য বিতরণকৃত কাজের সময়সূচী (ঐচ্ছিক - ডিফল্টভাবে InMemoryScheduler) | [Guide →](../docs/SCHEDULER.md) |
+| 🎯 **দক্ষতা সিস্টেম** | পুনঃব্যবহারযোগ্য শক্তি যা এজেন্টগুলি বিজ্ঞাপন দেয় এবং বুদ্ধিমান কাজের রাউটিংয়ের জন্য কার্যকর করে | [Guide →](../docs/SKILLS.md) |
+| 🤝 **এজেন্ট আলোচনা** | বুদ্ধিমান অর্কেস্ট্রেশনের জন্য ক্ষমতা-ভিত্তিক এজেন্ট নির্বাচন | [Guide →](../docs/NEGOTIATION.md) |
+| 🌐 **টানেলিং** | পরীক্ষার জন্য স্থানীয় এজেন্টগুলিকে ইন্টারনেটে প্রকাশ করুন (**স্থানীয় উন্নয়ন শুধুমাত্র, উৎপাদনের জন্য নয়**) | [Guide →](../docs/TUNNELING.md) |
+| 📬 **পুশ বিজ্ঞপ্তি** | কাজের আপডেটের জন্য রিয়েল-টাইম ওয়েবহুক বিজ্ঞপ্তি - কোন পোলিং প্রয়োজন নেই | [Guide →](../docs/NOTIFICATIONS.md) |
+| 📊 **অবজারভেবিলিটি ও মনিটরিং** | OpenTelemetry এবং Sentry এর মাধ্যমে কর্মক্ষমতা ট্র্যাক করুন এবং সমস্যা ডিবাগ করুন | [Guide →](../docs/OBSERVABILITY.md) |
 | 🔄 **পুনরায় চেষ্টা করার প্রক্রিয়া** | স্থিতিশীল এজেন্টগুলির জন্য স্বয়ংক্রিয় পুনরায় চেষ্টা সহ এক্সপোনেনশিয়াল ব্যাকঅফ | [Guide →](docs.getbindu.com/bindu/learn/retry/overview) |
-| 🔑 **বিকেন্দ্রীভূত পরিচয়পত্র (DIDs)** | যাচাইযোগ্য, নিরাপদ এজেন্ট ইন্টারঅ্যাকশন এবং পেমেন্ট ইন্টিগ্রেশনের জন্য ক্রিপ্টোগ্রাফিক পরিচয় | [Guide →](docs/DID.md) |
-| 🏥 **স্বাস্থ্য পরীক্ষা ও মেট্রিক্স** | অন্তর্নির্মিত এন্ডপয়েন্টের মাধ্যমে এজেন্টের স্বাস্থ্য এবং কর্মক্ষমতা পর্যবেক্ষণ করুন | [Guide →](docs/HEALTH_METRICS.md) |
+| 🔑 **বিকেন্দ্রীভূত পরিচয়পত্র (DIDs)** | যাচাইযোগ্য, নিরাপদ এজেন্ট ইন্টারঅ্যাকশন এবং পেমেন্ট ইন্টিগ্রেশনের জন্য ক্রিপ্টোগ্রাফিক পরিচয় | [Guide →](../docs/DID.md) |
+| 🏥 **স্বাস্থ্য পরীক্ষা ও মেট্রিক্স** | অন্তর্নির্মিত এন্ডপয়েন্টের মাধ্যমে এজেন্টের স্বাস্থ্য এবং কর্মক্ষমতা পর্যবেক্ষণ করুন | [Guide →](../docs/HEALTH_METRICS.md) |
 
 ---
 
@@ -460,7 +460,7 @@ curl --location 'http://localhost:3773/' \
 Bindu একটি সুন্দর চ্যাট ইন্টারফেস অন্তর্ভুক্ত করে `http://localhost:5173` এ। `frontend` ফোল্ডারে নেভিগেট করুন এবং সার্ভার শুরু করতে `npm run dev` চালান।
 
 <p align="center">
-  <img src="assets/agent-ui.png" alt="Bindu Agent UI" width="640" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
+  <img src="../assets/agent-ui.png" alt="Bindu Agent UI" width="640" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
 </p>
 
 ---
@@ -599,7 +599,7 @@ uv sync --dev
 pre-commit run --all-files
 ```
 
-> 📖 [Contributing Guidelines](.github/contributing.md)
+> 📖 [Contributing Guidelines](../.github/contributing.md)
 
 ---
 
@@ -733,7 +733,7 @@ pre-commit run --all-files
 <br/>
 
 <p align="center">
-  <img src="assets/sunflower-footer.jpeg" alt="Bindu" width="720" />
+  <img src="../assets/sunflower-footer.jpeg" alt="Bindu" width="720" />
 </p>
 
 <p align="center">

@@ -54,6 +54,11 @@ export interface CallPeerInput {
   referenceTaskIds?: string[]
   signal?: AbortSignal
   timeoutMs?: number
+  /** Wall-clock ceiling for this peer call, forwarded to sendAndPoll's
+   *  ``deadlineMs``. Planner sets this so each peer call inherits the
+   *  plan's remaining time budget. Independent of ``signal`` — either
+   *  trigger aborts the call. */
+  deadlineMs?: number
   acceptedOutputModes?: string[]
 }
 
@@ -188,6 +193,7 @@ async function runCall(
     message,
     signal: input.signal,
     timeoutMs: input.timeoutMs,
+    deadlineMs: input.deadlineMs,
     acceptedOutputModes: input.acceptedOutputModes,
   })
 

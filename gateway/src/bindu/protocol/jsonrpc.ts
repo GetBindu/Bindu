@@ -73,6 +73,11 @@ export const ErrorCode = {
   ContextNotFound: -32020,
   ContextNotCancelable: -32021,
   SkillNotFound: -32030,
+  // Gateway-internal: the caller (or the gateway's deadline) aborted the
+  // call before the peer reached a terminal state. Carries a `reason`
+  // discriminator in ``data`` so callers can tell a client disconnect
+  // from a plan-level timeout.
+  AbortedByCaller: -32040,
 } as const
 
 export type ErrorCodeValue = (typeof ErrorCode)[keyof typeof ErrorCode]
@@ -121,6 +126,22 @@ export class BinduError extends Error {
 
   static transport(message: string, peer?: string, cause?: unknown): BinduError {
     return new BinduError(ErrorCode.InternalError, `transport: ${message}`, { peer, cause })
+  }
+
+  static aborted(
+    reason: "deadline" | "signal",
+    peer?: string,
+    extra?: Record<string, unknown>,
+  ): BinduError {
+    const msg = reason === "deadline" ? "plan deadline exceeded" : "aborted by caller"
+    return new BinduError(ErrorCode.AbortedByCaller, msg, {
+      peer,
+      data: { reason, ...(extra ?? {}) },
+    })
+  }
+
+  isAbort(): boolean {
+    return this.code === ErrorCode.AbortedByCaller
   }
 
   isSchemaMismatch(): boolean {

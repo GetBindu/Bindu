@@ -1,25 +1,25 @@
 <div align="center" id="top">
   <a href="https://getbindu.com">
     <picture>
-      <img src="assets/bindu.png" alt="Bindu" width="300">
+      <img src="../assets/bindu.png" alt="Bindu" width="300">
     </picture>
   </a>
 </div>
 
 <p align="center">
-  <em>La couche d'identité, de communication et de paiements pour les agents IA</em>
+  <em>Die Identitäts-, Kommunikations- und Zahlungs-Schicht für KI-Agenten</em>
 </p>
 
 <p align="center">
-  <a href="README.md">🇬🇧 Anglais</a> •
-  <a href="README.de.md">🇩🇪 Allemand</a> •
-  <a href="README.es.md">🇪🇸 Espagnol</a> •
-  <a href="README.fr.md">🇫🇷 Français</a> •
-  <a href="README.hi.md">🇮🇳 हिंदी</a> •
-  <a href="README.bn.md">🇮🇳 বাংলা</a> •
-  <a href="README.zh.md">🇨🇳 中文</a> •
-  <a href="README.nl.md">🇳🇱 Néerlandais</a> •
-  <a href="README.ta.md">🇮🇳 தமிழ்</a>
+  <a href="../README.md">🇬🇧 Englisch</a> •
+  <a href="README.de.md">🇩🇪 Deutsch</a> •
+  <a href="README.es.md">🇪🇸 Spanisch</a> •
+  <a href="README.fr.md">🇫🇷 Französisch</a> •
+  <a href="README.hi.md">🇮🇳 Hindi</a> •
+  <a href="README.bn.md">🇮🇳 Bengali</a> •
+  <a href="README.zh.md">🇨🇳 Chinesisch</a> •
+  <a href="README.nl.md">🇳🇱 Niederländisch</a> •
+  <a href="README.ta.md">🇮🇳 Tamil</a>
 </p>
 
 <p align="center">
@@ -36,17 +36,17 @@
 <br/>
 
 <p align="center">
-  <img src="assets/sunflower-mountains.jpeg" alt="Bindu — The Internet of Agents" width="720" />
+  <img src="../assets/sunflower-mountains.jpeg" alt="Bindu — The Internet of Agents" width="720" />
 </p>
 
 <p align="center">
-  <em>"Comme des tournesols se tournant vers la lumière, les agents collaborent en essaims - chacun indépendant, mais ensemble ils créent quelque chose de plus grand."</em>
+  <em>"Wie Sonnenblumen, die sich dem Licht zuwenden, arbeiten Agenten in Schwärmen zusammen - jeder unabhängig, doch gemeinsam schaffen sie etwas Größeres."</em>
 </p>
 
 <br/>
 
 <div align="center">
-  <h3>Intégrez votre agent en une seule ligne</h3>
+  <h3>Onboarden Sie Ihren Agenten in einer Zeile</h3>
 </div>
 
 <div align="center">
@@ -55,10 +55,10 @@
 
 ---
 
-**Bindu** (prononcé : _binduu_) est une couche opérationnelle pour les agents IA qui fournit des capacités d'identité, de communication et de paiement. Elle offre un service prêt pour la production avec une API pratique pour connecter, authentifier et orchestrer des agents à travers des systèmes distribués en utilisant des protocoles ouverts : **A2A**, **AP2**, et **X402**.Construit avec une architecture distribuée (Gestionnaire de tâches, planificateur, stockage), Bindu permet un développement rapide et une intégration facile avec n'importe quel cadre d'IA. Transformez n'importe quel cadre d'agent en un service entièrement interopérable pour la communication, la collaboration et le commerce dans l'Internet des Agents.
+**Bindu** (ausgesprochen: _binduu_) ist eine Betriebsschicht für KI-Agenten, die Identitäts-, Kommunikations- und Zahlungsfunktionen bereitstellt. Es bietet einen produktionsbereiten Dienst mit einer praktischen API, um Agenten über verteilte Systeme hinweg zu verbinden, zu authentifizieren und zu orchestrieren, unter Verwendung offener Protokolle: **A2A**, **AP2** und **X402**.Mit einer verteilten Architektur (Task-Manager, Scheduler, Speicher) ermöglicht Bindu eine schnelle Entwicklung und einfache Integration mit jedem KI-Framework. Transformieren Sie jedes Agenten-Framework in einen vollständig interoperablen Dienst für Kommunikation, Zusammenarbeit und Handel im Internet der Agenten.
 
 <p align="center">
-  <strong>🌟 <a href="https://getbindu.com">Enregistrez votre agent</a> • 🌻 <a href="https://docs.getbindu.com">Documentation</a> • 💬 <a href="https://discord.gg/3w5zuYUuwt">Communauté Discord</a></strong>
+  <strong>🌟 <a href="https://getbindu.com">Registrieren Sie Ihren Agenten</a> • 🌻 <a href="https://docs.getbindu.com">Dokumentation</a> • 💬 <a href="https://discord.gg/3w5zuYUuwt">Discord-Community</a></strong>
 </p>
 
 
@@ -66,7 +66,7 @@
 
 <br/>
 
-## 🎥 Regardez Bindu en Action
+## 🎥 Sehen Sie Bindu in Aktion
 
 <div align="center">
   <a href="https://www.youtube.com/watch?v=qppafMuw_KI" target="_blank">
@@ -76,16 +76,16 @@
 
 <br/>
 
-## 📋 Prérequis
+## 📋 Voraussetzungen
 
-Avant d'installer Bindu, assurez-vous d'avoir :
+Stellen Sie vor der Installation von Bindu sicher, dass Sie:
 
-- **Python 3.12 ou supérieur** - [Download here](https://www.python.org/downloads/)
-- **Gestionnaire de paquets UV** - [Installation guide](https://github.com/astral-sh/uv)
-- **Clé API requise** : Définissez `OPENROUTER_API_KEY` ou `OPENAI_API_KEY` dans vos variables d'environnement. Des modèles OpenRouter gratuits sont disponibles pour les tests.
+- **Python 3.12 oder höher** - [Download here](https://www.python.org/downloads/)
+- **UV-Paketmanager** - [Installation guide](https://github.com/astral-sh/uv)
+- **API-Schlüssel erforderlich**: Setzen Sie `OPENROUTER_API_KEY` oder `OPENAI_API_KEY` in Ihren Umgebungsvariablen. Kostenlose OpenRouter-Modelle sind für Tests verfügbar.
 
 
-### Vérifiez votre configuration
+### Überprüfen Sie Ihre Einrichtung
 
 ```bash
 # Check Python version
@@ -101,18 +101,18 @@ uv --version
 
 ## 📦 Installation
 <details>
-<summary><b>Remarque pour les utilisateurs (Git & GitHub Desktop)</b></summary>
+<summary><b>Benutzerhinweis (Git & GitHub Desktop)</b></summary>
 
-Sur certains systèmes Windows, git peut ne pas être reconnu dans l'invite de commandes même après l'installation en raison de problèmes de configuration de PATH.
+Auf einigen Windows-Systemen wird git möglicherweise im Eingabeaufforderungsfenster nicht erkannt, selbst nach der Installation aufgrund von PATH-Konfigurationsproblemen.
 
-Si vous rencontrez ce problème, vous pouvez utiliser *GitHub Desktop* comme alternative :
+Wenn Sie auf dieses Problem stoßen, können Sie *GitHub Desktop* als Alternative verwenden:
 
-1. Installez GitHub Desktop depuis https://desktop.github.com/
-2. Connectez-vous avec votre compte GitHub
-3. Clonez le dépôt en utilisant l'URL du dépôt :
+1. Installieren Sie GitHub Desktop von https://desktop.github.com/
+2. Melden Sie sich mit Ihrem GitHub-Konto an
+3. Klonen Sie das Repository mit der Repository-URL:
    https://github.com/getbindu/Bindu.git
 
-GitHub Desktop vous permet de cloner, gérer des branches, valider des modifications et ouvrir des demandes de tirage sans utiliser la ligne de commande.
+GitHub Desktop ermöglicht es Ihnen, zu klonen, Branches zu verwalten, Änderungen zu committen und Pull-Requests zu öffnen, ohne die Befehlszeile zu verwenden.
 
 </details>
 
@@ -130,16 +130,16 @@ uv sync --dev
 ```
 
 <details>
-<summary><b>Problèmes d'installation courants</b> (cliquez pour développer)</summary>
+<summary><b>Häufige Installationsprobleme</b> (klicken, um zu erweitern)</summary>
 
 <br/>
 
-| Problème | Solution |
-|-------|----------|| `uv: command not found` | Redémarrez votre terminal après avoir installé UV. Sur Windows, utilisez PowerShell |
-| `Python version not supported` | Installez Python 3.12+ depuis [python.org](https://www.python.org/downloads/) |
-| Virtual environment not activating (Windows) | Utilisez PowerShell et exécutez `.venv\Scripts\activate` |
-| `Microsoft Visual C++ required` | Téléchargez [Visual C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) |
-| `ModuleNotFoundError` | Activez venv et exécutez `uv sync --dev` |
+| Problem | Lösung |
+|-------|----------|| `uv: command not found` | Starten Sie Ihr Terminal neu, nachdem Sie UV installiert haben. Unter Windows verwenden Sie PowerShell |
+| `Python version not supported` | Installieren Sie Python 3.12+ von [python.org](https://www.python.org/downloads/) |
+| Virtuelle Umgebung wird nicht aktiviert (Windows) | Verwenden Sie PowerShell und führen Sie `.venv\Scripts\activate` aus |
+| `Microsoft Visual C++ required` | Laden Sie [Visual C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) herunter |
+| `ModuleNotFoundError` | Aktivieren Sie venv und führen Sie `uv sync --dev` aus |
 
 </details>
 
@@ -147,11 +147,11 @@ uv sync --dev
 
 <br/>
 
-## 🚀 Démarrage rapide
+## 🚀 Schnellstart
 
-### Option 1 : Utilisation de Cookiecutter (Recommandé)
+### Option 1: Verwendung von Cookiecutter (Empfohlen)
 
-**Temps jusqu'au premier agent : ~2 minutes ⏱️**
+**Zeit bis zum ersten Agenten: ~2 Minuten ⏱️**
 
 ```bash
 # Install cookiecutter
@@ -167,13 +167,13 @@ uvx cookiecutter https://github.com/getbindu/create-bindu-agent.git
   </a>
 </div>
 
-Votre agent local devient un service en direct, sécurisé et découvrable. [Learn more →](https://docs.getbindu.com/bindu/create-bindu-agent/overview)
+Ihr lokaler Agent wird zu einem aktiven, sicheren, auffindbaren Dienst. [Learn more →](https://docs.getbindu.com/bindu/create-bindu-agent/overview)
 
-> **💡 Conseil Pro :** Les agents créés avec cookiecutter incluent des actions GitHub qui enregistrent automatiquement votre agent dans le [GetBindu.com](https://getbindu.com) lorsque vous poussez vers votre dépôt.
+> **💡 Profi-Tipp:** Mit Cookiecutter erstellte Agenten enthalten GitHub Actions, die Ihren Agenten automatisch im [GetBindu.com](https://getbindu.com) registrieren, wenn Sie in Ihr Repository pushen.
 
-### Option 2 : Configuration manuelle
+### Option 2: Manuelle Einrichtung
 
-Créez votre script d'agent `my_agent.py` :
+Erstellen Sie Ihr Agentenskript `my_agent.py`:
 
 ```python
 import os
@@ -222,11 +222,11 @@ bindufy(config, handler)
 # bindufy(config, handler, launch=True)
 ```
 
-![Sample Agent](assets/agno-simple.png)
+![Sample Agent](../assets/agno-simple.png)
 
-Votre agent est maintenant en direct à l'URL configurée dans `deployment.url`.
+Ihr Agent ist jetzt unter der in `deployment.url` konfigurierten URL aktiv.
 
-Définissez un port personnalisé sans modifications de code :
+Setzen Sie einen benutzerdefinierten Port ohne Codeänderungen:
 
 ```bash
 # Linux/macOS
@@ -236,22 +236,22 @@ export BINDU_PORT=4000
 $env:BINDU_PORT="4000"
 ```
 
-Les exemples existants qui utilisent `http://localhost:3773` sont automatiquement remplacés lorsque `BINDU_PORT` est défini.
+Vorhandene Beispiele, die `http://localhost:3773` verwenden, werden automatisch überschrieben, wenn `BINDU_PORT` gesetzt ist.
 
-### Option 3 : Agent local sans configuration
+### Option 3: Zero-Config Lokaler Agent
 
-Essayez Bindu sans configurer Postgres, Redis ou tout service cloud. Fonctionne entièrement localement en utilisant un stockage en mémoire et un planificateur.
+Versuchen Sie Bindu, ohne Postgres, Redis oder andere Cloud-Dienste einzurichten. Läuft vollständig lokal mit In-Memory-Speicher und Scheduler.
 
 ```bash
 python examples/beginner_zero_config_agent.py
 ```
 
-### Option 4 : Agent Echo minimal (Test)
+### Option 4: Minimaler Echo-Agent (Test)
 
 <details>
-<summary><b>Voir l'exemple minimal</b> (cliquez pour développer)</summary>
+<summary><b>Minimalbeispiel anzeigen</b> (klicken zum Erweitern)</summary>
 
-Agent fonctionnel le plus petit possible :
+Kleinster möglicher funktionierender Agent:
 
 ```python
 import os
@@ -278,7 +278,7 @@ bindufy(config, handler)
 # bindufy(config, handler, launch=True)
 ```
 
-**Exécutez l'agent :**
+**Führen Sie den Agenten aus:**
 
 ```bash
 # Start the agent
@@ -288,11 +288,11 @@ python examples/echo_agent.py
 </details>
 
 <details>
-<summary><b>Testez l'agent avec curl</b> (cliquez pour développer)</summary>
+<summary><b>Testen Sie den Agenten mit curl</b> (klicken zum Erweitern)</summary>
 
 <br/>
 
-Entrée :
+Eingabe:
 ```bash
 curl --location 'http://localhost:3773/' \
 --header 'Content-Type: application/json' \
@@ -323,7 +323,7 @@ curl --location 'http://localhost:3773/' \
 }'
 ```
 
-Sortie :
+Ausgabe:
 ```bash
 {
     "jsonrpc": "2.0",
@@ -355,7 +355,7 @@ Sortie :
 }
 ```
 
-Vérifiez l'état de la tâche
+Überprüfen Sie den Status der Aufgabe
 ```bash
 curl --location 'http://localhost:3773/' \
 --header 'Content-Type: application/json' \
@@ -369,7 +369,7 @@ curl --location 'http://localhost:3773/' \
 }'
 ```
 
-Sortie :
+Ausgabe:
 ```bash
 {
     "jsonrpc": "2.0",
@@ -437,59 +437,59 @@ Sortie :
 
  
 
-## 🚀 Fonctionnalités principales
-| Fonctionnalité | Description | Documentation |
+## 🚀 Kernfunktionen
+| Feature | Beschreibung | Dokumentation |
 | :--- | :--- | :--- |
-| **Authentification** | Accès API sécurisé avec Ory Hydra OAuth2 (optionnel pour le développement) | [Guide →](docs/AUTHENTICATION.md) |
-| 💰 **Intégration de Paiement (X402)** | Accepter les paiements USDC sur la blockchain Base avant d'exécuter des méthodes protégées | [Guide →](docs/PAYMENT.md) |
-| 💾 **Stockage PostgreSQL** | Stockage persistant pour les déploiements en production (optionnel - InMemoryStorage par défaut) | [Guide →](docs/STORAGE.md) |
-| 📋 **Planificateur Redis** | Planification de tâches distribuées pour des déploiements multi-travailleurs (optionnel - InMemoryScheduler par défaut) | [Guide →](docs/SCHEDULER.md) |
-| 🎯 **Système de Compétences** | Capacités réutilisables que les agents annoncent et exécutent pour un routage intelligent des tâches | [Guide →](docs/SKILLS.md) |
-| 🤝 **Négociation d'Agent** | Sélection d'agent basée sur les capacités pour une orchestration intelligente | [Guide →](docs/NEGOTIATION.md) |
-| 🌐 **Tunneling** | Exposer des agents locaux à Internet pour des tests (**développement local uniquement, pas pour la production**) | [Guide →](docs/TUNNELING.md) |
-| 📬 **Notifications Push** | Notifications webhook en temps réel pour les mises à jour de tâches - aucun sondage requis | [Guide →](docs/NOTIFICATIONS.md) |
-| 📊 **Observabilité & Surveillance** | Suivre les performances et déboguer les problèmes avec OpenTelemetry et Sentry | [Guide →](docs/OBSERVABILITY.md) |
-| 🔄 **Mécanisme de Réessai** | Réessai automatique avec un backoff exponentiel pour des agents résilients | [Guide →](docs.getbindu.com/bindu/learn/retry/overview) |
-| 🔑 **Identifiants Décentralisés (DIDs)** | Identité cryptographique pour des interactions d'agent vérifiables et sécurisées et intégration de paiement | [Guide →](docs/DID.md) |
-| 🏥 **Vérification de Santé & Métriques** | Surveiller la santé et les performances des agents avec des points de terminaison intégrés | [Guide →](docs/HEALTH_METRICS.md) |
+| **Authentifizierung** | Sicherer API-Zugriff mit Ory Hydra OAuth2 (optional für die Entwicklung) | [Guide →](../docs/AUTHENTICATION.md) |
+| 💰 **Zahlungsintegration (X402)** | Akzeptieren Sie USDC-Zahlungen auf der Base-Blockchain, bevor geschützte Methoden ausgeführt werden | [Guide →](../docs/PAYMENT.md) |
+| 💾 **PostgreSQL-Speicher** | Persistenter Speicher für Produktionsbereitstellungen (optional - InMemoryStorage standardmäßig) | [Guide →](../docs/STORAGE.md) |
+| 📋 **Redis-Planer** | Verteilte Aufgabenplanung für Multi-Worker-Bereitstellungen (optional - InMemoryScheduler standardmäßig) | [Guide →](../docs/SCHEDULER.md) |
+| 🎯 **Fähigkeitssystem** | Wiederverwendbare Fähigkeiten, die Agenten für intelligentes Aufgabenrouting bewerben und ausführen | [Guide →](../docs/SKILLS.md) |
+| 🤝 **Agentenverhandlung** | Fähigkeitsbasierte Agentenauswahl für intelligente Orchestrierung | [Guide →](../docs/NEGOTIATION.md) |
+| 🌐 **Tunneling** | Lokale Agenten für Tests im Internet verfügbar machen (**nur lokale Entwicklung, nicht für die Produktion**) | [Guide →](../docs/TUNNELING.md) |
+| 📬 **Push-Benachrichtigungen** | Echtzeit-Webhooks für Aufgabenaktualisierungen - kein Polling erforderlich | [Guide →](../docs/NOTIFICATIONS.md) |
+| 📊 **Beobachtbarkeit & Überwachung** | Verfolgen Sie die Leistung und debuggen Sie Probleme mit OpenTelemetry und Sentry | [Guide →](../docs/OBSERVABILITY.md) |
+| 🔄 **Wiederholungsmechanismus** | Automatische Wiederholung mit exponentiellem Backoff für resiliente Agenten | [Guide →](docs.getbindu.com/bindu/learn/retry/overview) |
+| 🔑 **Dezentrale Identifikatoren (DIDs)** | Kryptografische Identität für überprüfbare, sichere Agenteninteraktionen und Zahlungsintegration | [Guide →](../docs/DID.md) |
+| 🏥 **Gesundheitsprüfung & Metriken** | Überwachen Sie die Gesundheit und Leistung von Agenten mit integrierten Endpunkten | [Guide →](../docs/HEALTH_METRICS.md) |
 
 ---
 
 <br/>
 
-## 🎨 Interface de Chat
+## 🎨 Chat-Benutzeroberfläche
 
-Bindu comprend une belle interface de chat à `http://localhost:5173`. Accédez au dossier `frontend` et exécutez `npm run dev` pour démarrer le serveur.
+Bindu enthält eine schöne Chat-Oberfläche unter `http://localhost:5173`. Navigieren Sie zum `frontend`-Ordner und führen Sie `npm run dev` aus, um den Server zu starten.
 
 <p align="center">
-  <img src="assets/agent-ui.png" alt="Bindu Agent UI" width="640" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
+  <img src="../assets/agent-ui.png" alt="Bindu Agent UI" width="640" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />
 </p>
 
 ---
 
 <br/>
 
-## 🌐 GetBindu.comLe [**GetBindu.com**](https://getbindu.com) est un registre public de tous les agents Bindu, les rendant découvrables et accessibles à l'écosystème plus large des agents.
+## 🌐 GetBindu.comDas [**GetBindu.com**](https://getbindu.com) ist ein öffentliches Verzeichnis aller Bindu-Agenten, das sie für das breitere Agenten-Ökosystem auffindbar und zugänglich macht.
 
-### ✨ Inscription Automatique avec Cookiecutter
+### ✨ Automatische Registrierung mit Cookiecutter
 
-Lorsque vous créez un agent en utilisant le modèle cookiecutter, il inclut une action GitHub préconfigurée qui enregistre automatiquement votre agent dans le répertoire :
+Wenn Sie einen Agenten mit der Cookiecutter-Vorlage erstellen, enthält er eine vorkonfigurierte GitHub-Aktion, die Ihren Agenten automatisch im Verzeichnis registriert:
 
-1. **Créez votre agent** en utilisant cookiecutter
-2. **Poussez sur GitHub** - L'action GitHub se déclenche automatiquement
-3. **Votre agent apparaît** dans le [GetBindu.com](https://getbindu.com)
+1. **Erstellen Sie Ihren Agenten** mit Cookiecutter
+2. **Pushen Sie zu GitHub** - Die GitHub-Aktion wird automatisch ausgelöst
+3. **Ihr Agent erscheint** im [GetBindu.com](https://getbindu.com)
 
-> **Remarque** : Récupérez votre `BINDU_PAT_TOKEN` depuis [getbindu.com](https://getbindu.com) pour enregistrer votre agent.
+> **Hinweis**: Sammeln Sie Ihre `BINDU_PAT_TOKEN` von [getbindu.com](https://getbindu.com), um Ihren Agenten zu registrieren.
 
-### 📝 Inscription Manuelle
+### 📝 Manuelle Registrierung
 
-Le processus d'inscription manuelle est actuellement en développement.
+Der manuelle Registrierungsprozess befindet sich derzeit in der Entwicklung.
 
 ---
 
 <br/>
 
-## 🌌 La Vision
+## 🌌 Die Vision
 
 ```
 a peek into the night sky
@@ -513,38 +513,38 @@ a peek into the night sky
 {{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{
 ```
 
-_Chaque symbole est un agent — une étincelle d'intelligence. Le petit point est Bindu, le point d'origine dans l'Internet des Agents._
+_Jedes Symbol ist ein Agent — ein Funke von Intelligenz. Der winzige Punkt ist Bindu, der Ursprungspunkt im Internet der Agenten._
 
-### Connexion NightSky (En Cours)
+### NightSky-Verbindung (In Arbeit)
 
-NightSky permet des essaims d'agents. Chaque Bindu est un point annotant les agents avec le langage partagé de A2A, AP2 et X402. Les agents peuvent être hébergés n'importe où—ordinateurs portables, nuages ou clusters—tout en parlant le même protocole, se faisant confiance par conception, et travaillant ensemble comme un esprit distribué unique.
+NightSky ermöglicht Schwärme von Agenten. Jeder Bindu ist ein Punkt, der Agenten mit der gemeinsamen Sprache von A2A, AP2 und X402 annotiert. Agenten können überall gehostet werden—Laptops, Clouds oder Cluster—und sprechen dennoch dasselbe Protokoll, vertrauen sich gegenseitig von Natur aus und arbeiten zusammen als ein einziger, verteilter Verstand.
 
-> **💭 Un Objectif Sans Plan N'est Qu'un Souhait.**
+> **💭 Ein Ziel ohne Plan ist nur ein Wunsch.**
 
 ---
 
 <br/>
 
-## 🛠️ Cadres d'Agent Supportés
+## 🛠️ Unterstützte Agenten-Frameworks
 
-Bindu est **indépendant du cadre** et testé avec :
+Bindu ist **framework-unabhängig** und wurde getestet mit:
 
-- **AG2** (anciennement AutoGen)
+- **AG2** (ehemals AutoGen)
 - **Agno**
 - **CrewAI**
 - **LangChain**
 - **LlamaIndex**
 - **FastAgent**
 
-Vous souhaitez une intégration avec votre cadre préféré ? [Let us know on Discord](https://discord.gg/3w5zuYUuwt) !
+Möchten Sie eine Integration mit Ihrem bevorzugten Framework? [Let us know on Discord](https://discord.gg/3w5zuYUuwt)!
 
 ---
 
 <br/>
 
-## 🧪 Tests
+## 🧪 Testen
 
-Bindu maintient une **couverture de test de 70%+** (objectif : 80%+) :
+Bindu hat eine **Testabdeckung von über 70%** (Ziel: über 80%):
 
 ```bash
 uv run pytest -n auto --cov=bindu --cov-report=term-missing
@@ -555,29 +555,29 @@ uv run coverage report --skip-covered --fail-under=70
 
 <br/>
 
-## 🔧 Dépannage
+## 🔧 Fehlersuche
 
 <details>
-<summary>Problèmes Courants</summary>
+<summary>Häufige Probleme</summary>
 
 <br/>
 
-| Problème | Solution |
-|----------|----------|
-| `Python 3.12 not found` | Installez Python 3.12+ et définissez dans PATH, ou utilisez `pyenv` |
-| `bindu: command not found` | Activez l'environnement virtuel : `source .venv/bin/activate` || `Port 3773 already in use` | Définir `BINDU_PORT=4000` ou remplacer l'URL par `BINDU_DEPLOYMENT_URL=http://localhost:4000` |
-| L'échec de pré-validation | Exécuter `pre-commit run --all-files` |
-| Les tests échouent | Installer les dépendances de développement : `uv sync --dev` |
-| `Permission denied` (macOS) | Exécuter `xattr -cr .` pour effacer les attributs étendus |
+| Problem | Lösung |
+|-------|----------|
+| `Python 3.12 not found` | Installieren Sie Python 3.12+ und setzen Sie es in den PATH, oder verwenden Sie `pyenv` |
+| `bindu: command not found` | Aktivieren Sie die virtuelle Umgebung: `source .venv/bin/activate` || `Port 3773 already in use` | Setze `BINDU_PORT=4000` oder überschreibe die URL mit `BINDU_DEPLOYMENT_URL=http://localhost:4000` |
+| Pre-commit schlägt fehl | Führe `pre-commit run --all-files` aus |
+| Tests schlagen fehl | Installiere Entwicklungsabhängigkeiten: `uv sync --dev` |
+| `Permission denied` (macOS) | Führe `xattr -cr .` aus, um erweiterte Attribute zu löschen |
 
-**Réinitialiser l'environnement :**
+**Umgebung zurücksetzen:**
 ```bash
 rm -rf .venv
 uv venv --python 3.12.9
 uv sync --dev
 ```
 
-**Windows PowerShell :**
+**Windows PowerShell:**
 ```bash
 Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
@@ -588,9 +588,9 @@ Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 <br/>
 
-## 🤝 Contribuer
+## 🤝 Mitwirken
 
-Nous accueillons les contributions ! Rejoignez-nous sur [Discord](https://discord.gg/3w5zuYUuwt). Choisissez le canal qui correspond le mieux à votre contribution.
+Wir freuen uns über Beiträge! Schließe dich uns auf [Discord](https://discord.gg/3w5zuYUuwt) an. Wähle den Kanal, der am besten zu deinem Beitrag passt.
 
 ```bash
 git clone https://github.com/getbindu/Bindu.git
@@ -601,34 +601,34 @@ uv sync --dev
 pre-commit run --all-files
 ```
 
-> 📖 [Contributing Guidelines](.github/contributing.md)
+> 📖 [Contributing Guidelines](../.github/contributing.md)
 
 ---
 
 <br/>
 
-## 📜 Licence
+## 📜 Lizenz
 
-Bindu est open-source sous la [Apache License 2.0](https://choosealicense.com/licenses/apache-2.0/).
-
----
-
-<br/>
-
-## 💬 Communauté
-
-Nous 💛 les contributions ! Que vous corrigiez des bogues, amélioriez la documentation ou construisiez des démos, vos contributions rendent Bindu meilleur.
-
-- 💬 [Join Discord](https://discord.gg/3w5zuYUuwt) pour les discussions et le support
-- ⭐ [Star the repository](https://github.com/getbindu/Bindu) si vous le trouvez utile !
+Bindu ist Open Source unter der [Apache License 2.0](https://choosealicense.com/licenses/apache-2.0/).
 
 ---
 
 <br/>
 
-## 👥 Modérateurs actifs
+## 💬 Gemeinschaft
 
-Nos modérateurs dédiés aident à maintenir une communauté accueillante et productive :
+Wir 💛 Beiträge! Egal, ob du Fehler behebst, die Dokumentation verbesserst oder Demos erstellst – deine Beiträge machen Bindu besser.
+
+- 💬 [Join Discord](https://discord.gg/3w5zuYUuwt) für Diskussionen und Unterstützung
+- ⭐ [Star the repository](https://github.com/getbindu/Bindu), wenn du es nützlich findest!
+
+---
+
+<br/>
+
+## 👥 Aktive Moderatoren
+
+Unsere engagierten Moderatoren helfen, eine einladende und produktive Gemeinschaft aufrechtzuerhalten:
 
 <table>
   <tr>
@@ -659,15 +659,15 @@ Nos modérateurs dédiés aident à maintenir une communauté accueillante et pr
     </tr>
 </table>
 
-> Vous voulez devenir modérateur ? Contactez-nous sur [Discord](https://discord.gg/3w5zuYUuwt) !
+> Möchtest du Moderator werden? Kontaktiere uns auf [Discord](https://discord.gg/3w5zuYUuwt)!
 
 ---
 
 <br/>
 
-## 🙏 Remerciements
+## 🙏 Danksagungen
 
-Reconnaissant envers ces projets :
+Dankbar für diese Projekte:
 
 - [FastA2A](https://github.com/pydantic/fasta2a)
 - [12 Factor Agents](https://github.com/humanlayer/12-factor-agents/blob/main/content/factor-11-trigger-from-anywhere.md)
@@ -682,13 +682,13 @@ Reconnaissant envers ces projets :
 
 <br/>
 
-## 🗺️ Feuille de route
+## 🗺️ Fahrplan
 
-- [ ] Support de transport GRPC- [ ] Augmenter la couverture des tests à 80 % (en cours)
-- [ ] Support de bout en bout pour AP2
-- [ ] Intégration de DSPy (en cours)
-- [ ] Support de MLTS
-- [ ] Support de X402 avec d'autres facilitateurs
+- [ ] Unterstützung für GRPC-Transport- [ ] Testabdeckung auf 80% erhöhen (in Bearbeitung)
+- [ ] AP2 End-to-End-Unterstützung
+- [ ] DSPy-Integration (in Bearbeitung)
+- [ ] MLTS-Unterstützung
+- [ ] X402-Unterstützung mit anderen Facilitators
 
 > 💡 [Suggest features on Discord](https://discord.gg/3w5zuYUuwt)!
 
@@ -702,7 +702,7 @@ Reconnaissant envers ces projets :
 
 <br/>
 
-## 🎓 Ateliers
+## 🎓 Workshops
 
 - [AI Native in Action: Agent Symphony](https://www.meetup.com/ai-native-Amsterdam && India/events/311066899/) - [Slides](https://docs.google.com/presentation/d/1SqGXI0Gv_KCWZ1Mw2SOx_kI0u-LLxwZq7lMSONdl8oQ/edit)
 
@@ -710,34 +710,34 @@ Reconnaissant envers ces projets :
 
 <br/>
 
-## ⭐ Historique des étoiles
+## ⭐ Sternengeschichte
 
 [![Star History Chart](https://api.star-history.com/svg?repos=getbindu/Bindu&type=Date)](https://www.star-history.com/#getbindu/Bindu&Date)
 
 ---
 
 <p align="center">
-  <strong>Construit avec 💛 par l'équipe d'Amsterdam && Inde </strong><br/>
-  <em>Joyeux Bindu ! 🌻🚀✨</em>
+  <strong>Hergestellt mit 💛 vom Team aus Amsterdam && Indien </strong><br/>
+  <em>Frohes Bindu! 🌻🚀✨</em>
 </p>
 
 <p align="center">
-  <strong>De l'idée à l'Internet des Agents en 2 minutes.</strong><br/>
-  <em>Votre agent. Votre cadre. Protocoles universels.</em>
+  <strong>Von der Idee zum Internet der Agenten in 2 Minuten.</strong><br/>
+  <em>Ihr Agent. Ihr Framework. Universelle Protokolle.</em>
 </p>
 
 <p align="center">
-  <a href="https://github.com/getbindu/Bindu">⭐ Étoilez-nous sur GitHub</a> •
-  <a href="https://discord.gg/3w5zuYUuwt">💬 Rejoignez Discord</a> •
-  <a href="https://docs.getbindu.com">🌻 Lisez la documentation</a>
+  <a href="https://github.com/getbindu/Bindu">⭐ Sternen Sie uns auf GitHub</a> •
+  <a href="https://discord.gg/3w5zuYUuwt">💬 Treten Sie Discord bei</a> •
+  <a href="https://docs.getbindu.com">🌻 Lesen Sie die Dokumentation</a>
 </p>
 
 <br/>
 
 <p align="center">
-  <img src="assets/sunflower-footer.jpeg" alt="Bindu" width="720" />
+  <img src="../assets/sunflower-footer.jpeg" alt="Bindu" width="720" />
 </p>
 
 <p align="center">
-  <em>"Nous croyons en la théorie du tournesol - se tenir debout ensemble, apportant espoir et lumière à l'Internet des Agents."</em>
+  <em>"Wir glauben an die Sonnenblumentheorie - zusammen aufrecht stehen, Hoffnung und Licht ins Internet der Agenten bringen."</em>
 </p>
