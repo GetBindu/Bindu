@@ -482,8 +482,9 @@ async def _voice_control_reader(
                 )
                 try:
                     await websocket.close()
-                finally:
-                    return
+                except Exception:
+                    logger.exception("Failed to close voice websocket after stop frame")
+                return
             if frame_type == "user_text":
                 user_text = payload.get("text")
                 if isinstance(user_text, str) and user_text.strip() and on_user_text:
