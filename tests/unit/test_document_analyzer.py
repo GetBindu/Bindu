@@ -240,7 +240,10 @@ class TestHandler:
 
     def test_handles_valid_pdf_message(self, mock_agent):
         pdf_bytes = make_pdf_bytes("Deep learning paper content")
-        with patch("document_analyzer.extract_document_text", return_value="Deep learning paper content"):
+        with patch(
+            "document_analyzer.extract_document_text",
+            return_value="Deep learning paper content",
+        ):
             messages = [
                 {
                     "parts": [
@@ -276,7 +279,10 @@ class TestHandler:
         assert "Contract clause" in call_input
 
     def test_prompt_extracted_from_text_part(self, mock_agent):
-        with patch("document_analyzer.extract_document_text", return_value="Some research content"):
+        with patch(
+            "document_analyzer.extract_document_text",
+            return_value="Some research content",
+        ):
             pdf_bytes = make_pdf_bytes("Some research content")
             messages = [
                 {
@@ -314,10 +320,16 @@ class TestHandler:
         assert "Document one" in call_input
         assert "Document two" in call_input
 
-    def test_unsupported_file_type_returns_failure_when_only_bad_files(self, mock_agent):
+    def test_unsupported_file_type_returns_failure_when_only_bad_files(
+        self, mock_agent
+    ):
         bad_file_part = {
             "kind": "file",
-            "file": {"bytes": b64(b"fake data"), "mimeType": "image/png", "name": "bad.png"},
+            "file": {
+                "bytes": b64(b"fake data"),
+                "mimeType": "image/png",
+                "name": "bad.png",
+            },
         }
         messages = [{"parts": [make_text_part("analyze this"), bad_file_part]}]
         result = handler(messages)
@@ -329,11 +341,18 @@ class TestHandler:
         pdf_bytes = make_pdf_bytes("Good file content")
         bad_file_part = {
             "kind": "file",
-            "file": {"bytes": b64(b"fake data"), "mimeType": "image/png", "name": "bad.png"},
+            "file": {
+                "bytes": b64(b"fake data"),
+                "mimeType": "image/png",
+                "name": "bad.png",
+            },
         }
         with patch(
             "document_analyzer.extract_document_text",
-            side_effect=["Good file content", ValueError("Unsupported file type: image/png")],
+            side_effect=[
+                "Good file content",
+                ValueError("Unsupported file type: image/png"),
+            ],
         ):
             messages = [
                 {
@@ -356,7 +375,9 @@ class TestHandler:
         assert result == "No valid document found in the messages."
 
     def test_empty_prompt_still_runs_with_document(self, mock_agent):
-        with patch("document_analyzer.extract_document_text", return_value="Research abstract"):
+        with patch(
+            "document_analyzer.extract_document_text", return_value="Research abstract"
+        ):
             pdf_bytes = make_pdf_bytes("Research abstract")
             messages = [
                 {
@@ -373,7 +394,9 @@ class TestHandler:
 
     def test_last_text_part_used_as_prompt(self, mock_agent):
         """If multiple text parts exist, the last one overwrites (current behavior)."""
-        with patch("document_analyzer.extract_document_text", return_value="Some content"):
+        with patch(
+            "document_analyzer.extract_document_text", return_value="Some content"
+        ):
             pdf_bytes = make_pdf_bytes("Some content")
             messages = [
                 {
@@ -390,7 +413,10 @@ class TestHandler:
 
     def test_multi_turn_conversation_uses_all_parts(self, mock_agent):
         """All messages in the conversation are iterated for files."""
-        with patch("document_analyzer.extract_document_text", return_value="Uploaded in earlier turn"):
+        with patch(
+            "document_analyzer.extract_document_text",
+            return_value="Uploaded in earlier turn",
+        ):
             pdf_bytes = make_pdf_bytes("Uploaded in earlier turn")
             messages = [
                 {
