@@ -80,7 +80,7 @@ def extract_text_from_docx(file_bytes):
         return "\n".join([p.text for p in doc.paragraphs])
     except Exception as e:
         logger.error(f"Error extracting DOCX text: {e}")
-        return ""
+        raise ValueError(f"Invalid DOCX file: {str(e)}") from e
 
 
 def extract_document_text(file_bytes, mime_type):
@@ -147,6 +147,7 @@ def _collect_prompt_and_documents(
                     file_info = part.get("file", {})
                     b64_data = file_info.get("bytes") or file_info.get("data")
                     mime_type = file_info.get("mimeType", "")
+                    file_name = file_info.get("name", "uploaded_file")
 
                     if not b64_data:
                         raise ValueError("No file data found")
@@ -159,7 +160,7 @@ def _collect_prompt_and_documents(
                     doc_text = extract_document_text(file_bytes, mime_type)
                     extracted_docs.append(doc_text)
                 except Exception as e:
-                    errors.append(str(e))
+                    errors.append(f"{file_name}: {str(e)}")
 
     return "\n".join(prompt_parts).strip(), extracted_docs, errors
 
@@ -176,7 +177,7 @@ def handler(messages: list[dict]):
 
     if not extracted_docs:
         if errors:
-            return "Failed to process documents:\n" + "\n".join(errors)
+            return "Failed to process uploaded files:\n" + "\n".join(errors)
         return "No valid document found in the messages."
 
     combined_document = "\n\n".join(extracted_docs)
@@ -191,7 +192,13 @@ Document Content:
 Provide analysis based on the prompt.
 """
     )
-    return result
+    response_text = getattr(result, "content", result)
+    if errors:
+        return (
+            f"{response_text}\n\nWarning: Some files could not be processed:\n"
+            + "\n".join(errors)
+        )
+    return response_text
 
 
 # Bindu config
