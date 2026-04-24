@@ -25,12 +25,27 @@ from __future__ import annotations
 
 from typing import Any
 
-import grpc
+try:
+    import grpc
 
-from bindu.grpc.generated import agent_handler_pb2, agent_handler_pb2_grpc
+    from bindu.grpc.generated import agent_handler_pb2, agent_handler_pb2_grpc
+except ImportError as exc:  # pragma: no cover - optional dependency path
+    grpc = None  # type: ignore[assignment]
+    agent_handler_pb2 = None  # type: ignore[assignment]
+    agent_handler_pb2_grpc = None  # type: ignore[assignment]
+    _GRPC_IMPORT_ERROR = exc
+else:
+    _GRPC_IMPORT_ERROR = None
 from bindu.utils.logging import get_logger
 
 logger = get_logger("bindu.grpc.client")
+
+
+def _require_grpc_dependencies() -> None:
+    if grpc is None or agent_handler_pb2 is None or agent_handler_pb2_grpc is None:
+        raise ImportError(
+            "gRPC support requires optional dependencies. Install with: pip install 'bindu[grpc]'"
+        ) from _GRPC_IMPORT_ERROR
 
 
 class GrpcAgentClient:
@@ -72,6 +87,7 @@ class GrpcAgentClient:
                 instead of HandleMessages (unary). The streaming RPC returns a
                 generator that ResultProcessor.collect_results() will drain.
         """
+        _require_grpc_dependencies()
         self._address = callback_address
         self._timeout = timeout
         self._use_streaming = use_streaming

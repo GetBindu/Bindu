@@ -1,5 +1,6 @@
 """Minimal tests for bindufy module."""
 
+from typing import Any, cast
 from unittest.mock import Mock
 import pytest
 from uuid import UUID
@@ -181,17 +182,16 @@ class TestBindufyUtilities:
 
         assert extension.pay_to_address == "0x123"
 
+    def test_bindufy_non_callable_handler_raises_clear_error(self):
+        """bindufy should fail fast with a clear handler validation message."""
+        config = {
+            "author": "test@example.com",
+            "name": "Test Agent",
+            "deployment": {"url": "http://localhost:3773"},
+        }
 
-def test_bindufy_non_callable_handler_raises_clear_error():
-    """bindufy should fail fast with a clear handler validation message."""
-    config = {
-        "author": "test@example.com",
-        "name": "Test Agent",
-        "deployment": {"url": "http://localhost:3773"},
-    }
-
-    with pytest.raises(
-        TypeError,
-        match="callable function or coroutine function",
-    ):
-        bindufy(config=config, handler="not_callable", run_server=False)  # type: ignore[arg-type]
+        with pytest.raises(
+            TypeError,
+            match="callable function or coroutine function",
+        ):
+            bindufy(config=config, handler=cast(Any, "not_callable"), run_server=False)

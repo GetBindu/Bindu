@@ -1,5 +1,6 @@
 """Minimal tests for in-memory scheduler."""
 
+import asyncio
 import pytest
 from uuid import uuid4
 
@@ -106,3 +107,52 @@ class TestInMemoryScheduler:
             assert len(operations) == 2
             assert operations[0]["operation"] == "run"
             assert operations[1]["operation"] == "cancel"
+
+    @pytest.mark.asyncio
+    async def test_send_operation_waits_for_capacity(self, monkeypatch):
+        scheduler = InMemoryScheduler()
+
+        async with scheduler:
+            release_send = asyncio.Event()
+            first_send_started = asyncio.Event()
+            second_send_started = asyncio.Event()
+            send_call_count = 0
+
+            async def fake_send(_task_op):
+                nonlocal send_call_count
+                send_call_count += 1
+                if send_call_count == 1:
+                    first_send_started.set()
+                elif send_call_count == 2:
+                    second_send_started.set()
+                await release_send.wait()
+
+            monkeypatch.setattr(scheduler._write_stream, "send", fake_send)
+
+            first_run = asyncio.create_task(
+                scheduler.run_task(  # type: ignore[arg-type]
+                    {
+                        "task_id": uuid4(),
+                        "context_id": uuid4(),
+                    }
+                )
+            )
+            await asyncio.wait_for(first_send_started.wait(), timeout=1.0)
+
+            second_run = asyncio.create_task(
+                scheduler.run_task(  # type: ignore[arg-type]
+                    {
+                        "task_id": uuid4(),
+                        "context_id": uuid4(),
+                    }
+                )
+            )
+            await asyncio.wait_for(second_send_started.wait(), timeout=1.0)
+
+            assert first_run.done() is False
+            assert second_run.done() is False
+
+            release_send.set()
+            await asyncio.gather(first_run, second_run)
+
+            assert send_call_count == 2

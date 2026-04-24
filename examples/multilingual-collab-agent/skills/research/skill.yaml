@@ -54,7 +54,7 @@ requirements:
     - "duckduckgo-search>=8.1.1"
     - "agno>=2.5.2"
   system: []
-  min_memory_mb: 256
+  min_memory_mb: 640
 
 performance:
   avg_processing_time_ms: 3000
@@ -63,6 +63,7 @@ performance:
   scalability: horizontal
 
 allowed_tools:
+  # "Read" covers web access/search in this runtime.
   - Read
 
 documentation:

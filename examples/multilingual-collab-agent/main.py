@@ -1,12 +1,3 @@
-# |---------------------------------------------------------|
-# |                                                         |
-# |                 Give Feedback / Get Help                |
-# | https://github.com/getbindu/Bindu/issues/new/choose    |
-# |                                                         |
-# |---------------------------------------------------------|
-#
-#  Thank you users! We ❤️ you! - 🌻
-
 """Multilingual Collaborative Agent v2 — A Bindu Agent.
 
 An identity-aware agent that detects user language (English, Hindi, Bengali)
@@ -35,6 +26,8 @@ load_dotenv()
 agent: Agent | None = None
 _initialized = False
 _init_lock = asyncio.Lock()
+DEFAULT_MODEL = "openai/gpt-oss-120b"
+_mem0_enabled = False
 
 
 def load_config() -> dict:
@@ -46,9 +39,11 @@ def load_config() -> dict:
 
 def build_agent() -> Agent:
     """Build and return the multilingual agent instance."""
+    global _mem0_enabled
+
     openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
     mem0_api_key = os.getenv("MEM0_API_KEY")
-    model_name = os.getenv("MODEL_NAME", "openai/gpt-oss-120b")
+    model_name = os.getenv("MODEL_NAME", DEFAULT_MODEL)
 
     if not openrouter_api_key:
         raise ValueError("OPENROUTER_API_KEY environment variable is required.")
@@ -160,6 +155,8 @@ async def handler(messages: list[dict[str, str]]) -> Any:
             print("🔧 Initializing multilingual agent...")
             agent = build_agent()
             _initialized = True
+            if _mem0_enabled:
+                print("   Memory: Mem0 persistent memory enabled")
             print("✅ Agent initialized")
 
     response = await agent.arun(messages)
@@ -170,9 +167,8 @@ def main() -> None:
     """Start the Bindu agent server."""
     config = load_config()
     print("🌍 Starting Multilingual Collaborative Agent...")
-    print(f"   Supported languages: English, Hindi (हिन्दी), Bengali (বাংলা)")
-    print(f"   Model: {os.getenv('MODEL_NAME', 'openai/gpt-4o-mini')}")
-    print(f"   Memory: Mem0 persistent memory enabled")
+    print("   Supported languages: English, Hindi (हिन्दी), Bengali (বাংলা)")
+    print(f"   Model: {os.getenv('MODEL_NAME', DEFAULT_MODEL)}")
     bindufy(config, handler)
 
 

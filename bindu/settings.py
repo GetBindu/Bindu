@@ -3,7 +3,7 @@
 This module defines the configuration settings for the application using pydantic models.
 """
 
-from pydantic import Field, computed_field, BaseModel, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl, computed_field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import AliasChoices
 from typing import Literal
@@ -875,6 +875,12 @@ class SentrySettings(BaseSettings):
     and release health tracking for production deployments.
     """
 
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="SENTRY__",
+        extra="allow",
+    )
+
     # Enable/disable Sentry
     enabled: bool = False
 
@@ -1016,6 +1022,117 @@ class GrpcSettings(BaseSettings):
     )
 
 
+class VoiceSettings(BaseSettings):
+    """Voice agent configuration settings.
+
+    Configures the real-time voice pipeline powered by Pipecat,
+    including STT (Deepgram), TTS (Piper/ElevenLabs/Azure), VAD,
+    and session management.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="VOICE__",
+        extra="allow",
+    )
+
+    # Master toggle
+    enabled: bool = False
+
+    # Speech-to-Text
+    stt_provider: Literal["deepgram"] = "deepgram"
+    stt_api_key: str = ""
+    stt_model: str = "nova-3"
+    stt_language: str = "en"
+
+    # Provider URLs
+    provider_urls: dict[str, str] = Field(
+        default_factory=lambda: {
+            "deepgram_listen": "https://api.deepgram.com/v1/listen",
+            "elevenlabs_tts": "https://api.elevenlabs.io/v1/text-to-speech",
+            "azure_tts_voices": "https://{region}.tts.speech.microsoft.com/cognitiveservices/voices/list",
+        }
+    )
+
+    # Optional credential lifecycle (for short-lived tokens, if used)
+    token_refresh_endpoint: str = ""
+    token_expiry_seconds: int = 0
+    token_refresh_leeway_seconds: int = 60
+
+    # HTTP client behavior
+    http_timeout_seconds: float = 30.0
+
+    # Text-to-Speech
+    tts_provider: Literal["elevenlabs", "piper", "azure"] = "elevenlabs"
+    tts_fallback_provider: Literal["none", "elevenlabs", "azure"] = "none"
+    tts_api_key: str = ""
+    tts_voice_id: str = "21m00Tcm4TlvDq8ikWAM"  # ElevenLabs "Rachel"
+    tts_model: str = "eleven_turbo_v2_5"
+    tts_stability: float = 0.5
+    tts_similarity_boost: float = 0.75
+
+    # Azure Text-to-Speech (used when tts_provider=azure or fallback is azure)
+    azure_tts_api_key: str = ""
+    azure_tts_region: str = ""
+    azure_tts_voice: str = "en-US-SaraNeural"
+
+    # Audio format
+    sample_rate: int = 16000
+    audio_channels: int = 1
+    audio_encoding: str = "linear16"  # PCM 16-bit
+    audio_sample_width_bytes: int = 2
+
+    # Audio chunking and streaming
+    chunk_overlap_fraction: float = 0.25
+    chunk_throttle_ms: int = 800
+
+    # Voice Activity Detection
+    vad_enabled: bool = True
+    vad_threshold: float = 0.5
+
+    # Behavior
+    allow_interruptions: bool = True
+    agent_timeout_secs: float = 10.0
+    utterance_timeout_secs: float = 30.0
+    retry_attempts: int = 3
+    retry_backoff_start_ms: int = 200
+    retry_backoff_factor: float = 2.0
+    retry_backoff_max_ms: int = 2000
+    cancellation_grace_secs: float = 0.5
+    conversation_history_limit: int = 50
+    conversation_policy: Literal["unsaved", "terminate"] = "unsaved"
+    session_timeout: int = 300  # seconds (5 min)
+    max_concurrent_sessions: int = 10
+
+    # Session storage backend (for multi-worker compatibility)
+    session_backend: Literal["memory", "redis"] = "memory"
+    redis_url: str = ""  # e.g., "redis://localhost:6379/0"
+    redis_session_ttl: int = 300  # seconds, TTL for session keys in Redis
+
+    # WebSocket session authentication
+    session_auth_required: bool = False
+    session_token_ttl: int = 300  # seconds; must be <= session_timeout
+
+    # Rate limiting (0 disables)
+    rate_limit_per_ip_per_minute: int = 120
+    rate_limit_backend: Literal["memory", "redis"] = "memory"
+
+    # Extension metadata
+    # Note: bindu:// is an internal routing scheme used by the voice agent extension.
+    # Consumers should handle this as a special case for internal routing.
+    extension_uri: str = "bindu://voice"
+    extension_description: str = "Real-time voice conversation for Bindu agents"
+
+    @model_validator(mode="after")
+    def _validate_session_token_ttl(self) -> "VoiceSettings":
+        # Enforce that tokens never outlive sessions.
+        # If misconfigured via env (e.g. TTL > timeout), clamp TTL to timeout
+        # to fail safe without preventing the server from starting.
+        if self.session_token_ttl > self.session_timeout:
+            self.session_token_ttl = self.session_timeout
+        return self
+
+
 class Settings(BaseSettings):
     """Main settings class that aggregates all configuration components."""
 
@@ -1044,6 +1161,7 @@ class Settings(BaseSettings):
     negotiation: NegotiationSettings = NegotiationSettings()
     sentry: SentrySettings = SentrySettings()
     grpc: GrpcSettings = GrpcSettings()
+    voice: VoiceSettings = VoiceSettings()
 
 
 app_settings = Settings()
