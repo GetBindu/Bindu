@@ -177,3 +177,6 @@ fallback-version = "0.3.14"
 
 [tool.hatch.build.hooks.vcs]
 version-file = "bindu/_version.py"
+
+[tool.uv]
+constraint-dependencies = ["pydantic-extra-types>=2.11.3"]
