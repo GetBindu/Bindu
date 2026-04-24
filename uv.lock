@@ -7,6 +7,9 @@ resolution-markers = [
     "python_full_version < '3.13'",
 ]
 
+[manifest]
+constraints = [{ name = "pydantic-extra-types", specifier = ">=2.11.3" }]
+
 [[package]]
 name = "ag2"
 version = "0.11.4"
@@ -530,7 +533,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "ag2", extras = ["openai"], marker = "extra == 'agents'", specifier = ">=0.11.0" },
-    { name = "agno", marker = "extra == 'agents'", specifier = ">=2.5.2" },
+    { name = "agno", specifier = ">=2.5.2" },
     { name = "aiofiles", specifier = ">=24.1.0,<25" },
     { name = "aiofiles", marker = "extra == 'core'", specifier = ">=24.1.0,<25" },
     { name = "alembic", specifier = ">=1.17.2,<2" },
@@ -546,10 +549,8 @@ requires-dist = [
     { name = "duckduckgo-search", marker = "extra == 'agents'", specifier = ">=8.1.1" },
     { name = "eth-account", specifier = "==0.13.7" },
     { name = "eth-utils", marker = "extra == 'agents'", specifier = ">=5.0.0" },
-    { name = "grpcio", specifier = ">=1.78.0" },
-    { name = "grpcio", marker = "extra == 'grpc'", specifier = ">=1.62.0" },
-    { name = "grpcio-tools", specifier = ">=1.78.0" },
-    { name = "grpcio-tools", marker = "extra == 'grpc'", specifier = ">=1.62.0" },
+    { name = "grpcio", marker = "extra == 'grpc'", specifier = ">=1.67.0,<1.78.0" },
+    { name = "grpcio-tools", marker = "extra == 'grpc'", specifier = ">=1.67.0,<1.78.0" },
     { name = "httpx", specifier = ">=0.28.1,<1" },
     { name = "httpx", marker = "extra == 'core'", specifier = ">=0.28.1,<1" },
     { name = "langchain", marker = "extra == 'agents'", specifier = ">=1.2.9" },
@@ -570,8 +571,8 @@ requires-dist = [
     { name = "opentelemetry-sdk", specifier = "==1.35.0" },
     { name = "orjson", specifier = ">=3.10.18,<4" },
     { name = "orjson", marker = "extra == 'core'", specifier = ">=3.10.18,<4" },
-    { name = "protobuf", specifier = ">=6.33.5" },
-    { name = "protobuf", marker = "extra == 'grpc'", specifier = ">=4.25.0" },
+    { name = "pipecat-ai", extras = ["deepgram", "elevenlabs", "piper", "silero"], marker = "extra == 'voice'", specifier = "~=0.0.105" },
+    { name = "protobuf", marker = "extra == 'grpc'", specifier = ">=5.29.6,<6.0.0" },
     { name = "pycryptodome", marker = "extra == 'agents'", specifier = ">=3.20.0" },
     { name = "pydantic", specifier = ">=2.11.7" },
     { name = "pydantic", marker = "extra == 'core'", specifier = ">=2.11.7" },
@@ -1618,18 +1619,17 @@ pydantic = [
 
 [[package]]
 name = "fastapi"
-version = "0.135.3"
+version = "0.125.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "annotated-doc" },
     { name = "pydantic" },
     { name = "starlette" },
     { name = "typing-extensions" },
-    { name = "typing-inspection" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f7/e6/7adb4c5fa231e82c35b8f5741a9f2d055f520c29af5546fd70d3e8e1cd2e/fastapi-0.135.3.tar.gz", hash = "sha256:bd6d7caf1a2bdd8d676843cdcd2287729572a1ef524fc4d65c17ae002a1be654", size = 396524, upload-time = "2026-04-01T16:23:58.188Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/17/71/2df15009fb4bdd522a069d2fbca6007c6c5487fce5cb965be00fc335f1d1/fastapi-0.125.0.tar.gz", hash = "sha256:16b532691a33e2c5dee1dac32feb31dc6eb41a3dd4ff29a95f9487cb21c054c0", size = 370550, upload-time = "2025-12-17T21:41:44.15Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/84/a4/5caa2de7f917a04ada20018eccf60d6cc6145b0199d55ca3711b0fc08312/fastapi-0.135.3-py3-none-any.whl", hash = "sha256:9b0f590c813acd13d0ab43dd8494138eb58e484bfac405db1f3187cfc5810d98", size = 117734, upload-time = "2026-04-01T16:23:59.328Z" },
+    { url = "https://files.pythonhosted.org/packages/34/2f/ff2fcc98f500713368d8b650e1bbc4a0b3ebcdd3e050dcdaad5f5a13fd7e/fastapi-0.125.0-py3-none-any.whl", hash = "sha256:2570ec4f3aecf5cca8f0428aed2398b774fcdfee6c2116f86e80513f2f86a7a1", size = 112888, upload-time = "2025-12-17T21:41:41.286Z" },
 ]
 
 [package.optional-dependencies]
@@ -1638,8 +1638,6 @@ standard = [
     { name = "fastapi-cli", extra = ["standard"] },
     { name = "httpx" },
     { name = "jinja2" },
-    { name = "pydantic-extra-types" },
-    { name = "pydantic-settings" },
     { name = "python-multipart" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -4247,19 +4245,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/f5/71/b494cef3165e3413ee9bbbb5a9eedc9af0ea7b88d8638beef6c2061b110e/pydantic_core-2.46.0-graalpy312-graalpy250_312_native-macosx_11_0_arm64.whl", hash = "sha256:a2ab0e785548be1b4362a62c4004f9217598b7ee465f1f420fc2123e2a5b5b02", size = 1940442, upload-time = "2026-04-13T09:06:29.332Z" },
     { url = "https://files.pythonhosted.org/packages/7e/3e/a4d578c8216c443e26a1124f8c1e07c0654264ce5651143d3883d85ff140/pydantic_core-2.46.0-graalpy312-graalpy250_312_native-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:16d45aecb18b8cba1c68eeb17c2bb2d38627ceed04c5b30b882fc9134e01f187", size = 1999672, upload-time = "2026-04-13T09:04:42.798Z" },
     { url = "https://files.pythonhosted.org/packages/cd/c1/9114560468685525a21770138382fd0cb849aaf351ff2c7b97f760d121e0/pydantic_core-2.46.0-graalpy312-graalpy250_312_native-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:5078f6c377b002428e984259ac327ef8902aacae6c14b7de740dd4869a491501", size = 2154533, upload-time = "2026-04-13T09:04:50.868Z" },
-]
-
-[[package]]
-name = "pydantic-extra-types"
-version = "2.11.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "pydantic" },
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/41/d3/3be31542180c0300b6860129ff1e3a428f3ef580727616ce22462626129b/pydantic_extra_types-2.11.2.tar.gz", hash = "sha256:3a2b83b61fe920925688e7838b59caa90a45637d1dbba2b1364b8d1f7ff72a0a", size = 203929, upload-time = "2026-04-05T20:50:51.556Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/92/a4/7b6ab05c18d6c6e682382a0f0235301684452c4131a869f45961d1d032c9/pydantic_extra_types-2.11.2-py3-none-any.whl", hash = "sha256:683b8943252543e49760f89733b1519bc62f31d1a287ebbdc5a7b7959fb4acfd", size = 82851, upload-time = "2026-04-05T20:50:50.036Z" },
 ]
 
 [[package]]
