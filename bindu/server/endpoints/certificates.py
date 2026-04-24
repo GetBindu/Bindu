@@ -34,8 +34,30 @@ from bindu.utils.logging import get_logger
 
 logger = get_logger("bindu.server.endpoints.certificates")
 
+
+class CertificateNotFoundError(ValueError):
+    """Raised when a certificate is not found in storage."""
+
+
+class CertificateBindingError(RuntimeError):
+    """Raised when Hydra certificate binding or unbinding fails."""
+
+
+def _get_cert_ttl_hours() -> int:
+    """Get certificate TTL from settings with a safe fallback."""
+    return getattr(getattr(app_settings, "mtls", None), "cert_ttl_hours", 24)
+
+
+def _get_certs_dir() -> Path:
+    """Get certificate directory from settings with a safe fallback."""
+    certs_dir = getattr(
+        getattr(app_settings, "mtls", None),
+        "certs_dir",
+        "~/.bindu/certs",
+    )
+    return Path(certs_dir).expanduser()
+
 # Default certificate TTL — 24 hours as per ADR
-CERT_TTL_HOURS = 24
 
 
 # -----------------------------------------------------------------------------
@@ -62,7 +84,7 @@ def load_or_create_local_ca() -> tuple:
     Returns:
         Tuple of (ca_key, ca_cert)
     """
-    certs_dir = Path.home() / ".bindu" / "certs"
+    certs_dir = _get_certs_dir()
     certs_dir.mkdir(parents=True, exist_ok=True)
 
     ca_key_path = certs_dir / "ca.key"
@@ -73,11 +95,11 @@ def load_or_create_local_ca() -> tuple:
             ca_key = serialization.load_pem_private_key(f.read(), password=None)
         with open(ca_cert_path, "rb") as f:
             ca_cert = x509.load_pem_x509_certificate(f.read())
-        logger.debug("Loaded existing local CA from ~/.bindu/certs/")
+        logger.debug(f"Loaded existing local CA from {certs_dir}")
         return ca_key, ca_cert
 
     # First run — generate a new local Root CA
-    logger.info("Generating local Root CA in ~/.bindu/certs/ ...")
+    logger.info(f"Generating local Root CA in {certs_dir} ...")
     ca_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
     subject = issuer = x509.Name(
@@ -110,7 +132,7 @@ def load_or_create_local_ca() -> tuple:
     with open(ca_cert_path, "wb") as f:
         f.write(ca_cert.public_bytes(serialization.Encoding.PEM))
 
-    logger.info("Local Root CA generated and saved to ~/.bindu/certs/")
+    logger.info(f"Local Root CA generated and saved to {certs_dir}")
     return ca_key, ca_cert
 
 
@@ -133,7 +155,9 @@ def sign_csr(csr_pem: str) -> str:
         .public_key(csr.public_key())
         .serial_number(x509.random_serial_number())
         .not_valid_before(datetime.now(timezone.utc))
-        .not_valid_after(datetime.now(timezone.utc) + timedelta(hours=CERT_TTL_HOURS))
+        .not_valid_after(
+            datetime.now(timezone.utc) + timedelta(hours=_get_cert_ttl_hours())
+        )
         .sign(ca_key, hashes.SHA256())
     )
 
@@ -176,16 +200,16 @@ async def _bind_certificate(
         )
         if response.status not in (200, 201):
             error_text = await response.text()
-            raise ValueError(
+            raise CertificateBindingError(
                 f"Failed to bind certificate to Hydra client: {error_text}"
             )
         logger.debug(
             f"Certificate bound to Hydra client: did={agent_did}, "
             f"fingerprint={cert_fingerprint[:16]}..."
         )
-    except (aiohttp.ClientError, ValueError) as error:
+    except (aiohttp.ClientError, CertificateBindingError) as error:
         logger.error(f"Failed to bind agent certificate: {error}")
-        raise ValueError(f"Certificate binding failed: {str(error)}")
+        raise CertificateBindingError(f"Certificate binding failed: {str(error)}")
 
 
 async def _unbind_certificate(
@@ -206,13 +230,13 @@ async def _unbind_certificate(
         )
         if response.status not in (200, 201):
             error_text = await response.text()
-            raise ValueError(
+            raise CertificateBindingError(
                 f"Failed to unbind certificate from Hydra client: {error_text}"
             )
         logger.debug(f"Certificate unbound from Hydra client: did={agent_did}")
-    except (aiohttp.ClientError, ValueError) as error:
+    except (aiohttp.ClientError, CertificateBindingError) as error:
         logger.error(f"Failed to unbind agent certificate: {error}")
-        raise ValueError(f"Certificate unbinding failed: {str(error)}")
+        raise CertificateBindingError(f"Certificate unbinding failed: {str(error)}")
 
 
 async def _write_audit_log(
@@ -317,7 +341,7 @@ async def issue_certificate(
         CertificateData with the signed cert and metadata
     """
     now = datetime.now(timezone.utc)
-    expires_at = now + timedelta(hours=CERT_TTL_HOURS)
+    expires_at = now + timedelta(hours=_get_cert_ttl_hours())
 
     cert_pem = sign_csr(csr_pem)
     fingerprint = compute_sha256_fingerprint(cert_pem)
@@ -377,7 +401,7 @@ async def renew_certificate(
         CertificateData for the new certificate
 
     Raises:
-        ValueError: If no active certificate matches the provided fingerprint
+        CertificateNotFoundError: If no active certificate matches the provided fingerprint
     """
     result = await conn.execute(
         select(agent_certificates_table).where(
@@ -388,13 +412,13 @@ async def renew_certificate(
     )
     existing = result.fetchone()
     if not existing:
-        raise ValueError(
+        raise CertificateNotFoundError(
             f"No active certificate found for did={agent_did} "
             f"with fingerprint={current_fingerprint[:16]}..."
         )
 
     now = datetime.now(timezone.utc)
-    expires_at = now + timedelta(hours=CERT_TTL_HOURS)
+    expires_at = now + timedelta(hours=_get_cert_ttl_hours())
     new_cert_pem = sign_csr(csr_pem)
     new_fingerprint = compute_sha256_fingerprint(new_cert_pem)
 
@@ -462,7 +486,7 @@ async def revoke_certificate(
         reason: Optional revocation reason for the audit log
 
     Raises:
-        ValueError: If the certificate is not found
+        CertificateNotFoundError: If the certificate is not found
     """
     result = await conn.execute(
         update(agent_certificates_table)
@@ -475,7 +499,7 @@ async def revoke_certificate(
     )
 
     if not result.fetchone():
-        raise ValueError(
+        raise CertificateNotFoundError(
             f"Certificate not found: did={agent_did}, "
             f"fingerprint={cert_fingerprint[:16]}..."
         )
@@ -523,6 +547,9 @@ async def issue_certificate_endpoint(app: Any, request: Request) -> JSONResponse
 
         return JSONResponse(dict(result), status_code=201)
 
+    except CertificateBindingError:
+        logger.error("Certificate binding failure during issuance")
+        return JSONResponse({"error": "Certificate operation failed"}, status_code=502)
     except Exception as e:
         logger.error(f"Certificate issuance failed: {e}")
         return JSONResponse({"error": "Certificate issuance failed"}, status_code=500)
@@ -553,8 +580,11 @@ async def renew_certificate_endpoint(app: Any, request: Request) -> JSONResponse
 
         return JSONResponse(dict(result), status_code=200)
 
-    except ValueError as e:
+    except CertificateNotFoundError as e:
         return JSONResponse({"error": str(e)}, status_code=404)
+    except CertificateBindingError:
+        logger.error("Certificate binding failure during renewal")
+        return JSONResponse({"error": "Certificate operation failed"}, status_code=502)
     except Exception as e:
         logger.error(f"Certificate renewal failed: {e}")
         return JSONResponse({"error": "Certificate renewal failed"}, status_code=500)
@@ -585,8 +615,11 @@ async def revoke_certificate_endpoint(app: Any, request: Request) -> JSONRespons
 
         return JSONResponse({"status": "revoked"}, status_code=200)
 
-    except ValueError as e:
+    except CertificateNotFoundError as e:
         return JSONResponse({"error": str(e)}, status_code=404)
+    except CertificateBindingError:
+        logger.error("Certificate binding failure during revocation")
+        return JSONResponse({"error": "Certificate operation failed"}, status_code=502)
     except Exception as e:
         logger.error(f"Certificate revocation failed: {e}")
         return JSONResponse({"error": "Certificate revocation failed"}, status_code=500)
