@@ -8,7 +8,7 @@ The pipeline is built lazily when starting a voice session.
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Any, Callable, TypedDict, cast
 
 from bindu.settings import app_settings
 from bindu.utils.logging import get_logger
@@ -20,6 +20,15 @@ from .voice_agent_extension import VoiceAgentExtension
 logger = get_logger("bindu.voice.pipeline_builder")
 
 
+class VoicePipelineComponents(TypedDict):
+    """Concrete components returned by ``build_voice_pipeline``."""
+
+    stt: Any
+    tts: Any
+    bridge: AgentBridgeProcessor
+    vad: Any | None
+
+
 def build_voice_pipeline(
     voice_ext: VoiceAgentExtension,
     manifest_run: Callable[..., Any],
@@ -29,7 +38,7 @@ def build_voice_pipeline(
     on_user_transcript: Callable[[str], Any] | None = None,
     on_agent_response: Callable[[str], Any] | None = None,
     on_agent_transcript: Callable[[str, bool], Any] | None = None,
-) -> dict[str, Any]:
+) -> VoicePipelineComponents:
     """Build the voice pipeline components.
 
     Returns a dict of pipeline components that can be wired up to a
@@ -76,9 +85,12 @@ def build_voice_pipeline(
         f"context={context_id}, VAD={app_settings.voice.vad_enabled}"
     )
 
-    return {
-        "stt": stt,
-        "tts": tts,
-        "bridge": bridge,
-        "vad": vad_component,
-    }
+    return cast(
+        VoicePipelineComponents,
+        {
+            "stt": stt,
+            "tts": tts,
+            "bridge": bridge,
+            "vad": vad_component,
+        },
+    )

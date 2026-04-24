@@ -16,7 +16,7 @@ import importlib
 import secrets
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from uuid import uuid4
 
 from fastapi import HTTPException
@@ -30,6 +30,7 @@ from bindu.server.endpoints.utils import handle_endpoint_errors
 
 if TYPE_CHECKING:
     from bindu.server.applications import BinduApplication
+    from bindu.extensions.voice.session_factory import SessionManagerBackend
 
 logger = get_logger("bindu.server.endpoints.voice")
 
@@ -196,15 +197,20 @@ class _FilteredWebSocket:
         return data
 
 
-try:
+if TYPE_CHECKING:
     from pipecat.serializers.base_serializer import (
         FrameSerializer as _PipecatFrameSerializer,
     )
-except Exception:  # pragma: no cover
+else:
+    try:
+        from pipecat.serializers.base_serializer import (
+            FrameSerializer as _PipecatFrameSerializer,
+        )
+    except Exception:  # pragma: no cover
 
-    class _PipecatFrameSerializer:  # type: ignore[too-many-ancestors]
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
-            pass
+        class _PipecatFrameSerializer:  # type: ignore[too-many-ancestors]
+            def __init__(self, *args: Any, **kwargs: Any) -> None:
+                pass
 
 
 class _RawAudioFrameSerializer(_PipecatFrameSerializer):
@@ -706,10 +712,14 @@ async def voice_websocket(websocket: WebSocket) -> None:
     app: BinduApplication = websocket.app  # type: ignore[assignment]
     session_id = websocket.path_params.get("session_id", "")
 
-    session_manager = getattr(app, "_voice_session_manager", None)
+    session_manager = cast(
+        "SessionManagerBackend | None",
+        getattr(app, "_voice_session_manager", None),
+    )
     if session_manager is None:
         await websocket.close(code=1008, reason="Voice extension is not enabled")
         return
+    voice_session_manager: SessionManagerBackend = session_manager
     if not app_settings.voice.enabled:
         await websocket.close(code=1008, reason="Voice is disabled")
         return
@@ -719,14 +729,14 @@ async def voice_websocket(websocket: WebSocket) -> None:
         await websocket.close(code=1008, reason=preflight_error)
         return
 
-    session = await session_manager.get_session(session_id)
+    session = await voice_session_manager.get_session(session_id)
     if session is None:
         await websocket.close(code=1008, reason="Invalid session ID")
         return
 
     async def _end_session_best_effort() -> None:
         try:
-            await session_manager.end_session(session_id)
+            await voice_session_manager.end_session(session_id)
         except Exception:
             logger.debug(
                 "Failed to end voice session during websocket handshake cleanup",
@@ -872,7 +882,7 @@ async def voice_websocket(websocket: WebSocket) -> None:
         # Notify UI we are listening
         await _send_json(websocket, {"type": "state", "state": "listening"}, send_lock)
 
-        components = build_voice_pipeline(
+        components_result = build_voice_pipeline(
             voice_ext=voice_ext,
             manifest_run=manifest.run,
             context_id=session.context_id,
@@ -881,9 +891,13 @@ async def voice_websocket(websocket: WebSocket) -> None:
             on_agent_response=_on_agent_response,
             on_agent_transcript=_on_agent_transcript,
         )
+        if components_result is None:
+            raise RuntimeError("Voice pipeline builder returned no components")
+        components = components_result
 
         inbound_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=10)
         filtered_ws = _FilteredWebSocket(websocket, inbound_queue)
+        bridge = components["bridge"]
 
         async def _handle_user_text(text: str) -> None:
             await _send_json(
@@ -896,9 +910,7 @@ async def voice_websocket(websocket: WebSocket) -> None:
                 },
                 send_lock,
             )
-            response = await components["bridge"].process_transcription(
-                text, emit_frames=True
-            )
+            response = await bridge.process_transcription(text, emit_frames=True)
             if response:
                 await _on_agent_response(response)
 

@@ -281,9 +281,7 @@ class TestCreateTTSService:
             ) as mock_settings,
             patch.dict(
                 "sys.modules",
-                {
-                    "pipecat.services.azure.tts": MagicMock(AzureTTSService=mock_tts_cls)
-                },
+                {"pipecat.services.azure.tts": MagicMock(AzureTTSService=mock_tts_cls)},
             ),
         ):
             mock_settings.voice.tts_api_key = ""

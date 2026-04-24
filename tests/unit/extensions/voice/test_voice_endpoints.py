@@ -354,9 +354,7 @@ class TestVoicePipelineErrorClassification:
 class TestVoiceWebSocketSubprotocolParsing:
     def test_extract_ws_session_token_parses_label_and_token(self):
         websocket = MagicMock()
-        websocket.headers = {
-            "sec-websocket-protocol": "bindu.voice.v1, token-abc"
-        }
+        websocket.headers = {"sec-websocket-protocol": "bindu.voice.v1, token-abc"}
 
         label, token = _extract_ws_session_token(websocket)
 

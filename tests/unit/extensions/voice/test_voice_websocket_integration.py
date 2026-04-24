@@ -173,10 +173,7 @@ async def test_voice_websocket_accepts_subprotocol_session_token(
 
         websocket.accept.assert_awaited()
         # Should negotiate the fixed voice websocket protocol, not the token.
-        assert (
-            websocket.accept.await_args.kwargs.get("subprotocol")
-            == "bindu.voice.v1"
-        )
+        assert websocket.accept.await_args.kwargs.get("subprotocol") == "bindu.voice.v1"
 
         sent = [
             json.loads(call.args[0]) for call in websocket.send_text.await_args_list
