@@ -88,3 +88,12 @@ async def health_endpoint(app: BinduApplication, request: Request) -> JSONRespon
 
     status_code = 200 if runtime["strict_ready"] else 503
     return JSONResponse(payload, status_code=status_code)
+
+
+@handle_endpoint_errors("healthz check")
+async def healthz_endpoint(app: BinduApplication, request: Request) -> JSONResponse:
+    """Strict readiness endpoint for Kubernetes probes.
+
+    Returns HTTP 200 when all components are ready and HTTP 503 otherwise.
+    """
+    return await health_endpoint(app, request)
