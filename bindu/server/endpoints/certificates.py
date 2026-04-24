@@ -246,6 +246,52 @@ async def _write_audit_log(
 
 
 # -----------------------------------------------------------------------------
+# Authorization helpers
+# -----------------------------------------------------------------------------
+
+
+def _get_caller_did(request: Request) -> str | None:
+    """Extract the caller's DID from request state (set by auth middleware).
+
+    Returns:
+        The authenticated agent DID, or None if unauthenticated.
+    """
+    return getattr(request.state, "agent_did", None)
+
+
+def _authorize_agent_did(
+    caller_did: str | None,
+    requested_did: str,
+) -> JSONResponse | None:
+    """Check that the authenticated caller owns the requested agent_did.
+
+    Returns a JSONResponse error if unauthorized, or None if authorized.
+
+    Args:
+        caller_did: DID extracted from the authenticated request.
+        requested_did: DID supplied in the request body.
+
+    Returns:
+        JSONResponse with 401/403 if unauthorized, None if authorized.
+    """
+    if caller_did is None:
+        return JSONResponse(
+            {"error": "Authentication required"},
+            status_code=401,
+        )
+    if caller_did != requested_did:
+        logger.warning(
+            f"Authorization denied: caller={caller_did} "
+            f"attempted to manage certificates for {requested_did}"
+        )
+        return JSONResponse(
+            {"error": "Forbidden: cannot manage certificates for another agent"},
+            status_code=403,
+        )
+    return None
+
+
+# -----------------------------------------------------------------------------
 # Core certificate lifecycle logic
 # -----------------------------------------------------------------------------
 
@@ -297,7 +343,9 @@ async def issue_certificate(
         event_data={"expires_at": expires_at.isoformat()},
     )
 
-    logger.info(f"Certificate issued: did={agent_did}, fingerprint={fingerprint[:16]}...")
+    logger.info(
+        f"Certificate issued: did={agent_did}, fingerprint={fingerprint[:16]}..."
+    )
 
     return CertificateData(
         certificate_pem=cert_pem,
@@ -317,9 +365,6 @@ async def renew_certificate(
     hydra_client: HydraClient,
 ) -> CertificateData:
     """Renew an mTLS certificate before expiry.
-
-    Requires the current valid fingerprint. OAuth2 refresh token validation
-    is handled at the middleware/route level before this is called.
 
     Args:
         agent_did: DID of the agent
@@ -409,9 +454,6 @@ async def revoke_certificate(
 ) -> None:
     """Revoke an mTLS certificate immediately.
 
-    Marks as revoked in DB and removes the Hydra binding, killing access
-    for any subsequent request using this certificate.
-
     Args:
         agent_did: DID of the agent
         cert_fingerprint: SHA-256 fingerprint of the certificate to revoke
@@ -472,6 +514,9 @@ async def issue_certificate_endpoint(app: Any, request: Request) -> JSONResponse
                 status_code=400,
             )
 
+        if auth_error := _authorize_agent_did(_get_caller_did(request), agent_did):
+            return auth_error
+
         async with app._storage.connection() as conn:
             hydra_client = HydraClient(admin_url=app_settings.hydra.admin_url)
             result = await issue_certificate(agent_did, csr_pem, conn, hydra_client)
@@ -480,7 +525,7 @@ async def issue_certificate_endpoint(app: Any, request: Request) -> JSONResponse
 
     except Exception as e:
         logger.error(f"Certificate issuance failed: {e}")
-        return JSONResponse({"error": str(e)}, status_code=500)
+        return JSONResponse({"error": "Certificate issuance failed"}, status_code=500)
 
 
 async def renew_certificate_endpoint(app: Any, request: Request) -> JSONResponse:
@@ -497,6 +542,9 @@ async def renew_certificate_endpoint(app: Any, request: Request) -> JSONResponse
                 status_code=400,
             )
 
+        if auth_error := _authorize_agent_did(_get_caller_did(request), agent_did):
+            return auth_error
+
         async with app._storage.connection() as conn:
             hydra_client = HydraClient(admin_url=app_settings.hydra.admin_url)
             result = await renew_certificate(
@@ -509,7 +557,7 @@ async def renew_certificate_endpoint(app: Any, request: Request) -> JSONResponse
         return JSONResponse({"error": str(e)}, status_code=404)
     except Exception as e:
         logger.error(f"Certificate renewal failed: {e}")
-        return JSONResponse({"error": str(e)}, status_code=500)
+        return JSONResponse({"error": "Certificate renewal failed"}, status_code=500)
 
 
 async def revoke_certificate_endpoint(app: Any, request: Request) -> JSONResponse:
@@ -526,6 +574,9 @@ async def revoke_certificate_endpoint(app: Any, request: Request) -> JSONRespons
                 status_code=400,
             )
 
+        if auth_error := _authorize_agent_did(_get_caller_did(request), agent_did):
+            return auth_error
+
         async with app._storage.connection() as conn:
             hydra_client = HydraClient(admin_url=app_settings.hydra.admin_url)
             await revoke_certificate(
@@ -538,4 +589,4 @@ async def revoke_certificate_endpoint(app: Any, request: Request) -> JSONRespons
         return JSONResponse({"error": str(e)}, status_code=404)
     except Exception as e:
         logger.error(f"Certificate revocation failed: {e}")
-        return JSONResponse({"error": str(e)}, status_code=500)
+        return JSONResponse({"error": "Certificate revocation failed"}, status_code=500)
