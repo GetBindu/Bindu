@@ -3,7 +3,7 @@
 This module defines the configuration settings for the application using pydantic models.
 """
 
-from pydantic import Field, computed_field, BaseModel, HttpUrl
+from pydantic import Field, computed_field, BaseModel, HttpUrl, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import AliasChoices
 from typing import Literal
@@ -219,7 +219,10 @@ class ObservabilitySettings(BaseSettings):
     )
 
     # OpenInference Instrumentor Mapping
+    # Maps framework names to their instrumentor module paths and class names
+    # Format: framework_name: (module_path, class_name)
     instrumentor_map: dict[str, tuple[str, str]] = {
+        # Agent Frameworks
         "agno": ("openinference.instrumentation.agno", "AgnoInstrumentor"),
         "crewai": ("openinference.instrumentation.crewai", "CrewAIInstrumentor"),
         "langchain": (
@@ -248,6 +251,7 @@ class ObservabilitySettings(BaseSettings):
             "openinference.instrumentation.smolagents",
             "SmolAgentsInstrumentor",
         ),
+        # LLM Providers
         "litellm": ("openinference.instrumentation.litellm", "LiteLLMInstrumentor"),
         "openai": ("openinference.instrumentation.openai", "OpenAIInstrumentor"),
         "anthropic": (
@@ -293,8 +297,10 @@ class X402Settings(BaseSettings):
     extension_uri: str = "https://github.com/google-a2a/a2a-x402/v0.1"
 
     # Protected methods that require payment
+    # Similar to auth's public_endpoints, this defines which JSON-RPC methods need payment
     protected_methods: list[str] = [
-        "message/send",
+        "message/send",  # Creating new tasks requires payment
+        # "message/stream",  # Uncomment if streaming should require payment
     ]
 
     # Metadata keys
@@ -320,8 +326,10 @@ class X402Settings(BaseSettings):
     # SKALE facilitator endpoint (dirtroad.dev runs the reference facilitator)
     skale_facilitator_url: str = "https://facilitator.dirtroad.dev"
 
-    # SKALE Europa Hub chain ID (eip155 format required by x402 protocol)
-    skale_network: str = "eip155:2046399126"
+    # SKALE Europa Hub network slug — matches rpc_urls_by_network key below.
+    # Uses friendly slug (skale-europa) consistent with other network slugs
+    # (base-sepolia, base, ethereum) rather than CAIP-2 form (eip155:2046399126).
+    skale_network: str = "skale-europa"
 
     # Bridged USDC on SKALE Europa Hub
     # Contract: https://elated-tan-skat.explorer.mainnet.skalenodes.com/
@@ -338,33 +346,33 @@ class X402Settings(BaseSettings):
     # Always check https://chainlist.org for latest RPC URLs
     rpc_urls_by_network: dict[str, list[str]] = {
         "base-sepolia": [
-            "https://sepolia.base.org",
-            "https://base-sepolia.public.blastapi.io",
-            "https://rpc.ankr.com/base_sepolia",
-            "https://base-sepolia.blockpi.network/v1/rpc/public",
-            "https://base-sepolia-rpc.publicnode.com",
+            "https://sepolia.base.org",  # Official Base Sepolia
+            "https://base-sepolia.public.blastapi.io",  # Blast public API
+            "https://rpc.ankr.com/base_sepolia",  # Ankr public
+            "https://base-sepolia.blockpi.network/v1/rpc/public",  # BlockPI public
+            "https://base-sepolia-rpc.publicnode.com",  # PublicNode
         ],
         "base": [
-            "https://mainnet.base.org",
-            "https://base.blockpi.network/v1/rpc/public",
-            "https://base-rpc.publicnode.com",
-            "https://1rpc.io/base",
-            "https://base.drpc.org",
+            "https://mainnet.base.org",  # Official Base Mainnet
+            "https://base.blockpi.network/v1/rpc/public",  # BlockPI public
+            "https://base-rpc.publicnode.com",  # PublicNode
+            "https://1rpc.io/base",  # 1RPC public
+            "https://base.drpc.org",  # DRPC public
         ],
         "ethereum": [
-            "https://eth.llamarpc.com",
-            "https://ethereum-rpc.publicnode.com",
-            "https://rpc.ankr.com/eth",
-            "https://ethereum.public.blockpi.network/v1/rpc/public",
+            "https://eth.llamarpc.com",  # LlamaRPC
+            "https://ethereum-rpc.publicnode.com",  # PublicNode
+            "https://rpc.ankr.com/eth",  # Ankr public
+            "https://ethereum.public.blockpi.network/v1/rpc/public",  # BlockPI
         ],
         # SKALE Europa Hub — gasless transactions (no ETH needed for gas)
-        # Chain ID: 2046399126
+        # Chain ID: 2046399126  CAIP-2: eip155:2046399126
         # Docs: https://docs.skale.space/
-        "eip155:2046399126": [
+        "skale-europa": [
             "https://mainnet.skalenodes.com/v1/elated-tan-skat",
         ],
-        # Alias for convenience
-        "skale-europa": [
+        # CAIP-2 alias so x402 payment payloads using eip155:2046399126 resolve correctly
+        "eip155:2046399126": [
             "https://mainnet.skalenodes.com/v1/elated-tan-skat",
         ],
     }
@@ -380,6 +388,7 @@ class AgentSettings(BaseSettings):
     )
 
     # A2A Protocol Method Handlers
+    # Maps JSON-RPC method names to task_manager handler method names
     method_handlers: dict[str, str] = {
         "message/send": "send_message",
         "message/stream": "stream_message",
@@ -389,6 +398,7 @@ class AgentSettings(BaseSettings):
         "contexts/list": "list_contexts",
         "contexts/clear": "clear_context",
         "tasks/feedback": "task_feedback",
+        # Push-notification config methods (A2A protocol extension)
         "tasks/pushNotificationConfig/set": "set_task_push_notification",
         "tasks/pushNotificationConfig/get": "get_task_push_notification",
         "tasks/pushNotificationConfig/list": "list_task_push_notifications",
@@ -396,21 +406,23 @@ class AgentSettings(BaseSettings):
     }
 
     # Task State Configuration (A2A Protocol)
+    # Non-terminal states: Task is mutable, can receive new messages
     non_terminal_states: frozenset[str] = frozenset(
         {
-            "submitted",
-            "working",
-            "input-required",
-            "auth-required",
+            "submitted",  # Task submitted, awaiting execution
+            "working",  # Agent actively processing
+            "input-required",  # Waiting for user input
+            "auth-required",  # Waiting for authentication
         }
     )
 
+    # Terminal states: Task is immutable, no further changes allowed
     terminal_states: frozenset[str] = frozenset(
         {
-            "completed",
-            "failed",
-            "canceled",
-            "rejected",
+            "completed",  # Successfully completed with artifacts
+            "failed",  # Failed due to error
+            "canceled",  # Canceled by user
+            "rejected",  # Rejected by agent
         }
     )
 
@@ -420,6 +432,8 @@ class AgentSettings(BaseSettings):
     stream_missing_task_retry_delay_seconds: float = 0.05
 
     # Structured Response System Prompt
+    # This prompt instructs LLMs to return structured JSON responses for state transitions
+    # following the A2A Protocol hybrid agent pattern
     structured_response_system_prompt: str = """
     You are an AI agent in the Bindu framework following the A2A Protocol.
 
@@ -505,7 +519,10 @@ CRITICAL
 
 
 class AuthSettings(BaseSettings):
-    """Authentication and authorization configuration settings."""
+    """Authentication and authorization configuration settings.
+
+    Uses Ory Hydra as the authentication provider.
+    """
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -513,11 +530,17 @@ class AuthSettings(BaseSettings):
         extra="allow",
     )
 
+    # Enable/disable authentication
     enabled: bool = False
-    provider: str = "hydra"
-    algorithms: list[str] = ["RS256"]
-    leeway: int = 10
 
+    # Authentication provider
+    provider: str = "hydra"
+
+    # Token Validation
+    algorithms: list[str] = ["RS256"]
+    leeway: int = 10  # Clock skew tolerance in seconds
+
+    # Public Endpoints (no authentication required)
     public_endpoints: list[str] = [
         "/.well-known/agent.json",
         "/.well-known/*",
@@ -527,13 +550,14 @@ class AuthSettings(BaseSettings):
         "/agent/skills",
         "/agent/skills/*",
         "/health",
-        "/healthz",
+        "/healthz",  # strict readiness probe for k8s
         "/metrics",
-        "/payment-capture",
-        "/api/start-payment-session",
-        "/api/payment-status/*",
+        "/payment-capture",  # x402 payment capture page (browser-based)
+        "/api/start-payment-session",  # x402 payment session creation
+        "/api/payment-status/*",  # x402 payment status check
     ]
 
+    # Permission-based access control
     require_permissions: bool = False
     permissions: dict[str, list[str]] = {
         "message/send": ["agent:write"],
@@ -569,7 +593,11 @@ class OAuthProviderConfig(BaseModel):
 
 
 class HydraSettings(BaseSettings):
-    """Ory Hydra OAuth2 authentication configuration settings."""
+    """Ory Hydra OAuth2 authentication configuration settings.
+
+    Hydra provides OAuth2/OIDC authentication for securing Bindu APIs
+    and enabling agent-to-agent authentication.
+    """
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -577,17 +605,27 @@ class HydraSettings(BaseSettings):
         extra="allow",
     )
 
+    # Enable/disable Hydra authentication
     enabled: bool = False
+
+    # Hydra API endpoints
     admin_url: str = "https://hydra-admin.getbindu.com"
     public_url: str = "https://hydra.getbindu.com"
-    timeout: int = 10
-    verify_ssl: bool = True
-    max_retries: int = 3
-    cache_ttl: int = 300
-    max_cache_size: int = 1000
-    auto_register_agents: bool = True
-    agent_client_prefix: str = "agent-"
 
+    # Connection settings
+    timeout: int = 10  # Request timeout in seconds
+    verify_ssl: bool = True  # Verify SSL certificates
+    max_retries: int = 3  # Maximum retry attempts
+
+    # Token cache settings
+    cache_ttl: int = 300  # Token introspection cache TTL (5 minutes)
+    max_cache_size: int = 1000  # Maximum cache entries
+
+    # Auto-registration settings
+    auto_register_agents: bool = True  # Auto-register agents as OAuth clients
+    agent_client_prefix: str = "agent-"  # Prefix for agent client IDs
+
+    # Default OAuth2 scopes for agents
     default_agent_scopes: list[str] = [
         "openid",
         "offline",
@@ -595,12 +633,14 @@ class HydraSettings(BaseSettings):
         "agent:write",
     ]
 
+    # Default grant types for agents
     default_grant_types: list[str] = [
-        "client_credentials",
-        "authorization_code",
-        "refresh_token",
+        "client_credentials",  # M2M authentication
+        "authorization_code",  # User authentication
+        "refresh_token",  # Token refresh
     ]
 
+    # Public endpoints (no authentication required)
     public_endpoints: list[str] = [
         "/.well-known/agent.json",
         "/.well-known/*",
@@ -610,27 +650,36 @@ class HydraSettings(BaseSettings):
         "/agent/skills",
         "/agent/skills/*",
         "/health",
-        "/healthz",
+        "/healthz",  # strict readiness probe for k8s
         "/metrics",
         "/payment-capture",
         "/favicon.ico",
-        "/oauth/*",
+        "/oauth/*",  # OAuth callback endpoints
     ]
 
 
 class StorageSettings(BaseSettings):
-    """Storage backend configuration settings."""
+    """Storage backend configuration settings.
+
+    Supports multiple storage backends:
+    - memory: In-memory storage (default, non-persistent)
+    - postgres: PostgreSQL storage (persistent)
+
+    PostgreSQL settings must be provided via environment variables or config.
+    """
 
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="allow",
     )
 
+    # Storage backend selection
     backend: Literal["memory", "postgres"] = Field(
         default="memory",
         validation_alias=AliasChoices("backend", "STORAGE_TYPE"),
     )
 
+    # PostgreSQL Configuration - must be provided via env vars or config
     postgres_url: str | None = Field(
         default=None,
         validation_alias=AliasChoices("postgres_url", "DATABASE_URL"),
@@ -640,29 +689,42 @@ class StorageSettings(BaseSettings):
     postgres_timeout: int = 60
     postgres_command_timeout: int = 30
 
+    # DID-based schema isolation
     postgres_did: str | None = Field(
         default=None,
         validation_alias=AliasChoices("postgres_did", "POSTGRES_DID", "DID"),
     )
 
+    # Connection retry settings
     postgres_max_retries: int = 3
     postgres_retry_delay: float = 1.0
-    run_migrations_on_startup: bool = False
+
+    # Migration settings
+    run_migrations_on_startup: bool = False  # Safer default for production
 
 
 class SchedulerSettings(BaseSettings):
-    """Scheduler backend configuration settings."""
+    """Scheduler backend configuration settings.
+
+    Supports multiple scheduler backends:
+    - memory: In-memory scheduler (default, single-process)
+    - redis: Redis scheduler (distributed, multi-process)
+
+    Redis settings must be provided via environment variables or config.
+    """
 
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="allow",
     )
 
+    # Scheduler backend selection
     backend: Literal["memory", "redis"] = Field(
         default="memory",
         validation_alias=AliasChoices("backend", "SCHEDULER_TYPE"),
     )
 
+    # Redis Configuration - must be provided via env vars or config
     redis_url: str | None = Field(
         default=None,
         validation_alias=AliasChoices("redis_url", "REDIS_URL"),
@@ -671,38 +733,53 @@ class SchedulerSettings(BaseSettings):
     redis_port: int | None = None
     redis_password: str | None = None
     redis_db: int | None = None
-    queue_name: str = "bindu:tasks"
-    max_connections: int = 10
-    retry_on_timeout: bool = True
+    queue_name: str = "bindu:tasks"  # Can keep default queue name
+    max_connections: int = 10  # Connection pool setting
+    retry_on_timeout: bool = True  # Retry behavior setting
     poll_timeout: int = Field(
         default=1,
         validation_alias=AliasChoices("poll_timeout", "REDIS_POLL_TIMEOUT"),
-        description="Timeout in seconds for Redis blpop operations.",
+        description="Timeout in seconds for Redis blpop operations. Higher values reduce API calls but increase task start latency.",
     )
 
 
 class RetrySettings(BaseSettings):
-    """Retry mechanism configuration settings using Tenacity."""
+    """Retry mechanism configuration settings using Tenacity.
 
+    Configures retry behavior for different operation types:
+    - Worker operations (task execution)
+    - Storage operations (database, redis)
+    - Scheduler operations (task scheduling)
+    - API calls (external services)
+    """
+
+    # Worker task execution retries
     worker_max_attempts: int = 3
-    worker_min_wait: float = 1.0
-    worker_max_wait: float = 10.0
+    worker_min_wait: float = 1.0  # seconds
+    worker_max_wait: float = 10.0  # seconds
 
+    # Storage operation retries (database, redis)
     storage_max_attempts: int = 5
-    storage_min_wait: float = 0.5
-    storage_max_wait: float = 5.0
+    storage_min_wait: float = 0.5  # seconds
+    storage_max_wait: float = 5.0  # seconds
 
+    # Scheduler operation retries
     scheduler_max_attempts: int = 3
-    scheduler_min_wait: float = 1.0
-    scheduler_max_wait: float = 8.0
+    scheduler_min_wait: float = 1.0  # seconds
+    scheduler_max_wait: float = 8.0  # seconds
 
+    # External API call retries
     api_max_attempts: int = 4
-    api_min_wait: float = 1.0
-    api_max_wait: float = 15.0
+    api_min_wait: float = 1.0  # seconds
+    api_max_wait: float = 15.0  # seconds
 
 
 class NegotiationSettings(BaseSettings):
-    """Negotiation and capability assessment configuration settings."""
+    """Negotiation and capability assessment configuration settings.
+
+    Controls how agents assess their ability to handle tasks during
+    the negotiation phase of agent-to-agent communication.
+    """
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -710,29 +787,44 @@ class NegotiationSettings(BaseSettings):
         extra="allow",
     )
 
+    # Scoring weights for capability assessment
+    # All weights are normalized to sum to 1.0 during calculation
     skill_match_weight: float = 0.55
     io_compatibility_weight: float = 0.20
     performance_weight: float = 0.15
     load_weight: float = 0.05
     cost_weight: float = 0.05
 
+    # Default latency estimate when no performance data available
     default_latency_ms: int = 5000
+
+    # Keyword extraction limits
     max_keyword_length: int = 100
     max_task_text_length: int = 10000
+
+    # Minimum score threshold for acceptance
     min_score_threshold: float = 0.0
 
+    # Embedding-based semantic matching
     use_embeddings: bool = True
-    embedding_provider: str = "openrouter"
-    embedding_model: str = "text-embedding-3-small"
-    embedding_api_key: str = ""
-    embedding_weight: float = 0.7
-    keyword_weight: float = 0.3
+    embedding_provider: str = "openrouter"  # Options: openrouter, sentence-transformers
+    embedding_model: str = "text-embedding-3-small"  # OpenRouter model
+    embedding_api_key: str = ""  # OpenRouter API key (set via config or env)
+    embedding_weight: float = 0.7  # Weight for embedding score in hybrid matching
+    keyword_weight: float = 0.3  # Weight for keyword score in hybrid matching
     embedding_batch_size: int = 32
-    embedding_cache_size: int = 1000
+    embedding_cache_size: int = 1000  # Max task embeddings to cache
 
 
 class VaultSettings(BaseSettings):
-    """HashiCorp Vault configuration for DID keys and Hydra credentials storage."""
+    """HashiCorp Vault configuration for DID keys and Hydra credentials storage.
+
+    When enabled, Vault provides persistent storage for:
+    - DID private/public keys (ensures same DID across pod restarts)
+    - Hydra OAuth2 client credentials (prevents duplicate client registrations)
+
+    This is critical for Kubernetes deployments where pods are ephemeral.
+    """
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -740,19 +832,22 @@ class VaultSettings(BaseSettings):
         extra="allow",
     )
 
+    # Vault connection
     url: str = Field(
         default="http://localhost:8200",
         validation_alias=AliasChoices("VAULT__URL", "VAULT_ADDR"),
-        description="Vault server URL",
+        description="Vault server URL (e.g., https://vault.example.com:8200)",
     )
     token: str = Field(
         default="",
         validation_alias=AliasChoices("VAULT__TOKEN", "VAULT_TOKEN"),
-        description="Vault authentication token",
+        description="Vault authentication token for API access",
     )
+
+    # Enable/disable Vault
     enabled: bool = Field(
         default=False,
-        description="Enable Vault integration",
+        description="Enable Vault integration for persistent credential storage",
     )
 
 
@@ -765,11 +860,13 @@ class OAuthSettings(BaseSettings):
         extra="allow",
     )
 
+    # Base URL for OAuth callbacks
     callback_base_url: str = Field(
         default="http://localhost:3773",
-        description="Base URL for OAuth callbacks",
+        description="Base URL for OAuth callbacks (e.g., https://your-domain.com)",
     )
 
+    # Notion OAuth
     notion_client_id: str = Field(
         default="",
         validation_alias=AliasChoices("OAUTH__NOTION_CLIENT_ID", "NOTION_CLIENT_ID"),
@@ -781,6 +878,7 @@ class OAuthSettings(BaseSettings):
         ),
     )
 
+    # Google OAuth (for Gmail)
     google_client_id: str = Field(
         default="",
         validation_alias=AliasChoices("OAUTH__GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_ID"),
@@ -792,6 +890,7 @@ class OAuthSettings(BaseSettings):
         ),
     )
 
+    # GitHub OAuth
     github_client_id: str = Field(
         default="",
         validation_alias=AliasChoices("OAUTH__GITHUB_CLIENT_ID", "GITHUB_CLIENT_ID"),
@@ -805,34 +904,66 @@ class OAuthSettings(BaseSettings):
 
 
 class SentrySettings(BaseSettings):
-    """Sentry error tracking and performance monitoring configuration."""
+    """Sentry error tracking and performance monitoring configuration.
 
+    Sentry provides real-time error tracking, performance monitoring,
+    and release health tracking for production deployments.
+    """
+
+    # Enable/disable Sentry
     enabled: bool = False
+
+    # Sentry DSN (Data Source Name)
+    # Get this from your Sentry project settings
     dsn: str = ""
 
+    # Environment name (e.g., production, staging, development)
     environment: str = Field(
         default="development",
         validation_alias=AliasChoices("SENTRY__ENVIRONMENT", "ENVIRONMENT"),
     )
 
+    # Release version (for tracking deployments)
+    # Defaults to project version if not specified
     release: str = ""
+
+    # Sample rate for error events (0.0 to 1.0)
+    # 1.0 = capture all errors
     traces_sample_rate: float = 1.0
+
+    # Sample rate for performance monitoring (0.0 to 1.0)
+    # 0.1 = capture 10% of transactions for performance monitoring
     profiles_sample_rate: float = 0.1
+
+    # Enable performance monitoring
     enable_tracing: bool = True
+
+    # Enable profiling
     enable_profiling: bool = False
+
+    # Send default PII (Personally Identifiable Information)
+    # Set to False in production for privacy compliance
     send_default_pii: bool = False
+
+    # Maximum breadcrumbs to capture
     max_breadcrumbs: int = 100
+
+    # Attach stack trace to messages
     attach_stacktrace: bool = True
 
     integrations: list[str] = [
-        "starlette",
-        "sqlalchemy",
-        "redis",
-        "asyncio",
+        "starlette",  # Covers all HTTP endpoints in bindu/server/endpoints/
+        "sqlalchemy",  # PostgreSQL storage integration
+        "redis",  # Redis scheduler integration
+        "asyncio",  # Async task integration
     ]
 
+    # Tags to add to all events
+    # Useful for filtering and grouping in Sentry UI
     default_tags: dict[str, str] = {}
 
+    # Before send hook - filter events before sending to Sentry
+    # Can be used to scrub sensitive data or filter out noise
     filter_transactions: list[str] = [
         "/healthz",
         "/health",
@@ -840,17 +971,36 @@ class SentrySettings(BaseSettings):
         "/favicon.ico",
     ]
 
+    # Ignore specific errors by exception type
     ignore_errors: list[str] = [
         "KeyboardInterrupt",
         "SystemExit",
     ]
 
+    # Server name (defaults to hostname)
     server_name: str = ""
+
+    # Debug mode (logs Sentry SDK debug info)
     debug: bool = False
 
 
 class GrpcSettings(BaseSettings):
-    """gRPC adapter configuration for language-agnostic agent support."""
+    """gRPC adapter configuration for language-agnostic agent support.
+
+    When enabled, the Bindu core starts a gRPC server alongside the HTTP server.
+    External SDKs (TypeScript, Kotlin, Rust) connect to this gRPC server to
+    register their agents and receive handler calls.
+
+    The gRPC server implements BinduService (registration) and acts as a client
+    to the SDK's AgentHandler service (task execution).
+
+    Architecture:
+        SDK (any language) --gRPC--> Bindu Core (:3774)
+            RegisterAgent(config, skills, callback_address)
+
+        Bindu Core --gRPC--> SDK (callback_address)
+            HandleMessages(messages) when a task arrives
+    """
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -895,17 +1045,32 @@ class GrpcSettings(BaseSettings):
 
 
 class MTLSSettings(BaseSettings):
-    """mTLS certificate lifecycle configuration settings."""
+    """mTLS certificate lifecycle configuration settings.
+
+    Controls certificate TTL, storage directory, and feature flag.
+    Set MTLS__ENABLED=true to activate certificate lifecycle endpoints.
+    """
 
     model_config = SettingsConfigDict(
-        env_prefix="BINDU_MTLS_",
+        env_prefix="MTLS__",
         env_file=".env",
-        extra="ignore",
+        extra="allow",
     )
 
     enabled: bool = False
     cert_ttl_hours: int = 24
     certs_dir: str = "~/.bindu/certs"
+
+    @field_validator("certs_dir", mode="before")
+    @classmethod
+    def expand_certs_dir(cls, v: str) -> str:
+        """Expand ~ to absolute home directory path at settings load time.
+
+        Prevents tilde from being interpreted literally by filesystem APIs
+        such as Path(), open(), or os.makedirs().
+        """
+        import os
+        return os.path.expanduser(str(v))
 
 
 class Settings(BaseSettings):
