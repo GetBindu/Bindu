@@ -6,6 +6,10 @@ on:
   push:
     branches: [main]
 
+# Least-privilege default. Jobs that need more (e.g. magika) escalate locally.
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -22,10 +26,10 @@ jobs:
         python-version: ["3.12", "3.13"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b  # v7.3.0
         with:
           enable-cache: true
 
@@ -49,7 +53,7 @@ jobs:
 
       - name: Upload coverage
         if: matrix.python-version == '3.13'
-        uses: coverallsapp/github-action@v2
+        uses: coverallsapp/github-action@648a8eb78e6d50909eff900e4ec85cab4524a45b  # v2.3.6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           file: coverage.xml
@@ -63,10 +67,10 @@ jobs:
     needs: unit-tests
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b  # v7.3.0
         with:
           enable-cache: true
 
@@ -90,10 +94,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
         with:
           node-version: "20"
 
@@ -106,3 +110,66 @@ jobs:
       - name: Verify example dependencies
         working-directory: examples/typescript-openai-agent
         run: npm install
+
+  # ──────────────────────────────────────────────────────────────
+  # Magika scan — AI file-type detection on changed files.
+  # Warn-only: reports to the job summary, never blocks CI.
+  # ──────────────────────────────────────────────────────────────
+  magika-scan:
+    name: Magika File-Type Scan
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          fetch-depth: 0  # need history to diff against the base ref
+
+      - name: Install Magika
+        run: pipx install magika
+
+      - name: Compute changed files
+        id: changed
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            git fetch --no-tags --depth=1 origin "$BASE_REF"
+            base="origin/$BASE_REF"
+          else
+            base="HEAD~1"
+          fi
+          git diff --name-only --diff-filter=AM "$base"...HEAD \
+            | grep -Ev '^(sdks/typescript/src/generated/|bindu/grpc/generated/|node_modules/|dist/|\.venv/)' \
+            > changed.txt || true
+          count=$(wc -l < changed.txt | tr -d ' ')
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          echo "Changed files ($count):"
+          cat changed.txt
+
+      - name: Run Magika on changed files
+        if: steps.changed.outputs.count != '0'
+        run: |
+          : > to_scan.txt
+          while IFS= read -r f; do
+            [ -f "$f" ] && echo "$f" >> to_scan.txt
+          done < changed.txt
+
+          if [ ! -s to_scan.txt ]; then
+            echo "No existing files to scan (changes were all deletions)."
+            exit 0
+          fi
+
+          {
+            echo "### Magika File-Type Scan"
+            echo ""
+            echo "Scanned $(wc -l < to_scan.txt | tr -d ' ') changed file(s)."
+            echo ""
+            echo '```'
+            xargs -a to_scan.txt -d '\n' magika
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

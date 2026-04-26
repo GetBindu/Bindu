@@ -1,19 +1,24 @@
 # Bindu Agent Workflows & Skills
 
-This directory contains AI agent workflows and skills for automating Bindu development tasks.
+This directory contains AI agent workflows and skills for automating Bindu development tasks. The agent-agnostic entry point is [AGENTS.md](../AGENTS.md) at the repo root.
 
 ## Structure
 
 ```
-.bindu/
-├── workflows/          # Step-by-step guides for complex tasks
+.agents/
+├── workflows/         # Step-by-step guides for complex tasks
 │   ├── testing.md     # Run tests and validate changes
 │   ├── deployment.md  # Deploy Bindu agents
 │   └── release.md     # Create releases and tags
 └── skills/            # Modular, reusable capabilities
-    ├── test-pr/       # Test pull requests
-    ├── deploy-agent/  # Deploy agents to production
-    └── create-release/ # Create release notes and tags
+    # Ops / CI
+    ├── test-pr/                  # Test pull requests
+    ├── deploy-agent/             # Deploy agents to production
+    ├── create-release/           # Create release notes and tags
+    # Development
+    ├── regenerate-grpc-stubs/    # Sync Python + TS stubs after proto edits
+    ├── add-example-agent/        # Add a new example under examples/
+    └── debug-grpc-connection/    # Diagnose core↔SDK gRPC handshake issues
 ```
 
 ## Usage
@@ -33,9 +38,15 @@ When working on Bindu, reference these workflows:
 Skills are invoked by workflows or directly:
 
 ```
-/skill test-pr <PR-number>        # Test a pull request
-/skill deploy-agent <agent-name>  # Deploy an agent
-/skill create-release <version>   # Create a release
+# Ops / CI
+/skill test-pr <PR-number>              # Test a pull request
+/skill deploy-agent <agent-name>        # Deploy an agent
+/skill create-release <version>         # Create a release
+
+# Development
+/skill regenerate-grpc-stubs            # After editing proto/*.proto
+/skill add-example-agent <name>         # Add a new example/<name>/
+/skill debug-grpc-connection            # Triage core↔SDK handshake issues
 ```
 
 ## Workflow Philosophy

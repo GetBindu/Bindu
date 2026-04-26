@@ -157,6 +157,7 @@ class TaskManager:
             workers=self._workers,
             context_id_parser=self._parse_context_id,
             push_manager=self._push_manager,
+            error_response_creator=self._create_error_response,
         )
         self._task_handlers = TaskHandlers(
             scheduler=self.scheduler,
@@ -216,65 +217,122 @@ class TaskManager:
         return uuid.uuid4()
 
     # Message handler methods
-    async def send_message(self, request: SendMessageRequest) -> SendMessageResponse:
+    #
+    # The ``caller_did`` argument is threaded in by the A2A endpoint from the
+    # authenticated request (``scope.state.user.client_id``). Phase 1 uses it
+    # only to stamp ``owner_did`` on newly-created tasks and contexts inside
+    # ``storage.submit_task``. Phase 2 will consult it in reads to enforce
+    # ownership. ``None`` is allowed and means "no authenticated identity" —
+    # expected in deployments that run with auth disabled.
+    async def send_message(
+        self,
+        request: SendMessageRequest,
+        caller_did: str | None = None,
+    ) -> SendMessageResponse:
         """Send a message using the A2A protocol."""
-        return await self._message_handlers.send_message(request)
+        return await self._message_handlers.send_message(request, caller_did=caller_did)
 
-    async def stream_message(self, request: StreamMessageRequest):
+    async def stream_message(
+        self,
+        request: StreamMessageRequest,
+        caller_did: str | None = None,
+    ):
         """Stream messages using Server-Sent Events."""
-        return await self._message_handlers.stream_message(request)
+        return await self._message_handlers.stream_message(
+            request, caller_did=caller_did
+        )
 
     # Task handler methods
-    async def get_task(self, request: GetTaskRequest) -> GetTaskResponse:
+    async def get_task(
+        self,
+        request: GetTaskRequest,
+        caller_did: str | None = None,
+    ) -> GetTaskResponse:
         """Get a task and return it to the client."""
-        return await self._task_handlers.get_task(request)
+        return await self._task_handlers.get_task(request, caller_did=caller_did)
 
-    async def list_tasks(self, request: ListTasksRequest) -> ListTasksResponse:
+    async def list_tasks(
+        self,
+        request: ListTasksRequest,
+        caller_did: str | None = None,
+    ) -> ListTasksResponse:
         """List all tasks in storage."""
-        return await self._task_handlers.list_tasks(request)
+        return await self._task_handlers.list_tasks(request, caller_did=caller_did)
 
-    async def cancel_task(self, request: CancelTaskRequest) -> CancelTaskResponse:
+    async def cancel_task(
+        self,
+        request: CancelTaskRequest,
+        caller_did: str | None = None,
+    ) -> CancelTaskResponse:
         """Cancel a running task."""
-        return await self._task_handlers.cancel_task(request)
+        return await self._task_handlers.cancel_task(request, caller_did=caller_did)
 
-    async def task_feedback(self, request: TaskFeedbackRequest) -> TaskFeedbackResponse:
+    async def task_feedback(
+        self,
+        request: TaskFeedbackRequest,
+        caller_did: str | None = None,
+    ) -> TaskFeedbackResponse:
         """Submit feedback for a completed task."""
-        return await self._task_handlers.task_feedback(request)
+        return await self._task_handlers.task_feedback(request, caller_did=caller_did)
 
     # Context handler methods
-    async def list_contexts(self, request: ListContextsRequest) -> ListContextsResponse:
+    async def list_contexts(
+        self,
+        request: ListContextsRequest,
+        caller_did: str | None = None,
+    ) -> ListContextsResponse:
         """List all contexts in storage."""
-        return await self._context_handlers.list_contexts(request)
+        return await self._context_handlers.list_contexts(
+            request, caller_did=caller_did
+        )
 
     async def clear_context(
-        self, request: ClearContextsRequest
+        self,
+        request: ClearContextsRequest,
+        caller_did: str | None = None,
     ) -> ClearContextsResponse:
         """Clear a context from storage."""
-        return await self._context_handlers.clear_context(request)
+        return await self._context_handlers.clear_context(
+            request, caller_did=caller_did
+        )
 
     # Push notification handler methods
     async def set_task_push_notification(
-        self, request: SetTaskPushNotificationRequest
+        self,
+        request: SetTaskPushNotificationRequest,
+        caller_did: str | None = None,
     ) -> SetTaskPushNotificationResponse:
         """Set push notification settings for a task."""
         return await self._push_manager.set_task_push_notification(
-            request, self.storage.load_task
+            request, self.storage.load_task, caller_did=caller_did
         )
 
     async def get_task_push_notification(
-        self, request: GetTaskPushNotificationRequest
+        self,
+        request: GetTaskPushNotificationRequest,
+        caller_did: str | None = None,
     ) -> GetTaskPushNotificationResponse:
         """Get push notification settings for a task."""
-        return await self._push_manager.get_task_push_notification(request)
+        return await self._push_manager.get_task_push_notification(
+            request, caller_did=caller_did
+        )
 
     async def list_task_push_notifications(
-        self, request: ListTaskPushNotificationConfigRequest
+        self,
+        request: ListTaskPushNotificationConfigRequest,
+        caller_did: str | None = None,
     ) -> ListTaskPushNotificationConfigResponse:
         """List push notification configurations for a task."""
-        return await self._push_manager.list_task_push_notifications(request)
+        return await self._push_manager.list_task_push_notifications(
+            request, caller_did=caller_did
+        )
 
     async def delete_task_push_notification(
-        self, request: DeleteTaskPushNotificationConfigRequest
+        self,
+        request: DeleteTaskPushNotificationConfigRequest,
+        caller_did: str | None = None,
     ) -> DeleteTaskPushNotificationConfigResponse:
         """Delete a push notification configuration for a task."""
-        return await self._push_manager.delete_task_push_notification(request)
+        return await self._push_manager.delete_task_push_notification(
+            request, caller_did=caller_did
+        )

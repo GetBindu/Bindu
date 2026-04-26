@@ -33,9 +33,22 @@ from .base import AuthMiddleware
 logger = get_logger("bindu.server.middleware.hydra")
 
 # Constants
-CACHE_TTL_SECONDS = 300  # 5 minutes
+CACHE_TTL_SECONDS = 300  # 5 minutes — default upper bound on cache lifetime
 MAX_BODY_SIZE_BYTES = 2 * 1024 * 1024  # 2 MB
 MAX_SIGNATURE_AGE_SECONDS = 300  # 5 minutes
+
+# Scopes treated as sensitive by default. Tokens carrying any of these are
+# never cached: each request re-introspects against Hydra so that
+# revocations take effect immediately. Operators can override via
+# ``HydraSettings.sensitive_scopes``.
+DEFAULT_SENSITIVE_SCOPES: frozenset[str] = frozenset(
+    {
+        "admin",
+        "agent:execute",
+        "payment:capture",
+        "key:rotate",
+    }
+)
 
 
 class HydraMiddleware(AuthMiddleware):
@@ -47,8 +60,33 @@ class HydraMiddleware(AuthMiddleware):
 
         self._introspection_cache = {}
         self._cache_locks = {}
-        self._cache_ttl = CACHE_TTL_SECONDS
+        self._cache_ttl = self._coerce_int(
+            getattr(auth_config, "cache_ttl", None), CACHE_TTL_SECONDS
+        )
         self._max_body_size = MAX_BODY_SIZE_BYTES
+
+        configured_sensitive = getattr(auth_config, "sensitive_scopes", None)
+        self._sensitive_scopes: frozenset[str] = self._coerce_scopes(
+            configured_sensitive, DEFAULT_SENSITIVE_SCOPES
+        )
+
+    @staticmethod
+    def _coerce_int(value: Any, default: int) -> int:
+        """Best-effort int coercion; falls back to ``default`` on failure."""
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default
+
+    @staticmethod
+    def _coerce_scopes(value: Any, default: frozenset[str]) -> frozenset[str]:
+        """Coerce a config value into a frozenset of scope strings."""
+        if value is None:
+            return default
+        try:
+            return frozenset(str(s) for s in value)
+        except TypeError:
+            return default
 
     def _initialize_provider(self) -> None:
         """Initialize Hydra-specific components and HTTP clients."""
@@ -67,7 +105,13 @@ class HydraMiddleware(AuthMiddleware):
             raise
 
     async def _validate_token(self, token: str) -> dict[str, Any]:
-        """Validate OAuth2 token using Hydra introspection."""
+        """Validate OAuth2 token using Hydra introspection.
+
+        Tokens carrying any scope in ``self._sensitive_scopes`` are never
+        cached — every request re-introspects so that a Hydra-side
+        revocation takes effect immediately. See
+        ``bugs/core/2026-04-26-hydra-token-cache-revocation-lag.md``.
+        """
         cache_key = hashlib.sha256(token.encode()).hexdigest()
         if cache_key in self._introspection_cache:
             cached = self._introspection_cache[cache_key]
@@ -89,6 +133,10 @@ class HydraMiddleware(AuthMiddleware):
             if introspection_result["exp"] < current_time:
                 raise ValueError(f"Token expired at {introspection_result['exp']}")
 
+            if not self._is_cacheable(introspection_result):
+                logger.debug("Token has sensitive scope; skipping introspection cache")
+                return introspection_result
+
             expires_at = min(
                 introspection_result["exp"], current_time + self._cache_ttl
             )
@@ -102,6 +150,40 @@ class HydraMiddleware(AuthMiddleware):
         except Exception as e:
             logger.error(f"Token introspection failed: {e}")
             raise
+
+    def _is_cacheable(self, introspection_result: dict[str, Any]) -> bool:
+        """Return False if the token carries any scope flagged as sensitive."""
+        if not self._sensitive_scopes:
+            return True
+        scope_str = introspection_result.get("scope", "") or ""
+        token_scopes = scope_str.split() if isinstance(scope_str, str) else []
+        return self._sensitive_scopes.isdisjoint(token_scopes)
+
+    def invalidate_token_cache(self, token: str) -> bool:
+        """Drop the cached introspection result for ``token``.
+
+        Call this from any code path that revokes or otherwise invalidates a
+        token (e.g. ``HydraClient.revoke_token``) so the next request for
+        that token re-introspects against Hydra. Single-instance only —
+        cross-process invalidation needs out-of-band signalling.
+
+        Returns True if a cache entry was removed.
+        """
+        cache_key = hashlib.sha256(token.encode()).hexdigest()
+        removed = self._introspection_cache.pop(cache_key, None) is not None
+        self._cache_locks.pop(cache_key, None)
+        return removed
+
+    async def revoke_token(self, token: str) -> bool:
+        """Revoke ``token`` upstream and drop its local introspection entry.
+
+        This is the recommended entry point for in-process revocation: it
+        ensures the cached "active=true" verdict can't outlive the
+        revocation by up to ``cache_ttl`` seconds on this instance.
+        """
+        revoked = await self.hydra_client.revoke_token(token)
+        self.invalidate_token_cache(token)
+        return revoked
 
     def _extract_user_info(self, token_payload: dict[str, Any]) -> dict[str, Any]:
         """Normalize Hydra introspection data into a standard user/service object."""
@@ -158,13 +240,30 @@ class HydraMiddleware(AuthMiddleware):
     async def _verify_did_signature_asgi(
         self, receive: Callable, client_did: str, headers: Any
     ) -> tuple[bool, dict[str, Any], Callable]:
-        """Safely verify DID signature by buffering the raw ASGI receive stream."""
+        """Safely verify DID signature by buffering the raw ASGI receive stream.
+
+        Contract: this function is only invoked for callers whose OAuth
+        ``client_id`` starts with ``did:`` — the outer ``__call__`` gate in
+        :meth:`HydraMiddleware.__call__` enforces that. At that point the
+        DID-signed request envelope is mandatory; there is no fallback to
+        "unsigned is fine." Previously this function failed open (returned
+        ``is_valid=True``) when signature headers were absent or when Hydra
+        had no public key for the client — both treated as "can't verify, so
+        allow." That reduced DID signing to a header the caller could simply
+        omit. See ``bugs/2026-04-18-did-signature-fail-open.md``.
+        """
         signature_data = extract_signature_headers(dict(headers))
 
         if not signature_data:
+            # Caller is a DID client but sent no X-DID-Signature. Reject —
+            # signing is mandatory once client_id is a DID.
+            logger.warning(
+                f"DID client {client_did} sent request without signature "
+                f"headers; signing is mandatory for did:* clients."
+            )
             return (
-                True,
-                {"did_verified": False, "reason": "no_signature_headers"},
+                False,
+                {"did_verified": False, "reason": "missing_signature_headers"},
                 receive,
             )
 
@@ -173,7 +272,20 @@ class HydraMiddleware(AuthMiddleware):
 
         public_key = await self.hydra_client.get_public_key_from_client(client_did)
         if not public_key:
-            return True, {"did_verified": False, "reason": "no_public_key"}, receive
+            # Hydra client metadata has no public_key — the signature can't
+            # be verified. Reject rather than wave the request through. An
+            # operator who registered a DID client without a public key in
+            # metadata has a configuration bug that must be fixed explicitly.
+            logger.warning(
+                f"No public key in Hydra metadata for DID client {client_did}; "
+                f"signature verification cannot proceed. Register the client's "
+                f"base58 Ed25519 public key under metadata.public_key."
+            )
+            return (
+                False,
+                {"did_verified": False, "reason": "public_key_unavailable"},
+                receive,
+            )
 
         # Memory Safety Guard
         content_length = int(headers.get("content-length", 0))

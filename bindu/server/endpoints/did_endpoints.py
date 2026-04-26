@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
+from pydantic.alias_generators import to_camel
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
@@ -23,6 +24,45 @@ from .utils import (
 )
 
 logger = get_logger("bindu.server.endpoints.did_endpoints")
+
+
+def _normalize_did_document_keys(value: Any) -> Any:
+    """Recursively convert snake_case keys to camelCase for on-the-wire output.
+
+    The DID document is assembled by the DID extension as a plain dict
+    (see :meth:`DIDAgentExtension.get_did_document`) rather than through a
+    pydantic model, because the W3C schema requires the ``@context`` key
+    which isn't a valid Python identifier. Today all the keys the extension
+    emits are already W3C-correct (``@context``, ``id``, ``created``,
+    ``authentication``, ``publicKeyBase58``). This helper keeps the
+    endpoint's output in sync with the rest of the A2A wire format (which
+    uses camelCase via pydantic's ``by_alias=True``) regardless of what
+    future extensions add to the document.
+
+    Rules:
+    - Keys starting with ``@`` (the W3C JSON-LD convention) pass through.
+    - Keys without an underscore pass through — they're already single
+      words or camelCase. This avoids damaging deliberate acronym casing
+      like ``URI`` or ``ID``.
+    - Keys containing an underscore are converted via
+      :func:`pydantic.alias_generators.to_camel` — the same transform the
+      rest of ``bindu/common/protocol/types.py`` uses.
+
+    Returns the value unchanged for non-dict, non-list inputs (strings,
+    numbers, booleans, etc.).
+    """
+    if isinstance(value, dict):
+        return {
+            (
+                k
+                if (not isinstance(k, str) or k.startswith("@") or "_" not in k)
+                else to_camel(k)
+            ): _normalize_did_document_keys(v)
+            for k, v in value.items()
+        }
+    if isinstance(value, list):
+        return [_normalize_did_document_keys(item) for item in value]
+    return value
 
 
 def _did_not_found_error(did: str, reason: str, client_ip: str) -> Response:
@@ -94,4 +134,4 @@ async def did_resolve_endpoint(app: BinduApplication, request: Request) -> Respo
 
     logger.debug(f"Resolving DID {did} for {client_ip}")
     did_document = did_extension.get_did_document()
-    return JSONResponse(content=did_document)
+    return JSONResponse(content=_normalize_did_document_keys(did_document))

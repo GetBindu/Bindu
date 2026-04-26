@@ -17,7 +17,7 @@ This document outlines the maintainer structure, responsibilities, and processes
 Maintainers are trusted contributors who have demonstrated:
 
 1. **Technical Excellence**
-   - Deep understanding of the Bindu architecture and A2A/AP2/X402 protocols
+   - Deep understanding of the Bindu architecture and A2A/X402 protocols
    - Consistent high-quality code contributions
    - Strong testing and documentation practices
 

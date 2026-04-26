@@ -12,7 +12,7 @@ Prerequisites
 
 Usage
 -----
-    export OPENROUTER_API_KEY="your_api_key_here"
+    export OPENROUTER_API_KEY="your_api_key_here"  # pragma: allowlist secret
     python pdf_research_agent.py
 
 The agent will be live at http://localhost:3775

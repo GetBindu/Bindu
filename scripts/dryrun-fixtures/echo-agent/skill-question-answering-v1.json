@@ -1,0 +1,250 @@
+{
+  "id": "question-answering-v1",
+  "name": "question-answering",
+  "description": "Provides intelligent question answering capabilities for general knowledge queries.\nUse when users ask factual questions, need explanations, or require information retrieval.\n",
+  "tags": [
+    "qa",
+    "knowledge",
+    "reasoning",
+    "general"
+  ],
+  "input_modes": [
+    "text/plain",
+    "application/json"
+  ],
+  "output_modes": [
+    "text/plain",
+    "application/json"
+  ],
+  "version": "1.0.0",
+  "author": "raahul@getbindu.com",
+  "examples": [
+    "What is photosynthesis?",
+    "How does a refrigerator work?",
+    "Why do we see different phases of the moon?",
+    "Explain quantum computing in simple terms",
+    "What's the difference between RNA and DNA?"
+  ],
+  "capabilities_detail": {
+    "factual_questions": {
+      "supported": true,
+      "types": [
+        "what",
+        "who",
+        "where",
+        "when",
+        "how",
+        "why"
+      ],
+      "description": "Answers direct factual questions across various domains"
+    },
+    "explanations": {
+      "supported": true,
+      "detail_levels": [
+        "brief",
+        "detailed",
+        "comprehensive"
+      ],
+      "description": "Provides explanations with adjustable depth"
+    },
+    "reasoning": {
+      "supported": true,
+      "types": [
+        "causal",
+        "comparative",
+        "analytical"
+      ],
+      "description": "Multi-step reasoning for complex questions"
+    },
+    "domains": [
+      "science",
+      "history",
+      "technology",
+      "mathematics",
+      "general_knowledge"
+    ]
+  },
+  "requirements": {
+    "packages": [],
+    "system": [],
+    "min_memory_mb": 100
+  },
+  "performance": {
+    "avg_processing_time_ms": 750,
+    "max_concurrent_requests": 10,
+    "memory_per_request_mb": 100,
+    "scalability": "horizontal"
+  },
+  "allowed_tools": [
+    "Read",
+    "Search",
+    "Reason"
+  ],
+  "documentation": {
+    "overview": "This skill enables the agent to answer a wide range of questions using reasoning\nand knowledge retrieval. It's designed for general-purpose question answering\nacross various domains including science, history, technology, and everyday topics.\n",
+    "use_cases": {
+      "when_to_use": [
+        "User asks a direct factual question",
+        "User needs an explanation of a concept",
+        "User wants to understand how something works",
+        "User requests information about historical events, scientific facts, or general knowledge",
+        "User needs help understanding a topic"
+      ],
+      "when_not_to_use": [
+        "Real-time information (use web-search skill)",
+        "Personal data or user-specific information (use context-retrieval skill)",
+        "Complex calculations (use calculator skill)",
+        "Code generation (use code-assistant skill)",
+        "Document processing (use document-analysis skill)"
+      ]
+    },
+    "input_structure": "Accepts natural language questions in plain text or structured format:\n\nPlain text:\n\"What is photosynthesis?\"\n\nStructured JSON:\n{\n  \"question\": \"What is photosynthesis?\",\n  \"context\": \"optional context or constraints\",\n  \"detail_level\": \"brief|detailed|comprehensive\"\n}\n",
+    "output_format": "Standard response (JSON):\n{\n  \"answer\": \"Photosynthesis is the process by which plants...\",\n  \"confidence\": 0.95,\n  \"sources\": [\"general_knowledge\"],\n  \"follow_up_suggestions\": [\n    \"Would you like to know about the chemical equation?\",\n    \"Interested in learning about different types of photosynthesis?\"\n  ]\n}\n\nBrief response (text/plain):\n\"Photosynthesis is the process by which plants convert light energy into chemical energy...\"\n",
+    "quality_guidelines": [
+      "Accuracy: Prioritize factual correctness",
+      "Clarity: Use clear, understandable language",
+      "Completeness: Address all aspects of the question",
+      "Conciseness: Be thorough but not verbose",
+      "Honesty: Acknowledge uncertainty when appropriate"
+    ],
+    "error_handling": [
+      "Ambiguous questions: Ask for clarification",
+      "Out of scope: Politely indicate limitations",
+      "Insufficient information: Request additional context",
+      "Controversial topics: Present balanced perspectives"
+    ],
+    "examples": [
+      {
+        "title": "Simple Factual Question",
+        "input": "What is the capital of France?",
+        "output": {
+          "answer": "The capital of France is Paris.",
+          "confidence": 1,
+          "sources": [
+            "general_knowledge"
+          ]
+        }
+      },
+      {
+        "title": "Explanation Request",
+        "input": {
+          "question": "How does a refrigerator work?",
+          "detail_level": "detailed"
+        },
+        "output": {
+          "answer": "A refrigerator works by using a refrigeration cycle to remove heat from its interior...\n\n1. Compression: The compressor pressurizes refrigerant gas...\n2. Condensation: The hot gas flows through condenser coils...\n3. Expansion: The liquid refrigerant passes through an expansion valve...\n4. Evaporation: The cold refrigerant absorbs heat from the interior...\n",
+          "confidence": 0.92,
+          "sources": [
+            "general_knowledge",
+            "physics"
+          ],
+          "follow_up_suggestions": [
+            "Would you like to know about different types of refrigerants?",
+            "Interested in energy efficiency tips for refrigerators?"
+          ]
+        }
+      },
+      {
+        "title": "Complex Reasoning",
+        "input": "Why do we see different phases of the moon?",
+        "output": {
+          "answer": "We see different phases of the moon because of the changing positions of the Moon,\nEarth, and Sun. As the Moon orbits Earth, the amount of its sunlit surface visible\nfrom Earth varies:\n\n- New Moon: Moon is between Earth and Sun (dark side faces us)\n- First Quarter: Moon is 90° from the Sun (half illuminated)\n- Full Moon: Earth is between Moon and Sun (fully illuminated)\n- Last Quarter: Moon is 270° from the Sun (half illuminated)\n\nThe cycle takes about 29.5 days to complete.\n",
+          "confidence": 0.96,
+          "sources": [
+            "astronomy",
+            "general_knowledge"
+          ]
+        }
+      }
+    ],
+    "best_practices": {
+      "for_developers": [
+        "Provide clear questions in natural language",
+        "Include context when available",
+        "Specify desired detail level",
+        "Handle follow-up questions in conversation flow"
+      ],
+      "for_orchestrators": [
+        "Route factual questions to this skill",
+        "Chain with web-search for real-time information",
+        "Combine with document-analysis for context-aware answers",
+        "Use confidence scores for answer validation",
+        "Consider caching common questions for performance"
+      ]
+    }
+  },
+  "assessment": {
+    "keywords": [
+      "question",
+      "answer",
+      "what",
+      "why",
+      "how",
+      "who",
+      "where",
+      "when",
+      "explain",
+      "explanation",
+      "knowledge",
+      "fact",
+      "factual",
+      "reasoning",
+      "understand"
+    ],
+    "specializations": [
+      {
+        "domain": "science_questions",
+        "confidence_boost": 0.3
+      },
+      {
+        "domain": "history_questions",
+        "confidence_boost": 0.3
+      },
+      {
+        "domain": "technology_questions",
+        "confidence_boost": 0.2
+      },
+      {
+        "domain": "general_knowledge",
+        "confidence_boost": 0.2
+      }
+    ],
+    "anti_patterns": [
+      "real-time data",
+      "current events",
+      "latest news",
+      "today's weather",
+      "stock prices",
+      "live scores",
+      "code generation",
+      "write code",
+      "calculate",
+      "solve equation"
+    ],
+    "complexity_indicators": {
+      "simple": [
+        "what is",
+        "who is",
+        "where is",
+        "define",
+        "capital of"
+      ],
+      "medium": [
+        "how does",
+        "why do",
+        "explain",
+        "difference between",
+        "compare"
+      ],
+      "complex": [
+        "analyze",
+        "multi-step",
+        "comprehensive explanation",
+        "detailed reasoning",
+        "in-depth"
+      ]
+    }
+  },
+  "documentation_path": "beginner/skills/question-answering/skill.yaml",
+  "has_documentation": true
+}

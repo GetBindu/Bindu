@@ -1,50 +1,80 @@
-"""
-Motivational Quote Agent - A simple agent that returns motivational quotes.
-Based on the echo_simple_agent.py example.
+"""Motivational Coach Agent
+
+A Bindu agent that provides motivation, encouragement, and positive inspiration.
+Helps users stay motivated, overcome challenges, and achieve their goals.
+
+Features:
+- Daily motivation and positive affirmations
+- Goal setting and achievement strategies
+- Overcoming procrastination and self-doubt
+- Web search for inspirational content and success stories
+- OpenRouter integration with gpt-oss-120b
+
+Usage:
+    python motivational_agent.py
+
+Environment:
+    Requires OPENROUTER_API_KEY in .env file
 """
 
 import os
-import random
 from bindu.penguin.bindufy import bindufy
+from agno.agent import Agent
+from agno.tools.duckduckgo import DuckDuckGoTools
+from agno.models.openrouter import OpenRouter
 
-# Collection of motivational quotes
-QUOTES = [
-    "The only way to do great work is to love what you do. - Steve Jobs",
-    "It does not matter how slowly you go as long as you do not stop. - Confucius",
-    "Believe you can and you're halfway there. - Theodore Roosevelt",
-    "The future belongs to those who believe in the beauty of their dreams. - Eleanor Roosevelt",
-    "Success is not final, failure is not fatal: it is the courage to continue that counts. - Winston Churchill",
-    "Your time is limited, don't waste it living someone else's life. - Steve Jobs",
-    "The harder you work for something, the greater you'll feel when you achieve it.",
-    "Dream it. Believe it. Build it.",
-    "Start where you are. Use what you have. Do what you can.",
-    "The only limit to our realization of tomorrow is our doubts of today.",
-]
+from dotenv import load_dotenv
 
-def get_motivational_quote():
-    """Return a random motivational quote."""
-    return random.choice(QUOTES)
+load_dotenv()
 
-def handler(messages):
-    """Return a motivational quote for any message."""
-    quote = get_motivational_quote()
-    return [{
-        "role": "assistant",
-        "content": f"💪 Here's your motivation: {quote}"
-    }]
+# Define your agent
+agent = Agent(
+    instructions=(
+        "You are a motivational coach and personal development guide. "
+        "Your job is to inspire, encourage, and motivate users to achieve their goals. "
+        "Provide positive affirmations, practical advice for overcoming challenges, "
+        "strategies for success, and help users build confidence and resilience. "
+        "Be empathetic, supportive, and uplifting while maintaining a professional tone. "
+        "Draw inspiration from successful people, psychology, and proven motivational techniques. "
+        "When users face specific challenges, provide actionable steps and encouragement."
+    ),
+    model=OpenRouter(
+        id="openai/gpt-oss-120b",
+        api_key=os.getenv("OPENROUTER_API_KEY")
+    ),
+    tools=[DuckDuckGoTools()],  # optional: for inspirational quotes and success stories
+)
 
+
+# Configuration
+# Note: Infrastructure configs (storage, scheduler, sentry, API keys) are now
+# automatically loaded from environment variables. See .env.example for details.
 config = {
     "author": "jerphinasmi24@gmail.com",
     "name": "motivational_agent",
-    "description": "An agent that shares motivational quotes to brighten your day",
+    "description": "A motivational coach agent for personal development and goal achievement",
     "deployment": {
-        "url": os.getenv("BINDU_DEPLOYMENT_URL", "http://localhost:3773"),
-        "expose": True,
-    },
-    "skills": []
+            "url": "http://localhost:3773",
+            "expose": True,
+            "cors_origins": ["http://localhost:5173"]
+        },
+    "skills": ["skills/question-answering", "skills/pdf-processing"],
 }
 
-if __name__ == "__main__":
-    bindufy(config, handler)
-    print("✨ Motivational Quote Agent is running!")
-    print("📢 Try sending a message to get inspired!")
+
+# Handler function
+def handler(messages: list[dict[str, str]]):
+    """Process messages and return agent response.
+
+    Args:
+        messages: List of message dictionaries containing conversation history
+
+    Returns:
+        Agent response result
+    """
+    result = agent.run(input=messages)
+    return result
+
+
+# Bindu-fy it
+bindufy(config, handler)

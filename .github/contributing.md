@@ -41,7 +41,7 @@ Report any unacceptable behavior to `raahul@getbindu.com`.
 We welcome contributions in several areas:
 
 - **Core Framework**: Improve the Bindu wrapper and protocol implementation
-- **Protocol Support**: Enhance A2A, AP2, and X402 compliance
+- **Protocol Support**: Enhance A2A and X402 compliance
 - **Agent Integrations**: Add support for new agent frameworks
 - **Documentation**: Improve guides, examples, and API docs
 - **Testing**: Increase test coverage (target: 80%+)

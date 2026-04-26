@@ -14,7 +14,7 @@ features:
   - Generate structured summaries with thesis, key findings, and conclusions
   - Graceful fallback to raw-text mode when pypdf is unavailable
   - Deployed as a live Bindu microservice via bindufy()
-  - A2A / AP2 / X402 protocol-compliant out of the box
+  - A2A / X402 protocol-compliant out of the box
 
 tags:
   - pdf

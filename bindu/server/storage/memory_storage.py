@@ -33,7 +33,7 @@ from bindu.settings import app_settings
 from bindu.utils.logging import get_logger
 from bindu.utils.retry import retry_storage_operation
 
-from .base import Storage
+from .base import OwnershipError, Storage
 from .helpers.validation import validate_uuid_type
 
 logger = get_logger("bindu.server.storage.memory_storage")
@@ -62,6 +62,11 @@ class InMemoryStorage(Storage[dict[str, Any]]):
         self.contexts: dict[UUID, list[UUID]] = {}
         self.task_feedback: dict[UUID, list[dict[str, Any]]] = {}
         self._webhook_configs: dict[UUID, PushNotificationConfig] = {}
+        # Owner tracking kept out of the Task/Context TypedDicts so the A2A
+        # protocol shape on the wire stays unchanged. Phase 2 enforcement
+        # reads these via get_task_owner / get_context_owner.
+        self._task_owners: dict[UUID, str | None] = {}
+        self._context_owners: dict[UUID, str | None] = {}
 
     @retry_storage_operation(
         max_attempts=DEFAULT_STORAGE_RETRY_ATTEMPTS,
@@ -100,7 +105,12 @@ class InMemoryStorage(Storage[dict[str, Any]]):
         min_wait=DEFAULT_STORAGE_MIN_WAIT,
         max_wait=DEFAULT_STORAGE_MAX_WAIT,
     )
-    async def submit_task(self, context_id: UUID, message: Message) -> Task:
+    async def submit_task(
+        self,
+        context_id: UUID,
+        message: Message,
+        caller_did: str | None = None,
+    ) -> Task:
         """Create a new task or continue an existing non-terminal task.
 
         Task-First Pattern (Bindu):
@@ -111,6 +121,10 @@ class InMemoryStorage(Storage[dict[str, Any]]):
         Args:
             context_id: Context to associate the task with
             message: Initial message containing task request
+            caller_did: Authenticated caller identity. Recorded as the task
+                owner on creation. If this call also creates the context, the
+                context's owner is recorded as well (write-once semantics —
+                subsequent tasks on the same context do not overwrite it).
 
         Returns:
             Task in 'submitted' state (new or continued)
@@ -163,6 +177,16 @@ class InMemoryStorage(Storage[dict[str, Any]]):
                         )
                 message["reference_task_ids"] = normalized_refs
 
+        # Refuse if the context already exists and is owned by someone else.
+        # Checked before the task existence branch because a reused task_id on
+        # an existing context must still respect that context's owner.
+        if context_id in self._context_owners:
+            existing_owner = self._context_owners[context_id]
+            if existing_owner != caller_did:
+                raise OwnershipError(
+                    f"Context {context_id} is owned by a different caller."
+                )
+
         # Check if task already exists
         existing_task = self.tasks.get(task_id)
 
@@ -205,10 +229,12 @@ class InMemoryStorage(Storage[dict[str, Any]]):
             history=[message],
         )
         self.tasks[task_id] = task
+        self._task_owners[task_id] = caller_did
 
-        # Add task to context
+        # Add task to context; record owner on first context creation only.
         if context_id not in self.contexts:
             self.contexts[context_id] = []
+            self._context_owners[context_id] = caller_did
         self.contexts[context_id].append(task_id)
 
         return task
@@ -344,18 +370,20 @@ class InMemoryStorage(Storage[dict[str, Any]]):
         pass
 
     async def list_tasks(
-        self, length: int | None = None, offset: int = 0
+        self,
+        length: int | None = None,
+        offset: int = 0,
+        owner_did: str | None = None,
     ) -> list[Task]:
-        """List all tasks in storage.
-
-        Args:
-            length: Optional limit on number of tasks to return
-            offset: Optional offset for pagination
-
-        Returns:
-            List of tasks
-        """
-        all_tasks = list(self.tasks.values())
+        """List tasks in storage, optionally filtered by owner."""
+        if owner_did is None:
+            all_tasks = list(self.tasks.values())
+        else:
+            all_tasks = [
+                task
+                for task_id, task in self.tasks.items()
+                if self._task_owners.get(task_id) == owner_did
+            ]
 
         if offset > 0:
             all_tasks = all_tasks[offset:]
@@ -380,19 +408,15 @@ class InMemoryStorage(Storage[dict[str, Any]]):
         return sum(1 for t in self.tasks.values() if t["status"]["state"] == status)
 
     async def list_tasks_by_context(
-        self, context_id: UUID, length: int | None = None, offset: int = 0
+        self,
+        context_id: UUID,
+        length: int | None = None,
+        offset: int = 0,
+        owner_did: str | None = None,
     ) -> list[Task]:
         """List tasks belonging to a specific context.
 
         Used for building conversation history and supporting task refinements.
-
-        Args:
-            context_id: Context to filter tasks by
-            length: Optional limit on number of tasks to return
-            offset: Optional offset for pagination
-
-        Returns:
-            List of tasks in the context
 
         Raises:
             TypeError: If context_id is not UUID
@@ -401,9 +425,16 @@ class InMemoryStorage(Storage[dict[str, Any]]):
 
         # Get task IDs from context
         task_ids = self.contexts.get(context_id, [])
-        tasks: list[Task] = [
-            self.tasks[task_id] for task_id in task_ids if task_id in self.tasks
-        ]
+        if owner_did is None:
+            tasks: list[Task] = [
+                self.tasks[task_id] for task_id in task_ids if task_id in self.tasks
+            ]
+        else:
+            tasks = [
+                self.tasks[task_id]
+                for task_id in task_ids
+                if task_id in self.tasks and self._task_owners.get(task_id) == owner_did
+            ]
 
         if offset > 0:
             tasks = tasks[offset:]
@@ -414,24 +445,28 @@ class InMemoryStorage(Storage[dict[str, Any]]):
         return tasks
 
     async def list_contexts(
-        self, length: int | None = None, offset: int = 0
+        self,
+        length: int | None = None,
+        offset: int = 0,
+        owner_did: str | None = None,
     ) -> list[dict[str, Any]]:
-        """List all contexts in storage.
+        """List contexts in storage, optionally filtered by owner."""
+        if owner_did is None:
+            items = self.contexts.items()
+        else:
+            items = [
+                (ctx_id, task_ids)
+                for ctx_id, task_ids in self.contexts.items()
+                if self._context_owners.get(ctx_id) == owner_did
+            ]
 
-        Args:
-            length: Optional maximum number of contexts to return
-            offset: Optional offset for pagination
-
-        Returns:
-            List of context dicts
-        """
         contexts = [
             {
                 "context_id": ctx_id,
                 "task_count": len(task_ids),
                 "task_ids": task_ids,
             }
-            for ctx_id, task_ids in self.contexts.items()
+            for ctx_id, task_ids in items
         ]
 
         if offset > 0:
@@ -470,9 +505,11 @@ class InMemoryStorage(Storage[dict[str, Any]]):
             # Also clear feedback for these tasks
             if task_id in self.task_feedback:
                 del self.task_feedback[task_id]
+            self._task_owners.pop(task_id, None)
 
         # Remove the context itself
         del self.contexts[context_id]
+        self._context_owners.pop(context_id, None)
 
         logger.info(f"Cleared context {context_id}: removed {len(task_ids)} tasks")
 
@@ -485,6 +522,18 @@ class InMemoryStorage(Storage[dict[str, Any]]):
         self.contexts.clear()
         self.task_feedback.clear()
         self._webhook_configs.clear()
+        self._task_owners.clear()
+        self._context_owners.clear()
+
+    async def get_task_owner(self, task_id: UUID) -> str | None:
+        """Return the owner DID for a task, or None if unknown or unowned."""
+        task_id = validate_uuid_type(task_id, "task_id")
+        return self._task_owners.get(task_id)
+
+    async def get_context_owner(self, context_id: UUID) -> str | None:
+        """Return the owner DID for a context, or None if unknown or unowned."""
+        context_id = validate_uuid_type(context_id, "context_id")
+        return self._context_owners.get(context_id)
 
     async def close(self) -> None:
         """Safely close and cleanup resources."""

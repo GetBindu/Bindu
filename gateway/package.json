@@ -1,0 +1,47 @@
+{
+  "name": "@bindu/gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Bindu Gateway — task-first orchestrator for multi-agent plans. Forked from OpenCode, rewired for Bindu.",
+  "license": "Apache-2.0",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev": "tsx watch --env-file-if-exists=.env.local --env-file-if-exists=.env src/index.ts",
+    "start": "tsx --env-file-if-exists=.env.local --env-file-if-exists=.env src/index.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^3.0.53",
+    "@effect/platform-node": "4.0.0-beta.48",
+    "@hono/node-server": "^1.19.11",
+    "@noble/ed25519": "^2.1.0",
+    "@noble/hashes": "^2.2.0",
+    "@supabase/supabase-js": "^2.58.0",
+    "ai": "^6.0.168",
+    "bs58": "^6.0.0",
+    "cross-spawn": "7.0.6",
+    "effect": "4.0.0-beta.48",
+    "glob": "^13.0.6",
+    "hono": "^4.12.14",
+    "mime-types": "3.0.2",
+    "minimatch": "^10.2.5",
+    "remeda": "2.26.0",
+    "semver": "^7.6.3",
+    "xdg-basedir": "5.1.0",
+    "zod": "4.1.8"
+  },
+  "devDependencies": {
+    "@types/cross-spawn": "6.0.6",
+    "@types/mime-types": "3.0.1",
+    "@types/node": "22.13.9",
+    "@types/semver": "^7.5.8",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.2.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

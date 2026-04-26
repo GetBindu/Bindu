@@ -2,7 +2,7 @@
 	import ChatWindow from "$lib/components/chat/ChatWindow.svelte";
 	import { pendingMessage } from "$lib/stores/pendingMessage";
 	import { isAborted } from "$lib/stores/isAborted";
-	import { onMount } from "svelte";
+	import { onMount, tick } from "svelte";
 	import { page } from "$app/state";
 	import { beforeNavigate, invalidateAll } from "$app/navigation";
 	import { base } from "$app/paths";
@@ -400,7 +400,14 @@
 			$loading = false;
 			pending = false;
 			clearReply();
-			isWritingMessage = false; // Reset guard
+			// Await a tick so Svelte flushes the content assignment
+			// (messageToWriteTo.content = update.text) into the DOM BEFORE
+			// we drop the isWritingMessage guard. Without this, the $effect
+			// that syncs `messages = data.messages` fires immediately after
+			// the guard drops, overwriting the locally-set agent response
+			// with stale server data — making the response invisible until refresh.
+			await tick();
+			isWritingMessage = false; // Reset guard after Svelte has flushed reactive updates
 			// No invalidateAll() - causes reload loop. UI updates reactively.
 		}
 	}
@@ -433,8 +440,17 @@
 			return;
 		}
 
+		// For the Bindu agent model we use direct client-side API polling
+		// (sendAgentMessage), which never persists FinalAnswer updates to the DB.
+		// isConversationStreaming() would therefore always return true for agent
+		// messages, falsely triggering the BackgroundGenerationPoller which calls
+		// invalidate(UrlDependency.Conversation) and wipes locally-written content.
+		// Skip background generation tracking entirely for the agent model.
+		const currentModelOnMount = findCurrentModel(data.models, data.oldModels, data.model);
+		const isAgentModel = currentModelOnMount?.id === 'bindu' || currentModelOnMount?.name === 'bindu';
+
 		// Only check streaming if not already loading (prevents re-trigger on reload)
-		if (!$loading && isConversationStreaming(messages)) {
+		if (!$loading && !isAgentModel && isConversationStreaming(messages)) {
 			addBackgroundGeneration({ id: page.params.id!, startedAt: Date.now() });
 			$loading = true;
 		}
@@ -465,7 +481,13 @@
 	const settings = useSettingsStore();
 	let messages = $state(data.messages);
 	$effect(() => {
-		messages = data.messages;
+		// Only sync from server data when we are NOT actively writing a message.
+		// During a write the messages array is mutated locally; overwriting it with
+		// stale server data (triggered by a background-poller invalidation) would
+		// wipe the live response before the UI can display it.
+		if (!isWritingMessage) {
+			messages = data.messages;
+		}
 	});
 
 	function isConversationStreaming(msgs: Message[]): boolean {
@@ -483,15 +505,25 @@
 	}
 
 	$effect(() => {
-		const streaming = isConversationStreaming(messages);
-		if (streaming) {
-			$loading = true;
-		} else if (!pending) {
-			$loading = false;
-		}
+		// Skip the streaming heuristic for the Bindu agent model.
+		// Agent messages never have FinalAnswer persisted in the DB
+		// (the agent uses direct client-side polling), so
+		// isConversationStreaming() would always return true and keep
+		// $loading=true long after the response has been displayed.
+		const currentModelEffect = findCurrentModel(data.models, data.oldModels, data.model);
+		const isAgentModelEffect = currentModelEffect?.id === 'bindu' || currentModelEffect?.name === 'bindu';
 
-		if (!streaming && browser) {
-			removeBackgroundGeneration(page.params.id!);
+		if (!isAgentModelEffect) {
+			const streaming = isConversationStreaming(messages);
+			if (streaming) {
+				$loading = true;
+			} else if (!pending) {
+				$loading = false;
+			}
+
+			if (!streaming && browser) {
+				removeBackgroundGeneration(page.params.id!);
+			}
 		}
 	});
 

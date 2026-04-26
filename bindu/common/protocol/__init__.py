@@ -17,7 +17,7 @@ getbindu envisions a future where AI agents aren't trapped in silos, but dance t
 a decentralized choreography.
 
 Each agent is a sovereign point of intelligence, self-hosted and
-independent, yet capable of forming powerful connections with others. Through A2A (Agent to Agent), AP2, x402
+independent, yet capable of forming powerful connections with others. Through A2A (Agent to Agent) and x402
 these agents communicate, collaborate, and create emergent intelligence that transcends any
 single entity.
 
