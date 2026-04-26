@@ -147,14 +147,9 @@ class MessageHandlers:
 
         config = request_params.get("configuration", {})
         if "history_length" in config:
-            try:
-                history_length = self._parse_non_negative_history_length(
-                    config["history_length"]
-                )
-            except ValueError as exc:
-                from bindu.common.protocol.types import InvalidParamsError
-
-                raise InvalidParamsError(str(exc)) from exc
+            history_length = self._parse_non_negative_history_length(
+                config["history_length"]
+            )
             if history_length is not None:
                 scheduler_params["history_length"] = history_length
 
