@@ -33,6 +33,10 @@ from bindu.grpc.server import start_grpc_server
 # Mock AgentHandler — simulates what a TypeScript/Kotlin SDK would run
 # ---------------------------------------------------------------------------
 
+# Use an explicit IPv4 loopback instead of "localhost" to avoid environments
+# where IPv6 resolution causes bind/connect failures (common in CI).
+LOOPBACK_HOST = "127.0.0.1"
+
 
 class MockAgentHandler(agent_handler_pb2_grpc.AgentHandlerServicer):
     """A mock AgentHandler that echoes messages back.
@@ -118,7 +122,7 @@ def _start_mock_agent_handler(port: int) -> tuple[grpc.Server, MockAgentHandler]
     handler = MockAgentHandler()
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
     agent_handler_pb2_grpc.add_AgentHandlerServicer_to_server(handler, server)
-    server.add_insecure_port(f"localhost:{port}")
+    server.add_insecure_port(f"{LOOPBACK_HOST}:{port}")
     server.start()
     return server, handler
 
@@ -132,11 +136,98 @@ CALLBACK_PORT = 13999  # Mock agent handler port
 HTTP_PORT = 13773  # A2A HTTP server port
 
 
+def _wait_for_http_ready(base_url: str, timeout_s: float = 20.0) -> None:
+    """Wait until the agent HTTP server is ready to accept requests."""
+    deadline = time.monotonic() + timeout_s
+    last_exc: Exception | None = None
+
+    while time.monotonic() < deadline:
+        try:
+            with httpx.Client(timeout=2.0) as client:
+                resp = client.get(f"{base_url}/health")
+            if resp.status_code == 200:
+                return
+        except Exception as exc:  # noqa: BLE001 - test helper
+            last_exc = exc
+        time.sleep(0.2)
+
+    raise AssertionError(
+        f"HTTP server at {base_url} did not become ready within {timeout_s}s"
+        + (f" (last error: {last_exc})" if last_exc else "")
+    )
+
+
+def _wait_for_task_terminal(
+    base_url: str,
+    task_id: str,
+    timeout_s: float = 30.0,
+) -> dict[str, Any]:
+    """Poll tasks/get until the task reaches a terminal state."""
+    deadline = time.monotonic() + timeout_s
+    last_task: dict[str, Any] | None = None
+    last_exc: Exception | None = None
+
+    get_task_request = {
+        "jsonrpc": "2.0",
+        "method": "tasks/get",
+        "params": {"taskId": task_id},
+        "id": "99999999-8888-7777-6666-555555555555",
+    }
+
+    while time.monotonic() < deadline:
+        try:
+            with httpx.Client(timeout=5.0) as client:
+                resp = client.post(
+                    base_url,
+                    json=get_task_request,
+                    headers={"Content-Type": "application/json"},
+                )
+        except httpx.HTTPError as exc:
+            last_exc = exc
+            time.sleep(0.2)
+            continue
+
+        if resp.status_code != 200:
+            time.sleep(0.2)
+            continue
+
+        try:
+            payload = resp.json()
+        except ValueError as exc:
+            last_exc = exc
+            time.sleep(0.2)
+            continue
+
+        if payload.get("error"):
+            pytest.fail(
+                f"tasks/get returned JSON-RPC error payload: {payload.get('error')} (full payload: {payload})"
+            )
+
+        task = payload["result"]
+        last_task = task
+
+        state = task["status"]["state"]
+        if state in ("completed", "failed", "canceled"):
+            return task
+
+        time.sleep(0.2)
+
+    raise AssertionError(
+        f"Task {task_id} did not reach a terminal state within {timeout_s}s"
+        + (
+            f" (last state: {last_task.get('status', {}).get('state')})"
+            if last_task
+            else ""
+        )
+        + (f" (last error: {last_exc})" if last_exc else "")
+    )
+
+
 @pytest.fixture(scope="module")
 def grpc_server():
     """Start the Bindu core gRPC server for the test session."""
     registry = AgentRegistry()
-    server = start_grpc_server(registry=registry, port=GRPC_PORT, host="localhost")
+    server = start_grpc_server(registry=registry, port=GRPC_PORT, host=LOOPBACK_HOST)
     yield server, registry
     server.stop(grace=1)
 
@@ -161,7 +252,7 @@ class TestGrpcE2ERegistration:
 
     def test_heartbeat_unregistered(self, grpc_server: Any) -> None:
         """Test heartbeat for an unregistered agent returns acknowledged=False."""
-        channel = grpc.insecure_channel(f"localhost:{GRPC_PORT}")
+        channel = grpc.insecure_channel(f"{LOOPBACK_HOST}:{GRPC_PORT}")
         stub = agent_handler_pb2_grpc.BinduServiceStub(channel)
 
         response = stub.Heartbeat(
@@ -179,7 +270,7 @@ class TestGrpcE2ERegistration:
         self, grpc_server: Any, mock_agent: MockAgentHandler
     ) -> None:
         """Test full RegisterAgent flow — DID, manifest, HTTP server."""
-        channel = grpc.insecure_channel(f"localhost:{GRPC_PORT}")
+        channel = grpc.insecure_channel(f"{LOOPBACK_HOST}:{GRPC_PORT}")
         stub = agent_handler_pb2_grpc.BinduServiceStub(channel)
 
         config = {
@@ -187,7 +278,7 @@ class TestGrpcE2ERegistration:
             "name": "e2e-test-agent",
             "description": "E2E test agent",
             "deployment": {
-                "url": f"http://localhost:{HTTP_PORT}",
+                "url": f"http://{LOOPBACK_HOST}:{HTTP_PORT}",
                 "expose": True,
             },
         }
@@ -196,17 +287,16 @@ class TestGrpcE2ERegistration:
             agent_handler_pb2.RegisterAgentRequest(
                 config_json=json.dumps(config),
                 skills=[],
-                grpc_callback_address=f"localhost:{CALLBACK_PORT}",
+                grpc_callback_address=f"{LOOPBACK_HOST}:{CALLBACK_PORT}",
             )
         )
 
         assert response.success is True
         assert response.agent_id != ""
         assert response.did.startswith("did:bindu:")
-        assert response.agent_url == f"http://localhost:{HTTP_PORT}"
+        assert response.agent_url == f"http://{LOOPBACK_HOST}:{HTTP_PORT}"
 
-        # Wait for uvicorn to start
-        time.sleep(3)
+        _wait_for_http_ready(f"http://{LOOPBACK_HOST}:{HTTP_PORT}", timeout_s=30.0)
 
         channel.close()
 
@@ -221,7 +311,7 @@ class TestGrpcE2ERegistration:
 
         agent_id = agents[0].agent_id
 
-        channel = grpc.insecure_channel(f"localhost:{GRPC_PORT}")
+        channel = grpc.insecure_channel(f"{LOOPBACK_HOST}:{GRPC_PORT}")
         stub = agent_handler_pb2_grpc.BinduServiceStub(channel)
 
         response = stub.Heartbeat(
@@ -242,11 +332,12 @@ class TestGrpcE2EMessageFlow:
 
     def test_agent_card_available(self, grpc_server: Any, mock_agent: Any) -> None:
         """Test that the A2A agent card is served after registration."""
-        # Give the HTTP server time to fully start
-        time.sleep(2)
+        _wait_for_http_ready(f"http://{LOOPBACK_HOST}:{HTTP_PORT}", timeout_s=30.0)
 
         with httpx.Client(timeout=5.0) as client:
-            resp = client.get(f"http://localhost:{HTTP_PORT}/.well-known/agent.json")
+            resp = client.get(
+                f"http://{LOOPBACK_HOST}:{HTTP_PORT}/.well-known/agent.json"
+            )
 
         assert resp.status_code == 200
         card = resp.json()
@@ -298,7 +389,7 @@ class TestGrpcE2EMessageFlow:
         # Send A2A message
         with httpx.Client(timeout=15.0) as client:
             resp = client.post(
-                f"http://localhost:{HTTP_PORT}",
+                f"http://{LOOPBACK_HOST}:{HTTP_PORT}",
                 json=a2a_request,
                 headers={"Content-Type": "application/json"},
             )
@@ -307,29 +398,13 @@ class TestGrpcE2EMessageFlow:
         result = resp.json()
         assert "result" in result
 
-        # Wait for async task processing
-        time.sleep(3)
-
-        # Get the completed task
-        get_task_request = {
-            "jsonrpc": "2.0",
-            "method": "tasks/get",
-            "params": {"taskId": task_id},
-            "id": "99999999-8888-7777-6666-555555555555",
-        }
-
-        with httpx.Client(timeout=5.0) as client:
-            resp = client.post(
-                f"http://localhost:{HTTP_PORT}",
-                json=get_task_request,
-                headers={"Content-Type": "application/json"},
-            )
-
-        assert resp.status_code == 200
-        task_result = resp.json()
+        task = _wait_for_task_terminal(
+            base_url=f"http://{LOOPBACK_HOST}:{HTTP_PORT}",
+            task_id=task_id,
+            timeout_s=45.0,
+        )
 
         # Verify task completed
-        task = task_result["result"]
         assert task["status"]["state"] == "completed"
 
         # Verify agent response in history
@@ -357,6 +432,6 @@ class TestGrpcE2EMessageFlow:
     def test_health_endpoint(self, grpc_server: Any, mock_agent: Any) -> None:
         """Test the /health endpoint works on the registered agent's server."""
         with httpx.Client(timeout=5.0) as client:
-            resp = client.get(f"http://localhost:{HTTP_PORT}/health")
+            resp = client.get(f"http://{LOOPBACK_HOST}:{HTTP_PORT}/health")
 
         assert resp.status_code == 200

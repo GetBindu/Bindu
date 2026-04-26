@@ -1,6 +1,6 @@
 import { collections } from "$lib/server/database";
 import ObjectId from "bson-objectid";
-import type { Semaphores } from "$lib/types/Semaphore";
+import type { Semaphore, Semaphores } from "$lib/types/Semaphore";
 
 /**
  * Returns the lock id if the lock was acquired, false otherwise
@@ -8,14 +8,15 @@ import type { Semaphores } from "$lib/types/Semaphore";
 export async function acquireLock(key: Semaphores | string): Promise<ObjectId | false> {
 	try {
 		const id = new ObjectId();
-
-		const insert = await collections.semaphores.insertOne({
+		const lockDocument = {
 			_id: id,
 			key,
 			createdAt: new Date(),
 			updatedAt: new Date(),
 			deleteAt: new Date(Date.now() + 1000 * 60 * 3), // 3 minutes
-		});
+		} satisfies Semaphore & { _id: ObjectId };
+
+		const insert = await collections.semaphores.insertOne(lockDocument);
 
 		return insert.acknowledged ? id : false; // true if the document was inserted
 	} catch (e) {

@@ -179,6 +179,7 @@ class TestReadmeUpdates:
         assert "MINIMAX_API_KEY" in readme
 
 
+@pytest.mark.integration
 class TestMiniMaxIntegration:
     """Integration tests for MiniMax API (require MINIMAX_API_KEY)."""
 

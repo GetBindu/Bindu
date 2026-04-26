@@ -6,7 +6,10 @@
 	import IconMic from "~icons/lucide/mic";
 
 	import ChatInput from "./ChatInput.svelte";
+	import { sendAgentMessage } from "$lib/utils/agentMessageHandler";
 	import VoiceRecorder from "./VoiceRecorder.svelte";
+	import VoiceCallButton from "$lib/components/voice/VoiceCallButton.svelte";
+	import VoiceCallPanel from "$lib/components/voice/VoiceCallPanel.svelte";
 	import StopGeneratingBtn from "../StopGeneratingBtn.svelte";
 	import type { Model } from "$lib/types/Model";
 	import FileDropzone from "./FileDropzone.svelte";
@@ -29,7 +32,7 @@
 	import ReplyIndicator from "./ReplyIndicator.svelte";
 	import { agentInspector, resetAgentInspector } from "$lib/stores/agentInspector";
 
-	import { fly } from "svelte/transition";
+	import { fade, fly } from "svelte/transition";
 	import { cubicInOut } from "svelte/easing";
 
 	import { isVirtualKeyboard } from "$lib/utils/isVirtualKeyboard";
@@ -40,7 +43,13 @@
 		isMessageToolErrorUpdate,
 		isMessageToolResultUpdate,
 	} from "$lib/utils/messageUpdates";
+	import { MessageUpdateType } from "$lib/types/MessageUpdate";
 	import type { ToolFront } from "$lib/types/Tool";
+	import {
+		startVoiceSession,
+		voiceSessionId,
+		voiceError,
+	} from "$lib/stores/voice";
 
 	interface Props {
 		messages?: Message[];
@@ -139,11 +148,53 @@
 	);
 	let isTouchDevice = $derived(browser && navigator.maxTouchPoints > 0);
 
-	const handleSubmit = () => {
-		if (requireAuthUser() || loading || !draft) return;
-		onmessage?.(draft);
-		draft = "";
-	};
+	async function handleSubmit(): Promise<boolean> {
+		if (!draft) {
+			return false;
+		}
+		try {
+			const fileParts = (sources ? await Promise.all(sources) : []).filter(Boolean) as MessageFile[];
+			return await submit(draft, { fileParts });
+		} catch (err) {
+			console.error("Error preparing chat submission:", err);
+			$error = err instanceof Error ? err.message : String(err);
+			return false;
+		}
+	}
+
+	async function submit(
+		message: string,
+		options: { fileParts?: MessageFile[] } = {}
+	): Promise<boolean> {
+		const fileParts = options.fileParts ?? [];
+		if (!message || loading || isReadOnly) return false;
+		if (requireAuthUser()) return false;
+
+		const contextId = agentContextId ?? undefined;
+		let success = false;
+		try {
+			let streamed = "";
+			for await (const update of sendAgentMessage(message, contextId, { fileParts })) {
+				if (update.type === MessageUpdateType.Stream) {
+					streamed += update.token ?? "";
+					onmessage?.(streamed);
+				} else if (update.type === MessageUpdateType.FinalAnswer) {
+					onmessage?.(update.text ?? "");
+				}
+			}
+			success = true;
+		} catch (err) {
+			console.error("Error sending agent message:", err);
+			$error = err instanceof Error ? err.message : String(err);
+		}
+
+		if (success) {
+			draft = "";
+			files = [];
+		}
+
+		return success;
+	}
 
 	let lastTarget: EventTarget | null = null;
 
@@ -251,11 +302,11 @@
 	});
 
 	let sources = $derived(
-		files?.map<Promise<MessageFile>>((file) =>
+		files?.map((file) =>
 			file2base64(file).then((value) => ({
 				type: "base64",
 				value,
-				mime: file.type,
+				mime: file.type || "application/octet-stream",
 				name: file.name,
 			}))
 		)
@@ -309,15 +360,15 @@
 	import { TEXT_MIME_ALLOWLIST, IMAGE_MIME_ALLOWLIST_DEFAULT, DOCUMENT_MIME_ALLOWLIST } from "$lib/constants/mime";
 
 	let activeMimeTypes = $derived(
-		Array.from(
-			new Set([
-				...TEXT_MIME_ALLOWLIST,
-				...DOCUMENT_MIME_ALLOWLIST,
-				...(modelIsMultimodal
-					? (currentModel.multimodalAcceptedMimetypes ?? [...IMAGE_MIME_ALLOWLIST_DEFAULT])
-					: []),
-			])
-		)
+	       Array.from(
+		       new Set([
+			       ...TEXT_MIME_ALLOWLIST,
+			       ...DOCUMENT_MIME_ALLOWLIST,
+			       ...(modelIsMultimodal
+				       ? (currentModel.multimodalAcceptedMimetypes ?? [...IMAGE_MIME_ALLOWLIST_DEFAULT])
+				       : []),
+		       ])
+	       )
 	);
 	let isFileUploadEnabled = $derived(activeMimeTypes.length > 0);
 	let focused = $state(false);
@@ -372,7 +423,7 @@
 			if (trimmedText) {
 				// Set draft and send immediately
 				draft = draft.trim() ? `${draft.trim()} ${trimmedText}` : trimmedText;
-				handleSubmit();
+				await handleSubmit();
 			}
 		} catch (err) {
 			console.error("Transcription error:", err);
@@ -387,6 +438,31 @@
 		isRecording = false;
 		$error = message;
 	}
+
+	async function toggleVoiceSession() {
+		if ($voiceSessionId) {
+			return;
+		}
+
+		try {
+			await startVoiceSession(agentContextId ?? undefined);
+		} catch (err) {
+			console.error("Voice session error:", err);
+			$error = (err as Error).message || "Failed to start voice session";
+		}
+	}
+
+	let previousVoiceError: string | null = null;
+	$effect(() => {
+		if ($voiceError) {
+			$error = $voiceError;
+			previousVoiceError = $voiceError;
+		} else if ($error && $error === previousVoiceError) {
+			// Voice error was cleared, and the global error is that voice error, so clear it.
+			$error = undefined;
+			previousVoiceError = null;
+		}
+	});
 </script>
 
 <svelte:window
@@ -462,7 +538,7 @@
 					{#if !loading && !pending}
 						<div
 							class="intro-pills mt-10 flex flex-wrap items-center justify-center gap-2.5 px-4 transition-opacity duration-300"
-							transition:fade
+					transition:fade
 						>
 							{#each [
 								{ text: "Generate an image", icon: "🎨" },
@@ -473,14 +549,14 @@
 								{ text: "Find a dataset", icon: "📊" },
 								{ text: "Gift ideas", icon: "🎁" }
 							] as prompt}
-								<button
-									type="button"
-									class="prompt-pill flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-bold transition-all"
-									onclick={() => {
-										draft = prompt.text;
-										handleSubmit();
-									}}
-								>
+									<button
+										type="button"
+										class="prompt-pill flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-bold transition-all"
+										onclick={async () => {
+											draft = prompt.text;
+											await handleSubmit();
+										}}
+									>
 									{prompt.text}
 								</button>
 							{/each}
@@ -494,6 +570,10 @@
 
 		<ScrollToBottomBtn class="fixed bottom-36 right-4 lg:right-10" scrollNode={chatContainer} />
 	</div>
+
+	{#if $voiceSessionId}
+		<VoiceCallPanel />
+	{/if}
 
 	<div
 		class="pointer-events-none absolute inset-x-0 bottom-0 z-0 mx-auto flex w-full
@@ -509,10 +589,13 @@
 				{#each sources as source, index}
 					{#await source then src}
 						<UploadedFile
-							file={src}
-							onclose={() => {
-								files = files.filter((_, i) => i !== index);
-							}}
+							 file={{
+								 ...src,
+								 type: "base64" as const
+							 }}
+							 onclose={() => {
+									 files = files.filter((_, i) => i !== index);
+							 }}
 						/>
 					{/await}
 				{/each}
@@ -520,7 +603,11 @@
 		{/if}
 
 		<div class="w-full">
-			<!-- pills removed from here to prevent absolute overlap -->
+			{#if $voiceError && !$voiceSessionId}
+				<p class="mb-2 rounded-md bg-red-50 px-2 py-1 text-xs text-red-700 dark:bg-red-950/40 dark:text-red-300">
+					{$voiceError}
+				</p>
+			{/if}
 
 			<div class="flex w-full *:mb-3">
 				{#if !loading && lastIsError}
@@ -543,15 +630,15 @@
 			<!-- Right blue glow -->
 			<div class="composer-glow composer-glow-right"></div>
 
-			<form
-				tabindex="-1"
-				aria-label={isFileUploadEnabled ? "file dropzone" : undefined}
-				onsubmit={(e) => {
-					e.preventDefault();
-					handleSubmit();
-				}}
-				class="composer {isReadOnly ? 'opacity-30' : ''} {focused && isVirtualKeyboard() ? 'max-sm:mb-4' : ''} {pastedLongContent ? 'paste-glow' : ''}"
-			>
+			       <form
+				       tabindex="-1"
+				       aria-label={isFileUploadEnabled ? "file dropzone" : undefined}
+				       onsubmit={async (e) => {
+				       e.preventDefault();
+				       await handleSubmit();
+				       }}
+				       class="composer {isReadOnly ? 'opacity-30' : ''} {focused && isVirtualKeyboard() ? 'max-sm:mb-4' : ''} {pastedLongContent ? 'paste-glow' : ''}"
+			       >
 				{#if isRecording || isTranscribing}
 					<VoiceRecorder
 						{isTranscribing}
@@ -566,55 +653,69 @@
 				{:else if onDrag && isFileUploadEnabled}
 					<FileDropzone bind:files bind:onDrag mimeTypes={activeMimeTypes} />
 				{:else}
-					{#if lastIsError}
-						<ChatInput value="Sorry, something went wrong. Please try again." disabled={true} />
-					{:else}
-						<ChatInput
-							placeholder={isReadOnly ? "This conversation is read-only." : "Ask anything"}
-							{loading}
-							bind:value={draft}
-							bind:files
-							mimeTypes={activeMimeTypes}
-							onsubmit={handleSubmit}
-							{onPaste}
-							disabled={isReadOnly || lastIsError}
-							{modelIsMultimodal}
-							{modelSupportsTools}
-							bind:focused
-						>
-							{#if loading}
-								<StopGeneratingBtn
-									onClick={() => onstop?.()}
-									showBorder={true}
-									classNames="composer-btn icon-btn"
-								/>
-							{:else}
-								{#if transcriptionEnabled}
-									<button
-										type="button"
-										class="composer-btn"
-										disabled={isReadOnly}
-										onclick={() => {
-											isRecording = true;
-										}}
-										aria-label="Start voice recording"
-									>
-										<IconMic class="size-3.5" />
-										<span>Voice</span>
-									</button>
-								{/if}
+					<div
+						class="flex w-full flex-1 rounded-xl border-none bg-transparent"
+						class:paste-glow={pastedLongContent}
+					>
+						{#if lastIsError}
+							<ChatInput value="Sorry, something went wrong. Please try again." disabled={true} />
+						{:else}
+										<ChatInput
+										       placeholder={isReadOnly ? "This conversation is read-only." : "Imagine and Question"}
+										       {loading}
+										       bind:value={draft}
+										       bind:files
+										       mimeTypes={activeMimeTypes}
+										       onsubmit={async (message, fileParts) => {
+												return await submit(message, { fileParts: fileParts as MessageFile[] });
+										       }}
+										       {onPaste}
+										       disabled={isReadOnly || lastIsError}
+										       {modelIsMultimodal}
+										       {modelSupportsTools}
+										       bind:focused
+									       />
+						{/if}
+
+						{#if loading}
+							<StopGeneratingBtn
+								onClick={() => onstop?.()}
+								showBorder={true}
+								classNames="absolute bottom-2 right-2 size-8 sm:size-7 self-end rounded-full border bg-white text-black shadow transition-none dark:border-transparent dark:bg-gray-600 dark:text-white"
+							/>
+						{:else}
+							{#if transcriptionEnabled}
 								<button
-									class="send-btn"
-									disabled={!draft || isReadOnly}
-									type="submit"
-									aria-label="Send message"
-									name="submit"
+									type="button"
+									class="btn absolute bottom-2 right-10 mr-1.5 size-8 self-end rounded-full border bg-white/50 text-gray-500 transition-none hover:bg-gray-50 hover:text-gray-700 dark:border-transparent dark:bg-gray-600/50 dark:text-gray-300 dark:hover:bg-gray-500 dark:hover:text-white sm:right-9 sm:size-7"
+									disabled={isReadOnly}
+									onclick={() => {
+										isRecording = true;
+									}}
+									aria-label="Start voice recording"
 								>
-									<IconArrowUp class="size-4" />
+									<IconMic class="size-4" />
 								</button>
 							{/if}
-						</ChatInput>
-					{/if}
+							<VoiceCallButton
+								disabled={isReadOnly}
+								active={!!$voiceSessionId}
+								onclick={toggleVoiceSession}
+							/>
+							<button
+								class="btn send-btn absolute bottom-2 right-2 size-8 self-end rounded-full border bg-white text-black shadow transition-none enabled:hover:bg-white enabled:hover:shadow-inner dark:border-transparent dark:bg-gray-600 dark:text-white dark:hover:enabled:bg-black sm:size-7 {!draft ||
+								isReadOnly
+									? ''
+									: '!bg-black !text-white dark:!bg-white dark:!text-black'}"
+								disabled={!draft || isReadOnly}
+								type="submit"
+								aria-label="Send message"
+								name="submit"
+							>
+								<IconArrowUp />
+							</button>
+						{/if}
+					</div>
 				{/if}
 			</form>
 		</div>

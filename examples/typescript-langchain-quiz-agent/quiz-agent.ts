@@ -101,7 +101,7 @@ bindufy(
         ? response.content
         : JSON.stringify(response.content);
     } catch (error: any) {
-      return `Error: ${error.message}`;
+      return `Error: ${error instanceof Error ? error.message : String(error)}`;
     }
   }
 );

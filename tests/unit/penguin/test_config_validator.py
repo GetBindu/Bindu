@@ -26,14 +26,14 @@ class TestConfigValidator:
         """Test validation fails when required field is missing."""
         config = {"version": "1.0.0"}
 
-        with pytest.raises(ConfigError, match="author"):
+        with pytest.raises(ConfigError, match=r"author"):
             ConfigValidator.validate_and_process(config)
 
     def test_validate_missing_deployment_url_raises(self):
         """Test validation fails when deployment.url is missing."""
         config = {"author": "test@example.com", "name": "TestAgent", "deployment": {}}
 
-        with pytest.raises(ConfigError, match="deployment.url"):
+        with pytest.raises(ConfigError, match=r"deployment\.url"):
             ConfigValidator.validate_and_process(config)
 
     def test_validate_invalid_deployment_url_scheme_raises(self):
@@ -44,7 +44,7 @@ class TestConfigValidator:
             "deployment": {"url": "ftp://localhost:3773"},
         }
 
-        with pytest.raises(ConfigError, match="valid http\(s\) URL"):
+        with pytest.raises(ConfigError, match=r"valid http\(s\) URL"):
             ConfigValidator.validate_and_process(config)
 
     def test_validate_invalid_deployment_url_format_raises(self):
@@ -55,7 +55,7 @@ class TestConfigValidator:
             "deployment": {"url": "localhost:3773"},
         }
 
-        with pytest.raises(ConfigError, match="deployment.url"):
+        with pytest.raises(ConfigError, match=r"deployment\.url"):
             ConfigValidator.validate_and_process(config)
 
     def test_defaults_are_applied(self):

@@ -63,6 +63,7 @@ For full URL override, use `BINDU_DEPLOYMENT_URL` (e.g. `http://127.0.0.1:5001`)
 - `speech-to-text/` - Audio transcription using Gemini 2.0 Flash (MP3, WAV, OGG, M4A)
 - `ai-data-analysis-agent/` - Autonomous data analyst with CSV profiling and visualization
 - `cybersecurity-newsletter/` - Security news aggregator with CVE tracking
+- `voice-agent/` - Voice-enabled agent with WebSocket voice session endpoints
 
 ### TypeScript (Language-Agnostic via gRPC)
 - `typescript-openai-agent/` - OpenAI SDK agent bindufied with TypeScript SDK

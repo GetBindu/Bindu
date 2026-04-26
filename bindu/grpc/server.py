@@ -22,15 +22,30 @@ from __future__ import annotations
 
 from concurrent import futures
 
-import grpc
+try:
+    import grpc
 
-from bindu.grpc.generated import agent_handler_pb2_grpc
+    from bindu.grpc.generated import agent_handler_pb2_grpc
+except ImportError as exc:  # pragma: no cover - optional dependency path
+    grpc = None  # type: ignore[assignment]
+    agent_handler_pb2_grpc = None  # type: ignore[assignment]
+    _GRPC_IMPORT_ERROR = exc
+else:
+    _GRPC_IMPORT_ERROR = None
+
 from bindu.grpc.registry import AgentRegistry
 from bindu.grpc.service import BinduServiceImpl
 from bindu.settings import app_settings
 from bindu.utils.logging import get_logger
 
 logger = get_logger("bindu.grpc.server")
+
+
+def _require_grpc_dependencies() -> None:
+    if grpc is None or agent_handler_pb2_grpc is None:
+        raise ImportError(
+            "gRPC support requires optional dependencies. Install with: pip install 'bindu[grpc]'"
+        ) from _GRPC_IMPORT_ERROR
 
 
 def start_grpc_server(
@@ -54,6 +69,8 @@ def start_grpc_server(
         The started grpc.Server instance. Call wait_for_termination() to block,
         or stop() to shut down.
     """
+    _require_grpc_dependencies()
+
     registry = registry or AgentRegistry()
     host = host or app_settings.grpc.host
     port = port or app_settings.grpc.port
