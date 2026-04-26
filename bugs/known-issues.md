@@ -171,6 +171,26 @@ requests against the same session. For genuine concurrent use
 (multiple tabs, etc.), use distinct session IDs and reconcile
 externally.
 
+**Status:** ✅ **Fixed.** `withSessionLock` in
+[`gateway/src/planner/index.ts`](../gateway/src/planner/index.ts)
+serializes `runPlan` per `sessionID` via a per-key promise
+chain (`Map<SessionID, Promise<unknown>>` scoped to the planner
+layer). The second `/plan` call awaits the first's tail before
+its body starts, so message-history writes can no longer
+interleave. `Effect.ensuring` releases the lock on success,
+failure, OR interruption — an aborted or crashed plan can't
+deadlock the next caller. Prior errors are swallowed by the
+chain so a single failure doesn't poison the session forever.
+Different `session_id`s are unaffected (separate map keys).
+Limitation mirrors the compaction dedupe: per-process state
+only — multi-process gateway deployments would still need a
+Postgres advisory lock or a `gateway_sessions` version column
+with optimistic-concurrency on the message insert (Phase 2).
+Guarded by
+[`gateway/tests/planner/session-lock.test.ts`](../gateway/tests/planner/session-lock.test.ts)
+(4 tests: serialization, cross-session independence, failure
+recovery, tail cleanup).
+
 **Tracking:** _(no issue yet)_
 
 ### Medium

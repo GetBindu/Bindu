@@ -212,6 +212,31 @@ export const layer = Layer.effect(
     const agents = yield* AgentService
     const recipes = yield* Recipe.Service
 
+    /**
+     * Per-session serialization lock.
+     *
+     * Two concurrent /plan requests on the same session_id used to both
+     * append messages to gateway_messages without coordination. The
+     * second LLM call could observe the first's half-written tool_use
+     * before its paired tool_result, breaking Anthropic / OpenAI's
+     * tool-pairing invariant and corrupting the on-disk history.
+     *
+     * We serialize at the application layer: each call chains onto the
+     * previous one's promise. The second caller waits for the first to
+     * finish (success, failure, or abort) before its own runPlanBody
+     * starts. Frame-level isolation between concurrent /plan calls on
+     * DIFFERENT sessions is unaffected (separate map keys).
+     *
+     * Limitation: this is per-process state. A horizontally-scaled
+     * deployment of the gateway (multiple Node processes fronting one
+     * Supabase) could still race. Single-process Phase 1 is correct;
+     * Phase 2 needs a Postgres advisory lock or a version column on
+     * gateway_sessions with optimistic-concurrency on the message
+     * insert. Same constraint as the compaction dedupe — see
+     * compaction.ts for the parallel discussion.
+     */
+    const sessionLocks = new Map<SessionID, Promise<unknown>>()
+
     const prepareSession: Interface["prepareSession"] = (request) =>
       Effect.gen(function* () {
         const existing = request.session_id
@@ -238,6 +263,13 @@ export const layer = Layer.effect(
       })
 
     const runPlan: Interface["runPlan"] = (ctx, request, opts) =>
+      withSessionLock(sessionLocks, ctx.sessionID, runPlanBody(ctx, request, opts))
+
+    const runPlanBody = (
+      ctx: SessionContext,
+      request: PlanRequest,
+      opts: { abort?: AbortSignal } | undefined,
+    ): Effect.Effect<RunPlanOutcome, Error> =>
       Effect.gen(function* () {
         const plannerAgent = yield* agents.get("planner")
         if (!plannerAgent) {
@@ -347,6 +379,54 @@ export const layer = Layer.effect(
     return Service.of({ prepareSession, runPlan, startPlan })
   }),
 )
+
+// --------------------------------------------------------------------
+// Session serialization lock
+// --------------------------------------------------------------------
+
+/**
+ * Serialize execution of `inner` by sessionID. If another call is
+ * already holding the lock for this session, this one waits — chained
+ * onto the previous tail — and proceeds when the prior holder finishes
+ * (success, failure, or interruption).
+ *
+ * Implementation is a per-key promise chain: each caller installs a
+ * fresh promise as the new tail, awaits the prior tail (errors
+ * swallowed so a failed prior caller doesn't poison the chain), then
+ * runs `inner`. `Effect.ensuring` releases the lock unconditionally,
+ * so an interrupted runPlan does not deadlock subsequent callers. The
+ * tail entry is removed only if it's still ours — if a later caller
+ * already chained on, the entry stays so they can find it.
+ *
+ * Exported for the regression test, which exercises the same wrapper
+ * shape against a hand-rolled producer (mirrors compaction-dedupe.test.ts).
+ */
+export const withSessionLock = <R, E>(
+  locks: Map<SessionID, Promise<unknown>>,
+  sessionID: SessionID,
+  inner: Effect.Effect<R, E>,
+): Effect.Effect<R, E> =>
+  Effect.suspend(() => {
+    const prev = locks.get(sessionID) ?? Promise.resolve<unknown>(undefined)
+    let release: () => void = () => {}
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    locks.set(sessionID, held)
+
+    return Effect.tryPromise({
+      try: () => prev.catch(() => undefined),
+      catch: (e) => (e instanceof Error ? e : new Error(String(e))),
+    }).pipe(
+      Effect.flatMap(() => inner as Effect.Effect<R, Error>),
+      Effect.ensuring(
+        Effect.sync(() => {
+          release()
+          if (locks.get(sessionID) === held) locks.delete(sessionID)
+        }),
+      ),
+    ) as Effect.Effect<R, E>
+  })
 
 // --------------------------------------------------------------------
 // Plan-level deadline helpers
