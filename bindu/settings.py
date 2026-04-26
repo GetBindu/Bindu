@@ -1070,6 +1070,7 @@ class MTLSSettings(BaseSettings):
         such as Path(), open(), or os.makedirs().
         """
         import os
+
         return os.path.expanduser(str(v))
 
 
