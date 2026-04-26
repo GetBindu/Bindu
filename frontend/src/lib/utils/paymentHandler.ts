@@ -3,7 +3,9 @@
  * Handles payment sessions and token management for agents requiring payment
  */
 
-const AGENT_BASE_URL = 'http://localhost:3773';
+import { env as publicEnv } from '$env/dynamic/public';
+
+const AGENT_BASE_URL = publicEnv.PUBLIC_AGENT_BASE_URL || 'http://localhost:3773';
 
 // Payment state
 let paymentToken: string | null = null;

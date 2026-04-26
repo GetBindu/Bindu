@@ -26,7 +26,7 @@ export async function buildPrompt({
 		})
 		// Not super precise, but it's truncated in the model's backend anyway
 		.split(" ")
-		.slice(-(model.parameters?.truncate ?? 0))
+		.slice(-(model.parameters?.truncate ?? Infinity))
 		.join(" ");
 
 	return prompt;

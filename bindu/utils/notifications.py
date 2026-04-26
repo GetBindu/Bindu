@@ -11,6 +11,7 @@ import ssl
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
+from urllib import error, request
 
 from bindu.common.protocol.types import PushNotificationConfig
 from bindu.utils.logging import get_logger
@@ -36,38 +37,25 @@ _BLOCKED_NETWORKS: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = [
 ]
 
 
-def _resolve_and_check_ip(hostname: str) -> str:
-    """Resolve hostname to an IP address and verify it is not in a blocked range.
-
-    Returns the resolved IP address string so callers can connect directly to it,
-    preventing a DNS-rebinding attack where a second resolution (inside urlopen) could
-    return a different—potentially internal—address.
-
-    Args:
-        hostname: The hostname to resolve and validate.
-
-    Returns:
-        The resolved IP address as a string.
-
-    Raises:
-        ValueError: If the hostname cannot be resolved or resolves to a blocked range.
-    """
+def _resolve_and_check_ip(hostname: str, port: int) -> str:
+    """Resolve hostname to an IP address and verify it is not in a blocked range."""
     try:
-        resolved_ip = str(socket.getaddrinfo(hostname, None)[0][4][0])
-        addr = ipaddress.ip_address(resolved_ip)
+        infos = socket.getaddrinfo(hostname, port, type=socket.SOCK_STREAM)
+        addrs = [ipaddress.ip_address(info[4][0]) for info in infos]
     except (socket.gaierror, ValueError) as exc:
         raise ValueError(
             f"Push notification URL hostname could not be resolved: {exc}"
         ) from exc
 
-    for blocked in _BLOCKED_NETWORKS:
-        if addr in blocked:
-            raise ValueError(
-                f"Push notification URL resolves to a blocked address range "
-                f"({addr} is in {blocked}). Internal addresses are not allowed."
-            )
+    for addr in addrs:
+        for blocked in _BLOCKED_NETWORKS:
+            if addr in blocked:
+                raise ValueError(
+                    f"Push notification URL resolves to a blocked address range "
+                    f"({addr} is in {blocked}). Internal addresses are not allowed."
+                )
 
-    return resolved_ip
+    return str(addrs[0])
 
 
 class NotificationDeliveryError(Exception):
@@ -126,6 +114,8 @@ class NotificationService:
 
         Returns the resolved IP address so the caller can connect directly to it,
         eliminating the DNS-rebinding race between validation and connection.
+
+        Validates destination safety before any outbound call.
         """
         parsed = urlparse(config["url"])
         if parsed.scheme not in {"http", "https"}:
@@ -136,11 +126,45 @@ class NotificationService:
         # SSRF defence: resolve the hostname and reject internal/private addresses.
         # The returned IP is used directly for the connection so that no second
         # DNS lookup can return a different (internal) address.
+        return self._resolve_and_validate_destination(config["url"])
+
+    @staticmethod
+    def _resolve_and_validate_destination(url: str) -> str:
+        parsed = urlparse(url)
+        scheme = (parsed.scheme or "").lower()
+        if scheme not in {"http", "https"}:
+            raise ValueError("Push notification URL must use http or https scheme.")
         hostname = parsed.hostname
         if not hostname:
             raise ValueError("Push notification URL must include a valid hostname.")
 
-        return _resolve_and_check_ip(hostname)
+        port = parsed.port or (443 if scheme == "https" else 80)
+
+        # If hostname is an IP literal, validate without DNS.
+        try:
+            addr = ipaddress.ip_address(hostname)
+        except ValueError:
+            try:
+                return _resolve_and_check_ip(hostname, port)
+            except (socket.gaierror, ValueError) as exc:
+                if "blocked address range" in str(exc):
+                    raise
+                logger.warning(
+                    "Push notification hostname resolution failed; blocking registration",
+                    hostname=hostname,
+                    error=str(exc),
+                )
+                raise ValueError(
+                    "Push notification URL hostname could not be resolved."
+                ) from exc
+
+        for blocked in _BLOCKED_NETWORKS:
+            if addr in blocked:
+                raise ValueError(
+                    f"Push notification URL resolves to a blocked address range "
+                    f"({addr} is in {blocked}). Internal addresses are not allowed."
+                )
+        return str(addr)
 
     @create_retry_decorator("api", max_attempts=3, min_wait=0.5, max_wait=5.0)
     async def _post_with_retry(
@@ -157,7 +181,7 @@ class NotificationService:
 
         try:
             status = await asyncio.to_thread(
-                self._post_once, url, resolved_ip, headers, payload
+                self._post_once, url, headers, payload, resolved_ip
             )
             logger.debug(
                 "Delivered push notification",
@@ -191,67 +215,116 @@ class NotificationService:
             raise
 
     def _post_once(
-        self, url: str, resolved_ip: str, headers: dict[str, str], payload: bytes
+        self,
+        url: str,
+        headers: dict[str, str],
+        payload: bytes,
+        resolved_ip: str | None = None,
     ) -> int:
-        """POST *payload* to *url*, connecting directly to *resolved_ip*.
-
-        Bypassing a second DNS lookup closes the DNS-rebinding window: the IP
-        has already been validated in validate_config() and we re-use it here so
-        that no attacker-controlled DNS TTL change can redirect the connection to
-        an internal address between validation and delivery.
-
-        For HTTPS, a raw TCP socket is opened to *resolved_ip* and then wrapped
-        with TLS using *hostname* as the SNI server_hostname, so certificate
-        validation still uses the original domain name rather than the IP.
-        """
         parsed = urlparse(url)
-        hostname = parsed.hostname or ""
-        port = parsed.port or (443 if parsed.scheme == "https" else 80)
-        path = parsed.path or "/"
-        if parsed.query:
-            path = f"{path}?{parsed.query}"
+        scheme = (parsed.scheme or "").lower()
+        hostname = parsed.hostname
+        if scheme not in {"http", "https"}:
+            raise NotificationDeliveryError(
+                None, "Push notification URL must use http or https scheme."
+            )
+        if not hostname:
+            raise NotificationDeliveryError(
+                None, "Push notification URL must include a valid hostname."
+            )
+        try:
+            destination_ip = resolved_ip or self._resolve_and_validate_destination(url)
+        except ValueError as exc:
+            raise NotificationDeliveryError(None, str(exc)) from exc
 
-        # Set the Host header explicitly so virtual-host routing works correctly
-        # even though we are connecting to a raw IP.
-        host_header = f"{hostname}:{port}" if parsed.port else hostname
+        default_port = 443 if scheme == "https" else 80
+        port = parsed.port or default_port
+        host_header = f"[{hostname}]" if ":" in hostname else hostname
+        if parsed.port is not None and parsed.port != default_port:
+            host_header = f"{host_header}:{parsed.port}"
+
+        if scheme == "https":
+            path = parsed.path or "/"
+            if parsed.query:
+                path = f"{path}?{parsed.query}"
+
+            context = ssl.create_default_context()
+            request_headers = {"Host": host_header, "Connection": "close", **headers}
+            request_headers["Content-Length"] = str(len(payload))
+            try:
+                request_lines = [f"POST {path} HTTP/1.1\r\n"]
+                request_lines.extend(
+                    f"{key}: {value}\r\n" for key, value in request_headers.items()
+                )
+                request_lines.append("\r\n")
+                request_bytes = "".join(request_lines).encode("latin-1") + payload
+
+                with socket.create_connection(
+                    (destination_ip, port), timeout=self.timeout
+                ) as sock:
+                    with context.wrap_socket(
+                        sock, server_hostname=hostname
+                    ) as tls_socket:
+                        tls_socket.sendall(request_bytes)
+                        response = http.client.HTTPResponse(tls_socket)
+                        response.begin()
+                        status = response.status
+                        body = response.read() or b""
+                        if 200 <= status < 300:
+                            return status
+                        message = body.decode("utf-8", errors="ignore").strip()
+                        raise NotificationDeliveryError(
+                            status, message or f"HTTP error {status}"
+                        )
+            except (OSError, http.client.HTTPException, ssl.SSLError) as exc:
+                raise NotificationDeliveryError(
+                    None, f"Connection error: {exc}"
+                ) from exc
+
+        target_url = url
+        if isinstance(destination_ip, str) and destination_ip:
+            destination_host = (
+                f"[{destination_ip}]" if ":" in destination_ip else destination_ip
+            )
+            netloc = (
+                f"{destination_host}:{parsed.port}"
+                if parsed.port is not None
+                else destination_host
+            )
+            target_url = parsed._replace(netloc=netloc).geturl()
+
+        req = request.Request(target_url, data=payload, method="POST")
+        req.add_header("Host", host_header)
+        for key, value in headers.items():
+            req.add_header(key, value)
 
         try:
-            if parsed.scheme == "https":
-                # Open a plain TCP socket to the pre-validated IP, then wrap it
-                # with TLS using the original hostname for SNI and cert validation.
-                # This avoids a second DNS lookup while keeping TLS correct.
-                ctx = ssl.create_default_context()
-                raw_sock = socket.create_connection(
-                    (resolved_ip, port), timeout=self.timeout
+            # URL scheme is validated in validate_config() to only allow http/https
+            with request.urlopen(req, timeout=self.timeout) as response:  # nosec B310
+                status = response.getcode()
+                if 200 <= status < 300:
+                    return status
+                raise NotificationDeliveryError(
+                    status, f"Unexpected status code: {status}"
                 )
-                tls_sock = ctx.wrap_socket(raw_sock, server_hostname=hostname)
-                conn = http.client.HTTPSConnection(
-                    resolved_ip, port, timeout=self.timeout, context=ctx
-                )
-                conn.sock = tls_sock
-            else:
-                conn = http.client.HTTPConnection(
-                    resolved_ip, port, timeout=self.timeout
-                )
-
-            request_headers = dict(headers)
-            request_headers["Host"] = host_header
-
-            conn.request("POST", path, body=payload, headers=request_headers)
-            response = conn.getresponse()
-            status = response.status
-            if 200 <= status < 300:
-                return status
-
+        except error.HTTPError as exc:
+            status = exc.code
             body = b""
             try:
-                body = response.read() or b""
+                body = exc.read() or b""
             except OSError:
                 body = b""
             message = body.decode("utf-8", errors="ignore").strip()
-            raise NotificationDeliveryError(status, message or f"HTTP error {status}")
+            raise NotificationDeliveryError(
+                status, message or f"HTTP error {status}"
+            ) from exc
         except NotificationDeliveryError:
             raise
+        except error.URLError as exc:
+            reason = getattr(exc, "reason", exc)
+            raise NotificationDeliveryError(
+                None, f"Connection error: {reason}"
+            ) from exc
         except (OSError, http.client.HTTPException) as exc:
             raise NotificationDeliveryError(None, f"Connection error: {exc}") from exc
 

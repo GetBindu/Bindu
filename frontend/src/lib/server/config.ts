@@ -141,10 +141,19 @@ class ConfigManager {
 			};
 		}
 
+		const configWithDefaults = {
+			...(config as Record<string, string>),
+			PUBLIC_AGENT_BASE_URL:
+				(config as Record<string, string>).PUBLIC_AGENT_BASE_URL ||
+				"http://localhost:3773",
+		};
+
 		const publicEnvKeys = Object.keys(publicEnv);
 
 		return Object.fromEntries(
-			Object.entries(config).filter(([key]) => publicEnvKeys.includes(key))
+			Object.entries(configWithDefaults).filter(
+				([key]) => publicEnvKeys.includes(key) || key === "PUBLIC_AGENT_BASE_URL"
+			)
 		) as Record<PublicConfigKey, string>;
 	}
 }
@@ -162,6 +171,7 @@ type ExtraConfigKeys =
 	| "HF_TOKEN"
 	| "OLD_MODELS"
 	| "ENABLE_ASSISTANTS"
+	| "ENABLE_DATA_EXPORT"
 	| "METRICS_ENABLED"
 	| "METRICS_PORT";
 

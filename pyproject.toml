@@ -60,16 +60,14 @@ dependencies = [
     # Security
     "detect-secrets>=1.5.0,<2",
     "python-dotenv>=1.1.0",
-    "grpcio>=1.78.0",
-    "grpcio-tools>=1.78.0",
-    "protobuf>=6.33.5",
+    "agno>=2.5.2",
+    "openai>=2.17.0",
 ]
 
 [project.optional-dependencies]
 # Agent frameworks and tools for examples (use: pip install bindu[agents])
 agents = [
     "ag2[openai]>=0.11.0",
-    "agno>=2.5.2",
     "langchain>=1.2.9",
     "langchain-openai>=1.1.8",
     "langgraph>=1.0.8",
@@ -87,9 +85,15 @@ agents = [
 
 # gRPC adapter for language-agnostic agent support (use: pip install bindu[grpc])
 grpc = [
-    "grpcio>=1.62.0",
-    "grpcio-tools>=1.62.0",
-    "protobuf>=4.25.0",
+    "grpcio>=1.67.0,<1.78.0",
+    "grpcio-tools>=1.67.0,<1.78.0",
+    "protobuf>=5.29.6,<6.0.0",
+]
+
+# Voice agent support (use: pip install bindu[voice])
+voice = [
+    "pipecat-ai[deepgram,elevenlabs,piper,silero]~=0.0.105",
+    "websockets>=14.0",
 ]
 
 # Minimal core only (use: pip install bindu[core] --only-deps)
@@ -127,13 +131,14 @@ include = [
 [dependency-groups]
 dev = [
     "bindu",
+    "pipecat-ai[deepgram,elevenlabs,piper,silero]~=0.0.105",
     "pytest>=8.0.0",
     "pytest-asyncio>=0.26.0",
     "pytest-cov>=4.1.0",
     "pytest-timeout>=2.2.0",
     "pytest-xdist>=3.0.0",
     "pre-commit>=3.0.0",
-    "ty>=0.0.1a14",
+    "ty==0.0.1a14",
     "types-requests>=2.32.0.20250328",
     "pipreqs>=0.5.0",
     "twine>=6.1.0",
@@ -172,3 +177,6 @@ fallback-version = "0.3.14"
 
 [tool.hatch.build.hooks.vcs]
 version-file = "bindu/_version.py"
+
+[tool.uv]
+constraint-dependencies = ["pydantic-extra-types>=2.11.3"]

@@ -18,15 +18,39 @@ import json
 import time
 from pathlib import Path
 
-import grpc
+try:
+    import grpc
+
+    from bindu.grpc.generated import agent_handler_pb2, agent_handler_pb2_grpc
+except ImportError as exc:  # pragma: no cover - optional dependency path
+    grpc = None  # type: ignore[assignment]
+    agent_handler_pb2 = None  # type: ignore[assignment]
+    agent_handler_pb2_grpc = None  # type: ignore[assignment]
+    _GRPC_IMPORT_ERROR = exc
+else:
+    _GRPC_IMPORT_ERROR = None
 
 from bindu.grpc.client import GrpcAgentClient
-from bindu.grpc.generated import agent_handler_pb2, agent_handler_pb2_grpc
 from bindu.grpc.registry import AgentRegistry
 from bindu.settings import app_settings
 from bindu.utils.logging import get_logger
 
 logger = get_logger("bindu.grpc.service")
+
+
+def _require_grpc_dependencies() -> None:
+    if grpc is None or agent_handler_pb2 is None or agent_handler_pb2_grpc is None:
+        raise ImportError(
+            "gRPC support requires optional dependencies. Install with: pip install 'bindu[grpc]'"
+        ) from _GRPC_IMPORT_ERROR
+
+
+if agent_handler_pb2_grpc is not None:
+    _BinduServiceBase = agent_handler_pb2_grpc.BinduServiceServicer
+else:  # pragma: no cover - optional dependency path
+
+    class _BinduServiceBase:  # type: ignore[too-many-ancestors]
+        pass
 
 
 def _proto_skills_to_dicts(
@@ -45,6 +69,7 @@ def _proto_skills_to_dicts(
         List of skill dicts compatible with create_manifest().
     """
     result = []
+    _require_grpc_dependencies()
     for skill in skills:
         skill_dict = {
             "name": skill.name,
@@ -64,7 +89,7 @@ def _proto_skills_to_dicts(
     return result
 
 
-class BinduServiceImpl(agent_handler_pb2_grpc.BinduServiceServicer):
+class BinduServiceImpl(_BinduServiceBase):
     """gRPC servicer for BinduService — handles SDK registration and lifecycle.
 
     This runs on the Bindu core's gRPC server (port 3774). SDKs connect to
@@ -75,6 +100,7 @@ class BinduServiceImpl(agent_handler_pb2_grpc.BinduServiceServicer):
     """
 
     def __init__(self, registry: AgentRegistry) -> None:  # noqa: D107
+        _require_grpc_dependencies()
         self.registry = registry
 
     def RegisterAgent(

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto, replaceState } from "$app/navigation";
+	import { browser } from "$app/environment";
 	import { base } from "$app/paths";
 	import { page } from "$app/state";
 	import { usePublicConfig } from "$lib/utils/PublicConfig.svelte";
@@ -206,7 +207,7 @@
 
 	async function handleMessage(message: string) {
 		if (isAgentMode) {
-			await sendAgentMessage(message);
+			await sendAgentMessage([{ kind: "text", text: message }]);
 		} else {
 			await createConversation(message);
 		}

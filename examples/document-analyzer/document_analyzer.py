@@ -16,15 +16,19 @@ from dotenv import load_dotenv
 import os
 import io
 import base64
+from typing import Any
 
 from pypdf import PdfReader
 from docx import Document
+from bindu.utils.logging import get_logger
+
+logger = get_logger("examples.document_analyzer")
 
 load_dotenv()
 
 # Define LLM agent
 agent = Agent(
-    instructions = """
+    instructions="""
 You are an advanced document analysis assistant.
 
 Your job is to analyze uploaded documents and answer the user's prompt
@@ -42,11 +46,12 @@ Guidelines:
 - If the prompt asks for summary, provide concise bullet points
 - Do not hallucinate information outside the document
 """,
-    model = OpenRouter(
-        id = "arcee-ai/trinity-large-preview:free",
+    model=OpenRouter(
+        id="arcee-ai/trinity-large-preview:free",
         api_key=os.getenv("OPENROUTER_API_KEY"),
     ),
 )
+
 
 # Document Parsing
 def extract_text_from_pdf(file_bytes):
@@ -67,10 +72,16 @@ def extract_text_from_pdf(file_bytes):
 
     return "\n".join(text)
 
+
 def extract_text_from_docx(file_bytes):
     """Extract text from docx bytes"""
-    doc = Document(io.BytesIO(file_bytes))
-    return "\n".join([p.text for p in doc.paragraphs])
+    try:
+        doc = Document(io.BytesIO(file_bytes))
+        return "\n".join([p.text for p in doc.paragraphs])
+    except Exception as e:
+        logger.error(f"Error extracting DOCX text: {e}")
+        raise ValueError(f"Invalid DOCX file: {str(e)}") from e
+
 
 def extract_document_text(file_bytes, mime_type):
     """Parse document according to their mime type"""
@@ -83,6 +94,7 @@ def extract_document_text(file_bytes, mime_type):
         return extract_text_from_docx(file_bytes)
 
     raise ValueError(f"Unsupported file type: {mime_type}")
+
 
 # FilePart processing
 def get_file_bytes(part):
@@ -98,44 +110,44 @@ def get_file_bytes(part):
 
     if isinstance(data, str):
         import base64
+
         return base64.b64decode(data)
 
     return data
 
-# Handler
-def handler(messages: list[dict]):
-    """
-    Receives task.history — a list of A2A Message objects.
-    Each message has: role, parts[], kind, messageId, contextId, taskId
-    Each part has: kind="text"|"file", and either text or file.bytes+mimeType
-    """
-    if not messages:
-        return "No messages received."
-    import json
-    print("DEBUG messages:", json.dumps(messages, indent=2, default=str))
 
-    prompt = ""
-    extracted_docs = []
+# Handler
+def _collect_prompt_and_documents(
+    messages: list[dict[str, Any]],
+) -> tuple[str, list[str], list[str]]:
+    """Support both raw A2A messages and runtime chat-format messages."""
+    prompt_parts: list[str] = []
+    extracted_docs: list[str] = []
+    errors: list[str] = []
 
     for msg in messages:
-        # if a role is provided, only process user messages; treat missing
-        # roles as coming from the user so that tests/clients without a role
-        # field still work.
         role = msg.get("role")
         if role is not None and role != "user":
             continue
 
-        # be defensive: parts could be None or omitted
+        # Runtime path: manifest worker passes chat-format messages.
+        content = msg.get("content")
+        if isinstance(content, str) and content.strip():
+            prompt_parts.append(content)
+
+        # Compatibility path: raw A2A messages with parts.
         parts = msg.get("parts") or []
         for part in parts:
             if part.get("kind") == "text":
-                prompt = part.get("text", "")
-
+                text = part.get("text", "")
+                if text:
+                    prompt_parts.append(text)
             elif part.get("kind") == "file":
                 try:
                     file_info = part.get("file", {})
                     b64_data = file_info.get("bytes") or file_info.get("data")
                     mime_type = file_info.get("mimeType", "")
+                    file_name = file_info.get("name", "uploaded_file")
 
                     if not b64_data:
                         raise ValueError("No file data found")
@@ -147,15 +159,30 @@ def handler(messages: list[dict]):
                     )
                     doc_text = extract_document_text(file_bytes, mime_type)
                     extracted_docs.append(doc_text)
-
                 except Exception as e:
-                    extracted_docs.append(f"Error processing file: {str(e)}")
+                    errors.append(f"{file_name}: {str(e)}")
+
+    return "\n".join(prompt_parts).strip(), extracted_docs, errors
+
+
+def handler(messages: list[dict]):
+    """
+    Receives task.history — a list of A2A Message objects.
+    Each message has: role, parts[], kind, messageId, contextId, taskId
+    Each part has: kind="text"|"file", and either text or file.bytes+mimeType
+    """
+    if not messages:
+        return "No messages received."
+    prompt, extracted_docs, errors = _collect_prompt_and_documents(messages)
 
     if not extracted_docs:
+        if errors:
+            return "Failed to process uploaded files:\n" + "\n".join(errors)
         return "No valid document found in the messages."
 
     combined_document = "\n\n".join(extracted_docs)
-    result = agent.run(input=f"""
+    result = agent.run(
+        input=f"""
 User Prompt:
 {prompt}
 
@@ -163,14 +190,21 @@ Document Content:
 {combined_document}
 
 Provide analysis based on the prompt.
-""")
-    return result
+"""
+    )
+    response_text = getattr(result, "content", result)
+    if errors:
+        return (
+            f"{response_text}\n\nWarning: Some files could not be processed:\n"
+            + "\n".join(errors)
+        )
+    return response_text
 
 
 # Bindu config
 config = {
-    "author" : "vyomrohila@gmail.com",
-    "name" : "document_analyzer_agent",
+    "author": "vyomrohila@gmail.com",
+    "name": "document_analyzer_agent",
     "description": "AI agent that analyzes uploaded PDF or DOCX documents based on a user prompt.",
     "deployment": {
         "url": "http://localhost:3773",

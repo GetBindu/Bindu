@@ -7,8 +7,9 @@
 import type { MessageUpdate } from '$lib/types/MessageUpdate';
 import { MessageUpdateType, MessageUpdateStatus } from '$lib/types/MessageUpdate';
 import { handlePaymentRequired, getPaymentHeaders, clearPaymentToken } from './paymentHandler';
+import { env as publicEnv } from '$env/dynamic/public';
 
-const AGENT_BASE_URL = 'http://localhost:3773';
+const AGENT_BASE_URL = publicEnv.PUBLIC_AGENT_BASE_URL || 'http://localhost:3773';
 
 /**
  * Submit feedback for a task
@@ -61,9 +62,20 @@ export async function submitTaskFeedback(
 	return result.result;
 }
 
+
+interface FilePart {
+	kind: 'file';
+	file: {
+		bytes: string;
+		mimeType?: string;
+		name?: string;
+	};
+}
+
+
 interface AgentMessage {
 	role: 'user' | 'agent';
-	parts: Array<{ kind: 'text'; text: string }>;
+	parts: Array<{ kind: 'text'; text: string } | FilePart>;
 	kind: 'message';
 	messageId: string;
 	contextId: string;
@@ -105,6 +117,27 @@ function generateId(): string {
 function getAuthToken(): string | null {
 	if (typeof window === 'undefined') return null;
 	return localStorage.getItem('bindu_oauth_token');
+}
+
+function base64FromBytes(bytes: Uint8Array): string {
+	let binary = '';
+	for (let i = 0; i < bytes.length; i++) {
+		binary += String.fromCharCode(bytes[i] ?? 0);
+	}
+	return btoa(binary);
+}
+
+async function normalizeFileValue(
+	value: string | ArrayBuffer | Uint8Array | Blob
+): Promise<string> {
+	if (typeof value === 'string') return value;
+	if (value instanceof Uint8Array) return base64FromBytes(value);
+	if (value instanceof ArrayBuffer) return base64FromBytes(new Uint8Array(value));
+	if (value instanceof Blob) {
+		const buffer = await value.arrayBuffer();
+		return base64FromBytes(new Uint8Array(buffer));
+	}
+	return '';
 }
 
 /**
@@ -161,11 +194,25 @@ function extractTextFromTask(task: AgentTask): string {
 export async function* sendAgentMessage(
 	message: string,
 	contextId?: string,
-	abortSignal?: AbortSignal,
-	currentTaskId?: string,
-	taskState?: string,
-	replyToTaskId?: string
+	options: {
+		abortSignal?: AbortSignal;
+		currentTaskId?: string;
+		taskState?: string;
+		replyToTaskId?: string;
+		fileParts?: Array<{
+			name: string;
+			mime: string;
+			value: string | ArrayBuffer | Uint8Array | Blob;
+		}>;
+	} = {}
 ): AsyncGenerator<MessageUpdate, void, unknown> {
+	const {
+		abortSignal,
+		currentTaskId,
+		taskState,
+		replyToTaskId,
+		fileParts,
+	} = options;
 	const token = typeof window !== 'undefined' ? localStorage.getItem('bindu_oauth_token') : null;
 	const headers: Record<string, string> = {
 		'Content-Type': 'application/json',
@@ -214,14 +261,61 @@ export async function* sendAgentMessage(
 		: generateId();
 
 	// Build message with optional referenceTaskIds
+	const parts: AgentMessage["parts"] = [{ kind: 'text', text: message }];
+	if (fileParts && fileParts.length > 0) {
+		for (const f of fileParts) {
+			const mime = typeof f.mime === 'string' ? f.mime.trim() : '';
+			const name = typeof f.name === 'string' ? f.name.trim() : '';
+			const value = f.value;
+
+			const hasValue =
+				typeof value === 'string'
+					? value.length > 0
+					: value instanceof ArrayBuffer
+						? value.byteLength > 0
+						: value instanceof Uint8Array
+							? value.byteLength > 0
+							: value instanceof Blob
+								? value.size > 0
+								: Boolean(value);
+
+			if (!hasValue || !mime || !name) {
+				console.warn('[agentMessageHandler] Dropping invalid file part', {
+					hasValue,
+					mime,
+					name,
+				});
+				continue;
+			}
+
+			const normalizedValue = await normalizeFileValue(value);
+			if (!normalizedValue) {
+				console.warn('[agentMessageHandler] Dropping empty file part after normalization', {
+					mime,
+					name,
+				});
+				continue;
+			}
+
+			parts.push({
+				kind: 'file',
+				file: {
+					bytes: normalizedValue,
+					mimeType: mime,
+					name,
+				},
+			});
+		}
+	}
+
 	const agentMessage: AgentMessage = {
 		role: 'user',
-		parts: [{ kind: 'text', text: message }],
+		parts,
 		kind: 'message',
 		messageId,
 		contextId: newContextId,
 		taskId,
-		...(referenceTaskIds.length > 0 && { referenceTaskIds })
+		...(referenceTaskIds.length > 0 && { referenceTaskIds }),
 	};
 
 	// Step 1: Send message
