@@ -81,7 +81,9 @@ class TestContextHandlers:
         handler = ContextHandlers(storage=mock_storage)
         request = {"jsonrpc": "2.0", "id": "2", "params": {"length": "0"}}
 
-        with pytest.raises(ValueError, match="Field 'length' must be a non-negative integer"):
+        with pytest.raises(
+            ValueError, match="Field 'length' must be a non-negative integer"
+        ):
             await handler.list_contexts(request)
 
         mock_storage.list_contexts.assert_not_called()

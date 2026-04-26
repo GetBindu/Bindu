@@ -153,10 +153,11 @@ class MessageHandlers:
                 )
             except ValueError as exc:
                 from bindu.common.protocol.types import InvalidParamsError
+
                 raise InvalidParamsError(str(exc)) from exc
             if history_length is not None:
                 scheduler_params["history_length"] = history_length
-                
+
         push_config = config.get("push_notification_config")
         if push_config and self.push_manager:
             is_long_running = config.get("long_running", False)
