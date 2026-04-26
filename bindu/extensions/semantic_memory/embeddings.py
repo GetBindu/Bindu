@@ -6,10 +6,14 @@ from openai import OpenAI
 # Initialize client only if API key exists
 _api_key = os.getenv("OPENROUTER_API_KEY")
 
-client = OpenAI(
-    api_key=_api_key,
-    base_url="https://openrouter.ai/api/v1",
-) if _api_key else None
+client = (
+    OpenAI(
+        api_key=_api_key,
+        base_url="https://openrouter.ai/api/v1",
+    )
+    if _api_key
+    else None
+)
 
 
 def get_embedding(text: str) -> List[float]:

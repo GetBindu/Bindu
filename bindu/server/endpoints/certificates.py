@@ -57,6 +57,7 @@ def _get_certs_dir() -> Path:
     )
     return Path(certs_dir).expanduser()
 
+
 # Default certificate TTL — 24 hours as per ADR
 
 
@@ -515,8 +516,7 @@ async def revoke_certificate(
     )
 
     logger.info(
-        f"Certificate revoked: did={agent_did}, "
-        f"fingerprint={cert_fingerprint[:16]}..."
+        f"Certificate revoked: did={agent_did}, fingerprint={cert_fingerprint[:16]}..."
     )
 
 
