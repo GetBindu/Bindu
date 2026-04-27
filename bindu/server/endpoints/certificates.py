@@ -122,14 +122,21 @@ def load_or_create_local_ca() -> tuple:
         .sign(ca_key, hashes.SHA256())
     )
 
-    with open(ca_key_path, "wb") as f:
-        f.write(
-            ca_key.private_bytes(
-                serialization.Encoding.PEM,
-                serialization.PrivateFormat.TraditionalOpenSSL,
-                serialization.NoEncryption(),
-            )
-        )
+    import os
+
+    ca_key_bytes = ca_key.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.TraditionalOpenSSL,
+        serialization.NoEncryption(),
+    )
+
+    fd = os.open(str(ca_key_path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(ca_key_bytes)
+    except Exception:
+        os.close(fd)
+        raise
     with open(ca_cert_path, "wb") as f:
         f.write(ca_cert.public_bytes(serialization.Encoding.PEM))
 
@@ -541,17 +548,17 @@ async def issue_certificate_endpoint(app: Any, request: Request) -> JSONResponse
         if auth_error := _authorize_agent_did(_get_caller_did(request), agent_did):
             return auth_error
 
-        async with app._storage.connection() as conn:
+        async with app.storage.connection() as conn:
             hydra_client = HydraClient(admin_url=app_settings.hydra.admin_url)
             result = await issue_certificate(agent_did, csr_pem, conn, hydra_client)
 
         return JSONResponse(dict(result), status_code=201)
 
     except CertificateBindingError:
-        logger.error("Certificate binding failure during issuance")
+        logger.exception("Certificate binding failure during issuance")
         return JSONResponse({"error": "Certificate operation failed"}, status_code=502)
     except Exception as e:
-        logger.error(f"Certificate issuance failed: {e}")
+        logger.exception(f"Certificate issuance failed: {e}")
         return JSONResponse({"error": "Certificate issuance failed"}, status_code=500)
 
 
@@ -572,7 +579,7 @@ async def renew_certificate_endpoint(app: Any, request: Request) -> JSONResponse
         if auth_error := _authorize_agent_did(_get_caller_did(request), agent_did):
             return auth_error
 
-        async with app._storage.connection() as conn:
+        async with app.storage.connection() as conn:
             hydra_client = HydraClient(admin_url=app_settings.hydra.admin_url)
             result = await renew_certificate(
                 agent_did, csr_pem, current_fingerprint, conn, hydra_client
@@ -583,10 +590,10 @@ async def renew_certificate_endpoint(app: Any, request: Request) -> JSONResponse
     except CertificateNotFoundError as e:
         return JSONResponse({"error": str(e)}, status_code=404)
     except CertificateBindingError:
-        logger.error("Certificate binding failure during renewal")
+        logger.exception("Certificate binding failure during renewal")
         return JSONResponse({"error": "Certificate operation failed"}, status_code=502)
     except Exception as e:
-        logger.error(f"Certificate renewal failed: {e}")
+        logger.exception(f"Certificate renewal failed: {e}")
         return JSONResponse({"error": "Certificate renewal failed"}, status_code=500)
 
 
@@ -607,7 +614,7 @@ async def revoke_certificate_endpoint(app: Any, request: Request) -> JSONRespons
         if auth_error := _authorize_agent_did(_get_caller_did(request), agent_did):
             return auth_error
 
-        async with app._storage.connection() as conn:
+        async with app.storage.connection() as conn:
             hydra_client = HydraClient(admin_url=app_settings.hydra.admin_url)
             await revoke_certificate(
                 agent_did, cert_fingerprint, conn, hydra_client, reason
@@ -618,8 +625,8 @@ async def revoke_certificate_endpoint(app: Any, request: Request) -> JSONRespons
     except CertificateNotFoundError as e:
         return JSONResponse({"error": str(e)}, status_code=404)
     except CertificateBindingError:
-        logger.error("Certificate binding failure during revocation")
+        logger.exception("Certificate binding failure during revocation")
         return JSONResponse({"error": "Certificate operation failed"}, status_code=502)
     except Exception as e:
-        logger.error(f"Certificate revocation failed: {e}")
+        logger.exception(f"Certificate revocation failed: {e}")
         return JSONResponse({"error": "Certificate revocation failed"}, status_code=500)

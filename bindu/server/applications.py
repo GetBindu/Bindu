@@ -111,10 +111,10 @@ class BinduApplication(Starlette):
         # Setup middleware chain
         from bindu.utils import get_x402_extension_from_capabilities
 
-        x402_ext = get_x402_extension_from_capabilities(manifest)
+        x402_ext = get_x402_extension_from_capabilities(manifest) if manifest else None
         payment_requirements_for_middleware = (
             self._create_payment_requirements(x402_ext, manifest, resource_suffix="/")
-            if x402_ext
+            if x402_ext and manifest
             else None
         )
 

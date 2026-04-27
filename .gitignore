@@ -208,10 +208,7 @@ bindu/penguin/.bindu/public.pem
 .claude/worktrees/
 
 postman/*
-<<<<<<< HEAD
-
 AI-Agents/
-=======
 node_modules/
 **/node_modules/
 
@@ -226,4 +223,3 @@ sdks/kotlin/bin/
 examples/gateway_test_fleet/pids/
 examples/gateway_test_fleet/logs/
 examples/gateway_test_fleet/.fleet.env
->>>>>>> upstream/main
