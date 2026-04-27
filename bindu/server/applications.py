@@ -515,7 +515,7 @@ class BinduApplication(Starlette):
             return None
 
         from x402.common import process_price_to_atomic_amount
-        from x402.types import PaymentRequirements, SupportedNetworks
+        from x402.types import PaymentRequirements, SupportedNetworks, Price
         from typing import cast
 
         payment_requirements: list[PaymentRequirements] = []
@@ -537,8 +537,9 @@ class BinduApplication(Starlette):
             network = opt.get("network") or app_settings.x402.default_network
             pay_to_address = opt.get("pay_to_address") or x402_ext.pay_to_address
 
+            price = Price(amount=amount, network=network)
             max_amount_required, asset_address, eip712_domain = (
-                process_price_to_atomic_amount(amount, network)
+                process_price_to_atomic_amount(price)
             )
 
             payment_requirements.append(

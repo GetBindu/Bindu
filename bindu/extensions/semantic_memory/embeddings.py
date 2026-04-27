@@ -1,3 +1,5 @@
+"""Semantic memory embeddings module using OpenRouter/OpenAI API."""
+
 import os
 from typing import List
 
@@ -17,13 +19,11 @@ client = (
 
 
 def get_embedding(text: str) -> List[float]:
-    """
-    Generate embedding for given text.
+    """Generate embedding for given text.
 
     - Uses OpenRouter/OpenAI if API key is available
     - Falls back to dummy embedding in test environments
     """
-
     # 🔥 TEST-SAFE FALLBACK
     if not client:
         return [0.0] * 1536  # matches embedding size

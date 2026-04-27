@@ -111,6 +111,9 @@ async def did_resolve_endpoint(app: BinduApplication, request: Request) -> Respo
     if error_resp:
         return error_resp
 
+    if not app.manifest:
+        return _did_not_found_error(did, "Manifest not available", client_ip)
+
     # Get DID extension
     did_extension = app.manifest.did_extension
 

@@ -57,6 +57,12 @@ async def start_payment_session_endpoint(
     assert app._payment_session_manager is not None  # Validated above
     session = app._payment_session_manager.create_session()
 
+    if not app.manifest:
+        return JSONResponse(
+            content={"error": "Manifest not available"},
+            status_code=500,
+        )
+
     # Construct browser URL using app's base URL
     browser_url = f"{app.manifest.url}/payment-capture?session_id={session.session_id}"
 
