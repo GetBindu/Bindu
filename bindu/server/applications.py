@@ -49,8 +49,7 @@ logger = get_logger("bindu.server.applications")
 
 # Error message constants
 UNKNOWN_AUTH_PROVIDER_ERROR = (
-    "Unknown authentication provider: '{provider}'. "
-    "Supported providers: hydra"
+    "Unknown authentication provider: '{provider}'. Supported providers: hydra"
 )
 TASKMANAGER_NOT_INITIALIZED_ERROR = "TaskManager was not properly initialized."
 
@@ -365,6 +364,10 @@ class BinduApplication(Starlette):
                     app_settings.storage.backend = "memory"
 
             # Retry storage initialization for transient connection failures
+            if not self.manifest or not self.manifest.did_extension:
+                raise ValueError(
+                    "Manifest with DID extension is required for storage initialization"
+                )
             storage = await execute_with_retry(
                 create_storage,
                 max_attempts=app_settings.retry.storage_max_attempts,
@@ -495,7 +498,7 @@ class BinduApplication(Starlette):
     def _create_payment_requirements(
         self,
         x402_ext: Any,
-        manifest: AgentManifest,
+        manifest: AgentManifest | None,
         resource_suffix: str = "/",
     ) -> list[Any] | None:
         """Create payment requirements for X402 extension.
@@ -508,7 +511,7 @@ class BinduApplication(Starlette):
         Returns:
             List of PaymentRequirements or None
         """
-        if not x402_ext:
+        if not x402_ext or not manifest:
             return None
 
         from x402.common import process_price_to_atomic_amount
@@ -568,7 +571,7 @@ class BinduApplication(Starlette):
         middleware: Sequence[Middleware] | None,
         x402_ext: Any,
         payment_requirements: list[Any] | None,
-        manifest: AgentManifest,
+        manifest: AgentManifest | None,
         auth_enabled: bool,
         cors_origins: list[str] | None = None,
     ) -> list[Middleware]:
@@ -655,13 +658,11 @@ class BinduApplication(Starlette):
             return Middleware(HydraMiddleware, auth_config=app_settings.hydra)
         else:
             logger.error(f"Unknown authentication provider: {provider}")
-            raise ValueError(
-                UNKNOWN_AUTH_PROVIDER_ERROR.format(provider=provider)
-            )
+            raise ValueError(UNKNOWN_AUTH_PROVIDER_ERROR.format(provider=provider))
 
     def _setup_payment_session_manager(
         self,
-        manifest: AgentManifest,
+        manifest: AgentManifest | None,
         payment_requirements_for_middleware: list[Any],
     ) -> None:
         """Initialize payment session manager and related configuration.
@@ -670,6 +671,9 @@ class BinduApplication(Starlette):
             manifest: Agent manifest
             payment_requirements_for_middleware: Payment requirements from middleware setup
         """
+        if not manifest:
+            return
+
         from bindu.server.middleware.x402.payment_session_manager import (
             PaymentSessionManager,
         )

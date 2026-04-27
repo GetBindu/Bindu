@@ -1,5 +1,5 @@
 """Unit tests for mTLS certificate lifecycle endpoints."""
-import pytest
+
 from bindu.server.endpoints.certificates import (
     compute_sha256_fingerprint,
     CertificateNotFoundError,
@@ -19,9 +19,11 @@ def test_compute_sha256_fingerprint_returns_string():
     from datetime import datetime, timezone, timedelta
 
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    subject = issuer = x509.Name([
-        x509.NameAttribute(NameOID.COMMON_NAME, "Test"),
-    ])
+    subject = issuer = x509.Name(
+        [
+            x509.NameAttribute(NameOID.COMMON_NAME, "Test"),
+        ]
+    )
     cert = (
         x509.CertificateBuilder()
         .subject_name(subject)
@@ -50,6 +52,7 @@ def test_authorize_agent_did_returns_none_when_authorized():
 def test_authorize_agent_did_returns_401_when_unauthenticated():
     """Returns 401 when caller_did is None."""
     from starlette.responses import JSONResponse
+
     result = _authorize_agent_did(None, "did:bindu:test:agent:123")
     assert isinstance(result, JSONResponse)
     assert result.status_code == 401
@@ -58,6 +61,7 @@ def test_authorize_agent_did_returns_401_when_unauthenticated():
 def test_authorize_agent_did_returns_403_when_forbidden():
     """Returns 403 when caller_did does not match requested_did."""
     from starlette.responses import JSONResponse
+
     result = _authorize_agent_did(
         "did:bindu:test:agent:attacker",
         "did:bindu:test:agent:victim",
