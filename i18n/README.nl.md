@@ -227,7 +227,7 @@ flowchart TD
     C --> D3
     C --> D4
 
-    D4 --> E[A2A Signed Response"]
+    D4 --> E[A2A Signed Response]
 ```
 
 `bindufy()` is een dunne wrapper. Uw handler blijft puur - `(messages) -> response`. Bindu bezit identiteit, protocol, auth, betaling, opslag en planning.

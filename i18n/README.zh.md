@@ -227,7 +227,7 @@ flowchart TD
     C --> D3
     C --> D4
 
-    D4 --> E[A2A Signed Response"]
+    D4 --> E[A2A Signed Response]
 ```
 
 `bindufy()` 是一个薄包装器。您的 handler 保持纯净 - `(messages) -> response`。Bindu 拥有身份、协议、auth、支付、存储和调度。

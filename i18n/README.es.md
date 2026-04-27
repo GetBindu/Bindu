@@ -227,7 +227,7 @@ flowchart TD
     C --> D3
     C --> D4
 
-    D4 --> E[A2A Signed Response"]
+    D4 --> E[A2A Signed Response]
 ```
 
 `bindufy()` es un wrapper delgado. Tu handler permanece puro - `(messages) -> response`. Bindu posee identidad, protocolo, auth, pagos, almacenamiento y programación.

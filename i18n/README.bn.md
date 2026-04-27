@@ -227,7 +227,7 @@ flowchart TD
     C --> D3
     C --> D4
 
-    D4 --> E[A2A Signed Response"]
+    D4 --> E[A2A Signed Response]
 ```
 
 `bindufy()` একটি পাতলা মোড়ক। আপনার হ্যান্ডলার বিশুদ্ধ থাকে - `(messages) -> response`। Bindu পরিচয়, প্রোটোকল, অথ, পেমেন্ট, স্টোরেজ, এবং শিডিউলিং মালিক।

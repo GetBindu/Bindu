@@ -227,7 +227,7 @@ flowchart TD
     C --> D3
     C --> D4
 
-    D4 --> E[A2A Signed Response"]
+    D4 --> E[A2A Signed Response]
 ```
 
 `bindufy()` एक पतला रैपर है। आपका हैंडलर शुद्ध रहता है - `(messages) -> response`। Bindu पहचान, प्रोटोकॉल, auth, भुगतान, भंडारण और शेड्यूलिंग का मालिक है।

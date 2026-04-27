@@ -227,7 +227,7 @@ flowchart TD
     C --> D3
     C --> D4
 
-    D4 --> E[A2A Signed Response"]
+    D4 --> E[A2A Signed Response]
 ```
 
 `bindufy()` ஒரு மெல்லிய wrapper. உங்கள் handler தூய்மையாக இருக்கும் - `(messages) -> response`. Bindu அடையாளம், நெறிமுறை, auth, கட்டணம், சேமிப்பு மற்றும் திட்டமிடலை சொந்தமாக்கிறது.

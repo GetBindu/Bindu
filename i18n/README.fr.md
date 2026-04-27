@@ -247,7 +247,7 @@
       C --> D3
       C --> D4
 
-      D4 --> E[A2A Signed Response"]
+      D4 --> E[A2A Signed Response]
   ```
 
   `bindufy()` est un wrapper mince. Votre handler reste pur - `(messages) -> response`. Bindu possède l'identité, le protocole, l'auth, les paiements, le stockage et la planification.
