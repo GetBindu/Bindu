@@ -30,7 +30,6 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Add agent_certificates and certificate_audit_log tables."""
-
     # ------------------------------------------------------------------
     # agent_certificates
     # ------------------------------------------------------------------
@@ -152,7 +151,6 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Remove mTLS certificate tables."""
-
     # Drop certificate_audit_log
     op.drop_index("idx_cert_audit_created_at", table_name="certificate_audit_log")
     op.drop_index("idx_cert_audit_event_type", table_name="certificate_audit_log")

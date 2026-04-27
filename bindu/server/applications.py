@@ -47,6 +47,13 @@ from bindu.utils.logging import get_logger
 
 logger = get_logger("bindu.server.applications")
 
+# Error message constants
+UNKNOWN_AUTH_PROVIDER_ERROR = (
+    "Unknown authentication provider: '{provider}'. "
+    "Supported providers: hydra"
+)
+TASKMANAGER_NOT_INITIALIZED_ERROR = "TaskManager was not properly initialized."
+
 
 class BinduApplication(Starlette):
     """Bindu application class for creating Bindu-compatible servers."""
@@ -649,8 +656,7 @@ class BinduApplication(Starlette):
         else:
             logger.error(f"Unknown authentication provider: {provider}")
             raise ValueError(
-                f"Unknown authentication provider: '{provider}'. "
-                f"Supported providers: hydra"
+                UNKNOWN_AUTH_PROVIDER_ERROR.format(provider=provider)
             )
 
     def _setup_payment_session_manager(
@@ -696,5 +702,5 @@ class BinduApplication(Starlette):
             path = scope.get("path", "")
             # Allow observability and probe endpoints through before full startup
             if path not in ("/health", "/healthz", "/metrics"):
-                raise RuntimeError("TaskManager was not properly initialized.")
+                raise RuntimeError(TASKMANAGER_NOT_INITIALIZED_ERROR)
         await super().__call__(scope, receive, send)
