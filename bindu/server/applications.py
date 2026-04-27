@@ -539,7 +539,7 @@ class BinduApplication(Starlette):
 
             price = Price(amount=amount, network=network)
             max_amount_required, asset_address, eip712_domain = (
-                process_price_to_atomic_amount(price)
+                process_price_to_atomic_amount(price, network)
             )
 
             payment_requirements.append(
