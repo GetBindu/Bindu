@@ -68,14 +68,22 @@ class X402Middleware(BaseHTTPMiddleware):
         if network in self._web3_connections:
             return self._web3_connections[network], None
 
-        rpc_url = app_settings.x402.rpc_urls.get(network)
+        
+
+        rpc_map = getattr(app_settings.x402, "rpc_urls", None)
+        if not isinstance(rpc_map, dict):
+            logger.warning("rpc_urls not configured in X402Settings")
+            return None, "RPC configuration missing"
+
+        rpc_url = rpc_map.get(network)
         if not rpc_url:
             return None, f"No RPC configured for {network}"
-
+        
         try:
             w3 = Web3(
-                Web3.HTTPProvider(
-                    rpc_url, request_kwargs={"timeout": WEB3_RPC_TIMEOUT_SECONDS}
+                web3.HTTPProvider(
+                    rpc_url,
+                    request_kwargs = {"timeout": WEB3_RPC_TIMEOUT_SECONDS},
                 )
             )
             self._web3_connections[network] = w3
