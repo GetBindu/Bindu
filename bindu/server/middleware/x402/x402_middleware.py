@@ -1,20 +1,3 @@
-# |---------------------------------------------------------|
-# |                                                         |
-# |                 Give Feedback / Get Help                |
-# | https://github.com/getbindu/Bindu/issues/new/choose    |
-# |                                                         |
-# |---------------------------------------------------------|
-#
-#  Thank you users! We ❤️ you! - 🌻
-
-"""X402 Payment Middleware for Bindu.
-
-This middleware implements the x402 payment protocol for HTTP requests,
-following the official Coinbase x402 specification.
-
-Based on: https://github.com/coinbase/x402/blob/main/python/x402/src/x402/fastapi/middleware.py
-"""
-
 from __future__ import annotations
 
 import json
@@ -68,29 +51,35 @@ class X402Middleware(BaseHTTPMiddleware):
         if network in self._web3_connections:
             return self._web3_connections[network], None
 
-        
+        rpc_map = getattr(app_settings.x402, "rpc_urls_by_network", None)
 
-        rpc_map = getattr(app_settings.x402, "rpc_urls", None)
         if not isinstance(rpc_map, dict):
-            logger.warning("rpc_urls not configured in X402Settings")
+            logger.warning("rpc_urls_by_network not configured in X402Settings")
             return None, "RPC configuration missing"
 
         rpc_url = rpc_map.get(network)
         if not rpc_url:
             return None, f"No RPC configured for {network}"
-        
+
         try:
             w3 = Web3(
-                web3.HTTPProvider(
+                Web3.HTTPProvider(
                     rpc_url,
-                    request_kwargs = {"timeout": WEB3_RPC_TIMEOUT_SECONDS},
+                    request_kwargs={"timeout": WEB3_RPC_TIMEOUT_SECONDS},
                 )
             )
+
+            # ✅ verify connection
+            if not w3.is_connected():
+                logger.error(f"Web3 RPC not reachable for network {network}")
+                return None, "RPC connection failed"
+
             self._web3_connections[network] = w3
             return w3, None
+
         except Exception as e:
             logger.error(f"Failed to connect to {network}: {e}")
-            return None, str(e)
+            return None, "RPC connection error"
 
     async def dispatch(self, request: Request, call_next) -> Response:
         """Intercept requests and enforce payment for protected methods."""
@@ -102,7 +91,7 @@ class X402Middleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         # -------------------------------
-        # ✅ FIX: FAIL-CLOSED JSON PARSING
+        # ✅ FAIL-CLOSED JSON PARSING
         # -------------------------------
         try:
             body = await request.body()
@@ -118,9 +107,16 @@ class X402Middleware(BaseHTTPMiddleware):
                 "Invalid JSON body for x402 payment validation"
             )
 
+        # ✅ validate JSON structure
+        if not isinstance(request_data, dict):
+            return JSONResponse(
+                status_code=400,
+                content={"error": "Invalid JSON-RPC payload"},
+            )
+
         method = request_data.get("method")
 
-        if not isinstance(method, str):
+        if not isinstance(method, str) or not method.strip():
             return JSONResponse(
                 status_code=400,
                 content={"error": "Invalid or missing JSON-RPC method"},
@@ -206,8 +202,8 @@ class X402Middleware(BaseHTTPMiddleware):
             return True, None
 
         except Exception as e:
-            logger.error(f"Validation error: {e}")
-            return False, str(e)
+            logger.error(f"Validation error: {e}", exc_info=True)
+            return False, "payment validation failed"
 
     def _create_402_response(self, error: str) -> JSONResponse:
         """Create standardized 402 Payment Required response."""
