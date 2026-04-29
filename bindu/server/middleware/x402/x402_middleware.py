@@ -1,3 +1,11 @@
+"""X402 Payment Middleware for Bindu.
+
+This middleware implements the x402 payment protocol for HTTP requests,
+enforcing payment validation for protected JSON-RPC methods.
+
+Security: Ensures fail-closed behavior on malformed JSON to prevent payment bypass.
+"""
+
 from __future__ import annotations
 
 import json
