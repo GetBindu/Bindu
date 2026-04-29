@@ -15,6 +15,9 @@ from bindu.runtime.base import (
 )
 from bindu.runtime.config import RuntimeConfig, RuntimeConfigError
 
+# Register built-in providers on import.
+from bindu.runtime import in_process as _in_process  # noqa: F401, E402
+
 __all__ = [
     "RuntimeHandle",
     "RuntimeProvider",
