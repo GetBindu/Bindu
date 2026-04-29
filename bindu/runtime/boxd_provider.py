@@ -38,40 +38,10 @@ _POLL_INTERVAL = 1.0
 
 
 def _make_compute(**kwargs: Any):
-    """Construct a boxd Compute client.
-
-    Workaround: the boxd Python SDK currently uses TLS for any non-localhost
-    host, but production gRPC at ``boxd.sh:9443`` is plaintext (matches what
-    ``boxd-cli`` does). When ``BOXD_INSECURE=1`` is set, swap the SDK's
-    channel construction for ``insecure_channel``. Drop once the SDK
-    natively supports plaintext for production.
-    """
+    """Construct a boxd Compute client. Indirection so tests can patch."""
     from boxd.aio import Compute
 
-    compute = Compute(**kwargs)
-    if os.environ.get("BOXD_INSECURE") == "1":
-        _patch_compute_insecure(compute)
-    return compute
-
-
-def _patch_compute_insecure(compute: Any) -> None:
-    import grpc
-    import grpc.aio
-
-    from boxd._generated import api_pb2_grpc
-
-    async def _insecure_ensure_channel():
-        if compute._stub is not None:
-            return compute._stub
-        channel = grpc.aio.insecure_channel(
-            compute._api_url,
-            interceptors=[compute._auth.interceptor()],
-        )
-        compute._channel = channel
-        compute._stub = api_pb2_grpc.BoxdApiStub(channel)
-        return compute._stub
-
-    compute._ensure_channel = _insecure_ensure_channel
+    return Compute(**kwargs)
 
 
 async def _poll_until(
@@ -106,6 +76,8 @@ async def _exec_or_raise(
 
 
 class BoxdRuntimeProvider(RuntimeProvider):
+    """RuntimeProvider that runs the agent inside a boxd microVM."""
+
     async def _resolve_vm(self, compute: Any, name: str, config: RuntimeConfig) -> Any:
         """Get or create the VM for this agent (idempotent by name)."""
         from boxd import BoxConfig, LifecycleConfig, NetworkConfig, ProxyEntry
@@ -153,7 +125,9 @@ class BoxdRuntimeProvider(RuntimeProvider):
     async def _ship_source(self, box: Any, source_dir: Path) -> None:
         """Tar+gzip ``source_dir``, upload, extract to ``APP_DIR``."""
         blob = build_tarball(source_dir)
-        await box.write_file(blob, "/tmp/source.tar.gz")
+        # /tmp inside the VM is fine: the VM is single-tenant, the host is the
+        # only writer, and the file is consumed immediately by the next exec.
+        await box.write_file(blob, "/tmp/source.tar.gz")  # nosec B108
         await _exec_or_raise(
             box,
             "sh",
@@ -261,6 +235,7 @@ class BoxdRuntimeProvider(RuntimeProvider):
         config: RuntimeConfig,
         env: dict[str, str] | None = None,
     ) -> RuntimeHandle:
+        """Resolve the VM, ship source (A2) or use image (A1), start agent, wait healthy."""
         if not (os.environ.get("BOXD_API_KEY") or os.environ.get("BOXD_TOKEN")):
             raise RuntimeError(
                 "BOXD_API_KEY or BOXD_TOKEN must be set in the host environment"
@@ -316,6 +291,7 @@ class BoxdRuntimeProvider(RuntimeProvider):
             )
 
     async def health(self, handle: RuntimeHandle) -> bool:
+        """Return True if the agent's ``/health`` endpoint returns 200."""
         try:
             async with httpx.AsyncClient(timeout=3.0) as client:
                 resp = await client.get(f"{handle.url}/health")
@@ -326,6 +302,7 @@ class BoxdRuntimeProvider(RuntimeProvider):
     async def stream_logs(
         self, handle: RuntimeHandle, follow: bool = True
     ) -> AsyncIterator[bytes]:
+        """Yield log chunks streamed from the VM's console."""
         async with _make_compute() as compute:
             box = await compute.box.get(handle.name)
             async for chunk in box.stream_logs(follow=follow):
@@ -336,6 +313,7 @@ class BoxdRuntimeProvider(RuntimeProvider):
         handle: RuntimeHandle,
         mode: Literal["suspend", "destroy", "detach"],
     ) -> None:
+        """Apply the on-exit policy (``suspend`` / ``destroy`` / ``detach``)."""
         if mode == "detach":
             return
         async with _make_compute() as compute:

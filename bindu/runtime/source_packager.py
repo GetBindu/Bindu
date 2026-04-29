@@ -75,6 +75,7 @@ class IgnoreSpec:
 
     @classmethod
     def load(cls, root: Path) -> IgnoreSpec:
+        """Load patterns from ``.gitignore`` and ``.binduignore`` at ``root``."""
         lines: list[str] = []
         for filename in (".gitignore", ".binduignore"):
             lines.extend(_read_pattern_file(root / filename))

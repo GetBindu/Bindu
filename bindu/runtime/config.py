@@ -28,6 +28,8 @@ class RuntimeConfigError(ValueError):
 
 @dataclass(frozen=True)
 class RuntimeConfig:
+    """Validated runtime configuration for ``bindufy(runtime=...)``."""
+
     provider: Literal["in-process", "boxd"] = "in-process"
     image: str | None = None
     vcpu: int = 2
@@ -40,6 +42,7 @@ class RuntimeConfig:
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any] | None) -> RuntimeConfig:
+        """Parse and validate a raw runtime config dict."""
         if raw is None:
             return cls()
 

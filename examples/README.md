@@ -68,6 +68,11 @@ For full URL override, use `BINDU_DEPLOYMENT_URL` (e.g. `http://127.0.0.1:5001`)
 - `typescript-openai-agent/` - OpenAI SDK agent bindufied with TypeScript SDK
 - `typescript-langchain-agent/` - LangChain.js agent bindufied with TypeScript SDK
 
+### Runtime Providers
+- `runtime-boxd-agent/` - Echo agent that runs as a real microservice inside a
+  [boxd](https://boxd.sh) microVM (own URL, DID, persistent disk). See
+  `docs/runtime/` for the runtime-provider abstraction.
+
 > TypeScript agents use `@bindu/sdk` which automatically launches the Bindu Python core in the background. Same A2A protocol, same DID, same everything — just a different language. See the [gRPC documentation](../docs/GRPC_LANGUAGE_AGNOSTIC.md) for details.
 
 ### Advanced

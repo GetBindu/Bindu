@@ -1,0 +1,5 @@
+[project]
+name = "runtime-boxd-example"
+version = "0.1.0"
+description = "Bindu agent running inside a boxd microVM."
+requires-python = ">=3.10"

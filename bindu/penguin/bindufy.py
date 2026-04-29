@@ -692,7 +692,7 @@ def bindufy(
     key_dir: str | Path | None = None,
     launch: bool = False,
     runtime: Dict[str, Any] | None = None,
-) -> AgentManifest:
+) -> AgentManifest | None:
     """Transform an agent handler into a Bindu microservice.
 
     This is the main entry point for Python agents. It validates the handler,
@@ -778,7 +778,7 @@ def bindufy(
             runtime_config=runtime_config,
             caller_dir=caller_dir,
         )
-        return None  # type: ignore[return-value]
+        return None
 
     return _bindufy_core(
         config=config,

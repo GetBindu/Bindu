@@ -61,10 +61,15 @@ class RuntimeProvider(ABC):
         """Return True if the agent at ``handle`` is reachable & healthy."""
 
     @abstractmethod
-    async def stream_logs(
+    def stream_logs(
         self, handle: RuntimeHandle, follow: bool = True
     ) -> AsyncIterator[bytes]:
-        """Yield log chunks from the agent's runtime."""
+        """Return an async iterator of log chunks from the agent's runtime.
+
+        Implementations are async generators (``async def`` with ``yield``);
+        the method here is non-async so the signature matches what the
+        generator factory returns.
+        """
 
     @abstractmethod
     async def on_exit(
