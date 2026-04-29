@@ -26,10 +26,41 @@ from bindu.runtime.source_packager import build_tarball
 
 
 def _make_compute(**kwargs: Any):
-    """Indirection so tests can monkey-patch in a fake Compute."""
+    """Construct a boxd Compute client.
+
+    Indirection so tests can monkey-patch in a fake Compute.
+
+    Workaround: the boxd Python SDK currently uses TLS for any non-localhost
+    host, but production gRPC at ``boxd.sh:9443`` is plaintext (matches what
+    ``boxd-cli`` does). When ``BOXD_INSECURE=1`` is set, we replace the SDK's
+    channel construction with an ``insecure_channel``. Remove once the SDK
+    natively supports plaintext for production.
+    """
     from boxd.aio import Compute
 
-    return Compute(**kwargs)
+    compute = Compute(**kwargs)
+
+    if os.environ.get("BOXD_INSECURE") == "1":
+        import grpc
+        import grpc.aio
+
+        from boxd._generated import api_pb2_grpc
+
+        async def _insecure_ensure_channel():
+            if compute._stub is not None:
+                return compute._stub
+            interceptor = compute._auth.interceptor()
+            channel = grpc.aio.insecure_channel(
+                compute._api_url,
+                interceptors=[interceptor],
+            )
+            compute._channel = channel
+            compute._stub = api_pb2_grpc.BoxdApiStub(channel)
+            return compute._stub
+
+        compute._ensure_channel = _insecure_ensure_channel
+
+    return compute
 
 
 # The bindu default HTTP port. The boxd proxy is configured at VM creation
@@ -37,6 +68,11 @@ def _make_compute(**kwargs: Any):
 # proxy default (port 8000) does not match bindu's default (3773) and the
 # agent's public URL is unreachable.
 BINDU_DEFAULT_PORT = 3773
+
+# Where we stage the user's source inside the VM. Must be writable by the
+# default VM user (``boxd``). ``/app`` is not writable without sudo on
+# stock boxd images, so we use the user's home directory.
+APP_DIR = "/home/boxd/app"
 
 
 class BoxdRuntimeProvider(RuntimeProvider):
@@ -69,12 +105,35 @@ class BoxdRuntimeProvider(RuntimeProvider):
             create_kwargs["image"] = config.image
         return await compute.box.create(**create_kwargs)
 
+    async def _wait_vm_ready(self, box: Any, timeout: float = 60.0) -> None:
+        """Wait until the VM's in-VM exec server is responsive.
+
+        ``box.create()`` returns once the VM is "running", but the takeoff
+        agent inside the VM (which serves exec/write_file) takes a few more
+        seconds. Poll with a trivial exec until it responds or we time out.
+        """
+        from boxd.errors import BoxdError
+
+        deadline = asyncio.get_event_loop().time() + timeout
+        while asyncio.get_event_loop().time() < deadline:
+            try:
+                result = await box.exec("true")
+                if getattr(result, "exit_code", 0) == 0:
+                    return
+            except BoxdError:
+                pass
+            await asyncio.sleep(2.0)
+        raise TimeoutError(f"VM {box.name} did not become exec-ready within {timeout}s")
+
     async def _ship_source(self, box: Any, source_dir: Path) -> None:
-        """Tar+gzip ``source_dir``, upload, extract to ``/app`` in the VM."""
+        """Tar+gzip ``source_dir``, upload, extract to ``APP_DIR`` in the VM."""
         blob = build_tarball(source_dir)
         await box.write_file(blob, "/tmp/source.tar.gz")
-        await box.exec("mkdir", "-p", "/app")
-        result = await box.exec("tar", "xzf", "/tmp/source.tar.gz", "-C", "/app")
+        mkdir = await box.exec("mkdir", "-p", APP_DIR)
+        if getattr(mkdir, "exit_code", 0) != 0:
+            stderr = getattr(mkdir, "stderr", "")
+            raise RuntimeError(f"failed to mkdir {APP_DIR}: {stderr}")
+        result = await box.exec("tar", "xzf", "/tmp/source.tar.gz", "-C", APP_DIR)
         if getattr(result, "exit_code", 0) != 0:
             stderr = getattr(result, "stderr", "")
             raise RuntimeError(f"failed to extract source in VM: {stderr}")
@@ -86,13 +145,26 @@ class BoxdRuntimeProvider(RuntimeProvider):
         has_requirements: bool,
         bindu_version: str | None = None,
     ) -> None:
-        """Install bindu + the user's deps inside the VM (in /app)."""
+        """Install bindu + the user's deps inside the VM (in APP_DIR).
+
+        Uses ``--break-system-packages`` because the boxd default image is
+        Ubuntu 24.04, where the system Python is "externally managed" (PEP
+        668) and ``pip install`` is refused without that flag. Acceptable
+        here because the VM is single-tenant and dedicated to the agent.
+        """
         bindu_pkg = f"bindu=={bindu_version}" if bindu_version else "bindu"
-        commands: list[tuple[str, ...]] = [("pip", "install", bindu_pkg)]
+        pip = ("pip", "install", "--break-system-packages")
+        commands: list[tuple[str, ...]] = [(*pip, bindu_pkg)]
         if has_requirements:
-            commands.append(("pip", "install", "-r", "/app/requirements.txt"))
+            commands.append((*pip, "-r", f"{APP_DIR}/requirements.txt"))
         if has_pyproject:
-            commands.append(("pip", "install", "-e", "."))
+            commands.append(
+                (
+                    "sh",
+                    "-c",
+                    f"cd {APP_DIR} && pip install --break-system-packages -e .",
+                )
+            )
         for cmd in commands:
             result = await box.exec(*cmd)
             if getattr(result, "exit_code", 0) != 0:
@@ -114,9 +186,14 @@ class BoxdRuntimeProvider(RuntimeProvider):
         # nohup + & via sh -c so the exec call returns once the agent is
         # forked. Output captured to a fixed log path; we pipe it via
         # box.stream_logs() later.
+        #
+        # We invoke ``python <script>`` directly rather than ``bindu serve
+        # --script ...``: published bindu wheels don't always ship the
+        # console-script entry point, and the user's script calls bindufy()
+        # itself, so the CLI shim isn't needed in-VM.
         cmd_str = (
-            f"nohup bindu serve --script /app/{script} "
-            f"> /var/log/bindu-agent.log 2>&1 &"
+            f"cd {APP_DIR} && nohup python3 {APP_DIR}/{script} "
+            f"> /tmp/bindu-agent.log 2>&1 &"
         )
         result = await box.exec("sh", "-c", cmd_str, env=merged_env)
         if getattr(result, "exit_code", 0) != 0:
@@ -171,7 +248,28 @@ class BoxdRuntimeProvider(RuntimeProvider):
 
         async with _make_compute() as compute:
             box = await self._resolve_vm(compute, agent_name, config)
-            public_url = box.url or f"https://{agent_name}.boxd.sh"
+            # The boxd SDK returns box.url with or without a scheme depending
+            # on the underlying RPC (CreateVm includes it; GetVm may not).
+            # Normalize.
+            raw_url = box.url or f"{agent_name}.boxd.sh"
+            if not raw_url.startswith(("http://", "https://")):
+                raw_url = f"https://{raw_url}"
+            public_url = raw_url
+
+            # The VM may report "running" before its in-VM exec server is
+            # responsive. Wait until exec works before shipping anything.
+            await self._wait_vm_ready(box, timeout=60.0)
+
+            # Force the default proxy at bindu's port. `_resolve_vm` sets
+            # this at creation, but if the VM was created before we
+            # introduced that wiring (or by another path), the proxy may
+            # still be on its boxd default of 8000. Idempotent on warm runs.
+            try:
+                await box.set_proxy_port(port=BINDU_DEFAULT_PORT)
+            except AttributeError:
+                # Older boxd SDK without set_proxy_port — non-fatal; cold
+                # path's create-time NetworkConfig still applies.
+                pass
 
             if config.image is None:
                 if source_dir is None:

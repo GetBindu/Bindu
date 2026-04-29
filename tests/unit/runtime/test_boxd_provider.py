@@ -108,11 +108,12 @@ async def test_ship_source_writes_and_extracts(mock_boxd, fake_box, tmp_path):
     assert isinstance(payload, bytes)
     assert dest == "/tmp/source.tar.gz"
 
-    # mkdir + tar extract should have been exec'd
+    # mkdir + tar extract should have been exec'd into the user-writable dir
     exec_calls = fake_box.exec.await_args_list
-    assert any(c.args == ("mkdir", "-p", "/app") for c in exec_calls)
+    assert any(c.args == ("mkdir", "-p", "/home/boxd/app") for c in exec_calls)
     assert any(
-        c.args == ("tar", "xzf", "/tmp/source.tar.gz", "-C", "/app") for c in exec_calls
+        c.args == ("tar", "xzf", "/tmp/source.tar.gz", "-C", "/home/boxd/app")
+        for c in exec_calls
     )
 
 
@@ -127,10 +128,16 @@ async def test_install_deps_with_pyproject(mock_boxd, fake_box):
     await p._install_deps(fake_box, has_pyproject=True, has_requirements=False)
 
     exec_calls = fake_box.exec.await_args_list
-    # bindu must always be installed
-    assert any(c.args == ("pip", "install", "bindu") for c in exec_calls)
-    # And pip install -e .
-    assert any(c.args == ("pip", "install", "-e", ".") for c in exec_calls)
+    # bindu must always be installed (with --break-system-packages for PEP 668)
+    assert any(
+        c.args == ("pip", "install", "--break-system-packages", "bindu")
+        for c in exec_calls
+    )
+    # And pip install -e . runs in APP_DIR via sh -c
+    assert any(
+        c.args[0] == "sh" and "pip install --break-system-packages -e ." in c.args[2]
+        for c in exec_calls
+    )
 
 
 @pytest.mark.asyncio
@@ -142,7 +149,15 @@ async def test_install_deps_with_requirements(mock_boxd, fake_box):
 
     exec_calls = fake_box.exec.await_args_list
     assert any(
-        c.args == ("pip", "install", "-r", "/app/requirements.txt") for c in exec_calls
+        c.args
+        == (
+            "pip",
+            "install",
+            "--break-system-packages",
+            "-r",
+            "/home/boxd/app/requirements.txt",
+        )
+        for c in exec_calls
     )
 
 
@@ -159,7 +174,10 @@ async def test_install_deps_pinned_bindu_version(mock_boxd, fake_box):
     )
 
     exec_calls = fake_box.exec.await_args_list
-    assert any(c.args == ("pip", "install", "bindu==0.2.5") for c in exec_calls)
+    assert any(
+        c.args == ("pip", "install", "--break-system-packages", "bindu==0.2.5")
+        for c in exec_calls
+    )
 
 
 @pytest.mark.asyncio
@@ -195,8 +213,8 @@ async def test_start_agent_execs_bindu_serve(mock_boxd, fake_box):
     assert cmd_call.args[0] == "sh"
     assert cmd_call.args[1] == "-c"
     cmd_str = cmd_call.args[2]
-    assert "bindu serve" in cmd_str
-    assert "--script /app/my_agent.py" in cmd_str
+    assert "python3" in cmd_str
+    assert "/home/boxd/app/my_agent.py" in cmd_str
     # env from caller plus the auto-injected BINDU_PUBLIC_URL
     env = cmd_call.kwargs.get("env")
     assert env is not None
@@ -341,9 +359,9 @@ async def test_deploy_a2_full_flow(
     serve_calls = [
         c
         for c in fake_box.exec.await_args_list
-        if c.args and c.args[0] == "sh" and "bindu serve" in c.args[2]
+        if c.args and c.args[0] == "sh" and "python3" in c.args[2]
     ]
-    assert serve_calls, "bindu serve should have been called"
+    assert serve_calls, "agent script should have been started"
 
 
 @pytest.mark.asyncio

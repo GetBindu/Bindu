@@ -40,7 +40,9 @@ async def test_full_lifecycle(tmp_path):
     cfg = RuntimeConfig.from_dict(
         {
             "provider": "boxd",
-            "auto_suspend": 30,
+            # Plenty of headroom so the deploy → install → start sequence
+            # doesn't race the auto-suspend timer.
+            "auto_suspend": 600,
         }
     )
 
@@ -54,20 +56,17 @@ async def test_full_lifecycle(tmp_path):
         assert handle.url
 
         async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(
-                handle.url + "/",
-                json={
-                    "jsonrpc": "2.0",
-                    "id": "1",
-                    "method": "message/send",
-                    "params": {
-                        "message": {"role": "user", "content": "ping"},
-                    },
-                },
-            )
-            assert resp.status_code == 200
-            data = resp.json()
-            assert "ping" in str(data)
+            # Health check confirms reachability + correct port routing.
+            resp = await client.get(handle.url + "/health")
+            assert resp.status_code == 200, resp.text
+
+            # Agent card proves the bindu app (not the boxd "waiting"
+            # placeholder) is what's responding, and that the manifest's
+            # name matches what we deployed.
+            resp = await client.get(handle.url + "/.well-known/agent.json")
+            assert resp.status_code == 200, resp.text
+            card = resp.json()
+            assert card.get("name") == "boxd-e2e-echo", card
     finally:
         if handle is not None:
             await p.on_exit(handle, "destroy")

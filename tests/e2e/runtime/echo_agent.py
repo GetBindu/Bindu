@@ -21,7 +21,11 @@ config = {
     "author": "e2e@azin.run",
     "name": "boxd-e2e-echo",
     "description": "echo agent for e2e",
-    "deployment": {"url": "http://localhost:3773"},
+    "deployment": {
+        # Bind on all interfaces so the boxd proxy can reach us.
+        "url": "http://0.0.0.0:3773",
+        "expose": True,
+    },
 }
 
 if __name__ == "__main__":
