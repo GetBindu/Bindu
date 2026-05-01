@@ -3,7 +3,9 @@
 This module defines the configuration settings for the application using pydantic models.
 """
 
-from pydantic import Field, computed_field, BaseModel, HttpUrl
+import re
+
+from pydantic import Field, computed_field, BaseModel, HttpUrl, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import AliasChoices
 from typing import Literal
@@ -294,7 +296,7 @@ class X402Settings(BaseSettings):
     max_timeout_seconds: int = 600
 
     # SKALE facilitator endpoint
-    skale_facilitator_url: str = "https://facilitator.dirtroad.dev"
+    skale_facilitator_url: HttpUrl = "https://facilitator.dirtroad.dev"
 
     # SKALE Europa Hub network identifier
     skale_network: str = "eip155:2046399126"
@@ -306,7 +308,7 @@ class X402Settings(BaseSettings):
     skale_payment_token_name: str = "Bridged USDC (SKALE Europa)"
 
     # Default payment amount in USDC micro-units
-    skale_default_amount: str = "10000"
+    skale_default_amount: int = Field(default=10000, gt=0, le=10**18)
 
     # Extension URI
     extension_uri: str = "https://github.com/google-a2a/a2a-x402/v0.1"
@@ -357,11 +359,50 @@ class X402Settings(BaseSettings):
         ],
         "eip155:2046399126": [
             "https://mainnet.skalenodes.com/v1/elated-tan-skat",
+            "https://2046399126.rpc.thirdweb.com",
         ],
         "skale-europa": [
             "https://mainnet.skalenodes.com/v1/elated-tan-skat",
+            "https://2046399126.rpc.thirdweb.com",
         ],
     }
+
+    @field_validator("skale_network")
+    @classmethod
+    def validate_skale_network(cls, value: str) -> str:
+        """Validate the SKALE network identifier format."""
+        if not re.fullmatch(r"eip155:\d+", value):
+            raise ValueError("skale_network must match the format 'eip155:<numeric>'")
+        return value
+
+    @field_validator("skale_facilitator_url")
+    @classmethod
+    def validate_skale_facilitator_url(cls, value: HttpUrl) -> HttpUrl:
+        """Validate that the SKALE facilitator URL uses HTTPS."""
+        if value.scheme != "https":
+            raise ValueError("skale_facilitator_url must use HTTPS")
+        return value
+
+    @field_validator("skale_payment_token")
+    @classmethod
+    def validate_skale_payment_token(cls, value: str) -> str:
+        """Validate the SKALE payment token address format."""
+        if not re.fullmatch(r"0x[a-fA-F0-9]{40}", value):
+            raise ValueError(
+                "skale_payment_token must be a 0x-prefixed 40-hex-character address"
+            )
+        return value
+
+    @field_validator("skale_payment_token_name")
+    @classmethod
+    def validate_skale_payment_token_name(cls, value: str) -> str:
+        """Validate the SKALE payment token display name."""
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("skale_payment_token_name must not be empty")
+        if len(cleaned) > 100:
+            raise ValueError("skale_payment_token_name must be 100 characters or fewer")
+        return cleaned
 
 
 class AgentSettings(BaseSettings):
