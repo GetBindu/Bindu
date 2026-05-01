@@ -5,9 +5,15 @@ This module defines the configuration settings for the application using pydanti
 
 import re
 
-from pydantic import Field, computed_field, BaseModel, HttpUrl, field_validator
+from pydantic import (
+    computed_field,
+    BaseModel,
+    field_validator,
+    AliasChoices,
+    Field,
+    HttpUrl,
+)
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import AliasChoices
 from typing import Literal
 
 
@@ -296,7 +302,9 @@ class X402Settings(BaseSettings):
     max_timeout_seconds: int = 600
 
     # SKALE facilitator endpoint
-    skale_facilitator_url: HttpUrl = "https://facilitator.dirtroad.dev"
+    skale_facilitator_url: HttpUrl = Field(
+        default=HttpUrl("https://facilitator.dirtroad.dev"),
+    )
 
     # SKALE Europa Hub network identifier
     skale_network: str = "eip155:2046399126"

@@ -5,7 +5,7 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
-
+import os
 import pytest
 
 from bindu.auth.hydra.registration import (
@@ -77,7 +77,8 @@ class TestSaveAgentCredentials:
 
             creds_file = creds_dir / "oauth_credentials.json"
             # Check permissions (owner read/write only)
-            assert oct(creds_file.stat().st_mode)[-3:] == "600"
+            if os.name != "nt":
+                assert oct(creds_file.stat().st_mode)[-3:] == "600"
 
     def test_save_credentials_preserves_existing_entries(self):
         """Test that saving new credentials preserves existing ones."""
