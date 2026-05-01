@@ -3,18 +3,20 @@
 from __future__ import annotations
 
 from time import time
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
 from starlette.requests import Request
 from starlette.responses import Response
 
 from bindu.common.protocol.types import AgentCard, AgentCapabilities, agent_card_ta
-from bindu.server.applications import BinduApplication
 from bindu.utils.logging import get_logger
 from .utils import create_response_with_x402, handle_endpoint_errors, get_client_ip
 
 logger = get_logger("bindu.server.endpoints.agent_card")
+
+if TYPE_CHECKING:
+    from bindu.server.applications import BinduApplication
 
 # Constants
 A2A_PROTOCOL_VERSION = "1.0.0"

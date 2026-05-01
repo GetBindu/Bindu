@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from starlette.requests import Request
 from starlette.responses import Response
 
-from bindu.server.applications import BinduApplication
 from bindu.server.metrics import get_metrics
 from bindu.utils.logging import get_logger
 from .utils import get_agent_did
 
 logger = get_logger("bindu.server.endpoints.metrics")
+
+if TYPE_CHECKING:
+    from bindu.server.applications import BinduApplication
 
 # Constants - using string literals that match TaskState
 ACTIVE_TASK_STATUSES: tuple[str, str, str] = ("submitted", "working", "input-required")

@@ -6,11 +6,12 @@ intelligent agent selection and routing decisions.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from bindu.common.protocol.types import SkillNotFoundError
-from bindu.server.applications import BinduApplication
 from bindu.utils.logging import get_logger
 from .utils import (
     create_response_with_x402,
@@ -23,6 +24,9 @@ from .utils import (
 )
 
 logger = get_logger("bindu.server.endpoints.skills")
+
+if TYPE_CHECKING:
+    from bindu.server.applications import BinduApplication
 
 
 @handle_endpoint_errors("skills list")

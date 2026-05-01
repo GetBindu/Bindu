@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import base64
 import json
+from typing import TYPE_CHECKING
 
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, Response
@@ -26,11 +27,13 @@ from x402.encoding import safe_base64_decode
 from x402.paywall import get_paywall_html
 from x402.types import PaymentPayload
 
-from bindu.server.applications import BinduApplication
 from bindu.utils.logging import get_logger
 from .utils import handle_endpoint_errors, validate_manifest, validate_payment_manager
 
 logger = get_logger("bindu.server.endpoints.payment_sessions")
+
+if TYPE_CHECKING:
+    from bindu.server.applications import BinduApplication
 
 # Constants
 PAYMENT_WAIT_TIMEOUT_SECONDS = 300  # 5 minutes

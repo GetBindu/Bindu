@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from time import monotonic
+from typing import TYPE_CHECKING
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from bindu import __version__
-from bindu.server.applications import BinduApplication
 from .utils import handle_endpoint_errors, get_agent_did, get_runtime_status
 from bindu.utils.logging import get_logger
 
@@ -20,6 +20,9 @@ import sys
 logger = get_logger("bindu.server.endpoints.health")
 
 _start_time = monotonic()
+
+if TYPE_CHECKING:
+    from bindu.server.applications import BinduApplication
 
 
 def _build_health_payload(

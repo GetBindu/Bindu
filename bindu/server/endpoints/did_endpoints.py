@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from pydantic.alias_generators import to_camel
 from starlette.requests import Request
@@ -13,7 +13,6 @@ from bindu.common.protocol.types import (
     InvalidParamsError,
     JSONParseError,
 )
-from bindu.server.applications import BinduApplication
 from bindu.utils.logging import get_logger
 from .utils import (
     handle_endpoint_errors,
@@ -24,6 +23,9 @@ from .utils import (
 )
 
 logger = get_logger("bindu.server.endpoints.did_endpoints")
+
+if TYPE_CHECKING:
+    from bindu.server.applications import BinduApplication
 
 
 def _normalize_did_document_keys(value: Any) -> Any:
