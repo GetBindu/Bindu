@@ -19,7 +19,7 @@ from __future__ import annotations as _annotations
 
 from contextlib import asynccontextmanager
 from functools import partial
-from typing import Any, AsyncIterator, Callable, Sequence
+from typing import Any, AsyncIterator, Callable, Sequence, cast
 from uuid import UUID, uuid4
 
 from starlette.applications import Starlette
@@ -518,7 +518,6 @@ class BinduApplication(Starlette):
 
         from x402.common import process_price_to_atomic_amount
         from x402.types import PaymentRequirements, SupportedNetworks, Price
-        from typing import cast
 
         manifest_url = manifest.url
         manifest_name = manifest.name
