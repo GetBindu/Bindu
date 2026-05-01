@@ -520,11 +520,14 @@ class BinduApplication(Starlette):
         from x402.types import PaymentRequirements, SupportedNetworks, Price
         from typing import cast
 
+        manifest_url = manifest.url
+        manifest_name = manifest.name
+
         payment_requirements: list[PaymentRequirements] = []
 
         options: list[dict[str, Any]]
         if getattr(x402_ext, "payment_options", None):
-            options = list(x402_ext.payment_options)  # type: ignore[assignment]
+            options = list(x402_ext.payment_options)
         else:
             options = [
                 {
@@ -539,7 +542,7 @@ class BinduApplication(Starlette):
             network = opt.get("network") or app_settings.x402.default_network
             pay_to_address = opt.get("pay_to_address") or x402_ext.pay_to_address
 
-            price = Price(amount=amount, network=network)
+            price = cast(Price, amount)
             max_amount_required, asset_address, eip712_domain = (
                 process_price_to_atomic_amount(price, network)
             )
@@ -599,7 +602,7 @@ class BinduApplication(Starlette):
 
             logger.info(f"CORS middleware enabled for origins: {cors_origins}")
             cors_middleware = Middleware(
-                CORSMiddleware,
+                cast(Any, CORSMiddleware),
                 allow_origins=cors_origins,
                 allow_credentials=True,
                 allow_methods=["*"],
@@ -621,7 +624,7 @@ class BinduApplication(Starlette):
 
             facilitator_config = {"url": app_settings.x402.facilitator_url}
             x402_middleware = Middleware(
-                X402Middleware,
+                cast(Any, X402Middleware),
                 manifest=manifest,
                 facilitator_config=facilitator_config,
                 x402_ext=x402_ext,
@@ -639,7 +642,7 @@ class BinduApplication(Starlette):
         # Add metrics middleware (should be last to capture all requests)
         from .middleware import MetricsMiddleware
 
-        metrics_middleware = Middleware(MetricsMiddleware)
+        metrics_middleware = Middleware(cast(Any, MetricsMiddleware))
         middleware_list.append(metrics_middleware)
         logger.info("Metrics middleware enabled for Prometheus monitoring")
 
@@ -658,7 +661,10 @@ class BinduApplication(Starlette):
 
         if provider == "hydra":
             logger.info("Hydra OAuth2 authentication enabled")
-            return Middleware(HydraMiddleware, auth_config=app_settings.hydra)
+            return Middleware(
+                cast(Any, HydraMiddleware),
+                auth_config=app_settings.hydra,
+            )
         else:
             logger.error(f"Unknown authentication provider: {provider}")
             raise ValueError(UNKNOWN_AUTH_PROVIDER_ERROR.format(provider=provider))
