@@ -293,6 +293,21 @@ class X402Settings(BaseSettings):
     pay_to_env: str = "X402_PAY_TO"
     max_timeout_seconds: int = 600
 
+    # SKALE facilitator endpoint
+    skale_facilitator_url: str = "https://facilitator.dirtroad.dev"
+
+    # SKALE Europa Hub network identifier
+    skale_network: str = "eip155:2046399126"
+
+    # Bridged USDC on SKALE Europa Hub
+    skale_payment_token: str = "0x2aebcdc4f9f9149a50422fff86198cb0939ea165"
+
+    # Human-readable token name
+    skale_payment_token_name: str = "Bridged USDC (SKALE Europa)"
+
+    # Default payment amount in USDC micro-units
+    skale_default_amount: str = "10000"
+
     # Extension URI
     extension_uri: str = "https://github.com/google-a2a/a2a-x402/v0.1"
 
@@ -339,6 +354,12 @@ class X402Settings(BaseSettings):
             "https://ethereum-rpc.publicnode.com",  # PublicNode
             "https://rpc.ankr.com/eth",  # Ankr public
             "https://ethereum.public.blockpi.network/v1/rpc/public",  # BlockPI
+        ],
+        "eip155:2046399126": [
+            "https://mainnet.skalenodes.com/v1/elated-tan-skat",
+        ],
+        "skale-europa": [
+            "https://mainnet.skalenodes.com/v1/elated-tan-skat",
         ],
     }
 
