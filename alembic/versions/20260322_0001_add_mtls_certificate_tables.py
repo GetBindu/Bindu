@@ -144,8 +144,7 @@ def upgrade() -> None:
     op.create_index(
         "idx_cert_audit_created_at",
         "certificate_audit_log",
-        ["created_at"],
-        postgresql_ops={"created_at": "DESC"},
+        [sa.text("created_at DESC")],
     )
 
 

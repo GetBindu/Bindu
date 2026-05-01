@@ -368,12 +368,14 @@ class BinduApplication(Starlette):
                 raise ValueError(
                     "Manifest with DID extension is required for storage initialization"
                 )
+            manifest_did = self.manifest.did_extension.did
+
             storage = await execute_with_retry(
                 create_storage,
                 max_attempts=app_settings.retry.storage_max_attempts,
                 min_wait=app_settings.retry.storage_min_wait,
                 max_wait=app_settings.retry.storage_max_wait,
-                did=self.manifest.did_extension.did,
+                did=manifest_did,
             )
             app._storage = storage
             logger.info(f"✅ Storage initialized: {type(storage).__name__}")
@@ -548,8 +550,8 @@ class BinduApplication(Starlette):
                     network=cast(SupportedNetworks, network),
                     asset=asset_address,
                     max_amount_required=max_amount_required,
-                    resource=f"{manifest.url}{resource_suffix}",
-                    description=f"Payment required to use {manifest.name}",
+                    resource=f"{manifest_url}{resource_suffix}",
+                    description=f"Payment required to use {manifest_name}",
                     mime_type="",
                     pay_to=pay_to_address,
                     max_timeout_seconds=60,
@@ -675,6 +677,9 @@ class BinduApplication(Starlette):
         if not manifest:
             return
 
+        manifest_url = manifest.url
+        manifest_name = manifest.name
+
         from bindu.server.middleware.x402.payment_session_manager import (
             PaymentSessionManager,
         )
@@ -684,13 +689,13 @@ class BinduApplication(Starlette):
         self._payment_session_manager = PaymentSessionManager()
 
         self._payment_requirements = [
-            req.model_copy(update={"resource": f"{manifest.url}/payment-capture"})
+            req.model_copy(update={"resource": f"{manifest_url}/payment-capture"})
             for req in payment_requirements_for_middleware
         ]
 
         self._paywall_config = PaywallConfig(
             cdp_client_key=os.getenv("CDP_CLIENT_KEY") or "",
-            app_name=f"{manifest.name} - x402 Payment",
+            app_name=f"{manifest_name} - x402 Payment",
             app_logo="/assets/light.svg",
         )
 
