@@ -114,10 +114,50 @@ def test_includes_regular_python(tmp_path: Path):
     assert should_include(tmp_path / "agent.py", tmp_path, spec)
 
 
-def test_includes_dotenv(tmp_path: Path):
-    """`.env` is shipped — agents need their secrets."""
+def test_excludes_dotenv(tmp_path: Path):
+    """`.env` is NEVER shipped — secrets must be injected via --env KEY=VAL."""
     spec = _make_spec(tmp_path)
-    assert should_include(tmp_path / ".env", tmp_path, spec)
+    assert not should_include(tmp_path / ".env", tmp_path, spec)
+    assert not should_include(tmp_path / ".env.local", tmp_path, spec)
+    assert not should_include(tmp_path / ".env.production", tmp_path, spec)
+
+
+def test_excludes_pem_and_keys(tmp_path: Path):
+    """*.pem, *.key, id_rsa* are never shipped — they're private credentials."""
+    spec = _make_spec(tmp_path)
+    assert not should_include(tmp_path / "server.pem", tmp_path, spec)
+    assert not should_include(tmp_path / "deploy.key", tmp_path, spec)
+    assert not should_include(tmp_path / "id_rsa", tmp_path, spec)
+    assert not should_include(tmp_path / "id_ed25519", tmp_path, spec)
+    assert not should_include(tmp_path / "creds.kdbx", tmp_path, spec)
+    assert not should_include(tmp_path / "credentials.json", tmp_path, spec)
+
+
+def test_excludes_aws_ssh_dirs(tmp_path: Path):
+    """Anything under .aws/, .ssh/, .gnupg/, .bindu/ is dropped."""
+    spec = _make_spec(tmp_path)
+    assert not should_include(tmp_path / ".aws" / "credentials", tmp_path, spec)
+    assert not should_include(tmp_path / ".ssh" / "id_rsa", tmp_path, spec)
+    assert not should_include(tmp_path / ".gnupg" / "secring.gpg", tmp_path, spec)
+    assert not should_include(tmp_path / ".bindu" / "did" / "agent.pem", tmp_path, spec)
+
+
+def test_find_sensitive_files(tmp_path: Path):
+    """find_sensitive_files reports every secret that exists on disk."""
+    from bindu.runtime.source_packager import find_sensitive_files
+
+    (tmp_path / ".env").write_text("OPENAI_API_KEY=sk-xxx\n")
+    (tmp_path / "server.pem").write_text("-----BEGIN PRIVATE KEY-----\n")
+    (tmp_path / ".aws").mkdir()
+    (tmp_path / ".aws" / "credentials").write_text("[default]\n")
+    (tmp_path / "agent.py").write_text("# fine\n")
+    (tmp_path / "pyproject.toml").write_text("[project]\nname='x'\n")
+
+    found = {p.name for p in find_sensitive_files(tmp_path)}
+    assert ".env" in found
+    assert "server.pem" in found
+    assert "credentials" in found  # under .aws/
+    assert "agent.py" not in found
 
 
 def test_gitignore_pattern(tmp_path: Path):

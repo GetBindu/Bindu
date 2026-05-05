@@ -33,6 +33,39 @@ _DEFAULT_IGNORE_DIRS = frozenset(
 )
 _DEFAULT_IGNORE_SUFFIXES = (".pyc", ".pyo", ".log", ".sqlite", ".db")
 
+# Sensitive filename patterns. NEVER shipped, no opt-out: a deployed bindu
+# agent runs on a public-IP VM, and accidentally tarballing a ``.env`` with
+# ``OPENAI_API_KEY`` or a private SSH key into that VM is the kind of mistake
+# that ends with credentials on PyPI mirrors and shared object storage.
+# Users who need to inject secrets should use ``--env KEY=VALUE`` flags.
+# Glob syntax (``fnmatch``); matched against both the path and basename.
+_SENSITIVE_PATTERNS = (
+    ".env",
+    ".env.*",
+    "*.pem",
+    "*.key",
+    "*.p12",
+    "*.pfx",
+    "*.kdbx",
+    "id_rsa",
+    "id_dsa",
+    "id_ecdsa",
+    "id_ed25519",
+    "credentials.json",
+    "credentials.yaml",
+    "credentials.yml",
+    "*.kubeconfig",
+)
+# Sensitive directory names (any segment match excludes the whole subtree).
+_SENSITIVE_DIRS = frozenset(
+    {
+        ".aws",
+        ".gnupg",
+        ".ssh",
+        ".bindu",
+    }
+)
+
 MAX_TARBALL_BYTES = 50 * 1024 * 1024  # 50 MB compressed
 
 
@@ -82,6 +115,24 @@ class IgnoreSpec:
         return cls(patterns=tuple(lines))
 
 
+def is_sensitive(path: Path, root: Path) -> bool:
+    """Return True if the file looks like a secret/credential.
+
+    Checked independently of ``.gitignore`` because users frequently have
+    a real ``.env`` checked out (or in a sibling repo of a multi-repo
+    workspace) that they never intended to publish.
+    """
+    rel = path.relative_to(root)
+    if any(p in _SENSITIVE_DIRS for p in rel.parts):
+        return True
+    name = rel.name
+    rel_str = str(rel).replace("\\", "/")
+    for pat in _SENSITIVE_PATTERNS:
+        if fnmatch.fnmatch(name, pat) or fnmatch.fnmatch(rel_str, pat):
+            return True
+    return False
+
+
 def should_include(path: Path, root: Path, spec: IgnoreSpec) -> bool:
     """Decide whether ``path`` should be shipped."""
     rel = path.relative_to(root)
@@ -91,6 +142,9 @@ def should_include(path: Path, root: Path, spec: IgnoreSpec) -> bool:
         return False
 
     if path.suffix in _DEFAULT_IGNORE_SUFFIXES:
+        return False
+
+    if is_sensitive(path, root):
         return False
 
     rel_str = str(rel).replace("\\", "/")
@@ -125,6 +179,27 @@ def _walk_included(root: Path, spec: IgnoreSpec) -> list[Path]:
                 files.append(p)
     files.sort()
     return files
+
+
+def find_sensitive_files(root: Path) -> list[Path]:
+    """Return paths under ``root`` that look like secrets but exist on disk.
+
+    Used by the deploy CLI to warn the user that, e.g., their ``.env`` was
+    silently dropped from the tarball — so they know to inject those values
+    via ``--env KEY=VALUE`` instead.
+
+    Descends into ``_SENSITIVE_DIRS`` (unlike ``_walk_included``) so the
+    user can see what's inside their ``.aws/`` etc. when reporting drops.
+    """
+    found: list[Path] = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in _DEFAULT_IGNORE_DIRS]
+        for name in filenames:
+            p = Path(dirpath) / name
+            if is_sensitive(p, root):
+                found.append(p)
+    found.sort()
+    return found
 
 
 def build_tarball(root: Path, extra_ignores: tuple[str, ...] = ()) -> bytes:

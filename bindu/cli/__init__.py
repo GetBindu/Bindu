@@ -196,10 +196,57 @@ async def _supervise(provider: Any, handle: Any, runtime_config: Any) -> None:
         await provider.on_exit(handle, runtime_config.on_exit)
 
 
+def _print_dry_run(
+    *,
+    agent_name: str,
+    script_rel: str,
+    source_dir: Path,
+    runtime_config: Any,
+    sensitive_dropped: list[Path],
+) -> None:
+    """Print what ``bindu deploy`` *would* do without doing it."""
+    from bindu.runtime.source_packager import (
+        IgnoreSpec,
+        _walk_included,
+        build_tarball,
+    )
+
+    spec = IgnoreSpec.load(source_dir)
+    included = _walk_included(source_dir, spec)
+    blob_size = len(build_tarball(source_dir))
+
+    print("DRY RUN — nothing will be deployed.\n")
+    print(f"  agent name:    {agent_name}")
+    print(f"  source root:   {source_dir}")
+    print(f"  entry script:  {script_rel}")
+    print(f"  provider:      {runtime_config.provider}")
+    if runtime_config.image:
+        print(f"  image (A1):    {runtime_config.image}")
+    else:
+        print(f"  vcpu / memory: {runtime_config.vcpu} / {runtime_config.memory}")
+        print(f"  disk:          {runtime_config.disk}")
+        print(f"  auto_suspend:  {runtime_config.auto_suspend}s")
+        print(f"  on_exit:       {runtime_config.on_exit}")
+        if runtime_config.bindu_version:
+            print(f"  bindu_version: {runtime_config.bindu_version}")
+    if runtime_config.env:
+        print(f"  env keys:      {sorted(runtime_config.env)}  (values hidden)")
+    print(
+        f"  tarball:       {len(included)} files, {blob_size / 1024:.1f} KB compressed"
+    )
+    if sensitive_dropped:
+        print()
+        print("  WARNING: the following files were silently DROPPED from the tarball")
+        print("  because they look like secrets. Use --env KEY=VALUE for runtime")
+        print("  injection instead:")
+        for p in sensitive_dropped:
+            print(f"    - {p.relative_to(source_dir)}")
+
+
 def _handle_deploy(args: argparse.Namespace) -> None:
     """Handle ``bindu deploy <script>``: capture metadata → deploy → supervise."""
     from bindu.runtime import RuntimeConfig, get_provider
-    from bindu.runtime.source_packager import find_project_root
+    from bindu.runtime.source_packager import find_project_root, find_sensitive_files
 
     script_path = os.path.abspath(args.script)
     if not os.path.isfile(script_path):
@@ -210,9 +257,45 @@ def _handle_deploy(args: argparse.Namespace) -> None:
     caller_dir = Path(captured["caller_dir"])
     source_dir = find_project_root(caller_dir)
 
+    # Compute the script path relative to source_dir so the VM gets the same
+    # entry point the user typed — without re-detecting at provider level
+    # (which would silently pick a different bindufy() call in the same repo).
+    try:
+        script_rel = str(Path(script_path).resolve().relative_to(source_dir)).replace(
+            "\\", "/"
+        )
+    except ValueError:
+        sys.exit(
+            f"Error: script {script_path} is not under detected source root "
+            f"{source_dir}. Run from the project root or pass an absolute path "
+            "to a script inside the project."
+        )
+
     runtime_config = RuntimeConfig.from_dict(_build_runtime_dict(args))
     if runtime_config.provider == "in-process":
         sys.exit("Error: 'bindu deploy' requires a non-default --runtime")
+
+    sensitive = find_sensitive_files(source_dir)
+
+    if args.dry_run:
+        _print_dry_run(
+            agent_name=agent_name,
+            script_rel=script_rel,
+            source_dir=source_dir,
+            runtime_config=runtime_config,
+            sensitive_dropped=sensitive,
+        )
+        return
+
+    if sensitive:
+        print(
+            "warning: dropped {} sensitive file(s) from the deploy tarball "
+            "(use --dry-run to list, --env KEY=VALUE to inject secrets)".format(
+                len(sensitive)
+            ),
+            file=sys.stderr,
+            flush=True,
+        )
 
     provider = get_provider(runtime_config.provider)
 
@@ -222,6 +305,7 @@ def _handle_deploy(args: argparse.Namespace) -> None:
             source_dir=source_dir,
             config=runtime_config,
             env=None,
+            script=script_rel,
         )
         print(f"\n✓ {agent_name} serving at {handle.url}\n", flush=True)
         await _supervise(provider, handle, runtime_config)
@@ -326,6 +410,13 @@ def main() -> None:
         default=None,
         metavar="KEY=VALUE",
         help="Extra env var for the agent inside the VM (repeatable)",
+    )
+    deploy_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        dest="dry_run",
+        default=False,
+        help="Print what would be deployed (target VM, files, env keys) and exit.",
     )
 
     args = parser.parse_args()

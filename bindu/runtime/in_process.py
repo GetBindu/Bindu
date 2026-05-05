@@ -24,6 +24,7 @@ class InProcessRuntimeProvider(RuntimeProvider):
         source_dir: Path | None,
         config: RuntimeConfig,
         env: dict[str, str] | None = None,
+        script: str | None = None,
     ) -> RuntimeHandle:
         """Return a handle pointing at the local server; nothing is deployed."""
         return RuntimeHandle(

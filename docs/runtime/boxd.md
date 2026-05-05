@@ -45,9 +45,26 @@ the agent serves traffic from its own VM with a public HTTPS URL.
 - The agent's DID keys, x402 wallet, OAuth tokens are all generated and
   persisted **inside the VM**. `BOXD_API_KEY` stays on the host and is
   never shipped to the VM.
-- User secrets (`OPENAI_API_KEY`, etc.) ship via:
-  - a `.env` file in your project root (committed to the source tarball)
-  - or repeated `--env KEY=VALUE` flags on `bindu deploy`
+- User secrets (`OPENAI_API_KEY`, etc.) ship via repeated
+  `--env KEY=VALUE` flags on `bindu deploy`. They reach the agent
+  process's environment inside the VM and never touch the source tarball.
+- **`.env`-style files are never shipped.** A deployed agent runs on a
+  public-IP VM, so accidentally tarballing a `.env` with `OPENAI_API_KEY=`
+  would publish it. The deploy CLI silently drops `.env*`, `*.pem`,
+  `*.key`, `id_rsa*`, `credentials*.json`, `*.kdbx`, `*.p12`, `*.pfx`,
+  `*.kubeconfig` and anything under `.aws/` `.ssh/` `.gnupg/` `.bindu/`,
+  and prints a stderr warning listing what was dropped. Use `--dry-run`
+  to see the full list before deploying.
+
+## Pre-deploy preview
+
+```bash
+bindu deploy agent.py --runtime=boxd --dry-run
+```
+
+Prints the target VM, source root, entry script, resource config, env-var
+keys (values hidden), tarball file count + compressed size, and any
+sensitive files that would be silently dropped. No VM is touched.
 
 ## Source packaging
 
@@ -78,3 +95,5 @@ to `.binduignore`.
 | `pip install` failure | Dep not on PyPI, native build fails | Switch to A1 (custom image) and install the dep at image-build time |
 | Source >50 MB | Large data files included | Add to `.binduignore` |
 | Old bindu in VM rejects new features | Published bindu lags the host's | Pass `--bindu-version=local` to ship the host's source instead |
+| `upload to /tmp/... corrupted after 3 attempts` | boxd write_file truncation ([azin-tech/boxd#45](https://github.com/azin-tech/boxd/issues/45)) | Re-run `bindu deploy`; the corruption is intermittent and almost always clears on retry |
+| Looks like the wrong code is running after redeploy | boxd 0.1.x sometimes ships truncated tarballs | The deploy now sha256-verifies every upload and retries on mismatch. If you see this anyway, run `bindu shell <agent>` and check `cat /tmp/bindu-agent.pid` against `pgrep python3` |

@@ -22,6 +22,39 @@ def _ok_exec_result():
     return r
 
 
+def _wire_safe_write_file(fake_box):
+    """Make fake_box echo back the correct sha256 from sha256sum invocations.
+
+    The real ``_safe_write_file`` writes a blob, then runs ``sha256sum`` on
+    the destination and compares to the host's hash. To test the *callers*
+    (ship_source, _ship_bindu_source, deploy()) we need the box to look like
+    the bytes landed intact — so wire write_file to remember what was sent
+    and exec to return the matching hash for sha256sum.
+    """
+    import hashlib
+
+    last_blob: dict[str, bytes] = {}
+
+    async def fake_write_file(blob, dest):
+        last_blob[dest] = blob
+
+    fake_box.write_file.side_effect = fake_write_file
+
+    async def fake_exec(*args, **kwargs):
+        if args and args[0] == "sha256sum" and len(args) >= 2:
+            dest = args[1]
+            blob = last_blob.get(dest, b"")
+            r = MagicMock()
+            r.exit_code = 0
+            r.success = True
+            r.stdout = f"{hashlib.sha256(blob).hexdigest()}  {dest}\n"
+            r.stderr = ""
+            return r
+        return _ok_exec_result()
+
+    fake_box.exec.side_effect = fake_exec
+
+
 # ── _resolve_vm ────────────────────────────────────────────────────
 
 
@@ -97,7 +130,7 @@ async def test_resolve_vm_passes_config(mock_boxd, fake_box):
 @pytest.mark.asyncio
 async def test_ship_source_writes_and_extracts(mock_boxd, fake_box, tmp_path):
     (tmp_path / "agent.py").write_text("# hi\n")
-    fake_box.exec.return_value = _ok_exec_result()
+    _wire_safe_write_file(fake_box)
     p = BoxdRuntimeProvider()
 
     await p._ship_source(fake_box, tmp_path)
@@ -117,6 +150,89 @@ async def test_ship_source_writes_and_extracts(mock_boxd, fake_box, tmp_path):
         and "tar xzf /tmp/source.tar.gz -C /home/boxd/app" in c.args[2]
         for c in exec_calls
     )
+
+
+# ── _safe_write_file (verify-and-retry workaround for boxd issue #45) ─
+
+
+@pytest.mark.asyncio
+async def test_safe_write_file_succeeds_on_clean_upload(fake_box):
+    """When the sha256 on the VM matches the host, no retry."""
+    from bindu.runtime.boxd_provider import _safe_write_file
+
+    _wire_safe_write_file(fake_box)
+    await _safe_write_file(fake_box, b"hello world", "/tmp/x.bin")
+
+    assert fake_box.write_file.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_safe_write_file_retries_on_corrupted_upload(monkeypatch, fake_box):
+    """If the first upload's hash mismatches, retry until it succeeds."""
+    import hashlib
+
+    from bindu.runtime.boxd_provider import _safe_write_file
+
+    monkeypatch.setattr(
+        "bindu.runtime.boxd_provider.asyncio.sleep", AsyncMock(return_value=None)
+    )
+
+    blob = b"some data"
+    expected = hashlib.sha256(blob).hexdigest()
+    state = {"call": 0}
+
+    async def fake_write(b, d):
+        pass
+
+    async def fake_exec(*args, **kwargs):
+        if args and args[0] == "sha256sum":
+            state["call"] += 1
+            r = MagicMock()
+            r.exit_code = 0
+            # First call returns a wrong hash (truncation simulated); second matches.
+            hash_str = "0" * 64 if state["call"] == 1 else expected
+            r.stdout = f"{hash_str}  {args[1]}\n"
+            r.stderr = ""
+            return r
+        return _ok_exec_result()
+
+    fake_box.write_file.side_effect = fake_write
+    fake_box.exec.side_effect = fake_exec
+
+    await _safe_write_file(fake_box, blob, "/tmp/x.bin")
+    # Wrote twice (once corrupted, once clean)
+    assert fake_box.write_file.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_safe_write_file_raises_after_max_retries(monkeypatch, fake_box):
+    """If every attempt produces a corrupt upload, raise with a useful message."""
+    from bindu.runtime.boxd_provider import _safe_write_file
+
+    monkeypatch.setattr(
+        "bindu.runtime.boxd_provider.asyncio.sleep", AsyncMock(return_value=None)
+    )
+
+    async def fake_write(b, d):
+        pass
+
+    async def fake_exec_always_wrong(*args, **kwargs):
+        if args and args[0] == "sha256sum":
+            r = MagicMock()
+            r.exit_code = 0
+            r.stdout = f"{'f' * 64}  {args[1]}\n"
+            r.stderr = ""
+            return r
+        return _ok_exec_result()
+
+    fake_box.write_file.side_effect = fake_write
+    fake_box.exec.side_effect = fake_exec_always_wrong
+
+    with pytest.raises(RuntimeError) as ei:
+        await _safe_write_file(fake_box, b"data", "/tmp/x.bin")
+    msg = str(ei.value)
+    assert "corrupted" in msg
+    assert "issues/45" in msg  # points at the upstream bug
 
 
 # ── _install_deps ──────────────────────────────────────────────────
@@ -253,6 +369,32 @@ async def test_start_agent_execs_bindu_serve(mock_boxd, fake_box):
 
 
 @pytest.mark.asyncio
+async def test_start_agent_kills_old_pid_and_writes_new(mock_boxd, fake_box):
+    """Redeploy must SIGTERM the previous python3 (tracked via pidfile),
+    wait for it to die, then start the new one and record its PID.
+
+    Implementation note: kill-old and start run as two separate execs.
+    Combining them into one shell line confuses ``&`` precedence and
+    backgrounds the wrong subshell — easy to miss without splitting.
+    """
+    p = BoxdRuntimeProvider()
+    fake_box.exec.return_value = _ok_exec_result()
+
+    await p._start_agent(fake_box, script="agent.py")
+    sh_calls = [c.args[2] for c in fake_box.exec.await_args_list if c.args[0] == "sh"]
+    assert len(sh_calls) == 2, "expected two execs: kill-old then start"
+    kill_cmd, start_cmd = sh_calls
+    # First exec: pidfile check + TERM + poll + SIGKILL fallback.
+    assert "/tmp/bindu-agent.pid" in kill_cmd
+    assert "kill $OLD" in kill_cmd
+    assert "kill -9 $OLD" in kill_cmd
+    # Second exec: start detached, record new PID.
+    assert "setsid" in start_cmd
+    assert "python3" in start_cmd
+    assert "echo $! > /tmp/bindu-agent.pid" in start_cmd
+
+
+@pytest.mark.asyncio
 async def test_start_agent_raises_on_nonzero_exit(mock_boxd, fake_box):
     bad = MagicMock()
     bad.exit_code = 1
@@ -260,7 +402,9 @@ async def test_start_agent_raises_on_nonzero_exit(mock_boxd, fake_box):
     fake_box.exec.return_value = bad
 
     p = BoxdRuntimeProvider()
-    with pytest.raises(RuntimeError, match="failed to start"):
+    # First exec (kill-old) raises with this message; we accept either
+    # since both phases are "starting" from the user's POV.
+    with pytest.raises(RuntimeError, match="(failed to start|failed to stop)"):
         await p._start_agent(fake_box, script="agent.py")
 
 
@@ -362,7 +506,7 @@ async def test_deploy_a2_full_flow(
         "from bindu.penguin.bindufy import bindufy\nbindufy({}, lambda m: 'hi')\n"
     )
     (tmp_path / "pyproject.toml").write_text("[project]\nname='x'\nversion='0.1.0'\n")
-    fake_box.exec.return_value = _ok_exec_result()
+    _wire_safe_write_file(fake_box)
     fake_box.name = "my-agent"
     fake_box.url = "https://my-agent.boxd.sh"
 
@@ -436,6 +580,48 @@ async def test_deploy_requires_credentials(monkeypatch):
 
     with pytest.raises(RuntimeError, match="BOXD_API_KEY"):
         await p.deploy("agent", None, cfg, None)
+
+
+@pytest.mark.asyncio
+async def test_deploy_uses_explicit_script_over_detection(
+    mock_boxd, fake_box, tmp_path, fake_health, boxd_api_key
+):
+    """When ``script=`` is passed, the VM runs that exact path — even if
+    multiple .py files at the source root call bindufy()."""
+    # Two scripts, both call bindufy(). _detect_script_name would pick
+    # whichever sorts first; the explicit ``script=`` arg must win.
+    (tmp_path / "real_agent.py").write_text(
+        "from bindu.penguin.bindufy import bindufy\nbindufy({}, lambda m: 'hi')\n"
+    )
+    (tmp_path / "stale_agent.py").write_text(
+        "from bindu.penguin.bindufy import bindufy\nbindufy({}, lambda m: 'old')\n"
+    )
+    (tmp_path / "pyproject.toml").write_text("[project]\nname='x'\nversion='0.1.0'\n")
+    _wire_safe_write_file(fake_box)
+    fake_box.name = "agent"
+    fake_box.url = "https://agent.boxd.sh"
+
+    p = BoxdRuntimeProvider()
+    cfg = RuntimeConfig.from_dict({"provider": "boxd"})
+
+    await p.deploy(
+        agent_name="agent",
+        source_dir=tmp_path,
+        config=cfg,
+        env=None,
+        script="real_agent.py",
+    )
+
+    serve_calls = [
+        c
+        for c in fake_box.exec.await_args_list
+        if c.args and c.args[0] == "sh" and "python3" in c.args[2]
+    ]
+    assert serve_calls, "agent script should have been started"
+    cmd_str = serve_calls[0].args[2]
+    assert "real_agent.py" in cmd_str
+    # Detection fallback would have picked stale_agent.py (sorts first).
+    assert "stale_agent.py" not in cmd_str
 
 
 # ── health / stream_logs / on_exit ────────────────────────────────

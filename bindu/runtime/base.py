@@ -53,8 +53,16 @@ class RuntimeProvider(ABC):
         source_dir: Path | None,
         config: RuntimeConfig,
         env: dict[str, str] | None = None,
+        script: str | None = None,
     ) -> RuntimeHandle:
-        """Deploy the agent. Returns a handle once the agent is healthy."""
+        """Deploy the agent. Returns a handle once the agent is healthy.
+
+        ``script`` is the path to the entry-point script relative to
+        ``source_dir`` (e.g. ``"agents/echo.py"``). When omitted, the
+        provider may auto-detect a single top-level script — but the
+        deploy CLI always passes it explicitly to avoid wrong-script
+        deploys in multi-agent repos.
+        """
 
     @abstractmethod
     async def health(self, handle: RuntimeHandle) -> bool:

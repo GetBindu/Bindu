@@ -99,6 +99,39 @@ async def _exec_or_raise(
     return result
 
 
+_WRITE_FILE_RETRIES = 3
+
+
+async def _safe_write_file(box: Any, blob: bytes, dest: str) -> None:
+    """``box.write_file`` + sha256 verification, with retry on mismatch.
+
+    boxd 0.1.1's ``Box.write_file`` intermittently silently truncates
+    uploads (https://github.com/azin-tech/boxd/issues/45). The corruption
+    is rare and has 4 KB-aligned deltas — almost certainly a streaming-
+    writer race. We hash on both ends and retry on mismatch so the deploy
+    never proceeds with a corrupt artifact in the VM.
+    """
+    import hashlib
+
+    expected = hashlib.sha256(blob).hexdigest()
+    last_seen = "unknown"
+    for attempt in range(_WRITE_FILE_RETRIES):
+        await box.write_file(blob, dest)
+        result = await box.exec("sha256sum", dest)
+        stdout = getattr(result, "stdout", "") or ""
+        last_seen = stdout.split()[0] if stdout else "<no output>"
+        if last_seen == expected:
+            return
+        if attempt < _WRITE_FILE_RETRIES - 1:
+            await asyncio.sleep(1.0)
+    raise RuntimeError(
+        f"upload to {dest} corrupted after {_WRITE_FILE_RETRIES} attempts "
+        f"(expected sha256 {expected[:12]}..., got {last_seen[:12]}...). "
+        "Likely boxd write_file truncation; see "
+        "https://github.com/azin-tech/boxd/issues/45"
+    )
+
+
 class BoxdRuntimeProvider(RuntimeProvider):
     """RuntimeProvider that runs the agent inside a boxd microVM."""
 
@@ -151,7 +184,7 @@ class BoxdRuntimeProvider(RuntimeProvider):
         blob = build_tarball(source_dir)
         # /tmp inside the VM is fine: the VM is single-tenant, the host is the
         # only writer, and the file is consumed immediately by the next exec.
-        await box.write_file(blob, "/tmp/source.tar.gz")  # nosec B108
+        await _safe_write_file(box, blob, "/tmp/source.tar.gz")  # nosec B108
         await _exec_or_raise(
             box,
             "sh",
@@ -180,7 +213,7 @@ class BoxdRuntimeProvider(RuntimeProvider):
                 f"checkout; no pyproject.toml found at or above {host_root}"
             )
         blob = build_tarball(host_root, extra_ignores=_BINDU_SHIP_EXCLUDES)
-        await box.write_file(blob, "/tmp/bindu-source.tar.gz")  # nosec B108
+        await _safe_write_file(box, blob, "/tmp/bindu-source.tar.gz")  # nosec B108
         await _exec_or_raise(
             box,
             "sh",
@@ -245,19 +278,52 @@ class BoxdRuntimeProvider(RuntimeProvider):
         We invoke ``python3 <script>`` directly: published bindu wheels do
         not always ship the ``bindu`` console-script entry point, and the
         user's script calls ``bindufy()`` itself.
+
+        On redeploy we kill the previously-started agent (tracked via a
+        pidfile) before exec'ing the new one. Without this the old
+        process keeps holding port 3773 and the new one's bind silently
+        fails — ``/health`` keeps reporting OK from the old code.
         """
         merged_env = dict(env or {})
         if public_url:
             merged_env["BINDU_PUBLIC_URL"] = public_url
 
+        pidfile = "/tmp/bindu-agent.pid"  # nosec B108 — single-tenant VM
+        # Step 1: graceful TERM + 5s wait + SIGKILL on the prior agent. Run
+        # as its own exec so the next command sees a clean process table.
+        # Combining this with the start command into one shell line confuses
+        # ``&``/``&&`` precedence and ends up backgrounding the wrong subshell.
+        kill_old = (
+            f"if [ -f {pidfile} ]; then "
+            f"  OLD=$(cat {pidfile}); "
+            f"  kill $OLD 2>/dev/null || true; "
+            f"  for _ in 1 2 3 4 5; do "
+            f"    kill -0 $OLD 2>/dev/null || break; "
+            f"    sleep 1; "
+            f"  done; "
+            f"  kill -9 $OLD 2>/dev/null || true; "
+            f"  rm -f {pidfile}; "
+            f"fi"
+        )
+        await _exec_or_raise(
+            box, "sh", "-c", kill_old, error="failed to stop previous agent"
+        )
+
+        # Step 2: start the new agent detached. ``setsid`` puts it in its own
+        # session so the gRPC exec channel closing doesn't cascade SIGHUP to
+        # the python3 process. ``$!`` here is the python3 PID — the trailing
+        # ``&`` only backgrounds that one command, not a wrapper subshell.
+        start = (
+            f"cd {APP_DIR} && "
+            f"setsid nohup python3 {APP_DIR}/{script} "
+            f"> /tmp/bindu-agent.log 2>&1 < /dev/null & "
+            f"echo $! > {pidfile}"
+        )
         await _exec_or_raise(
             box,
             "sh",
             "-c",
-            (
-                f"cd {APP_DIR} && nohup python3 {APP_DIR}/{script} "
-                f"> /tmp/bindu-agent.log 2>&1 &"
-            ),
+            start,
             env=merged_env,
             error="failed to start agent",
         )
@@ -301,6 +367,7 @@ class BoxdRuntimeProvider(RuntimeProvider):
         source_dir: Path | None,
         config: RuntimeConfig,
         env: dict[str, str] | None = None,
+        script: str | None = None,
     ) -> RuntimeHandle:
         """Resolve the VM, ship source (A2) or use image (A1), start agent, wait healthy."""
         if not (os.environ.get("BOXD_API_KEY") or os.environ.get("BOXD_TOKEN")):
@@ -341,11 +408,16 @@ class BoxdRuntimeProvider(RuntimeProvider):
                     has_requirements=has_requirements,
                     bindu_version=config.bindu_version,
                 )
-                script = self._detect_script_name(source_dir)
+                # Trust the explicit script path from the caller (the deploy
+                # CLI threads through what the user actually invoked). Fall
+                # back to root-glob detection for callers that don't pass
+                # one — that includes the e2e tests and any future ad-hoc
+                # use of BoxdRuntimeProvider directly.
+                script_to_run = script or self._detect_script_name(source_dir)
                 merged_env = {**config.env, **(env or {})}
                 await self._start_agent(
                     box,
-                    script=script,
+                    script=script_to_run,
                     env=merged_env,
                     public_url=public_url,
                 )

@@ -246,6 +246,101 @@ def test_deploy_capture_env_unleaked(monkeypatch, tmp_path):
     assert "BINDU_DEPLOY_CAPTURE" not in os.environ
 
 
+def test_deploy_threads_script_path_to_provider(monkeypatch, tmp_path):
+    """The exact script the user typed reaches provider.deploy as a relative path."""
+    sub = tmp_path / "agents"
+    sub.mkdir()
+    script = sub / "echo.py"
+    script.write_text(
+        """
+from bindu.penguin.bindufy import bindufy
+config = {"author": "x@y", "name": "echo", "deployment": {"url": "http://localhost:3773"}}
+bindufy(config, lambda m: "hi", run_server=False)
+"""
+    )
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "x"\nversion = "0.1.0"\n'
+    )
+    deploy_kwargs = _patch_provider_and_run(
+        monkeypatch,
+        ["bindu", "deploy", str(script), "--runtime=boxd"],
+    )
+    # script is rooted at the project (where pyproject.toml lives), with the
+    # relative subdir preserved — VM will run python3 agents/echo.py.
+    assert deploy_kwargs["script"] == "agents/echo.py"
+    assert deploy_kwargs["source_dir"] == tmp_path.resolve()
+
+
+def test_dry_run_skips_provider_call(monkeypatch, tmp_path, capsys):
+    """--dry-run prints a plan and never calls provider.deploy."""
+    script = _make_agent_script(tmp_path, name="dryagent")
+
+    from bindu import cli as cli_mod
+
+    deploy_called = {"yes": False}
+
+    async def fake_deploy(**kwargs):
+        deploy_called["yes"] = True
+
+    fake_provider = MagicMock()
+    fake_provider.deploy = fake_deploy
+    import bindu.runtime as br
+
+    monkeypatch.setattr(br, "get_provider", lambda name: fake_provider)
+    monkeypatch.setattr(
+        sys, "argv", ["bindu", "deploy", str(script), "--runtime=boxd", "--dry-run"]
+    )
+    cli_mod.main()
+    out = capsys.readouterr().out
+
+    assert deploy_called["yes"] is False
+    assert "DRY RUN" in out
+    assert "dryagent" in out
+    assert "agent.py" in out
+    assert "boxd" in out
+
+
+def test_dry_run_warns_about_sensitive_files(monkeypatch, tmp_path, capsys):
+    """A dropped .env / *.pem is reported with relative path + injection hint."""
+    script = _make_agent_script(tmp_path, name="leaky")
+    (tmp_path / ".env").write_text("OPENAI_API_KEY=sk-leak\n")
+    (tmp_path / "server.pem").write_text("-----BEGIN PRIVATE KEY-----\n")
+
+    from bindu import cli as cli_mod
+
+    fake_provider = MagicMock()
+
+    async def never(**kwargs):
+        raise AssertionError("provider.deploy should not be called in dry-run")
+
+    fake_provider.deploy = never
+    import bindu.runtime as br
+
+    monkeypatch.setattr(br, "get_provider", lambda name: fake_provider)
+    monkeypatch.setattr(
+        sys, "argv", ["bindu", "deploy", str(script), "--runtime=boxd", "--dry-run"]
+    )
+    cli_mod.main()
+    out = capsys.readouterr().out
+
+    assert ".env" in out
+    assert "server.pem" in out
+    assert "--env" in out  # injection hint
+
+
+def test_warns_on_real_deploy_when_secrets_present(monkeypatch, tmp_path, capsys):
+    """Even in non-dry-run mode, emit a stderr warning if secrets were dropped."""
+    script = _make_agent_script(tmp_path, name="leaky2")
+    (tmp_path / ".env").write_text("OPENAI_API_KEY=sk-leak\n")
+    _patch_provider_and_run(
+        monkeypatch,
+        ["bindu", "deploy", str(script), "--runtime=boxd"],
+    )
+    err = capsys.readouterr().err
+    assert "sensitive" in err
+    assert "--env" in err
+
+
 def test_capture_sentinel_format(monkeypatch, tmp_path):
     """The JSON dumped by bindufy() in capture mode has the expected shape."""
     from bindu.cli import _capture_agent_metadata
