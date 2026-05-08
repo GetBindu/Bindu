@@ -212,7 +212,9 @@ class X402Middleware(BaseHTTPMiddleware):
 
         except Exception as e:
             logger.warning(f"Error parsing request body: {e}")
-            return await call_next(request)
+            return JSONResponse(
+                content={"error": "Invalid JSON in request body"}, status_code=400
+            )
 
         # Check for X-PAYMENT header
         payment_header = request.headers.get("X-PAYMENT", "")
