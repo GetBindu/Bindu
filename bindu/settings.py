@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 from pydantic import Field, computed_field, BaseModel, HttpUrl, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import AliasChoices
-from typing import Literal
+from typing import ClassVar, Literal
 
 
 class ProjectSettings(BaseSettings):
@@ -284,6 +284,10 @@ class ObservabilitySettings(BaseSettings):
 class X402Settings(BaseSettings):
     """x402 payments configuration settings."""
 
+    SKALE_SUPPORTED_NETWORKS: ClassVar[frozenset[str]] = frozenset(
+        {"eip155:2046399126", "skale-europa"}
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_prefix="X402__",
@@ -381,8 +385,7 @@ class X402Settings(BaseSettings):
     @classmethod
     def validate_skale_network(cls, value: str) -> str:
         """Validate the SKALE network identifier against supported mappings."""
-        supported_networks = {"eip155:2046399126", "skale-europa"}
-        if value not in supported_networks:
+        if value not in cls.SKALE_SUPPORTED_NETWORKS:
             raise ValueError(
                 "skale_network must be one of: eip155:2046399126, skale-europa"
             )
