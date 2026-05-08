@@ -6,7 +6,14 @@ This module defines the configuration settings for the application using pydanti
 import re
 from urllib.parse import urlparse
 
-from pydantic import Field, computed_field, BaseModel, HttpUrl, field_validator
+from pydantic import (
+    Field,
+    computed_field,
+    BaseModel,
+    HttpUrl,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import AliasChoices
 from typing import ClassVar, Literal
@@ -413,6 +420,22 @@ class X402Settings(BaseSettings):
         if len(cleaned) > 100:
             raise ValueError("skale_payment_token_name must be 100 characters or fewer")
         return cleaned
+
+    @model_validator(mode="after")
+    def validate_skale_network_mappings(self) -> "X402Settings":
+        """Ensure SKALE allowlist and RPC mappings stay in sync."""
+        missing = sorted(
+            network
+            for network in self.SKALE_SUPPORTED_NETWORKS
+            if network not in self.rpc_urls_by_network
+            or not self.rpc_urls_by_network[network]
+        )
+        if missing:
+            raise ValueError(
+                "Missing RPC URL mappings for SKALE networks: "
+                + ", ".join(missing)
+            )
+        return self
 
 
 class AgentSettings(BaseSettings):
