@@ -1317,6 +1317,84 @@ class AgentTrust(TypedDict):
 
 
 # -----------------------------------------------------------------------------
+# Certificate Lifecycle Types (mTLS) <NotPartOfA2A>
+# -----------------------------------------------------------------------------
+
+
+@pydantic.with_config(ConfigDict(alias_generator=to_camel))
+class CertificateIssueParams(TypedDict):
+    """Parameters for issuing a new mTLS certificate for an agent."""
+
+    agent_did: Required[str]
+    """The DID of the agent requesting the certificate."""
+
+    csr: Required[str]
+    """PEM-encoded Certificate Signing Request."""
+
+
+@pydantic.with_config(ConfigDict(alias_generator=to_camel))
+class CertificateRenewParams(TypedDict):
+    """Parameters for renewing an existing mTLS certificate."""
+
+    agent_did: Required[str]
+    """The DID of the agent renewing the certificate."""
+
+    csr: Required[str]
+    """PEM-encoded Certificate Signing Request for the new certificate."""
+
+    current_fingerprint: Required[str]
+    """SHA-256 fingerprint of the currently active certificate."""
+
+
+@pydantic.with_config(ConfigDict(alias_generator=to_camel))
+class CertificateRevokeParams(TypedDict):
+    """Parameters for revoking an mTLS certificate."""
+
+    agent_did: Required[str]
+    """The DID of the agent whose certificate is being revoked."""
+
+    cert_fingerprint: Required[str]
+    """SHA-256 fingerprint of the certificate to revoke."""
+
+    reason: NotRequired[str]
+    """Optional reason for revocation (for audit log)."""
+
+
+@pydantic.with_config(ConfigDict(alias_generator=to_camel))
+class CertificateData(TypedDict):
+    """Response data after a certificate is issued or renewed."""
+
+    certificate_pem: Required[str]
+    """PEM-encoded signed certificate."""
+
+    cert_fingerprint: Required[str]
+    """SHA-256 fingerprint of the issued certificate."""
+
+    status: Required[Literal["issued", "active", "revoked", "expired"]]
+    """Current lifecycle status of the certificate."""
+
+    issued_at: Required[str]
+    """ISO 8601 timestamp of issuance."""
+
+    expires_at: Required[str]
+    """ISO 8601 timestamp of expiry."""
+
+    agent_did: Required[str]
+    """The DID this certificate is bound to."""
+
+
+cert_issue_params_ta: TypeAdapter[CertificateIssueParams] = TypeAdapter(
+    CertificateIssueParams
+)
+cert_renew_params_ta: TypeAdapter[CertificateRenewParams] = TypeAdapter(
+    CertificateRenewParams
+)
+cert_revoke_params_ta: TypeAdapter[CertificateRevokeParams] = TypeAdapter(
+    CertificateRevokeParams
+)
+cert_data_ta: TypeAdapter[CertificateData] = TypeAdapter(CertificateData)
+
+# -----------------------------------------------------------------------------
 # Agent
 # -----------------------------------------------------------------------------
 

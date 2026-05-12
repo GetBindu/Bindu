@@ -208,6 +208,7 @@ bindu/penguin/.bindu/public.pem
 .claude/worktrees/
 
 postman/*
+AI-Agents/
 node_modules/
 **/node_modules/
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, is_dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from starlette.requests import Request
 from starlette.responses import Response, StreamingResponse
@@ -15,7 +15,6 @@ from bindu.common.protocol.types import (
     a2a_request_ta,
     a2a_response_ta,
 )
-from bindu.server.applications import BinduApplication
 from bindu.settings import app_settings
 from bindu.utils.logging import get_logger
 from .utils import (
@@ -30,6 +29,9 @@ from bindu.extensions.x402.extension import (
 )
 
 logger = get_logger("bindu.server.endpoints.a2a_protocol")
+
+if TYPE_CHECKING:
+    from bindu.server.applications import BinduApplication
 
 
 def _attach_payment_context(request: Request, a2a_request: Any, method: str) -> None:

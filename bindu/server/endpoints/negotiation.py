@@ -15,12 +15,11 @@ based on skills, performance, load, and pricing constraints.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-from bindu.server.applications import BinduApplication
 from bindu.server.negotiation.capability_calculator import (
     CapabilityCalculator,
     ScoringWeights,
@@ -33,6 +32,9 @@ from .utils import (
 )
 from bindu.utils.logging import get_logger
 from bindu.utils.capabilities import get_x402_extension_from_capabilities
+
+if TYPE_CHECKING:
+    from bindu.server.applications import BinduApplication
 from bindu.settings import app_settings
 
 logger = get_logger("bindu.server.endpoints.negotiation")

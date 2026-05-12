@@ -239,3 +239,75 @@ def drop_all_tables(engine):
         This is a destructive operation. Use with caution!
     """
     metadata.drop_all(engine)
+
+
+# -----------------------------------------------------------------------------
+# Agent Certificates Table (mTLS)
+# -----------------------------------------------------------------------------
+
+agent_certificates_table = Table(
+    "agent_certificates",
+    metadata,
+    # Primary key
+    Column("id", PG_UUID(as_uuid=True), primary_key=True, nullable=False),
+    # Agent identity
+    Column("agent_did", String(255), nullable=False),
+    Column("cert_fingerprint", String(255), nullable=False, unique=True),
+    # Lifecycle
+    Column("status", String(50), nullable=False, default="active"),
+    Column(
+        "issued_at", TIMESTAMP(timezone=True), nullable=False, server_default=func.now()
+    ),
+    Column("expires_at", TIMESTAMP(timezone=True), nullable=False),
+    # Timestamps
+    Column(
+        "created_at",
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    ),
+    Column(
+        "updated_at",
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
+    # Indexes for zero-trust freshness checks
+    Index("idx_agent_certs_fingerprint", "cert_fingerprint"),
+    Index("idx_agent_certs_status", "status"),
+    Index("idx_agent_certs_agent_did", "agent_did"),
+    # Table comment
+    comment="mTLS agent certificates tied to DIDs",
+)
+
+# -----------------------------------------------------------------------------
+# Certificate Audit Log Table (mTLS)
+# -----------------------------------------------------------------------------
+
+certificate_audit_log_table = Table(
+    "certificate_audit_log",
+    metadata,
+    # Primary key
+    Column("id", PG_UUID(as_uuid=True), primary_key=True, nullable=False),
+    # What happened
+    Column("event_type", String(50), nullable=False),  # issued | renewed | revoked
+    Column("agent_did", String(255), nullable=False),
+    Column("cert_fingerprint", String(255), nullable=False),
+    # Who/when
+    Column("performed_by", String(255), nullable=True),  # DID or system
+    Column("event_data", JSONB, nullable=True, server_default=text("'{}'::jsonb")),
+    Column(
+        "created_at",
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    ),
+    # Indexes
+    Index("idx_cert_audit_agent_did", "agent_did"),
+    Index("idx_cert_audit_fingerprint", "cert_fingerprint"),
+    Index("idx_cert_audit_event_type", "event_type"),
+    Index("idx_cert_audit_created_at", "created_at"),
+    # Table comment
+    comment="Immutable audit log for certificate lifecycle events (SIEM)",
+)

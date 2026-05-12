@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from time import monotonic
+from typing import TYPE_CHECKING
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from bindu import __version__
-from bindu.server.applications import BinduApplication
 from .utils import handle_endpoint_errors, get_agent_did, get_runtime_status
 from bindu.utils.logging import get_logger
 
@@ -20,6 +20,9 @@ import sys
 logger = get_logger("bindu.server.endpoints.health")
 
 _start_time = monotonic()
+
+if TYPE_CHECKING:
+    from bindu.server.applications import BinduApplication
 
 
 def _build_health_payload(
@@ -88,3 +91,12 @@ async def health_endpoint(app: BinduApplication, request: Request) -> JSONRespon
 
     status_code = 200 if runtime["strict_ready"] else 503
     return JSONResponse(payload, status_code=status_code)
+
+
+@handle_endpoint_errors("healthz check")
+async def healthz_endpoint(app: BinduApplication, request: Request) -> JSONResponse:
+    """Strict readiness endpoint for Kubernetes probes.
+
+    Returns HTTP 200 when all components are ready and HTTP 503 otherwise.
+    """
+    return await health_endpoint(app, request)

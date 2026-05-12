@@ -6,11 +6,12 @@ intelligent agent selection and routing decisions.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import JSONResponse, Response
 
 from bindu.common.protocol.types import SkillNotFoundError
-from bindu.server.applications import BinduApplication
 from bindu.utils.logging import get_logger
 from .utils import (
     create_response_with_x402,
@@ -23,6 +24,9 @@ from .utils import (
 )
 
 logger = get_logger("bindu.server.endpoints.skills")
+
+if TYPE_CHECKING:
+    from bindu.server.applications import BinduApplication
 
 
 @handle_endpoint_errors("skills list")
@@ -38,6 +42,12 @@ async def skills_list_endpoint(app: BinduApplication, request: Request) -> Respo
     error_resp = validate_manifest(app)
     if error_resp:
         return error_resp
+
+    if not app.manifest:
+        return JSONResponse(
+            content={"error": "Manifest not available"},
+            status_code=500,
+        )
 
     # Get skills from manifest
     skills = app.manifest.skills or []

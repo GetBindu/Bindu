@@ -985,47 +985,54 @@ class GrpcSettings(BaseSettings):
         extra="allow",
     )
 
-    # Enable/disable gRPC adapter server
     enabled: bool = Field(
         default=False,
         description="Enable gRPC server for language-agnostic SDK support",
     )
 
-    # gRPC server bind address
     host: str = Field(
         default="0.0.0.0",
         description="Host to bind the gRPC server to",
     )
 
-    # gRPC server port (separate from HTTP port 3773)
     port: int = Field(
         default=3774,
         description="Port for the gRPC server (default: 3774)",
     )
 
-    # Thread pool size for gRPC server
     max_workers: int = Field(
         default=10,
         description="Maximum number of gRPC server worker threads",
     )
 
-    # Maximum message size (4MB default)
     max_message_length: int = Field(
         default=4 * 1024 * 1024,
         description="Maximum gRPC message size in bytes (default: 4MB)",
     )
 
-    # Timeout for HandleMessages calls to SDK (seconds)
     handler_timeout: float = Field(
         default=30.0,
         description="Timeout in seconds for calling SDK's HandleMessages",
     )
 
-    # Health check interval for registered agents (seconds)
     health_check_interval: int = Field(
         default=30,
         description="Interval in seconds for health checking registered agents",
     )
+
+
+class MTLSSettings(BaseSettings):
+    """mTLS certificate lifecycle configuration settings."""
+
+    model_config = SettingsConfigDict(
+        env_prefix="BINDU_MTLS_",
+        env_file=".env",
+        extra="ignore",
+    )
+
+    enabled: bool = False
+    cert_ttl_hours: int = 24
+    certs_dir: str = "~/.bindu/certs"
 
 
 class Settings(BaseSettings):
@@ -1056,6 +1063,7 @@ class Settings(BaseSettings):
     negotiation: NegotiationSettings = NegotiationSettings()
     sentry: SentrySettings = SentrySettings()
     grpc: GrpcSettings = GrpcSettings()
+    mtls: MTLSSettings = MTLSSettings()
 
 
 app_settings = Settings()
