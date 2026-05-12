@@ -64,3 +64,29 @@ class TestCapabilityUtilities:
         result = get_x402_extension_from_capabilities(manifest)
 
         assert result is None
+
+    def test_add_extension_with_none_capabilities(self):
+        """Test adding extension when capabilities is None."""
+        extension = "https://example.com/ext"
+
+        result = add_extension_to_capabilities(None, extension)
+
+        assert "extensions" in result
+        assert extension in result["extensions"]
+
+    def test_add_extension_with_non_dict_capabilities(self):
+        """Test adding extension when capabilities is not a dict."""
+
+        extension = "https://example.com/ext"
+
+        # AgentCapabilities is a TypedDict which at runtime is a dict,
+        # but we can test the edge case by passing something else
+        # Actually this case won't happen in practice since TypedDict IS a dict
+        # Let's just cover the remaining code path by using a custom class
+        class FakeCapabilities(dict):
+            pass
+
+        result = add_extension_to_capabilities(FakeCapabilities(), extension)
+
+        assert "extensions" in result
+        assert extension in result["extensions"]

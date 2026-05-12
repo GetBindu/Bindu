@@ -70,7 +70,7 @@ class FileInterceptor:
                 processed_parts.append(
                     {
                         "kind": "text",
-                        "text": f"[Unsupported file type: {mime_type}]",
+                        "text": f"[System: User uploaded an unsupported file format ({mime_type})]",
                     }
                 )
                 continue

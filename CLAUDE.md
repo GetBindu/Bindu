@@ -364,6 +364,7 @@ bindu/
 **Last Updated**: 2026-03-30
 **Maintainer**: Bindu Team
 **Questions?** Check docs/ or open an issue on GitHub
+**Questions?** Check docs/ or open an issue on GitHub
 
 # CLAUDE.md - Full Content
 

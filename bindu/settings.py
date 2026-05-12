@@ -359,6 +359,8 @@ class AgentSettings(BaseSettings):
         "message/stream": "stream_message",
         "tasks/get": "get_task",
         "tasks/cancel": "cancel_task",
+        "tasks/pause": "pause_task",
+        "tasks/resume": "resume_task",
         "tasks/list": "list_tasks",
         "contexts/list": "list_contexts",
         "contexts/clear": "clear_context",
@@ -378,6 +380,8 @@ class AgentSettings(BaseSettings):
             "working",  # Agent actively processing
             "input-required",  # Waiting for user input
             "auth-required",  # Waiting for authentication
+            "suspended",  # Task paused (pause/resume feature)
+            "resumed",  # Task resumed and re-queued
         }
     )
 
