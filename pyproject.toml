@@ -31,7 +31,7 @@ dependencies = [
     "pyyaml>=6.0.2,<7",
     "requests>=2.32.3,<3",
     "tenacity>=9.1.4,<10",
-    "pynacl==1.5.0",
+    "pynacl>=1.6.2,<2",
     "numpy>=2.3.5,<3",
     #Native File Handling
     "pypdf>=6.10.2,<7",
@@ -46,7 +46,7 @@ dependencies = [
     "sentry-sdk>=2.41.0,<3",
     # x402 payments
     "x402==0.2.1",
-    "web3==7.13.0",
+    "web3>=7.15.0,<8",
     "eth-account==0.13.7",
     "cdp-sdk>=1.45.0,<2",
     # Database storage
@@ -116,7 +116,7 @@ core = [
     "pyyaml>=6.0.2,<7",
     "requests>=2.32.3,<3",
     "tenacity>=9.1.4,<10",
-    "pynacl==1.5.0",
+    "pynacl>=1.6.2,<2",
 ]
 
 [project.scripts]

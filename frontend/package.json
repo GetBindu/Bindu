@@ -83,7 +83,7 @@
 		"highlight.js": "^11.7.0",
 		"htmlparser2": "^10.0.0",
 		"husky": "^9.0.11",
-		"ip-address": "^9.0.5",
+		"ip-address": "^10.1.1",
 		"jsdom": "^22.0.0",
 		"json5": "^2.2.3",
 		"katex": "^0.16.21",
@@ -109,6 +109,10 @@
 		"zod": "^3.22.3"
 	},
 	"overrides": {
-		"@reflink/reflink": "file:stub/@reflink/reflink"
+		"@reflink/reflink": "file:stub/@reflink/reflink",
+		"cookie": "^0.7.0",
+		"@typescript-eslint/typescript-estree": {
+			"minimatch": "^9.0.7"
+		}
 	}
 }
