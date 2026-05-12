@@ -1,187 +1,169 @@
-# Payment Integration (X402)
+# Charging for your agent
 
-Bindu supports the **X402 payment protocol**, enabling you to monetize your AI agents by requiring cryptocurrency payments before executing specific methods. This allows you to build paid AI services with native blockchain payment integration.
+You built something useful. People want to use it. Running it costs you
+real money — LLM tokens, compute, maybe a paid API behind the scenes —
+and you'd like callers to chip in before the agent does the work.
 
-## How It Works
+That's what this page is about. Bindu plugs into a payment protocol
+called [x402](https://github.com/coinbase/x402), which lets you say
+*"this method costs 0.01 USDC; pay first, then I'll run it"*. Callers
+sign a one-shot authorization with their wallet, the payment settles on
+a blockchain, and your agent runs only when the money has changed hands.
+You don't deal with the chain directly — Bindu and a separate piece
+called a *facilitator* handle that — but understanding the shape of
+the flow will save you a lot of head-scratching when something doesn't
+work, so let's walk through it.
+
+## The five-second picture
 
 ```mermaid
 sequenceDiagram
-    participant User
-    participant Agent
-    participant Blockchain
-    participant Wallet
+    participant Caller
+    participant Agent as Your Agent (Bindu)
+    participant Facilitator as Facilitator (verifier + settler)
+    participant Chain as Blockchain
 
-    Note over User,Agent: 1. Start Payment Session
-    User->>Agent: POST /api/start-payment-session
-    Agent->>Agent: Create session (15 min expiry)
-    Agent-->>User: {session_id, browser_url}
+    Caller->>Agent: 1. Send a request (no payment yet)
+    Agent-->>Caller: 402 — "here's what I cost"
 
-    Note over User,Wallet: 2. Complete Payment in Browser
-    User->>Agent: Open browser_url
-    Agent-->>User: Show paywall UI
-    User->>Wallet: Connect wallet (MetaMask/Coinbase)
-    Wallet-->>User: Wallet connected
-    User->>Wallet: Approve transaction
-    Wallet->>Blockchain: Submit USDC transfer
-    Blockchain-->>Wallet: Transaction confirmed
-    Wallet->>Agent: Send X-PAYMENT header<br/>(signed transaction)
-    Agent->>Agent: Store payment in session
+    Note over Caller: Caller signs a payment<br/>authorization with their wallet
 
-    Note over User,Agent: 3. Verify Payment
-    User->>Agent: GET /api/payment-status/{session_id}
-    Agent->>Agent: Check session status
-    Agent-->>User: {status: completed, payment_token}
-
-    Note over User,Agent: 4. Use Protected Method
-    User->>Agent: POST / (JSON-RPC)<br/>X-Payment-Token: {token}
-    Agent->>Agent: Validate payment token
-    Agent->>Blockchain: Verify transaction on-chain<br/>(balance, signature)
-    Blockchain-->>Agent: Valid
-    Agent->>Agent: Execute protected method
-    Agent-->>User: Response
+    Caller->>Agent: 2. Resend the request<br/>with X-PAYMENT header
+    Agent->>Facilitator: "Is this payment good?"
+    Facilitator->>Chain: Check signature + balance
+    Facilitator-->>Agent: ✓ valid
+    Agent->>Agent: Run the handler
+    Agent->>Facilitator: "Please settle it"
+    Facilitator->>Chain: Move USDC on-chain
+    Facilitator-->>Agent: ✓ settled (receipt)
+    Agent-->>Caller: 3. Result + payment receipt
 ```
 
-## Configuration
+Four moving parts, three trips:
 
-Add the `execution_cost` configuration to your agent config to enable payment gating.
+1. **Caller** — anything that can speak HTTP. A script, another agent, a browser.
+2. **Your agent** — runs on top of Bindu. It's the gatekeeper: it tells callers what it costs, accepts proof of payment, then runs the actual work.
+3. **The facilitator** — a separate service Bindu talks to. The facilitator is the one that actually reads the signature, checks the chain, and broadcasts the transfer. Bindu doesn't speak to the blockchain directly; it speaks to the facilitator and trusts its yes/no answer. *We'll talk about which facilitator to use further down.*
+4. **The blockchain** — where the USDC actually moves. From Bindu's point of view this is the facilitator's problem; you only care that the receipt comes back.
 
-### Single payment option (existing behavior)
+That's the whole mental model. The rest of this doc is about the dials you turn, the things you'll see on the wire, and how to spot trouble when things misbehave.
+
+## Turning payments on — the smallest possible config
+
+Add one block to your agent config. Pick a network, an amount, and an address you want the money to land in.
 
 ```python
 config = {
-    "author": "your.email@example.com",
+    "author": "you@example.com",
     "name": "paid_agent",
-    "description": "An agent that requires payment",
+    "description": "An agent that earns its keep.",
     "deployment": {"url": "http://localhost:3773", "expose": True},
+
+    # ← The whole "I cost money" surface lives in this block.
     "execution_cost": {
-        "amount": "$0.0001",           # Amount in USD (will be converted to USDC)
-        "token": "USDC",                # Token type (USDC supported)
-        "network": "base-sepolia",      # Network (base-sepolia for testing, base for production)
-        "pay_to_address": "0x265<your-wallet-address>",  # Your wallet address
-        "protected_methods": [
-            "message/send"              # Methods that require payment
-        ]
-    }
+        "amount": "0.01",                  # 1 cent per call. Use a string, not float.
+        "token": "USDC",                   # USDC is what's supported today.
+        "network": "base-sepolia",         # Base's testnet — perfect for learning.
+        "pay_to_address": "0xYourWallet",  # Where the money lands.
+    },
 }
 ```
 
-### Multiple payment options (new behavior)
+Once that's in place, any caller hitting your agent without payment gets a 402 response describing exactly what's required: which network, which token, which amount, and where to send it. They sign a one-shot authorization with their wallet, retry with that authorization in the `X-PAYMENT` header, and now the request actually runs.
 
-You can now provide **multiple** payment options. The agent will advertise all options
-to the client, and any one of them can satisfy the requirement. For example:
+> **About the network.** `base-sepolia` is Base's testnet — fake money, fake gas, perfect for experimenting. When you're ready for real revenue, change it to `base`. Don't ship to `base` until you're sure you actually want to charge people on the live chain.
+
+## Charging more than one way
+
+Sometimes you want options — maybe you'll take USDC on Base, OR a small amount of ETH on Ethereum mainnet for users who don't want to bridge. Make `execution_cost` a list instead of a single dict:
 
 ```python
-config = {
-    "author": "your.email@example.com",
-    "name": "paid_agent",
-    "description": "An agent that requires payment",
-    "deployment": {"url": "http://localhost:3773", "expose": True},
-    "execution_cost": [
-        {
-            "amount": "0.1",              # 0.1 USDC on Base
-            "token": "USDC",
-            "network": "base",
-            "pay_to_address": "0xYourWalletAddressHere",
-        },
-        {
-            "amount": "0.0001",           # 0.0001 ETH on Ethereum mainnet
-            "token": "ETH",
-            "network": "ethereum",
-            "pay_to_address": "0xYourWalletAddressHere",
-        },
-    ],
-}
+"execution_cost": [
+    {
+        "amount": "0.1",
+        "token": "USDC",
+        "network": "base",
+        "pay_to_address": "0xYourWallet",
+    },
+    {
+        "amount": "0.0001",
+        "token": "ETH",
+        "network": "ethereum",
+        "pay_to_address": "0xYourWallet",
+    },
+],
 ```
 
-In this configuration, callers can pay **either** 0.1 USDC on Base **or** 0.0001 ETH
-on Ethereum to access the protected methods.
+When a caller is unpaid, your agent's 402 response includes both options and they pick one. Same code, just more flexibility for the caller.
 
-### Reaching networks beyond Base — SKALE as the worked example
+## Going beyond Base (SKALE, Polygon, anything else)
 
-The x402 v2 SDK ships built-in pricing for Base mainnet and Base Sepolia only.
-For any other EVM chain — SKALE, Polygon, Avalanche, Ethereum mainnet, etc. —
-two pieces have to line up:
+Out of the box, Bindu's underlying x402 library only knows about Base mainnet and Base Sepolia. That's because Base is where Coinbase runs the default facilitator, and the SDK ships the asset info for Base USDC baked in.
 
-1. **A facilitator that supports the chain.** The facilitator runs the
-   on-chain verification and settlement step. Coinbase's default
-   facilitator (`https://x402.org/facilitator`) supports Base and a handful
-   of non-EVM chains only — it does **not** know SKALE today. To reach
-   SKALE you must point Bindu at a facilitator that does (see [Live
-   facilitator support](#live-facilitator-support) below).
+To accept payment on *any other* EVM chain — SKALE, Polygon, Avalanche, Ethereum mainnet — two things have to be true at the same time:
 
-2. **An entry in `extra_networks`.** Bindu's `X402Settings.extra_networks`
-   lets you register the asset metadata for any EVM chain the facilitator
-   you chose advertises. Each entry teaches Bindu how to convert a price
-   like `"0.01"` into atomic units of the right ERC-20 contract on that
-   chain.
+1. **You point your agent at a facilitator that knows the chain.** Different facilitators support different chains. Coinbase's default (`https://x402.org/facilitator`) does Base and a handful of non-EVM things. If you want SKALE, you need a SKALE-aware facilitator.
 
-The default config already ships one example so the shape is visible:
+2. **Your agent knows what the USDC contract is on that chain.** Each chain has a different address for the bridged USDC token. Bindu has a config slot called `extra_networks` where you (or we, in the defaults) declare it.
+
+Here's what the SKALE Europa Hub entry looks like — and it ships in the defaults, so you can copy it as a template for any other chain:
 
 ```python
 # bindu/settings.py
 extra_networks = {
     "skale-europa": ExtraNetwork(
-        caip2="eip155:1187947933",
-        asset="0x85889c8c714505E0c94b30fcfcF64fE3Ac8FCb20",
-        asset_name="Bridged USDC (SKALE Bridge)",
-        asset_decimals=6,
-        asset_eip712_version="2",
+        caip2="eip155:1187947933",                              # Chain ID, in CAIP-2 form
+        asset="0x85889c8c714505E0c94b30fcfcF64fE3Ac8FCb20",     # USDC contract on this chain
+        asset_name="Bridged USDC (SKALE Bridge)",               # Required for EIP-712 signing
+        asset_decimals=6,                                        # USDC uses 6 decimals
+        asset_eip712_version="2",                                # Token contract's domain version
     ),
 }
 ```
 
-With that registered, your agent can use the friendly slug in
-`execution_cost`:
+With that registered, you can use the friendly slug in your agent config — Bindu translates it to the right chain ID and asset under the hood:
 
 ```python
-config = {
-    "execution_cost": [
-        {
-            "amount": "0.01",
-            "token": "USDC",
-            "network": "skale-europa",   # → eip155:1187947933 downstream
-            "pay_to_address": "0xYourSKALEAddress",
-        }
-    ],
-    ...
-}
+"execution_cost": [
+    {
+        "amount": "0.01",
+        "token": "USDC",
+        "network": "skale-europa",   # Bindu knows what this means now
+        "pay_to_address": "0xYourSKALEWallet",
+    }
+],
 ```
 
-The same pattern adds Polygon, Avalanche, Ethereum mainnet, or any other
-EVM chain — copy the `ExtraNetwork` block and fill in the chain's CAIP-2
-+ USDC contract.
+Same shape works for any other EVM chain — just add another entry to `extra_networks` with the chain's CAIP-2 string and its USDC contract address.
 
-#### Live facilitator support
+### Which facilitator can I use?
 
-| Facilitator | Networks | Notes |
+| Facilitator | Networks it supports | Notes |
 |---|---|---|
-| `https://x402.org/facilitator` (default) | Base, Solana, Algorand, Aptos, Stellar | Coinbase-operated. **No SKALE.** |
-| `https://facilitator.x402.fi` | Base, Polygon, Ethereum, Avalanche, **5 SKALE chains** (Europa, Calypso, Nebula variants), Solana | Multi-chain; cert is currently expired (see [`bugs/known-issues.md`](../bugs/known-issues.md)). |
+| `https://x402.org/facilitator` *(default)* | Base, Solana, Algorand, Aptos, Stellar | Coinbase-operated. Solid. Doesn't know SKALE. |
+| `https://facilitator.x402.fi` | Base + Polygon + Ethereum + Avalanche + **5 SKALE chains** + Solana | Run by the x402.fi team. Currently has an expired TLS cert — see [`bugs/known-issues.md`](../bugs/known-issues.md) before using in production. |
 
-To switch your agent to a SKALE-aware facilitator, set
-`X402__FACILITATOR_URL=https://facilitator.x402.fi` in your environment
-(or override `app_settings.x402.facilitator_url` in code).
+To swap, set an environment variable:
 
-> **Production caveat.** The only SKALE-aware facilitator we've verified
-> at the time of writing has an expired TLS certificate. Production
-> deployments should not silently accept that — either wait for the
-> operator to rotate the cert, or run your own facilitator instance.
-> The shipped configuration assumes Base (the validated default).
+```bash
+export X402__FACILITATOR_URL=https://facilitator.x402.fi
+```
 
-## End-to-end walkthrough with a local mock facilitator
+That's it — Bindu picks it up at startup. For production though, please read the next box before you ship.
 
-The fastest way to see the full paywall flow — including the **success
-path** with handler execution and settlement receipts — is to run a
-local mock facilitator. The mock returns `isValid: true` for every
-verify call and a fake transaction hash for every settle call, so you
-can exercise the Bindu side without a wallet, an RPC node, or any real
-on-chain activity. Use only for dev / smoke / CI.
+> **Production caveat.** The only public facilitator that supports SKALE today has an expired TLS certificate. That's not a Bindu problem; it's an operational issue on their end. Until they rotate the cert, "SKALE in production" really means "run your own facilitator". The defaults still point at Coinbase, which is what we recommend until your SKALE story is solid.
 
-This walkthrough is what produced the recorded smoke in
-`tests/integration/x402/test_skale_facilitator_supported.py` plus the
-manual demo against a configurable network.
+## Watching it work — end-to-end, on your laptop, in five minutes
 
-### Step 1 — write the mock facilitator (`mock_facilitator.py`)
+Here's the most useful thing you can do to understand how this whole flow hangs together: run it locally with a fake facilitator that always says yes. No wallet, no real money, no blockchain — just your agent, a stub facilitator, and curl.
+
+We'll do it in three small files. Open three terminals.
+
+### Step 1 — a fake facilitator
+
+This is a tiny HTTP server that pretends to be the facilitator. It implements the three endpoints Bindu actually calls — `/supported`, `/verify`, `/settle` — and just returns "yes, that payment is good" for any input. Useful for development; **never use it in production.**
+
+Save as `mock_facilitator.py`:
 
 ```python
 """Local mock x402 facilitator. Always says yes."""
@@ -193,6 +175,7 @@ from starlette.routing import Route
 
 
 async def supported(request: Request) -> JSONResponse:
+    # Tell Bindu which chains we 'support'.
     return JSONResponse({
         "kinds": [
             {"x402Version": 2, "scheme": "exact", "network": "eip155:1187947933"},  # SKALE
@@ -204,12 +187,15 @@ async def supported(request: Request) -> JSONResponse:
 
 
 async def verify(request: Request) -> JSONResponse:
+    # Real facilitators check the signature + balance here. We just say yes.
     body = await request.json()
     payer = body["paymentPayload"]["payload"]["authorization"]["from"]
     return JSONResponse({"isValid": True, "invalidReason": None, "payer": payer})
 
 
 async def settle(request: Request) -> JSONResponse:
+    # Real facilitators broadcast a transfer transaction here.
+    # We return a made-up transaction hash.
     body = await request.json()
     payer = body["paymentPayload"]["payload"]["authorization"]["from"]
     return JSONResponse({
@@ -227,17 +213,20 @@ app = Starlette(routes=[
     Route("/settle", settle, methods=["POST"]),
 ])
 
-
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=3775, log_level="warning")
 ```
 
-Start it: `python mock_facilitator.py`.
+Run it: `python mock_facilitator.py`. You should see uvicorn listening on port 3775.
 
-### Step 2 — write a Bindu agent pointed at it (`success_agent.py`)
+### Step 2 — an agent that points at it
+
+Save as `success_agent.py`. The handler just echoes back what the caller sent — the whole point is to see whether payment gating actually works, not to do anything fancy.
 
 ```python
 import os
+
+# Tell Bindu to use our fake facilitator instead of Coinbase's.
 os.environ["X402__FACILITATOR_URL"] = "http://127.0.0.1:3775"
 
 from bindu.penguin.bindufy import bindufy
@@ -252,12 +241,12 @@ bindufy(
     {
         "author": "demo@example.com",
         "name": "success_agent",
-        "description": "Agent for the SKALE success-path demo.",
+        "description": "Demo agent — paid work behind a paywall.",
         "deployment": {"url": "http://localhost:3773", "expose": False},
         "execution_cost": {
             "amount": "0.01",
             "token": "USDC",
-            "network": "skale-europa",   # → eip155:1187947933 via extra_networks
+            "network": "skale-europa",
             "pay_to_address": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
         },
         "skills": [],
@@ -268,17 +257,13 @@ bindufy(
 )
 ```
 
-Start it: `python success_agent.py`. The agent will call the mock
-facilitator's `/supported` during boot, register the SKALE scheme, and
-come up listening on `http://localhost:3773`.
+Run it: `python success_agent.py`. You'll see the agent boot, ask the fake facilitator what it supports, and start listening on port 3773.
 
-### Step 3 — exercise every paywall path
+### Step 3 — try every path
 
-The five subsections below correspond to the five branches in
-`X402Middleware.dispatch`. Run each `curl` against the live agent to
-see exactly the JSON it returns.
+Now you have a live setup. Let's walk through what each kind of request looks like — both the failures (which are the safety net you actually want) and the success (which is what you're trying to get to).
 
-#### 3a. Unpaid request → 402 with PaymentRequirements
+#### "I forgot to pay"
 
 ```bash
 curl -s -X POST http://localhost:3773/ -H 'Content-Type: application/json' \
@@ -291,7 +276,7 @@ curl -s -X POST http://localhost:3773/ -H 'Content-Type: application/json' \
       "taskId":"'"$(uuidgen)"'"}}}'
 ```
 
-Returns **HTTP 402** with a v2 `PaymentRequired` envelope:
+You get back **HTTP 402** with a body that tells you exactly what to do:
 
 ```json
 {
@@ -307,33 +292,27 @@ Returns **HTTP 402** with a v2 `PaymentRequired` envelope:
       "maxTimeoutSeconds": 60,
       "extra": {"name": "Bridged USDC (SKALE Bridge)", "version": "2"}
     }
-  ],
-  "agent": {"name": "success_agent", "did": "did:bindu:..."}
+  ]
 }
 ```
 
-Notice: the agent's friendly config (`network: "skale-europa"`,
-`amount: "0.01"`) is published over the wire as the CAIP-2 string,
-atomic amount (`0.01 × 10^6` = `10000`), and the right EIP-712 domain.
+Take a moment to look at what just happened. Your config said `"amount": "0.01"` and `"network": "skale-europa"`. On the wire that became `"amount": "10000"` (atomic units — 0.01 × one million, because USDC has 6 decimals) and `"network": "eip155:1187947933"` (the CAIP-2 chain identifier for SKALE Europa). That translation is the whole point of `extra_networks`.
 
-#### 3b. Malformed body → 402, request never reaches the agent
+#### "I sent garbage"
 
 ```bash
 printf '\xff\xfe garbage' | curl -s -X POST http://localhost:3773/ \
   -H 'Content-Type: application/json' --data-binary @-
 ```
 
-Returns `{"error": "Malformed JSON-RPC body"}` at HTTP 402. The
-historical `x402-middleware-fails-open-on-body-parse` bug (where a
-bad body skipped the payment check) is closed; the agent never sees
-the request.
+You get a 402 with `"error": "Malformed JSON-RPC body"`. The agent doesn't even try to run the handler — bad bodies get rejected before they can sneak past the payment check. (This used to be a bug where bad bodies snuck through unpaid; it's fixed now.)
 
-#### 3c. Replay → 402, no facilitator round-trip
+#### "I'm trying to pay with the same authorization twice" (replay attack)
 
-Build a syntactically-valid payment payload, send it twice with the
-same nonce:
+A payment authorization includes a random number called a nonce. If you reuse the same nonce, Bindu catches it and rejects:
 
 ```bash
+# Build a fake payment payload — same one for both calls
 NONCE="0x$(uuidgen | tr -d '-')$(uuidgen | tr -d '-')"
 PAYMENT=$(python3 -c "
 import base64, json
@@ -344,7 +323,9 @@ print(base64.b64encode(json.dumps({
         'authorization': {
             'from': '0x000000000000000000000000000000000000beef',
             'to':   '0x742d35Cc6634C0532925a3b844Bc454e4438f44e',
-            'value': '10000', 'validAfter': '0', 'validBefore': '9999999999',
+            'value': '10000',
+            'validAfter': '0',
+            'validBefore': '9999999999',
             'nonce': '$NONCE',
         },
     },
@@ -357,37 +338,30 @@ print(base64.b64encode(json.dumps({
     },
 }).encode()).decode())
 ")
-# First call — success (mock facilitator says isValid=true)
+
+# First call goes through (mock facilitator says yes)
 curl -s -X POST http://localhost:3773/ -H "X-PAYMENT: $PAYMENT" ...
-# Second call with same NONCE — replay rejected before facilitator is touched
+# Second call — same nonce — bounces
 curl -s -X POST http://localhost:3773/ -H "X-PAYMENT: $PAYMENT" ...
 ```
 
-Second call returns:
+The second call comes back with `"error": "Payment nonce already used (replay)"`. Bindu remembers the nonce and refuses to accept it twice. Notice that the facilitator wasn't even contacted the second time — we caught the replay before paying for an external round-trip.
 
-```json
-{"error": "Payment nonce already used (replay)"}
+This matters: without this check, an attacker who saw one valid payment could keep replaying it within its time window and get unlimited work for a single payment. Closed.
+
+#### "The facilitator doesn't know my chain"
+
+If you misconfigure — say, you point at the Coinbase facilitator but ask for SKALE — Bindu fails closed:
+
+```bash
+export X402__FACILITATOR_URL=https://x402.org/facilitator
 ```
 
-The nonce store catches it; the facilitator's `/verify` is not called
-a second time. This is the fix for `x402-no-replay-prevention`.
+Restart your agent and try a SKALE payment. You'll get 402 with `"error": "Payment verification failed"`. Coinbase's facilitator told Bindu "I don't know what `eip155:1187947933` is", and rather than guess or fall through, Bindu says no. **It's better to fail and say so than to accept work without verifying payment.**
 
-#### 3d. Forged signature, facilitator rejects → 402, agent does not run
+#### The happy path — paid request, real work
 
-Point the agent at the real Coinbase facilitator
-(`X402__FACILITATOR_URL=https://x402.org/facilitator`) and send the
-same payload as in 3c. Coinbase doesn't support SKALE, so verification
-raises `SchemeNotFoundError` and the middleware returns 402 with
-`error: "Payment verification failed"`. The handler does not execute
-(this is `x402-no-signature-verification` and
-`x402-balance-check-skipped-on-missing-contract-code` working
-together — the v2 facilitator is the trust boundary, and when it
-can't verify, we fail closed).
-
-#### 3e. Paid request → success, handler runs, receipt attached
-
-Same payload shape as 3c, fresh nonce, against the mock facilitator
-that always says yes:
+Same shape as the replay example, but with a fresh nonce. The fake facilitator says yes, the handler runs:
 
 ```bash
 TASK_ID=$(uuidgen)
@@ -403,16 +377,14 @@ curl -s -X POST http://localhost:3773/ \
       "taskId":"'"$TASK_ID"'"}}}'
 ```
 
-Returns **HTTP 200** with `state: submitted`. The handler runs
-asynchronously. Poll for completion:
+This returns **HTTP 200** with `"state": "submitted"`. The task is now running in the background. Poll for it to finish:
 
 ```bash
 curl -s -X POST http://localhost:3773/ -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","method":"tasks/get","id":"'"$(uuidgen)"'","params":{"taskId":"'"$TASK_ID"'"}}'
 ```
 
-After a moment, the task transitions to `completed` and the response
-carries:
+After a moment the state will be `"completed"`, and the response carries everything that happened:
 
 ```json
 {
@@ -440,217 +412,85 @@ carries:
 }
 ```
 
-What this proves end-to-end:
+Five things just happened here, and each leaves a trace you can verify:
 
-1. `X-PAYMENT` accepted (facilitator returned `isValid: true`)
-2. Nonce was claimed (would reject a replay; see 3c)
-3. Handler ran and emitted its artifact
-4. Worker called `/settle` on the facilitator; the success receipt is
-   attached under `metadata["x402.payment.receipts"]`
-5. Status flag `x402.payment.status: "payment-completed"` is set, so
-   downstream consumers can audit "did this task actually settle?"
-   without re-verifying signatures
+1. The payment was accepted (the facilitator said `isValid: true`).
+2. The nonce was claimed so it can't be replayed.
+3. Your handler actually ran (look at `artifacts[0].parts[0].text` — it's your agent's response).
+4. Settlement happened (the fake facilitator returned a fake transaction hash).
+5. The whole thing is auditable — `metadata["x402.payment.status"]` and `metadata["x402.payment.receipts"]` let you ask later: "did this task actually settle, and where's the receipt?"
 
-### Step 4 — what the mock did NOT prove
+That's the full success path. From the caller's point of view it's "send a request with a payment header, get a result with a receipt." From Bindu's point of view it's six or seven distinct checks, every one of which fails closed on the slightest hiccup.
 
-The mock facilitator returns `isValid: true` for any payload. It does
-not run EIP-712 signature recovery, it does not check on-chain
-balances, and it does not broadcast the transfer. Those steps live in
-a real facilitator. Two things you should also test against a real
-facilitator before shipping:
+### What this dev setup doesn't prove
 
-* **Forged signature is rejected.** With a real facilitator (e.g.
-  `https://x402.org/facilitator` for Base, or
-  `https://facilitator.x402.fi` for SKALE), an `X-PAYMENT` with a
-  random signature should come back from `/verify` as
-  `isValid: false, invalidReason: "invalid_exact_evm_signature"`.
-  Bindu's middleware then returns 402 — but the *signature recovery*
-  is the facilitator's job, not Bindu's.
-* **`validBefore` is honored.** Past the EIP-3009 window, a real
-  facilitator's `/verify` rejects the authorization. Bindu's nonce
-  store TTL is `requirement.max_timeout_seconds + 60`, which is
-  intentionally a little wider so that clock skew doesn't free the
-  slot before the facilitator gives up.
+The mock facilitator returns "yes" to everything. It doesn't recover the signature, it doesn't check the on-chain balance, and it certainly doesn't broadcast a transfer. Those steps are the *real* facilitator's job.
 
-For a paid-flow smoke against a real network you need a wallet with
-balance on the target chain and a signing helper that produces a
-real EIP-3009 `TransferWithAuthorization` payload. See
-`examples/hermes_agent/call.py` for a Python signing reference (it
-targets Base Sepolia, but the EIP-3009 flow is identical on any
-EVM chain — only the EIP-712 domain in `extra` differs).
+Before you ship anything that actually charges money, point your agent at a real facilitator (Coinbase's or your own) and confirm at least these two things:
 
-## Setup for Testing
+* **A forged signature is rejected.** Send the same fake payment as above to a real facilitator and watch the verify call come back with `"isValid": false, "invalidReason": "invalid_exact_evm_signature"`. If that doesn't happen, something's wrong.
+* **The `validBefore` window is honored.** Authorizations expire. Past that timestamp, a real facilitator should reject even a valid signature.
 
-### 1. Create a Crypto Wallet
+If you want to write code that produces a real (not fake) EIP-3009 authorization for testing, look at [`examples/hermes_agent/call.py`](../examples/hermes_agent/call.py) — it targets Base Sepolia, but the same signing flow works on any EVM chain.
 
-Choose one of these wallet options:
+## Going to production
 
-**MetaMask (Recommended):**
-1. Install the [MetaMask browser extension](https://metamask.io/)
-2. Create a new wallet or import an existing one
-3. Copy your wallet address (starts with `0x...`)
+When the mock-facilitator demo above feels obvious to you, you're almost there. The remaining work is real wallets, real money, and real verification. Here's the sequence:
 
-**Coinbase Wallet:**
-1. Install the [Coinbase Wallet extension](https://www.coinbase.com/wallet)
-2. Set up your wallet
-3. Copy your wallet address
+### Get a wallet
 
-### 2. Get Test USDC
+Pick whatever you're comfortable with. MetaMask is the most common; Coinbase Wallet integrates more smoothly with Base if that's your target. Either way:
 
-For testing on Base Sepolia testnet:
+1. Install the browser extension.
+2. Create a new wallet (or import an existing one — but consider creating a fresh one just for your agent so you don't mix funds).
+3. Copy the wallet address (`0x...`) — that's your `pay_to_address`.
+4. **Back up the seed phrase somewhere safe.** No exaggeration — if you lose it, the money is gone.
 
-1. **Get Base Sepolia ETH** (for gas fees):
-   - Visit [Chainlink Faucet](https://faucets.chain.link/base-sepolia)
-   - Connect your wallet
-   - Request test ETH
+### Get test funds first
 
-2. **Get Base Sepolia USDC**:
-   - The payment system will guide you through obtaining test USDC
-   - Alternatively, use a Base Sepolia faucet that provides USDC
+Before touching mainnet, do everything on Base Sepolia. Two things to grab:
 
-### 3. Update Agent Configuration
+* **Sepolia ETH for gas.** Even though Base is cheap, you need a tiny amount of ETH to send transactions. [Chainlink's faucet](https://faucets.chain.link/base-sepolia) is the easiest. Connect your wallet, request, done.
+* **Sepolia USDC.** You can get test USDC from the Base Sepolia faucet or by hitting your own agent's payment-capture page (it has a built-in flow).
 
-Add your wallet address to the agent config:
+### Switch one config line
+
+Once test mode works end-to-end, the switch to production is literally one line:
 
 ```python
-"pay_to_address": "0xYourWalletAddressHere"  # Replace with your actual address
+"network": "base"  # was "base-sepolia"
 ```
 
-## Payment Flow
+That's it. Same code, same wallet, same payment shape — just real USDC on Base mainnet instead of pretend USDC on the testnet. Real callers will need real wallets with real USDC, and you'll need to pay attention to a few extra things (see "Things to remember in production" below).
 
-### Step 1: Start a Payment Session
+## Things to remember in production
 
-When a user tries to access a protected method, they must first initiate a payment session:
+* **Test on Sepolia until you're bored of it.** The full code path on testnet is identical to mainnet. If something breaks on mainnet that worked on testnet, the problem is almost always wallet / funding / faucet related, not your code.
+* **Don't pick prices on a whim.** A penny per call sounds reasonable until you remember that an LLM call might cost you 5 cents. Math it out against your provider costs before you ship.
+* **Pay attention to the receipt.** Every settled task has `metadata["x402.payment.receipts"]` attached. That's your audit trail. If you ever need to dispute or refund, this is where you start.
+* **Each new task needs a new payment.** A finished task doesn't grant credit toward the next one. Within a single conversation, the same caller pays per task. If a task returns `"input_required"`, no new payment is needed to continue *that* task — but completing it and starting another is a fresh payment.
+* **Watch the facilitator.** If the facilitator goes down, your paid endpoints can't accept new requests. Either run your own, or accept the dependency consciously.
+* **Sessions expire.** A payment session — the browser flow where a caller clicks through MetaMask — expires after 60 seconds by default. Configurable.
 
-```bash
-curl --location --request POST 'http://localhost:3773/api/start-payment-session' \
---header 'Content-Type: application/json' \
---header 'Authorization: Bearer <your-access-token>'
-```
+## When something doesn't work
 
-**Response:**
-```json
-{
-    "session_id": "<session-id>",
-    "browser_url": "http://localhost:3773/payment-capture?session_id=<session-id>",
-    "expires_at": "<expires-at>",
-    "status": "pending"
-}
-```
+* Caller gets 402 forever, never reaches the handler → check that `X-PAYMENT` is being sent. The 402 body tells you exactly what's missing.
+* `"error": "Payment verification failed"` → the facilitator said no. Either the signature is wrong, the chain is wrong, or your facilitator doesn't know the chain you're asking for. Check the agent's server logs for the underlying error.
+* `"error": "Payment nonce already used (replay)"` → the caller is sending the same authorization twice. They need to sign a fresh one for each request.
+* `"error": "No matching payment requirements found"` → the payment payload doesn't match anything in your `execution_cost`. Usually a network or asset mismatch.
 
-### Step 2: Complete Payment in Browser
+## Where to look in the code
 
-1. Open the `browser_url` in your web browser
-2. Connect your wallet (MetaMask or Coinbase Wallet)
-3. Review the payment details:
-   - Amount in USDC
-   - Recipient address
-   - Network (Base Sepolia)
-4. Approve and sign the transaction
-5. Wait for blockchain confirmation
+If you want to read the actual implementation:
 
-<img src="../assets/payment-required-base.png" alt="Payment Required Screen" width="500" />
+* The middleware that does the 402 gatekeeping: [`bindu/server/middleware/x402/x402_middleware.py`](../bindu/server/middleware/x402/x402_middleware.py)
+* The nonce store that catches replays: [`bindu/server/middleware/x402/nonce_store.py`](../bindu/server/middleware/x402/nonce_store.py)
+* How payment requirements get built from your config: [`bindu/server/applications.py`](../bindu/server/applications.py) (search for `_create_payment_requirements`)
+* The tests, which double as the most accurate spec: [`tests/unit/server/middleware/x402/`](../tests/unit/server/middleware/x402/)
 
-### Step 3: Verify Payment Status
+## Related
 
-After completing the payment, check the session status:
-
-```bash
-curl --location 'http://localhost:3773/api/payment-status/<session_id>' \
---header 'Authorization: Bearer <your-access-token>'
-```
-
-**Successful Payment Response:**
-```json
-{
-    "session_id": "<session-id>",
-    "status": "completed",
-    "payment_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-
-<img src="../assets/payment-required-success.png" alt="Payment Success Screen" width="500" />
-
-**Response Fields:**
-- `session_id`: The payment session identifier
-- `status`: Payment status (`completed` means payment verified)
-- `payment_token`: JWT token to include in subsequent API calls
-
-### Step 4: Use the Agent with Payment Token
-
-Include the `payment_token` in your agent requests:
-
-```bash
-curl --location 'http://localhost:3773/' \
---header 'Content-Type: application/json' \
---header 'Authorization: Bearer <your-access-token>' \
---header 'X-Payment-Token: <payment-token>' \
---data '{
-    "jsonrpc": "2.0",
-    "method": "message/send",
-    "params": {
-        "message": {
-            "role": "user",
-            "content": "Hello, paid agent!"
-        }
-    },
-    "id": 1
-}'
-```
-
-## Example Implementation
-
-See the complete example at:
-```
-examples/beginner/echo_agent_behind_paywall.py
-```
-
-## UI Integration
-
-From the UI, you can obtain the access token and use it to initiate payment sessions.
-
-**Important Payment Behavior:**
-- Each new task requires payment when the agent is behind a paywall
-- If a task returns `input_required` status, no payment is needed for that interaction
-- Once a task completes successfully, a new payment is required for the next task, even within the same conversation/context
-- Payment tokens are task-specific and cannot be reused across multiple completed tasks
-
-## Security Considerations
-
-- **Wallet Security**: Never share your private keys or seed phrases
-- **Test Networks**: Always test on Base Sepolia before deploying to mainnet
-- **Payment Verification**: Payments are verified on-chain via blockchain signatures
-- **Session Expiration**: Payment sessions expire after 60 seconds by default
-- **Token Storage**: Payment tokens are JWTs with expiration times
-
-## Production Deployment
-
-When ready for production:
-
-1. **Switch to Base Mainnet**:
-   ```python
-   "network": "base"  # Change from "base-sepolia"
-   ```
-
-2. **Use Real USDC**: Ensure users have actual USDC on Base mainnet
-
-3. **Update Wallet Address**: Use your production wallet address
-
-4. **Monitor Payments**: Track incoming payments to your wallet address
-
-5. **Set Appropriate Pricing**: Adjust `amount` based on your service value
-
-## Tips
-
-- **Start Small**: Use low amounts for testing (e.g., `$0.0001`)
-- **Clear Communication**: Inform users about payment requirements upfront
-- **Handle Failures**: Implement proper error handling for failed payments
-- **Session Management**: Clean up expired payment sessions regularly
-- **User Experience**: Provide clear instructions in your UI for payment flow
-
-
-## Related Documentation
-
-- [X402 Protocol Specification](https://github.com/coinbase/x402)
-- [Base Sepolia Testnet](https://docs.base.org/network-information)
-- [Bindu Authentication](./AUTHENTICATION.md) - Required for payment endpoints
+* [x402 protocol spec](https://github.com/coinbase/x402) — the open standard everything here is built on.
+* [Base documentation](https://docs.base.org/network-information) — what you'll be paying on by default.
+* [`docs/AUTHENTICATION.md`](./AUTHENTICATION.md) — payment endpoints need auth; this is how that works.
+* [`bugs/known-issues.md`](../bugs/known-issues.md) — current limitations (notably: the SKALE facilitator's expired cert).
