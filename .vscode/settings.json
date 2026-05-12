@@ -12,5 +12,22 @@
         "Ripasudil",
         "Saptha",
         "Sapthami"
-    ]
+    ],
+    "files.exclude": {
+        "**/.git": true,
+        "**/.svn": true,
+        "**/.hg": true,
+        "**/.DS_Store": true,
+        "**/Thumbs.db": true,
+        "**/.apivcs": true,
+        "**/.gitignore": true,
+        "**/.designer.json": true,
+        "**/.exchange.xml": true,
+        "**/.vscode": true,
+        "**/.mvn": true,
+        "**/.tmp": true,
+        "**/.settings": true,
+        "**/.exchange_modules_tmp": true,
+        ".mule": true
+    }
 }
