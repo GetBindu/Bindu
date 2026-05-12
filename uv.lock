@@ -458,7 +458,7 @@ runtime-boxd = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "bindu" },
+    { name = "bindu", extra = ["runtime-boxd"] },
     { name = "pipreqs" },
     { name = "pre-commit" },
     { name = "pytest" },
@@ -554,7 +554,7 @@ provides-extras = ["agents", "core", "grpc", "runtime-boxd"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "bindu" },
+    { name = "bindu", extras = ["runtime-boxd"] },
     { name = "pipreqs", specifier = ">=0.5.0" },
     { name = "pre-commit", specifier = ">=3.0.0" },
     { name = "pytest", specifier = ">=8.0.0" },

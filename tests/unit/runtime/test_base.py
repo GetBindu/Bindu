@@ -32,22 +32,19 @@ def test_runtime_handle_metadata_defaults_to_empty_dict():
 
 def test_abc_cannot_be_instantiated_directly():
     with pytest.raises(TypeError):
-        RuntimeProvider()  # type: ignore[abstract]
+        RuntimeProvider()
 
 
 def test_register_and_get_provider():
     class FakeProvider(RuntimeProvider):
-        async def deploy(self, *a, **kw):  # type: ignore[override]
-            ...
+        async def deploy(self, *a, **kw): ...
 
-        async def health(self, *a, **kw):  # type: ignore[override]
-            ...
+        async def health(self, *a, **kw): ...
 
-        async def stream_logs(self, *a, **kw):  # type: ignore[override]
+        async def stream_logs(self, *a, **kw):
             yield b""
 
-        async def on_exit(self, *a, **kw):  # type: ignore[override]
-            ...
+        async def on_exit(self, *a, **kw): ...
 
     register_provider("fake", FakeProvider)
     try:
