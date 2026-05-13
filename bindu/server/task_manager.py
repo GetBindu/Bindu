@@ -95,6 +95,7 @@ from bindu.common.protocol.types import (
 )
 
 from ..utils.logging import get_logger
+from .errors import MalformedContextIdError
 from .handlers import ContextHandlers, MessageHandlers, TaskHandlers
 from .notifications import PushNotificationManager
 from .scheduler import Scheduler
@@ -184,19 +185,28 @@ class TaskManager:
         self._aexit_stack = None
 
     def _create_error_response(
-        self, response_class: type, request_id: str, error_class: type, message: str
+        self,
+        response_class: type,
+        request_id: str,
+        error_class: type,
+        message: str,
+        code: int = DEFAULT_JSONRPC_ERROR_CODE,
     ) -> Any:
         """Create a standardized error response."""
         return response_class(
             jsonrpc=JSONRPC_VERSION,
             id=request_id,
-            error=error_class(code=DEFAULT_JSONRPC_ERROR_CODE, message=message),
+            error=error_class(code=code, message=message),
         )
 
     def _parse_context_id(self, context_id: Any) -> uuid.UUID:
-        """Parse and validate context_id, generating a new one if needed.
+        """Parse and validate context_id.
 
-        Fix applied: Handles malformed UUID strings to prevent server crashes (DoS vector).
+        Returns a fresh UUID only when the client omitted ``context_id``
+        (i.e. starting a new conversation). A malformed string raises
+        ``MalformedContextIdError`` so the caller surfaces JSON-RPC -32602
+        instead of fabricating a new context — see the explanation on the
+        exception class.
         """
         if context_id is None:
             return uuid.uuid4()
@@ -207,14 +217,14 @@ class TaskManager:
         if isinstance(context_id, str):
             try:
                 return uuid.UUID(context_id)
-            except ValueError:
-                # Log the issue so we know bad data is coming in, but don't crash
+            except ValueError as exc:
                 logger.warning(
-                    f"Received malformed context_id: '{context_id}'. Generating new UUID fallback."
+                    "Rejected malformed context_id",
+                    extra={"context_id": context_id},
                 )
-                pass
+                raise MalformedContextIdError(context_id) from exc
 
-        return uuid.uuid4()
+        raise MalformedContextIdError(context_id)
 
     # Message handler methods
     #

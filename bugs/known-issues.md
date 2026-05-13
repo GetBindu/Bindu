@@ -938,13 +938,8 @@ explains it.
 | Slug | Severity | One-line |
 |---|---|---|
 | [`authz-scope-check-behind-optional-flag`](#authz-scope-check-behind-optional-flag) | medium (sec) | Scope check is optional; flipping the flag removes all authz |
-| [`did-admission-control-missing`](#did-admission-control-missing) | medium (sec) | No allowlist — any Hydra-registered DID can call |
 | [`cors-allow-credentials-with-user-origins`](#cors-allow-credentials-with-user-origins) | medium (sec) | Credentials + loose origins risk credentialed CORS |
-| [`task-cancel-check-then-act-race`](#task-cancel-check-then-act-race) | medium | TOCTOU between state check and scheduler cancel |
 | [`no-rate-limit-or-quota-per-caller`](#no-rate-limit-or-quota-per-caller) | medium | No per-caller quota; single caller can exhaust resources |
-| [`context-id-silent-fallback`](#context-id-silent-fallback) | medium | Malformed `context_id` silently creates a new context |
-| [`artifact-name-not-sanitized`](#artifact-name-not-sanitized) | low (sec) | Agent-supplied artifact names not basenamed |
-| [`skale-facilitator-cert-expired`](#skale-facilitator-cert-expired) | low (ops) | Only SKALE-aware x402 facilitator has an expired TLS cert |
 
 ### Medium
 
@@ -967,57 +962,6 @@ deprecated in your configuration and add a startup assertion that
 refuses to boot when the flag is false and auth is enabled.
 **Tracking:** _(no issue yet)_
 
-### did-admission-control-missing
-
-**Severity:** medium (security, admission control)
-**Summary:**
-[`bindu/server/middleware/auth/hydra.py`](../bindu/server/middleware/auth/hydra.py)
-verifies that an inbound request was signed by the private key of
-the DID declared in the OAuth token's `client_id`. Crypto is
-correct: forging signatures for a known DID is not feasible. But
-there is no admission-control layer above that — the server trusts
-ANY Hydra-registered DID that presents a valid OAuth token and a
-valid signature. No allowlist, no trust-chain check, no pattern
-match against an expected DID namespace.
-
-Concretely: in a multi-tenant deployment (or one where Hydra's
-admin API is reachable by more than the operator), a third party
-can `hydra create oauth2-client` with `client_id=did:bindu:evil:*`
-and a public key they control, then call the agent. Their token
-validates (Hydra issued it), their signature validates (they hold
-the matching private key), and the request reaches the handler.
-
-What they gain:
-
-- Ability to submit tasks — the agent burns its compute / LLM
-  budget executing on their behalf.
-- The response stream — they get whatever the agent produces.
-
-What they cannot do (already mitigated):
-
-- Read other tenants' tasks — PR #460
-  (`idor-task-context-no-ownership-check`, see postmortem
-  [`2026-04-18-idor-task-ownership.md`](./core/2026-04-18-idor-task-ownership.md))
-  scopes reads and lists by `owner_did`. Rows they create are only
-  visible to them.
-
-Single-tenant deployments with locked-down Hydra admin access are
-not reachable by this; Hydra registration is the de facto trust
-boundary. Severity rises to high for SaaS / multi-tenant / shared
-Hydra shapes.
-
-**Workaround:** Tightly restrict Hydra admin API access to the
-operator; audit the list of registered OAuth clients before
-exposing the agent. For stronger posture, deploy behind a reverse
-proxy that filters incoming `Authorization` headers by a known
-allowlist of token introspection subjects, or add a small
-post-auth middleware that rejects the request when
-`client_did not in app_settings.auth.allowed_dids`. A native fix
-would add an `ALLOWED_DIDS` config (exact-match or pattern) to
-`app_settings.auth` and enforce it in the Hydra middleware after
-signature verification passes — ~30 lines in one file.
-**Tracking:** _(no issue yet)_
-
 ### cors-allow-credentials-with-user-origins
 
 **Severity:** medium (security, CORS misconfig)
@@ -1036,26 +980,6 @@ that the supplied origins are compatible with `allow_credentials=True`.
 of known origins. Never include `"null"`, `"*"`, or a
 reflected-origin scheme. If possible, terminate CORS at a reverse
 proxy and leave `cors_origins=None` on the Bindu app.
-**Tracking:** _(no issue yet)_
-
-### task-cancel-check-then-act-race
-
-**Severity:** medium (correctness, concurrency)
-**Summary:**
-[`bindu/server/handlers/task_handlers.py`](../bindu/server/handlers/task_handlers.py)
-lines 67–95 load the task, read `status.state`, compare against
-`app_settings.agent.terminal_states`, and then call
-`self.scheduler.cancel_task(...)` without any atomic update between
-the read and the write. A worker that completes the task between
-those two steps leaves `cancel_task` trying to cancel a task that
-already reached a terminal state — the resulting behavior depends
-on the scheduler implementation and is not deterministic. The
-second `load_task` at line 90 may return a terminal task with the
-cancellation ignored, misleading the caller.
-**Workaround:** Callers should treat `cancel_task` as best-effort
-and always re-check task state after the call returns. Fix is a
-compare-and-swap in storage (`update_task_state_if(from, to)`) that
-returns false when the state has already moved.
 **Tracking:** _(no issue yet)_
 
 ### no-rate-limit-or-quota-per-caller
@@ -1078,67 +1002,6 @@ at the `TaskManager.send_message` level plus an explicit body-size
 limit on the Starlette app.
 **Tracking:** _(no issue yet)_ (shape-equivalent to the gateway's
 `no-rate-limit-cors-body-size-limit` entry)
-
-### context-id-silent-fallback
-
-**Severity:** medium (correctness, silent data loss)
-**Summary:** `_parse_context_id` in
-[`bindu/server/task_manager.py`](../bindu/server/task_manager.py)
-lines 196–216 logs a warning and returns a fresh UUID when the
-client sends a malformed `context_id`. The caller believes they are
-continuing conversation X and actually start a new isolated one;
-the old context is orphaned in storage. This also gives an attacker
-a cheap way to inflate storage by sending thousands of malformed
-context IDs.
-**Workaround:** Clients must validate `context_id` before sending.
-The fix is to reject malformed UUIDs with a JSON-RPC error
-(-32602 "Invalid params") rather than fabricate a new one.
-**Tracking:** _(no issue yet)_
-
-### Low
-
-### artifact-name-not-sanitized
-
-**Severity:** low (security, path handling)
-**Summary:** `Artifact.from_result` in
-[`bindu/utils/worker/artifacts.py`](../bindu/utils/worker/artifacts.py)
-accepts an `artifact_name` passed from the agent manifest and
-persists it verbatim without any basename or character filtering.
-If a downstream storage backend constructs a filesystem path from
-that name (current Postgres storage does not, but any file-based or
-S3-prefixed backend would), an agent that returns
-`artifact_name="../../etc/passwd"` writes outside the expected
-directory. Defensive sanitization is cheap and the surface is
-visible.
-**Workaround:** Operators running a file-backed artifact store
-should apply `os.path.basename` and an allow-list regex before
-writing. Fix in-core is to sanitize in `from_result`:
-`artifact_name = os.path.basename(artifact_name) or "result"`.
-**Tracking:** _(no issue yet)_
-
-### skale-facilitator-cert-expired
-
-**Severity:** low (operations, not a code bug)
-**Summary:** The only x402 facilitator that currently advertises SKALE
-chains in its `/supported` response is `https://facilitator.x402.fi`,
-and its TLS certificate is expired. Coinbase's own facilitator at
-`https://x402.org/facilitator` does not include SKALE in its
-`/supported` response. Operators who want SKALE today have to point
-`X402__FACILITATOR_URL` at `facilitator.x402.fi` and either accept
-the cert error or terminate TLS at a proxy with a fresh chain.
-Bindu's `ExtraNetwork` config and the registered money parser for
-`skale-europa` are in place — the only missing piece is a stable,
-properly-served facilitator endpoint. Tracked via the live network
-smoke at
-[`tests/integration/x402/test_skale_facilitator_supported.py`](../tests/integration/x402/test_skale_facilitator_supported.py),
-which is opt-in (`X402_NETWORK_TESTS=1`) and will fail loudly if the
-facilitator stops advertising SKALE or changes the bridged-USDC
-metadata.
-**Workaround:** For production, run your own facilitator instance
-keyed to the SKALE chains you need (`x402-facilitator` is open source).
-For local dev / testing, set `X402_NETWORK_TESTS=1` and use the
-expired-cert endpoint after reviewing the smoke test for context.
-**Tracking:** _(no issue yet)_
 
 ---
 

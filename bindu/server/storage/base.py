@@ -116,6 +116,37 @@ class Storage(ABC, Generic[ContextT]):
         """
 
     @abstractmethod
+    async def update_task_state_if(
+        self,
+        task_id: UUID,
+        from_state: TaskState,
+        to_state: TaskState,
+    ) -> bool:
+        """Atomically transition a task from ``from_state`` to ``to_state``.
+
+        Compare-and-swap primitive used by handlers that must avoid TOCTOU
+        races between reading task state and acting on it (e.g. cancel).
+
+        Implementations MUST guarantee that the read of the current state
+        and the write of the new state happen indivisibly with respect to
+        any other writer — for SQL backends, this means a single
+        ``UPDATE ... WHERE state = :from`` statement; for in-memory, it
+        means no ``await`` between the comparison and the assignment.
+
+        Args:
+            task_id: Task to transition.
+            from_state: State the task must currently be in for the swap
+                to land.
+            to_state: State to write if the precondition holds.
+
+        Returns:
+            ``True`` iff *this* call performed the transition. ``False``
+            when the task does not exist or its current state is not
+            ``from_state`` (someone else got there first). The caller is
+            expected to re-load the task to inspect the actual state.
+        """
+
+    @abstractmethod
     async def list_tasks(
         self,
         length: int | None = None,

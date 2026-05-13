@@ -83,7 +83,14 @@ class TaskHandlers:
         request: CancelTaskRequest,
         caller_did: str | None = None,
     ) -> CancelTaskResponse:
-        """Cancel a running task."""
+        """Cancel a running task.
+
+        Uses ``update_task_state_if`` (CAS) to claim the state transition
+        before signaling the scheduler. This closes the TOCTOU race where
+        a worker could complete the task between the cancelability check
+        and the scheduler call — see the resolved bug
+        ``task-cancel-check-then-act-race``.
+        """
         task_id = request["params"]["task_id"]
         task = await self.storage.load_task(task_id)
 
@@ -100,7 +107,6 @@ class TaskHandlers:
                 CancelTaskResponse, request["id"], TaskNotFoundError, "Task not found"
             )
 
-        # Check if task is in a cancelable state
         current_state = task["status"]["state"]
 
         if current_state in app_settings.agent.terminal_states:
@@ -112,13 +118,32 @@ class TaskHandlers:
                 f"Tasks can only be canceled while pending or running.",
             )
 
-        # Cancel the task
+        # Atomically claim the cancel transition. If the swap fails, the
+        # task moved underneath us (worker completed, parallel cancel
+        # already landed, etc.) — report the actual current state.
+        swapped = await self.storage.update_task_state_if(
+            task_id, from_state=current_state, to_state="canceled"
+        )
+        if not swapped:
+            latest = await self.storage.load_task(task_id)
+            actual_state = (
+                latest["status"]["state"] if latest is not None else "unknown"
+            )
+            return self.error_response_creator(
+                CancelTaskResponse,
+                request["id"],
+                TaskNotCancelableError,
+                f"Task cannot be canceled in '{actual_state}' state. "
+                f"Tasks can only be canceled while pending or running.",
+            )
+
+        # We own the transition. Signal the scheduler so any in-flight
+        # worker is interrupted; scheduler.cancel_task is best-effort and
+        # safe to call against an already-canceled task.
         await self.scheduler.cancel_task(request["params"])
+
         task = await self.storage.load_task(task_id)
-
-        # Type narrowing: task should exist since we already validated it above
         assert task is not None
-
         return CancelTaskResponse(jsonrpc="2.0", id=request["id"], result=task)
 
     @trace_task_operation("list_tasks", include_params=False)

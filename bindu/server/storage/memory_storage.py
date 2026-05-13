@@ -307,6 +307,30 @@ class InMemoryStorage(Storage[dict[str, Any]]):
 
         return task
 
+    async def update_task_state_if(
+        self,
+        task_id: UUID,
+        from_state: TaskState,
+        to_state: TaskState,
+    ) -> bool:
+        """In-memory CAS: atomic because asyncio yields only at ``await``.
+
+        This method contains no ``await`` between the state read and the
+        state write, so the operation is indivisible under cooperative
+        scheduling. Adding an ``await`` here would re-introduce the race
+        this method exists to prevent.
+        """
+        task_id = validate_uuid_type(task_id, "task_id")
+        task = self.tasks.get(task_id)
+        if task is None:
+            return False
+        if task["status"]["state"] != from_state:
+            return False
+        task["status"] = TaskStatus(
+            state=to_state, timestamp=datetime.now(timezone.utc).isoformat()
+        )
+        return True
+
     async def update_context(self, context_id: UUID, context: dict[str, Any]) -> None:
         """Store or update context metadata.
 

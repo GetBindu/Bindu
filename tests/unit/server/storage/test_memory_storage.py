@@ -372,6 +372,46 @@ class TestTaskOperations:
             await storage.update_task(task["id"], "working", new_messages=["invalid"])
 
     @pytest.mark.asyncio
+    async def test_cas_succeeds_when_state_matches(
+        self, storage, sample_context_id, sample_message
+    ):
+        """CAS swaps state and returns True when the precondition holds."""
+        task = await storage.submit_task(sample_context_id, sample_message)
+        await storage.update_task(task["id"], "working")
+
+        swapped = await storage.update_task_state_if(
+            task["id"], from_state="working", to_state="canceled"
+        )
+        assert swapped is True
+
+        reloaded = await storage.load_task(task["id"])
+        assert reloaded["status"]["state"] == "canceled"
+
+    @pytest.mark.asyncio
+    async def test_cas_fails_when_state_does_not_match(
+        self, storage, sample_context_id, sample_message
+    ):
+        """CAS returns False and leaves state untouched when precondition fails."""
+        task = await storage.submit_task(sample_context_id, sample_message)
+        await storage.update_task(task["id"], "completed")
+
+        swapped = await storage.update_task_state_if(
+            task["id"], from_state="working", to_state="canceled"
+        )
+        assert swapped is False
+
+        reloaded = await storage.load_task(task["id"])
+        assert reloaded["status"]["state"] == "completed"
+
+    @pytest.mark.asyncio
+    async def test_cas_returns_false_for_missing_task(self, storage):
+        """CAS returns False (not raises) for a task that does not exist."""
+        swapped = await storage.update_task_state_if(
+            uuid4(), from_state="working", to_state="canceled"
+        )
+        assert swapped is False
+
+    @pytest.mark.asyncio
     async def test_list_tasks(self, storage, sample_context_id):
         """Test listing all tasks."""
         from bindu.common.protocol.types import TextPart

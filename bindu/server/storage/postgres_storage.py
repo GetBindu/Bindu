@@ -546,6 +546,42 @@ class PostgresStorage(Storage[dict[str, Any]]):
 
         return await self._retry_on_connection_error(_update)
 
+    async def update_task_state_if(
+        self,
+        task_id: UUID,
+        from_state: TaskState,
+        to_state: TaskState,
+    ) -> bool:
+        """Postgres CAS via a single conditional ``UPDATE`` with ``RETURNING``.
+
+        Atomicity comes from the per-row lock Postgres takes when an
+        ``UPDATE`` matches a row. If the ``state = :from_state`` predicate
+        does not match (task missing or state already moved), zero rows
+        are returned and the swap is reported as failed.
+        """
+        task_id = validate_uuid_type(task_id, "task_id")
+        self._ensure_connected()
+
+        async def _cas() -> bool:
+            async with self._get_session_with_schema() as session:
+                async with session.begin():
+                    now = get_current_utc_timestamp()
+                    stmt = (
+                        update(tasks_table)
+                        .where(tasks_table.c.id == task_id)
+                        .where(tasks_table.c.state == from_state)
+                        .values(
+                            state=to_state,
+                            state_timestamp=now,
+                            updated_at=now,
+                        )
+                        .returning(tasks_table.c.id)
+                    )
+                    result = await session.execute(stmt)
+                    return result.first() is not None
+
+        return await self._retry_on_connection_error(_cas)
+
     async def list_tasks(
         self,
         length: int | None = None,

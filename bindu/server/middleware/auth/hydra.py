@@ -334,6 +334,22 @@ class HydraMiddleware(AuthMiddleware):
         }
         return is_valid, verification_result, cached_receive
 
+    def _is_did_admitted(self, client_did: str | None) -> bool:
+        """Whether ``client_did`` passes admission control.
+
+        Admission is opt-in: when ``auth_config.allowed_dids`` is ``None``
+        (default), every authenticated caller is admitted, preserving the
+        pre-allowlist behavior. When the operator configures a list, only
+        listed DIDs pass; all others are rejected with HTTP 403 in
+        ``__call__``. Closes the resolved bug
+        ``did-admission-control-missing`` — without this check, any
+        Hydra-registered DID can call the agent and consume its budget.
+        """
+        allowed = getattr(self.config, "allowed_dids", None)
+        if allowed is None:
+            return True
+        return bool(client_did) and client_did in allowed
+
     async def __call__(
         self, scope: dict[str, Any], receive: Callable, send: Callable
     ) -> None:
@@ -394,6 +410,22 @@ class HydraMiddleware(AuthMiddleware):
 
             user_info["signature_info"] = signature_info
             logger.debug(f"DID verification result: {signature_info}")
+
+        # --- Admission control ---
+        # Identity and (when applicable) signature have been proven. Apply
+        # the optional DID allowlist before forwarding so an operator can
+        # restrict which callers reach handlers even if Hydra would issue
+        # them a valid token.
+        if not self._is_did_admitted(client_did):
+            logger.warning(
+                f"DID {client_did} authenticated but not in admission allowlist"
+            )
+            response = JSONResponse(
+                {"error": "DID not admitted"},
+                status_code=403,
+            )
+            await response(scope, receive, send)
+            return
 
         self._attach_user_context(scope, user_info, token_payload)
         await self.app(scope, receive, send)

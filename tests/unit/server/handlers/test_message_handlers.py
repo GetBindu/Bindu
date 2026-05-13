@@ -7,6 +7,7 @@ from typing import cast
 from uuid import uuid4
 
 from bindu.common.protocol.types import Task
+from bindu.server.errors import MalformedContextIdError
 from bindu.server.handlers.message_handlers import MessageHandlers
 
 
@@ -385,3 +386,39 @@ class TestMessageHandlers:
         response = handler.stream_message(request)
 
         assert response is not None
+
+    @pytest.mark.asyncio
+    async def test_send_message_returns_invalid_params_on_malformed_context_id(self):
+        """Regression: malformed context_id must return JSON-RPC -32602
+        instead of silently fabricating a new context (see bug
+        `context-id-silent-fallback`)."""
+
+        def parser_that_rejects(value):
+            raise MalformedContextIdError(value)
+
+        captured = {}
+
+        def fake_error_response(response_class, request_id, error_class, message, code):
+            captured["code"] = code
+            captured["message"] = message
+            captured["request_id"] = request_id
+            return {"jsonrpc": "2.0", "id": request_id, "error": {"code": code, "message": message}}
+
+        handler = MessageHandlers(
+            scheduler=AsyncMock(),
+            storage=AsyncMock(),
+            context_id_parser=parser_that_rejects,
+            error_response_creator=fake_error_response,
+        )
+
+        request = {
+            "jsonrpc": "2.0",
+            "id": "req-bad-ctx",
+            "params": {"message": {"content": "hi", "context_id": "not-a-uuid"}},
+        }
+
+        response = await handler.send_message(request)
+
+        assert response["error"]["code"] == -32602
+        assert "not-a-uuid" in response["error"]["message"]
+        assert captured["request_id"] == "req-bad-ctx"

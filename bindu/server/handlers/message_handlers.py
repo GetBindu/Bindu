@@ -24,6 +24,7 @@ from uuid import UUID
 
 from bindu.common.protocol.types import (
     ContextNotFoundError,
+    InvalidParamsError,
     SendMessageRequest,
     SendMessageResponse,
     StreamMessageRequest,
@@ -35,9 +36,13 @@ from bindu.settings import app_settings
 from bindu.utils.logging import get_logger
 from bindu.utils.task_telemetry import trace_task_operation, track_active_task
 
+from bindu.server.errors import MalformedContextIdError
 from bindu.server.scheduler import Scheduler
 from bindu.server.storage import Storage
 from bindu.server.storage.base import OwnershipError
+
+# JSON-RPC 2.0 "Invalid params" — https://www.jsonrpc.org/specification#error_object
+INVALID_PARAMS_CODE = -32602
 
 logger = get_logger("bindu.server.handlers.message_handlers")
 
@@ -205,6 +210,14 @@ class MessageHandlers:
             task, _ = await self._submit_and_schedule_task(
                 request["params"], caller_did=caller_did
             )
+        except MalformedContextIdError as exc:
+            return self.error_response_creator(
+                SendMessageResponse,
+                request["id"],
+                InvalidParamsError,
+                f"Invalid params: context_id must be a UUID, got {exc.args[0]!r}",
+                INVALID_PARAMS_CODE,
+            )
         except OwnershipError:
             return self.error_response_creator(
                 SendMessageResponse,
@@ -233,6 +246,14 @@ class MessageHandlers:
         try:
             task, context_id = await self._submit_and_schedule_task(
                 request["params"], caller_did=caller_did
+            )
+        except MalformedContextIdError as exc:
+            return self.error_response_creator(
+                SendMessageResponse,
+                request["id"],
+                InvalidParamsError,
+                f"Invalid params: context_id must be a UUID, got {exc.args[0]!r}",
+                INVALID_PARAMS_CODE,
             )
         except OwnershipError:
             return self.error_response_creator(

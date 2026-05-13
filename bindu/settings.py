@@ -611,6 +611,13 @@ class AuthSettings(BaseSettings):
         "tasks/feedback": ["agent:write"],
     }
 
+    # Admission control. When None (default), any DID that passes Hydra
+    # introspection + signature verification is admitted — preserves the
+    # pre-allowlist behavior. When set, only listed DIDs are admitted;
+    # every other authenticated caller is rejected with HTTP 403 by the
+    # auth middleware. Closes `did-admission-control-missing`.
+    allowed_dids: list[str] | None = None
+
 
 # ============================================================================
 # Ory Configuration Models
