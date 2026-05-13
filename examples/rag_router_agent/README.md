@@ -60,7 +60,7 @@ LLM Refines → Final Answer
 
 ```bash
 cd examples/rag_router_agent
-python test_local.py
+python run_local.py
 ```
 
 > Requires: `OPENROUTER_API_KEY`
@@ -81,7 +81,7 @@ rag_router_agent/
 │   ├── tech_agent.py
 │
 ├── db/                   # Sample knowledge bases
-├── test_local.py         # Local testing script
+├── run_local.py         # Local testing script
 └── README.md
 ```
 
