@@ -26,10 +26,6 @@ DID documents, enabling agents to establish trust in a decentralized network.
 """
 
 from __future__ import annotations
-<<<<<<< HEAD
-
-=======
->>>>>>> aee9f6b1 (fix: move from __future__ import to top of did_agent_extension.py)
 import os
 import platform
 

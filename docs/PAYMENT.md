@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # Charging for your agent
 
 You built something useful. People want to use it. Running it costs you
@@ -143,8 +143,7 @@ Same shape works for any other EVM chain — just add another entry to `extra_ne
 |---|---|---|
 | `https://x402.org/facilitator` *(default)* | Base, Solana, Algorand, Aptos, Stellar | Coinbase-operated. Solid. Doesn't know SKALE. |
 | `https://facilitator.x402.fi` | Base + Polygon + Ethereum + Avalanche + **5 SKALE chains** + Solana | Run by the x402.fi team. Currently has an expired TLS cert — see [`bugs/known-issues.md`](../bugs/known-issues.md) before using in production. |
-=======
->>>>>>> 6a9d3dcf (fix: resolve remaining review issues (CI guard, payment handling, SKALE docs clarification))
+
 ## SKALE Integration Notes
 
 Bindu’s current x402 payment flow is architecturally compatible with additional
@@ -187,7 +186,7 @@ To properly support SKALE, the recommended approach is:
 
 ### Current Prototype Approach
 
-<<<<<<< HEAD
+
 To swap, set an environment variable:
 
 ```bash
@@ -217,15 +216,13 @@ from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
-=======
 Until full support is available, a safe prototype approach is:
->>>>>>> 6a9d3dcf (fix: resolve remaining review issues (CI guard, payment handling, SKALE docs clarification))
 
 - Validate agent → facilitator connectivity
 - Simulate the x402 verification layer
 - Use facilitator reachability as a placeholder for payment validation
 
-<<<<<<< HEAD
+
 async def supported(request: Request) -> JSONResponse:
     # Tell Bindu which chains we 'support'.
     return JSONResponse({
@@ -546,7 +543,5 @@ If you want to read the actual implementation:
 * [Base documentation](https://docs.base.org/network-information) — what you'll be paying on by default.
 * [`docs/AUTHENTICATION.md`](./AUTHENTICATION.md) — payment endpoints need auth; this is how that works.
 * [`bugs/known-issues.md`](../bugs/known-issues.md) — current limitations (notably: the SKALE facilitator's expired cert).
-=======
 This allows end-to-end flow testing while keeping the system ready for
 proper x402 integration once upstream support is available.
->>>>>>> 6a9d3dcf (fix: resolve remaining review issues (CI guard, payment handling, SKALE docs clarification))
