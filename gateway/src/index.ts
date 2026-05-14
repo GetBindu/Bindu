@@ -18,6 +18,7 @@ import * as ToolRegistry from "./tool/registry"
 import * as BinduClient from "./bindu/client"
 import * as Server from "./server"
 import * as Planner from "./planner"
+import { forwarderEffect } from "./comms-forwarder"
 import { buildPlanHandler } from "./api/plan-route"
 import { buildHealthHandler } from "./api/health-route"
 import { buildDidHandler } from "./api/did-route"
@@ -231,6 +232,8 @@ export async function main(): Promise<{ close: () => Promise<void> }> {
   }
 
   const runtime = ManagedRuntime.make(buildAppLayer(identity, tokenProvider))
+
+  runtime.runFork(forwarderEffect)
 
   const cfg = await runtime.runPromise(
     Effect.gen(function* () {

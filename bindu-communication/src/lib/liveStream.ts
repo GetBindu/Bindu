@@ -8,12 +8,16 @@ interface RawWebhook {
 		event_id?: string;
 		sequence?: number;
 		timestamp?: string;
-		kind?: "status-update" | "artifact-update" | string;
+		kind?: "status-update" | "artifact-update" | "gateway-event" | string;
 		task_id?: string;
 		context_id?: string;
 		status?: { state?: string };
 		artifact?: unknown;
 		final?: boolean;
+		// gateway-event extras
+		event_type?: string;
+		parent_id?: string;
+		properties?: Record<string, unknown>;
 	};
 }
 
@@ -62,8 +66,79 @@ function normalizeState(raw: string | undefined, isArtifact: boolean): EventStat
 	return KNOWN_STATES.has(raw as EventState) ? (raw as EventState) : undefined;
 }
 
+function mapGatewayEvent(raw: RawWebhook): StreamEvent {
+	const p = raw.payload;
+	const props = p.properties ?? {};
+	const eventType = p.event_type ?? "";
+	const tool = String(props.tool ?? "");
+	const error = props.error ? String(props.error) : undefined;
+
+	let kind: EventKind = "state-change";
+	let state: EventState | undefined;
+	let summary: string;
+	let counterpartyName = tool || "planner";
+
+	if (eventType === "session.prompt.started") {
+		kind = "plan-step";
+		state = "working";
+		summary = "Plan started";
+		counterpartyName = "planner";
+	} else if (eventType === "session.prompt.tool.start") {
+		kind = "state-change";
+		state = "working";
+		summary = `→ ${tool || "tool"} call`;
+	} else if (eventType === "session.prompt.tool.end") {
+		if (error) {
+			kind = "state-change";
+			state = "failed";
+			summary = `${tool || "tool"} failed: ${error.slice(0, 80)}`;
+		} else {
+			kind = "artifact";
+			state = "completed";
+			summary = `${tool || "tool"} returned`;
+		}
+	} else if (eventType === "session.prompt.finished") {
+		kind = "state-change";
+		state = "completed";
+		const stop = props.stopReason ? ` · ${props.stopReason}` : "";
+		summary = `Plan finished${stop}`;
+		counterpartyName = "planner";
+	} else {
+		summary = eventType || "(gateway event)";
+	}
+
+	const sigs = (props.signatures as Record<string, unknown> | null | undefined) ?? null;
+	const signed = !!sigs && (sigs.signed as number) > 0;
+
+	return {
+		id: raw.id,
+		agentId: raw.agentId,
+		parentId: p.parent_id || undefined,
+		ts: (p.timestamp ?? raw.receivedAt).slice(11, 19),
+		relTs: "live",
+		counterparty: {
+			name: counterpartyName,
+			did: `did:bindu:gateway:${String(props.sessionID ?? "?").slice(0, 8)}`,
+			trust: "self",
+		},
+		kind,
+		state,
+		summary,
+		signed,
+		verify: {
+			signature: signed,
+			didMatch: signed,
+			nonce: String(props.callID ?? p.event_id ?? "").slice(0, 8) || "—",
+		},
+		payload: JSON.stringify(p, null, 2),
+	};
+}
+
 export function mapWebhookToEvent(raw: RawWebhook): StreamEvent {
 	const p = raw.payload;
+
+	if (p.kind === "gateway-event") return mapGatewayEvent(raw);
+
 	const isArtifact = p.kind === "artifact-update";
 	const state = normalizeState(p.status?.state, isArtifact);
 	const firstContact = !isArtifact && markContext(raw.agentId, p.context_id);
