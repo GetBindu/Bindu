@@ -33,10 +33,21 @@ const subscribers = new Set<(e: LiveEvent) => void>();
 // authenticate via DID/HMAC headers in the future).
 const REQUIRED_TOKEN = process.env.BINDU_COMMS_TOKEN ?? "";
 
-function authMiddleware(c: { req: { header: (name: string) => string | undefined } }) {
+// Accept the token from either the Authorization header (preferred — used
+// by direct API consumers / curl) OR a ?token= query param (the only way
+// browser EventSource can authenticate, since it can't set headers).
+//
+// Query-string tokens get logged by intermediaries, so this is a
+// dev-surface compromise. A real auth track would use cookies or move
+// off EventSource to fetch-stream.
+function authMiddleware(c: {
+	req: { header: (name: string) => string | undefined; query: (name: string) => string | undefined };
+}) {
 	if (!REQUIRED_TOKEN) return null;
-	const got = c.req.header("authorization") ?? "";
-	if (got === `Bearer ${REQUIRED_TOKEN}`) return null;
+	const header = c.req.header("authorization") ?? "";
+	if (header === `Bearer ${REQUIRED_TOKEN}`) return null;
+	const query = c.req.query("token") ?? "";
+	if (query === REQUIRED_TOKEN) return null;
 	return { error: "unauthorized" } as const;
 }
 

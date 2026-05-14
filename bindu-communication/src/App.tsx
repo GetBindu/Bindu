@@ -28,7 +28,11 @@ function Shell() {
 	}, [openRegister]);
 
 	useEffect(() => {
-		const es = new EventSource("/api/events/stream");
+		const token = import.meta.env.VITE_COMMS_TOKEN as string | undefined;
+		const url = token
+			? `/api/events/stream?token=${encodeURIComponent(token)}`
+			: "/api/events/stream";
+		const es = new EventSource(url);
 		es.onmessage = (msg) => {
 			try {
 				addLiveEvent(mapWebhookToEvent(JSON.parse(msg.data)));
