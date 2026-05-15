@@ -51,11 +51,12 @@ export function groupByThread(events: StreamEvent[]): Thread[] {
 }
 
 /**
- * Pull a usable context id off any event shape:
- * - live status/artifact events carry it on payload.context_id (from JSON
- *   raw); we keep a flattened copy on counterparty for the prototype.
- * - mock events don't have a context_id field; we synthesize one from
- *   counterparty.did so the mock scenario still groups into one thread.
+ * Pull a usable thread key off any event shape:
+ * - A2A live events carry payload.context_id — that's the real thread id.
+ * - Events without one (mock scenarios, gateway plan-step rows whose
+ *   payload uses sessionID instead of context_id) fall back to the
+ *   counterparty DID so they still group sensibly (one thread per
+ *   correspondent / per gateway session).
  */
 function extractContextId(e: StreamEvent): string | null {
 	if (e.payload) {
@@ -68,14 +69,19 @@ function extractContextId(e: StreamEvent): string | null {
 			// fall through
 		}
 	}
-	// Mock fallback: per-counterparty grouping
-	if (e.counterparty?.did) return `mock:${e.counterparty.did}`;
+	if (e.counterparty?.did) return e.counterparty.did;
 	return null;
 }
 
 export function shortContextId(ctx: string): string {
 	if (ctx.length <= 12) return ctx;
-	if (ctx.startsWith("mock:")) return ctx.slice(5, 17) + "…";
+	// DID-style keys (did:bindu:…) get the existing DID short rendering
+	if (ctx.startsWith("did:")) {
+		const parts = ctx.split(":");
+		const last = parts[parts.length - 1] ?? "";
+		return `${parts.slice(0, -1).join(":")}:${last.slice(0, 4)}…`;
+	}
+	// Raw context IDs (UUIDs etc.) get first…last
 	return ctx.slice(0, 8) + "…" + ctx.slice(-4);
 }
 
