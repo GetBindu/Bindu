@@ -16,6 +16,7 @@ export interface NewAgentDraft {
 
 interface UIState {
 	selectedEventId: string | null;
+	selectedThreadId: string | null;
 	detailTab: DetailTab;
 	streamPaused: boolean;
 	expandedTraces: Set<string>;
@@ -25,6 +26,7 @@ interface UIState {
 	liveEvents: StreamEvent[];
 
 	selectEvent: (id: string | null) => void;
+	selectThread: (contextId: string | null) => void;
 	setDetailTab: (tab: DetailTab) => void;
 	togglePause: () => void;
 	toggleTrace: (id: string) => void;
@@ -37,6 +39,7 @@ interface UIState {
 
 export const useUI = create<UIState>((set) => ({
 	selectedEventId: "wa-7",
+	selectedThreadId: null,
 	detailTab: "glance",
 	streamPaused: false,
 	expandedTraces: new Set(["plan-1"]),
@@ -46,6 +49,7 @@ export const useUI = create<UIState>((set) => ({
 	liveEvents: [],
 
 	selectEvent: (id) => set({ selectedEventId: id }),
+	selectThread: (contextId) => set({ selectedThreadId: contextId }),
 	setDetailTab: (tab) => set({ detailTab: tab }),
 	togglePause: () => set((s) => ({ streamPaused: !s.streamPaused })),
 	toggleTrace: (id) =>

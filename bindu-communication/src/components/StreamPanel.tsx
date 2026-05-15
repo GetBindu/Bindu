@@ -1,55 +1,38 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useParams } from "react-router";
 import clsx from "clsx";
-import { WarningIcon, PauseIcon, PlayIcon } from "@phosphor-icons/react";
+import { PauseIcon, PlayIcon } from "@phosphor-icons/react";
 import { events as mockEvents } from "~/data/mock";
 import { useUI } from "~/state";
 import { shortDid } from "~/lib/format";
-import { EventRow } from "./EventRow";
-
-const FILTERS = ["all", "needs-attention", "completed", "untrusted"] as const;
+import { ThreadList } from "./ThreadList";
+import { ThreadView } from "./ThreadView";
 
 export function StreamPanel() {
 	const { agentId = "writer" } = useParams<{ agentId: string }>();
 	const streamPaused = useUI((s) => s.streamPaused);
 	const togglePause = useUI((s) => s.togglePause);
-	const expandedTraces = useUI((s) => s.expandedTraces);
 	const agents = useUI((s) => s.agents);
 	const liveEvents = useUI((s) => s.liveEvents);
+	const selectedThreadId = useUI((s) => s.selectedThreadId);
+	const selectThread = useUI((s) => s.selectThread);
 
 	const agent = agents.find((a) => a.id === agentId) ?? agents[0];
 
-	const visible = useMemo(() => {
-		const list = [...liveEvents, ...mockEvents]
-			.filter((e) => e.agentId === agentId)
-			.sort((a, b) => b.ts.localeCompare(a.ts));
-		const out: typeof list = [];
-		for (const e of list) {
-			if (e.parentId) continue;
-			out.push(e);
-			if (expandedTraces.has(e.id)) {
-				out.push(...list.filter((c) => c.parentId === e.id));
-			}
-		}
-		return out;
-	}, [agentId, expandedTraces, liveEvents]);
+	// Clear the open thread when the user switches agents — a context_id
+	// belongs to one agent's inbox, not another's.
+	useEffect(() => {
+		selectThread(null);
+	}, [agentId, selectThread]);
 
-	const childrenIds = useMemo(
+	const agentEvents = useMemo(
 		() =>
-			new Set(
-				[...liveEvents, ...mockEvents]
-					.filter((e) => e.parentId)
-					.map((e) => e.parentId!),
-			),
-		[liveEvents],
+			[...liveEvents, ...mockEvents].filter((e) => e.agentId === agentId),
+		[agentId, liveEvents],
 	);
-
-	const attention = visible.filter((e) => e.needsAttention);
-	const feed = visible.filter((e) => !e.needsAttention);
 
 	return (
 		<main className="flex min-w-0 flex-1 flex-col">
-			{/* Header */}
 			<header className="flex items-center justify-between border-b border-[--color-border-soft] bg-[--color-panel] px-6 py-3">
 				<div className="flex items-baseline gap-3">
 					<h1 className="text-[14px] font-medium text-fg">{agent.name}</h1>
@@ -84,70 +67,13 @@ export function StreamPanel() {
 				</div>
 			</header>
 
-			{/* Filters */}
-			<div className="flex items-center gap-2 border-b border-[--color-border-soft] px-6 py-2.5">
-				<span className="text-[10px] uppercase tracking-[0.15em] text-fg-dim">
-					Filters
-				</span>
-				{FILTERS.map((f, i) => (
-					<button
-						key={f}
-						type="button"
-						className={clsx(
-							"rounded-full border px-2.5 py-0.5 text-[11px] transition",
-							i === 0
-								? "border-[--color-cobalt] bg-[--color-cobalt-soft] text-[--color-cobalt-strong]"
-								: "border-[--color-border-soft] text-fg-dim hover:border-[--color-cobalt] hover:text-[--color-cobalt]",
-						)}
-					>
-						{f}
-					</button>
-				))}
-			</div>
-
-			{/* Body */}
-			<div className="scrollbar flex-1 overflow-y-auto">
-				{attention.length > 0 && (
-					<section className="border-b border-yellow-300/60 bg-yellow-50/60">
-						<div className="flex items-center justify-between px-6 pb-2 pt-3">
-							<div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.15em] text-yellow-800">
-								<WarningIcon size={12} weight="fill" />
-								Needs Attention ({attention.length})
-							</div>
-							<span className="text-[10px] text-fg-dim">
-								your input unblocks the agent
-							</span>
-						</div>
-						{attention.map((e) => (
-							<EventRow
-								key={e.id}
-								event={e}
-								hasChildren={childrenIds.has(e.id)}
-								indented={!!e.parentId}
-								attentionLane
-							/>
-						))}
-					</section>
-				)}
-
-				<div className="px-6 pb-2 pt-4 text-[10px] uppercase tracking-[0.15em] text-fg-dim">
-					Live feed
+			{selectedThreadId ? (
+				<ThreadView contextId={selectedThreadId} events={agentEvents} />
+			) : (
+				<div className="scrollbar flex-1 overflow-y-auto">
+					<ThreadList events={agentEvents} />
 				</div>
-				{feed.map((e) => (
-					<EventRow
-						key={e.id}
-						event={e}
-						hasChildren={childrenIds.has(e.id)}
-						indented={!!e.parentId}
-						attentionLane={false}
-					/>
-				))}
-				{feed.length === 0 && attention.length === 0 && (
-					<div className="flex h-40 items-center justify-center text-[12px] text-fg-dim">
-						No events for this agent.
-					</div>
-				)}
-			</div>
+			)}
 		</main>
 	);
 }
