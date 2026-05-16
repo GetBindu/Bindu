@@ -23,7 +23,7 @@ export interface EcosystemAgent {
 // --- personal agent ----------------------------------------------------
 // Mirrors `server/db.ts:PersonalAgentRow`. The wizard owns the persona
 // shape so we keep it flexible — server only enforces persona.name; the
-// rest is a TinyTroupe-style suggestion, not a requirement. Stored verbatim.
+// rest is a suggestion, not a requirement. Stored verbatim.
 
 export type PersonalAgentStatus =
 	| "configuring"
@@ -38,8 +38,8 @@ export interface PersonalAgentOccupation {
 	description?: string;
 }
 
-/** TinyTroupe-style persona. Every field except `name` is optional so
- * the wizard can save in-progress drafts and the user can fill in only
+/** Operator persona. Every field except `name` is optional so the
+ * wizard can save in-progress drafts and the user can fill in only
  * what matters to them. */
 export interface Persona {
 	name: string;

@@ -8,7 +8,7 @@
  *
  * Layout produced under `~/.bindu/personal/`:
  *
- *   persona.json         — TinyTroupe-shape JSON (Phase 2 wizard output)
+ *   persona.json         — operator persona JSON (Phase 2 wizard output)
  *   .env                 — model + Pipedream + DID hints (chmod 600)
  *   agent.py             — bindufied agno agent (auto-regenerated)
  *   logs/agent.log       — stdout+stderr tail

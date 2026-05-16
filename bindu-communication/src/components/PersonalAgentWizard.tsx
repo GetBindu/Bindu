@@ -529,8 +529,8 @@ function PersonaStep({
 				<div>
 					<h3 className="text-[13px] font-medium text-fg">Who is your agent?</h3>
 					<p className="mt-1 text-[11px] leading-relaxed text-fg-dim">
-						This persona shapes how your agent talks to others. The shape
-						mirrors TinyTroupe — fill in only what you care about.
+						This persona shapes how your agent talks to others. Fill in
+						only what you care about — every field except name is optional.
 					</p>
 				</div>
 				<ExampleMenu onSelect={onLoadExample} />

@@ -61,7 +61,7 @@ db.exec(`
 	);
 
 	-- Single-row table for the operator's personal agent. Key is always
-	-- 'me'; we keep one row max. Persona is the TinyTroupe-style JSON
+	-- 'me'; we keep one row max. Persona is operator-supplied JSON
 	-- stored verbatim as TEXT and parsed in helpers. DID is captured post-spawn
 	-- from the bindufied agent's /.well-known/did.json. Pipedream account
 	-- refs live in 'tools' JSON: { gmail?: { accountId }, notion?: { accountId } }.
@@ -332,7 +332,7 @@ export function listThreadState(): ThreadStateRow[] {
 // --- personal agent (single row, key='me') -------------------------------
 // The operator's own bindufied agent. Lifecycle:
 //   configuring → starting → alive ↔ down → failed
-// Persona JSON is TinyTroupe-shape. `tools` records the Pipedream Connect
+// Persona JSON is operator-supplied. `tools` records the Pipedream Connect
 // account IDs we got from the OAuth flow; the spawn step turns those
 // into MCP server URLs at code-gen time.
 
