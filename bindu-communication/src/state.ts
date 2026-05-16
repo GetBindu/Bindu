@@ -56,6 +56,10 @@ interface UIState {
 	composeDraftId: string | null;
 	openComposeWith: (draftId: string | null) => void;
 	hydrateThreadState: () => Promise<void>;
+	/** Auditor side panel (Verify / Inspect) toggle. Off by default so the
+	 * inbox surface stays Gmail-shape. */
+	showDetailRail: boolean;
+	toggleDetailRail: () => void;
 }
 
 const DRAFTS_LS_KEY = "bindu-comms:drafts";
@@ -124,8 +128,10 @@ export const useUI = create<UIState>((set) => ({
 	archivedThreads: new Set(),
 	drafts: loadDrafts(),
 	composeDraftId: null,
+	showDetailRail: false,
 
 	selectEvent: (id) => set({ selectedEventId: id }),
+	toggleDetailRail: () => set((s) => ({ showDetailRail: !s.showDetailRail })),
 	selectThread: (contextId) =>
 		set((s) => {
 			// Opening a thread implicitly marks it read.

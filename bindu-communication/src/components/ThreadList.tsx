@@ -274,7 +274,7 @@ function ThreadRow({
 				}
 			}}
 			className={clsx(
-				"group flex w-full cursor-pointer items-center gap-3 border-b border-[--color-border-soft] px-4 py-2.5 text-left transition hover:bg-[--color-row-hover] md:px-6 md:py-3",
+				"group flex w-full cursor-pointer items-center gap-3 border-b border-[--color-border-soft] px-4 py-3 text-left transition hover:bg-[--color-row-hover] md:px-6 md:py-3.5",
 				isUnread && "bg-yellow-50/40",
 				selected && "bg-[--color-cobalt-soft]",
 			)}
@@ -296,10 +296,12 @@ function ThreadRow({
 			>
 				{selected && <CheckIcon size={9} weight="bold" />}
 			</button>
-			{/* Unread dot */}
-			<div className="flex w-2 shrink-0 justify-center">
+
+			{/* Avatar — colored circle with first letter. Gmail-shape. */}
+			<div className="relative shrink-0">
+				<Avatar seed={labelTarget} />
 				{isUnread && !selected && (
-					<span className="h-2 w-2 rounded-full bg-[--color-cobalt]" />
+					<span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[--color-cobalt] ring-2 ring-white" />
 				)}
 			</div>
 
@@ -395,27 +397,79 @@ function ThreadRow({
 }
 
 /**
- * Best-effort "subject line" for a thread:
- * - if the conversation contains an outbound event with a `text` body, use that
- *   (that's the operator's first prompt — true subject in Gmail terms).
- * - else fall back to a Thread-id-style label.
+ * Best-effort "subject line" for a thread.
  *
- * We can't know the subject of an inbound-only conversation without the
- * recipient's task body. That's the data gap we flagged in Step 1.
+ * Priority:
+ *   1. Operator-canonical: an outbound event in this thread has the body
+ *      text — that IS the subject in Gmail terms.
+ *   2. Inbound state events get a humanized phrase (no "state → working").
+ *   3. Otherwise fall back to a thread short id.
  */
 function subjectFor(thread: Thread): string {
+	// Try to read the outbound body from the EARLIEST outbound event in the
+	// thread — operator-canonical "subject" of the conversation.
+	if (thread.earliest.agentId === "outbox" && thread.earliest.payload) {
+		try {
+			const p = JSON.parse(thread.earliest.payload) as { text?: string };
+			if (typeof p.text === "string" && p.text.trim().length > 0) {
+				return p.text;
+			}
+		} catch {
+			// no-op
+		}
+	}
+
 	const e = thread.latest;
+
+	// Outbound: latest event has the body text.
 	try {
 		const p = e.payload ? JSON.parse(e.payload) : null;
-		if (p?.text && typeof p.text === "string") {
-			return p.text;
-		}
+		if (p?.text && typeof p.text === "string") return p.text;
 	} catch {
 		// no-op
 	}
+
+	// Inbound + lifecycle: humanize the state instead of "state → working".
+	if (e.state) {
+		const map: Record<string, string> = {
+			submitted: "New request received",
+			pending: "Pending",
+			working: "Working on it…",
+			"input-required": "Needs your input",
+			"payment-required": "Payment required",
+			"auth-required": "Auth required",
+			completed: "Completed",
+			failed: "Failed",
+		};
+		if (map[e.state]) return map[e.state];
+	}
+
+	if (e.kind === "artifact") return "Artifact delivered";
 	if (e.counterparty.name === "task") {
 		return `Thread ${shortContextId(thread.contextId)}`;
 	}
 	return e.summary;
+}
+
+/**
+ * Colored letter avatar, Gmail-shape. Hue is deterministic on the seed so
+ * the same agent gets the same color across views and refreshes.
+ */
+function Avatar({ seed }: { seed: string }) {
+	let h = 0;
+	for (let i = 0; i < seed.length; i++) {
+		h = (h * 31 + seed.charCodeAt(i)) | 0;
+	}
+	const hue = Math.abs(h) % 360;
+	const initial = (seed.replace(/^did:bindu:[^:]+:/, "").trim()[0] ?? "?").toUpperCase();
+	return (
+		<div
+			className="flex h-8 w-8 items-center justify-center rounded-full text-[12px] font-semibold text-white"
+			style={{ backgroundColor: `hsl(${hue} 45% 50%)` }}
+			aria-hidden
+		>
+			{initial}
+		</div>
+	);
 }
 

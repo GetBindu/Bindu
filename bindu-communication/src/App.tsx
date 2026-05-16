@@ -20,6 +20,13 @@ function Shell() {
 	const closeCompose = useUI((s) => s.closeCompose);
 	const addLiveEvent = useUI((s) => s.addLiveEvent);
 	const hydrateThreadState = useUI((s) => s.hydrateThreadState);
+	const showDetailRail = useUI((s) => s.showDetailRail);
+	const selectedThreadId = useUI((s) => s.selectedThreadId);
+	// Detail rail (Verify / Inspect) is an opt-in side panel — agentic-inbox
+	// pattern. Only show it when a thread is open AND the user has asked
+	// for the auditor view. Gmail's main surface is the inbox, not a
+	// debug rail.
+	const railVisible = showDetailRail && !!selectedThreadId;
 
 	// Pull the server-side triage state once on mount. Optimistic local
 	// updates after this point keep their own copy in sync via the
@@ -64,7 +71,7 @@ function Shell() {
 		<div className="flex h-screen w-full overflow-hidden text-fg">
 			<Sidebar />
 			<StreamPanel />
-			<DetailRail />
+			{railVisible && <DetailRail />}
 			<RegisterModal />
 			<ComposeModal open={showCompose} onClose={closeCompose} />
 		</div>

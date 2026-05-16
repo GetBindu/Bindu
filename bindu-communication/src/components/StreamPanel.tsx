@@ -6,13 +6,34 @@ import {
 	TrayIcon,
 	MagnifyingGlassIcon,
 	XIcon,
+	ShieldCheckIcon,
 } from "@phosphor-icons/react";
 import { events as mockEvents } from "~/data/mock";
 import { useUI } from "~/state";
-import { shortDid } from "~/lib/format";
 import { ThreadList } from "./ThreadList";
 import { ThreadView } from "./ThreadView";
 import { DraftList } from "./DraftList";
+
+function DetailRailToggle() {
+	const showDetailRail = useUI((s) => s.showDetailRail);
+	const toggleDetailRail = useUI((s) => s.toggleDetailRail);
+	return (
+		<button
+			type="button"
+			onClick={toggleDetailRail}
+			title={showDetailRail ? "Hide auditor panel" : "Show auditor panel"}
+			className={clsx(
+				"flex items-center gap-1.5 rounded-md border bg-white px-2 py-1 text-[11px] transition",
+				showDetailRail
+					? "border-[--color-cobalt] text-[--color-cobalt]"
+					: "border-[--color-border] text-fg-muted hover:border-[--color-cobalt] hover:text-[--color-cobalt]",
+			)}
+		>
+			<ShieldCheckIcon size={11} weight="bold" />
+			Verify
+		</button>
+	);
+}
 
 type Folder = "inbox" | "sent" | "drafts" | "archive";
 type Mode = { kind: "folder"; folder: Folder } | { kind: "agent"; agentId: string };
@@ -58,32 +79,25 @@ export function StreamPanel() {
 		return all;
 	}, [mode, liveEvents]);
 
-	const FOLDER_TITLES: Record<Folder, [string, string]> = {
-		inbox: ["Inbox", "Conversations from your ecosystem"],
-		sent: ["Sent", "Conversations you initiated"],
-		drafts: ["Drafts", "Unsent messages saved locally"],
-		archive: ["Archive", "Threads you set aside"],
+	const FOLDER_TITLES: Record<Folder, string> = {
+		inbox: "Inbox",
+		sent: "Sent",
+		drafts: "Drafts",
+		archive: "Archive",
 	};
 	const title =
 		mode.kind === "folder"
-			? FOLDER_TITLES[mode.folder][0]
+			? FOLDER_TITLES[mode.folder]
 			: agents.find((a) => a.id === mode.agentId)?.name ?? mode.agentId;
-	const subtitle =
-		mode.kind === "folder"
-			? FOLDER_TITLES[mode.folder][1]
-			: shortDid(agents.find((a) => a.id === mode.agentId)?.did ?? "");
 
 	return (
 		<main className="flex min-w-0 flex-1 flex-col">
 			<header className="flex items-center justify-between gap-4 border-b border-[--color-border-soft] bg-[--color-panel] px-6 py-3">
-				<div className="flex min-w-0 items-baseline gap-3">
+				<div className="flex min-w-0 items-center gap-2.5">
 					{mode.kind === "folder" && (
-						<TrayIcon size={16} weight="duotone" className="text-fg-muted" />
+						<TrayIcon size={18} weight="duotone" className="text-fg-muted" />
 					)}
-					<h1 className="shrink-0 text-[14px] font-medium text-fg">{title}</h1>
-					<span className="hidden truncate text-[11px] text-fg-dim md:inline">
-						{subtitle}
-					</span>
+					<h1 className="shrink-0 text-[15px] font-semibold text-fg">{title}</h1>
 				</div>
 				<div className="relative max-w-[320px] flex-1">
 					<MagnifyingGlassIcon
@@ -109,7 +123,8 @@ export function StreamPanel() {
 						</button>
 					)}
 				</div>
-				<div className="flex items-center gap-3">
+				<div className="flex items-center gap-2">
+					{selectedThreadId && <DetailRailToggle />}
 					<button
 						type="button"
 						onClick={openCompose}
@@ -118,10 +133,6 @@ export function StreamPanel() {
 						<PencilSimpleIcon size={11} weight="fill" />
 						Compose
 					</button>
-					<div className="flex items-center gap-1.5 text-[11px]">
-						<span className="live-pulse inline-block h-1.5 w-1.5 rounded-full bg-[--color-cobalt]" />
-						<span className="text-fg-muted">live</span>
-					</div>
 				</div>
 			</header>
 			{/* MailboxSplitView — list shrinks to 380px when a thread opens,
