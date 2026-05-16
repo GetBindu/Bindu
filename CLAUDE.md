@@ -2,8 +2,8 @@
 
 ## Critical Context (Read First)
 
-- **Language**: Python 3.12+ (core), TypeScript (SDK + frontend)
-- **Framework**: FastAPI/Starlette (HTTP), gRPC (cross-language), SvelteKit (frontend)
+- **Language**: Python 3.12+ (core), TypeScript (SDK + comms UI + gateway)
+- **Framework**: FastAPI/Starlette (HTTP), gRPC (cross-language), React/Vite (bindu-communication UI)
 - **Database**: MongoDB (primary), PostgreSQL (optional), Redis (caching)
 - **Architecture**: Microservices with DID-based identity, OAuth2 auth, x402 payments
 - **Testing**: pytest (Python), Jest (TypeScript), Playwright (E2E)
@@ -40,10 +40,10 @@ npm run build                    # Compile TypeScript
 npm test                         # Run tests
 npm run lint                     # ESLint
 
-# Frontend
-cd frontend
+# Communications UI (operator inbox)
+cd bindu-communication
 npm install
-npm run dev                      # Dev server (port 5173)
+npm run dev                      # Dev server (port 3775)
 npm run build                    # Production build
 npm run preview                  # Preview build
 
@@ -142,10 +142,9 @@ bindu/
 │       │   ├── client.ts       # BinduService gRPC client
 │       │   └── core-launcher.ts # Spawns Python core
 │       └── proto/              # gRPC proto files
-├── frontend/                   # SvelteKit UI
-│   └── src/
-│       ├── routes/             # Pages
-│       └── lib/                # Components, utilities
+├── bindu-communication/        # Operator inbox UI (React + Vite + Hono)
+│   ├── server/                 # Hono API on :3787 (SQLite-backed events log)
+│   └── src/                    # React app on :3775
 ├── examples/
 │   ├── typescript-openai-agent/
 │   └── typescript-langchain-agent/

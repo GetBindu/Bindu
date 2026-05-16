@@ -26,8 +26,8 @@ lsof -ti:3773 -ti:3774           # Check which ports are bound
 # TypeScript SDK
 cd sdks/typescript && npm run build
 
-# Frontend dashboard (port 5173)
-cd frontend && npm run dev
+# Operator inbox UI (port 3775)
+cd bindu-communication && npm run dev
 
 # gRPC stub regeneration (after editing proto/agent_handler.proto)
 bash scripts/generate_protos.sh all

@@ -48,7 +48,6 @@ matching `bugs/<subsystem>/` folder:
 - [`bugs/gateway/`](./gateway/) — gateway postmortems
 - [`bugs/core/`](./core/) — Bindu Core (Python) postmortems
 - [`bugs/sdk/`](./sdk/) — SDK postmortems (none yet)
-- [`bugs/frontend/`](./frontend/) — frontend postmortems (none yet)
 
 See [`bugs/README.md`](./README.md) for the postmortem template.
 
@@ -64,7 +63,6 @@ Issue referencing the slug (e.g. "Fixes `context-window-hardcoded`").
 | [Gateway](#gateway) | 2 | 14 | 19 | 9 |
 | [Bindu Core (Python)](#bindu-core-python) | 0 | 6 | 3 | 0 |
 | [SDKs (TypeScript)](#sdks-typescript) | — | — | — | — |
-| [Frontend](#frontend) | — | — | — | — |
 
 ---
 
@@ -1010,9 +1008,3 @@ limit on the Starlette app.
 _No entries yet. Add them when the TS SDK's review pass lands. New
 postmortems for fixed SDK bugs go in [`bugs/sdk/`](./sdk/)._
 
----
-
-## Frontend
-
-_No entries yet. New postmortems for fixed frontend bugs go in
-[`bugs/frontend/`](./frontend/)._

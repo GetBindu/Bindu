@@ -454,7 +454,7 @@ Gateway 文档：
   </a>
 </div>
 
-运行 `cd frontend && npm run dev` 后，`http://localhost:5173` 上可用的内置聊天 UI。
+运行 `cd bindu-communication && npm run dev` 后，`http://localhost:3775` 上可用的内置聊天 UI。
 
 <p align="center">
   <img src="../assets/agent-ui.png" alt="Bindu agent UI" width="640" />
@@ -552,7 +552,7 @@ rm -rf .venv && uv venv --python 3.12.9 && uv sync --dev
 
 ## 已知问题
 
-如果您在生产中运行 Bindu，请先阅读 [`bugs/known-issues.md`](bugs/known-issues.md)。它是一个带有变通方法的 per-subsistem 目录。已解决错误的 postmortems 在 [`bugs/core/`](bugs/core/)、[`bugs/gateway/`](bugs/gateway/)、[`bugs/sdk/`](bugs/sdk/) 和 [`bugs/frontend/`](bugs/frontend/) 下。
+如果您在生产中运行 Bindu，请先阅读 [`bugs/known-issues.md`](bugs/known-issues.md)。它是一个带有变通方法的 per-subsistem 目录。已解决错误的 postmortems 在 [`bugs/core/`](bugs/core/)、[`bugs/gateway/`](bugs/gateway/)、[`bugs/sdk/`](bugs/sdk/) 下。
 
 当前高严重性项目：
 

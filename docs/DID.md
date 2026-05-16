@@ -354,7 +354,7 @@ See [AUTHENTICATION.md](./AUTHENTICATION.md#step-2--exchange-the-secret-for-a-to
 
 ### 4. Sign and send a request
 
-Use the gateway's sign-request helper (`gateway/src/bindu/identity/local.ts`), the frontend POC (`frontend/src/lib/did/`), or a Postman pre-request script (a full example lives in our Postman collection). All three produce identical bytes — they've been cross-tested.
+Use the gateway's sign-request helper (`gateway/src/bindu/identity/local.ts`) or a Postman pre-request script (a full example lives in our Postman collection). Both produce identical bytes — they've been cross-tested.
 
 If you're hand-rolling signing in a new language, the rules are in the "Signing a request" section above. Test against the canonical fixture: seed `= 32 zero bytes`, DID `= did:bindu:test`, body `= {"test": "value"}`, timestamp `= 1000`. Your signature should Base58-encode to:
 
@@ -407,7 +407,7 @@ The DID in `X-DID` doesn't have a public key registered with Hydra. Two paths:
 
 ### "I'm getting `missing_signature_headers`"
 
-You sent `Authorization: Bearer <token>` where the token's `client_id` is a DID, but you forgot to also send the three X-DID-* headers. Once the token's client is a DID, signing becomes mandatory — there's no "unsigned is fine" fallback. The gateway and frontend helpers always set all three.
+You sent `Authorization: Bearer <token>` where the token's `client_id` is a DID, but you forgot to also send the three X-DID-* headers. Once the token's client is a DID, signing becomes mandatory — there's no "unsigned is fine" fallback. The gateway's sign-request helper always sets all three.
 
 ---
 

@@ -90,11 +90,11 @@ curl --location 'http://localhost:3773/' \
 }'
 ```
 
-### Via Frontend UI
+### Via Operator Inbox UI
 
 ```bash
-cd frontend && npm run dev
-# Open http://localhost:5173
+cd bindu-communication && npm run dev
+# Open http://localhost:3775
 ```
 
 ## Security

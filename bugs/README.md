@@ -15,7 +15,6 @@ Two artifacts, one folder:
     `scripts/`
   - [`gateway/`](./gateway/) — gateway: `gateway/`
   - [`sdk/`](./sdk/) — SDKs: `sdks/`
-  - [`frontend/`](./frontend/) — frontend: `frontend/`
 
 Together they answer two different questions:
 
@@ -37,8 +36,7 @@ bugs/
 │   └── 2026-04-18-*.md
 ├── gateway/                (gateway postmortems)
 │   └── 2026-04-18-*.md
-├── sdk/                    (SDK postmortems — none yet)
-└── frontend/               (frontend postmortems — none yet)
+└── sdk/                    (SDK postmortems — none yet)
 ```
 
 ## When to write a postmortem

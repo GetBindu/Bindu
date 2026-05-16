@@ -285,12 +285,6 @@ If you've lost the client secret entirely, register a fresh one via the admin AP
 
 ---
 
-## A word on the UI
-
-The Bindu frontend has a Settings → Authentication page that can do step 2 for you. Enter your client secret, click a button, get a token. Useful when you're poking around with Postman or a browser extension. It's a convenience — not a replacement for understanding what's happening underneath.
-
----
-
 ## Where to go next
 
 Authentication answers _"are you allowed in?"_ But in a world where one agent might ask another agent to do work on behalf of yet a third agent, you need a stronger question answered: _"are you really who you claim to be?"_ That's what DID signing handles.

@@ -454,7 +454,7 @@ OpenAI या Anthropic API बोलने वाले किसी भी LLM
   </a>
 </div>
 
-`cd frontend && npm run dev` चलाने के बाद, `http://localhost:5173` पर एक अंतर्निहित चैट UI उपलब्ध है।
+`cd bindu-communication && npm run dev` चलाने के बाद, `http://localhost:3775` पर एक अंतर्निहित चैट UI उपलब्ध है।
 
 <p align="center">
   <img src="../assets/agent-ui.png" alt="Bindu agent UI" width="640" />
@@ -552,7 +552,7 @@ Windows PowerShell पर आपको `Set-ExecutionPolicy RemoteSigned -Scope 
 
 ## ज्ञात समस्याएं
 
-यदि आप Bindu को उत्पादन में चला रहे हैं, तो पहले [`bugs/known-issues.md`](bugs/known-issues.md) पढ़ें। यह वर्कअराउंड के साथ प्रति-सबसिस्टम कैटलॉग है। तय किए गए बग के लिए पोस्टमॉर्टम [`bugs/core/`](bugs/core/), [`bugs/gateway/`](bugs/gateway/), [`bugs/sdk/`](bugs/sdk/), और [`bugs/frontend/`](bugs/frontend/) के तहत रहते हैं।
+यदि आप Bindu को उत्पादन में चला रहे हैं, तो पहले [`bugs/known-issues.md`](bugs/known-issues.md) पढ़ें। यह वर्कअराउंड के साथ प्रति-सबसिस्टम कैटलॉग है। तय किए गए बग के लिए पोस्टमॉर्टम [`bugs/core/`](bugs/core/), [`bugs/gateway/`](bugs/gateway/), [`bugs/sdk/`](bugs/sdk/) के तहत रहते हैं।
 
 वर्तमान उच्च-गंभीरता आइटम:
 

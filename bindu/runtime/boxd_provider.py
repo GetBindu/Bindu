@@ -48,7 +48,6 @@ AGENT_PID_PATH = "/tmp/bindu-agent.pid"  # nosec B108 — single-tenant VM
 # nothing here is needed by ``pip install -e .`` for the Python package.
 # Keeping the tarball small avoids hitting boxd's gRPC message size limit.
 _BINDU_SHIP_EXCLUDES = (
-    "frontend/",
     "assets/",
     "examples/",
     "docs/",
@@ -63,6 +62,7 @@ _BINDU_SHIP_EXCLUDES = (
     "alembic/",
     ".github/",
     ".vscode/",
+    "bindu-communication/",
 )
 
 _VM_READY_TIMEOUT = 60.0
@@ -209,7 +209,7 @@ class BoxdRuntimeProvider(RuntimeProvider):
         as the host, useful for testing pre-publication branches and for
         users running a patched bindu.
 
-        The bindu repo includes ~16 MB of frontend / assets / docs that the
+        The bindu repo includes ~16 MB of comms UI / assets / docs that the
         Python package doesn't need at runtime; we exclude them to stay well
         under boxd's per-message gRPC upload limit.
         """

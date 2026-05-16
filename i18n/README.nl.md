@@ -454,7 +454,7 @@ Mist u een framework dat u gebruikt? Open een issue of vraag op [Discord](https:
   </a>
 </div>
 
-Na het uitvoeren van `cd frontend && npm run dev` is een ingebouwde chat-UI beschikbaar op `http://localhost:5173`.
+Na het uitvoeren van `cd bindu-communication && npm run dev` is een ingebouwde chat-UI beschikbaar op `http://localhost:3775`.
 
 <p align="center">
   <img src="../assets/agent-ui.png" alt="Bindu agent UI" width="640" />
@@ -552,7 +552,7 @@ Op Windows PowerShell heeft u mogelijk `Set-ExecutionPolicy RemoteSigned -Scope 
 
 ## Bekende problemen
 
-Als u Bindu in productie draait, lees eerst [`bugs/known-issues.md`](bugs/known-issues.md). Het is een per-subsysteem catalogus met workarounds. Postmortems voor opgeloste bugs staan onder [`bugs/core/`](bugs/core/), [`bugs/gateway/`](bugs/gateway/), [`bugs/sdk/`](bugs/sdk/), en [`bugs/frontend/`](bugs/frontend/).
+Als u Bindu in productie draait, lees eerst [`bugs/known-issues.md`](bugs/known-issues.md). Het is een per-subsysteem catalogus met workarounds. Postmortems voor opgeloste bugs staan onder [`bugs/core/`](bugs/core/), [`bugs/gateway/`](bugs/gateway/), [`bugs/sdk/`](bugs/sdk/).
 
 Huidige items met hoge ernst:
 

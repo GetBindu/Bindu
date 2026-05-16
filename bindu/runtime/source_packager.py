@@ -211,7 +211,7 @@ def build_tarball(root: Path, extra_ignores: tuple[str, ...] = ()) -> bytes:
     Args:
         root: Project root to walk.
         extra_ignores: Additional ignore patterns to apply on top of
-            ``.gitignore`` / ``.binduignore``. Same syntax (``frontend/``,
+            ``.gitignore`` / ``.binduignore``. Same syntax (``docs/``,
             ``*.bin``, etc.). Used by callers that need to ship a subset
             of the repo without mutating user files.
 

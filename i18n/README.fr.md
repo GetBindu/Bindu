@@ -474,7 +474,7 @@
     </a>
   </div>
 
-  Après avoir exécuté `cd frontend && npm run dev`, une UI de chat intégrée est disponible sur `http://localhost:5173`。
+  Après avoir exécuté `cd bindu-communication && npm run dev`, une UI de chat intégrée est disponible sur `http://localhost:3775`。
 
   <p align="center">
     <img src="../assets/agent-ui.png" alt="Bindu agent UI" width="640" />
@@ -572,7 +572,7 @@
 
   ## Problèmes connus
 
-  Si vous exécutez Bindu en production, lisez d'abord [`bugs/known-issues.md`](bugs/known-issues.md)。 C'est un catalogue par sous-système avec des workarounds. Les postmortems pour les bugs corrigés résident sous [`bugs/core/`](bugs/core/), [`bugs/gateway/`](bugs/gateway/), [`bugs/sdk/`](bugs/sdk/) et [`bugs/frontend/`](bugs/frontend/)。
+  Si vous exécutez Bindu en production, lisez d'abord [`bugs/known-issues.md`](bugs/known-issues.md)。 C'est un catalogue par sous-système avec des workarounds. Les postmortems pour les bugs corrigés résident sous [`bugs/core/`](bugs/core/), [`bugs/gateway/`](bugs/gateway/), [`bugs/sdk/`](bugs/sdk/)。
 
   Éléments de haute priorité actuels :
 
@@ -1105,7 +1105,7 @@ Sortie :
 
 ## 🎨 Interface de Chat
 
-Bindu comprend une belle interface de chat à `http://localhost:5173`. Accédez au dossier `frontend` et exécutez `npm run dev` pour démarrer le serveur.
+Bindu comprend une boîte de réception opérateur à `http://localhost:3775`. Accédez au dossier `bindu-communication` et exécutez `npm run dev` pour démarrer le serveur.
 
 <p align="center">
   <img src="../assets/agent-ui.png" alt="Bindu Agent UI" width="640" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);" />

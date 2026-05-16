@@ -454,7 +454,7 @@ Cinco cubren el espectro de lo que Bindu puede hacer. Todos los 20+ ejemplos eje
   </a>
 </div>
 
-Después de ejecutar `cd frontend && npm run dev`, hay una UI de chat integrada disponible en `http://localhost:5173`。
+Después de ejecutar `cd bindu-communication && npm run dev`, hay una UI de chat integrada disponible en `http://localhost:3775`。
 
 <p align="center">
   <img src="../assets/agent-ui.png" alt="Bindu agent UI" width="640" />
@@ -552,7 +552,7 @@ En Windows PowerShell es posible que necesites `Set-ExecutionPolicy RemoteSigned
 
 ## Problemas conocidos
 
-Si ejecutas Bindu en producción, lee primero [`bugs/known-issues.md`](bugs/known-issues.md)。 Es un catálogo por subsistema con workarounds. Postmortems para bugs corregidos residen bajo [`bugs/core/`](bugs/core/), [`bugs/gateway/`](bugs/gateway/), [`bugs/sdk/`](bugs/sdk/) y [`bugs/frontend/`](bugs/frontend/)。
+Si ejecutas Bindu en producción, lee primero [`bugs/known-issues.md`](bugs/known-issues.md)。 Es un catálogo por subsistema con workarounds. Postmortems para bugs corregidos residen bajo [`bugs/core/`](bugs/core/), [`bugs/gateway/`](bugs/gateway/), [`bugs/sdk/`](bugs/sdk/)。
 
 Elementos de alta prioridad actuales:
 

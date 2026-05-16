@@ -454,7 +454,7 @@ Ihr Framework fehlt? Öffnen Sie ein Issue oder fragen Sie auf [Discord](https:/
   </a>
 </div>
 
-Nach dem Ausführen von `cd frontend && npm run dev` ist eine eingebaute Chat-UI unter `http://localhost:5173` verfügbar。
+Nach dem Ausführen von `cd bindu-communication && npm run dev` ist eine eingebaute Chat-UI unter `http://localhost:3775` verfügbar。
 
 <p align="center">
   <img src="../assets/agent-ui.png" alt="Bindu agent UI" width="640" />
@@ -552,7 +552,7 @@ Unter Windows PowerShell benötigen Sie möglicherweise `Set-ExecutionPolicy Rem
 
 ## Bekannte Probleme
 
-Wenn Sie Bindu in der Produktion betreiben, lesen Sie zuerst [`bugs/known-issues.md`](bugs/known-issues.md). Es ist ein Katalog pro Subsystem mit Workarounds. Postmortems für behobene Bugs finden Sie unter [`bugs/core/`](bugs/core/), [`bugs/gateway/`](bugs/gateway/), [`bugs/sdk/`](bugs/sdk/) und [`bugs/frontend/`](bugs/frontend/)。
+Wenn Sie Bindu in der Produktion betreiben, lesen Sie zuerst [`bugs/known-issues.md`](bugs/known-issues.md). Es ist ein Katalog pro Subsystem mit Workarounds. Postmortems für behobene Bugs finden Sie unter [`bugs/core/`](bugs/core/), [`bugs/gateway/`](bugs/gateway/), [`bugs/sdk/`](bugs/sdk/)。
 
 Aktuelle High-Priority-Elemente:
 
