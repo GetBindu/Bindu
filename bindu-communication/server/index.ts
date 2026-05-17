@@ -581,7 +581,7 @@ function loadPrivateKey(): crypto.KeyObject | null {
 }
 
 const BASE58_ALPHABET =
-	"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+	"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"; // pragma: allowlist secret
 
 function base58Encode(bytes: Buffer): string {
 	let n = 0n;

@@ -459,12 +459,14 @@ export type SettingsField =
 	| "pipedreamClientSecret"
 	| "pipedreamEnvironment";
 
+// Column names, not secret values — detect-secrets matches the
+// "api_key" / "secret" substrings. Marked as false-positives inline.
 const SETTINGS_COLUMNS: Record<SettingsField, string> = {
-	openrouterApiKey: "openrouter_api_key",
-	openrouterModel: "openrouter_model",
+	openrouterApiKey: "openrouter_api_key", // pragma: allowlist secret
+	openrouterModel: "openrouter_model", // pragma: allowlist secret
 	pipedreamProjectId: "pipedream_project_id",
 	pipedreamClientId: "pipedream_client_id",
-	pipedreamClientSecret: "pipedream_client_secret",
+	pipedreamClientSecret: "pipedream_client_secret", // pragma: allowlist secret
 	pipedreamEnvironment: "pipedream_environment",
 };
 
@@ -515,8 +517,8 @@ export function readSettings(): SettingsRow {
 }
 
 /** Upsert any subset of fields. Missing fields are left untouched —
- * the SQL uses COALESCE so passing { openrouterApiKey: "new" } only
- * overwrites that one column. */
+ * the SQL uses COALESCE so passing a single field updates only that
+ * one column. */
 export function writeSettings(partial: Partial<Record<SettingsField, string>>): SettingsRow {
 	const now = new Date().toISOString();
 	upsertSettings.run({
