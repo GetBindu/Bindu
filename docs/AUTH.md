@@ -156,8 +156,11 @@ body_bytes = json.dumps({
     "message": {
       "role": "user", "kind": "message",
       "parts": [{"kind": "text", "text": "your prompt"}],
-      "messageId": "<uuid>", "contextId": "<uuid>", "taskId": "<uuid>"
-    }
+      "messageId": "<uuid>", "contextId": "<uuid>", "taskId": "<uuid>",
+    },
+    # Required. Drop it and the agent's request validator 400s
+    # before the auth middleware even sees the request.
+    "configuration": {"acceptedOutputModes": ["application/json"]},
   }
 }).encode("utf-8")
 ```
