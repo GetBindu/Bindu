@@ -189,6 +189,15 @@ examples/agent_swarm/.bindu/public.pem
 
 examples/typescript-openai-agent/logs/
 
+# Agent runtime output (charts, reports, etc.)
+examples/*/outputs/
+
+# Windows null-device artifacts — happen when `where`/`tasklist` or similar
+# Windows-only command leaks into a script and stderr gets redirected to `nul`.
+# Treated as a real file on Unix; never wanted in the repo.
+nul
+**/nul
+
 # Pebbling keys (DID private/public keys)
 examples/.pebbling/*
 **/.pebbling/private.pem
