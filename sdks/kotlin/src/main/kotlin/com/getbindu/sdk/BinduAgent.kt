@@ -169,11 +169,11 @@ private fun registerWithCore(
         .build()
 
     try {
-        val stub = bindu.grpc.BinduServiceGrpc.newBlockingStub(channel)
+        val stub = com.getbindu.grpc.BinduServiceGrpc.newBlockingStub(channel)
             .withDeadlineAfter(60, TimeUnit.SECONDS)
 
         val skillProtos = skills.map { skill ->
-            bindu.grpc.AgentHandlerProto.SkillDefinition.newBuilder()
+            com.getbindu.grpc.SkillDefinition.newBuilder()
                 .setName(skill["name"] as String)
                 .setDescription(skill["description"] as String)
                 .setRawContent(skill["raw_content"] as String)
@@ -181,7 +181,7 @@ private fun registerWithCore(
                 .build()
         }
 
-        val request = bindu.grpc.AgentHandlerProto.RegisterAgentRequest.newBuilder()
+        val request = com.getbindu.grpc.RegisterAgentRequest.newBuilder()
             .setConfigJson(configJson)
             .addAllSkills(skillProtos)
             .setGrpcCallbackAddress(callbackAddress)
@@ -218,11 +218,11 @@ private fun startAgentHandlerServer(
 /** AgentHandler gRPC service implementation. */
 private class AgentHandlerService(
     private val handler: MessageHandler
-) : bindu.grpc.AgentHandlerGrpc.AgentHandlerImplBase() {
+) : com.getbindu.grpc.AgentHandlerGrpc.AgentHandlerImplBase() {
 
     override fun handleMessages(
-        request: bindu.grpc.AgentHandlerProto.HandleRequest,
-        responseObserver: StreamObserver<bindu.grpc.AgentHandlerProto.HandleResponse>
+        request: com.getbindu.grpc.HandleRequest,
+        responseObserver: StreamObserver<com.getbindu.grpc.HandleResponse>
     ) {
         try {
             val messages = request.messagesList.map { msg ->
@@ -232,18 +232,18 @@ private class AgentHandlerService(
             val result = runBlocking { handler(messages) }
 
             val response = when (result) {
-                is String -> bindu.grpc.AgentHandlerProto.HandleResponse.newBuilder()
+                is String -> com.getbindu.grpc.HandleResponse.newBuilder()
                     .setContent(result)
                     .setIsFinal(true)
                     .build()
-                is HandlerResponse -> bindu.grpc.AgentHandlerProto.HandleResponse.newBuilder()
+                is HandlerResponse -> com.getbindu.grpc.HandleResponse.newBuilder()
                     .setContent(result.content)
                     .setState(result.state)
                     .setPrompt(result.prompt)
                     .setIsFinal(true)
                     .putAllMetadata(result.metadata)
                     .build()
-                else -> bindu.grpc.AgentHandlerProto.HandleResponse.newBuilder()
+                else -> com.getbindu.grpc.HandleResponse.newBuilder()
                     .setContent(result.toString())
                     .setIsFinal(true)
                     .build()
@@ -261,11 +261,11 @@ private class AgentHandlerService(
     }
 
     override fun healthCheck(
-        request: bindu.grpc.AgentHandlerProto.HealthCheckRequest,
-        responseObserver: StreamObserver<bindu.grpc.AgentHandlerProto.HealthCheckResponse>
+        request: com.getbindu.grpc.HealthCheckRequest,
+        responseObserver: StreamObserver<com.getbindu.grpc.HealthCheckResponse>
     ) {
         responseObserver.onNext(
-            bindu.grpc.AgentHandlerProto.HealthCheckResponse.newBuilder()
+            com.getbindu.grpc.HealthCheckResponse.newBuilder()
                 .setHealthy(true)
                 .setMessage("OK")
                 .build()
