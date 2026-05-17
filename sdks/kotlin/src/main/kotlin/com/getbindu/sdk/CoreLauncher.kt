@@ -63,7 +63,8 @@ object CoreLauncher {
     }
 
     private fun findCommand(grpcPort: Int, httpPort: Int): Pair<String, List<String>> {
-        val args = listOf("serve", "--grpc", "--grpc-port", grpcPort.toString(), "--port", httpPort.toString())
+        // bindu CLI doesn't accept --port; HTTP port comes from BINDU_PORT env or deployment.url
+        val args = listOf("serve", "--grpc", "--grpc-port", grpcPort.toString())
 
         // Try bindu CLI
         if (commandExists("bindu")) {
