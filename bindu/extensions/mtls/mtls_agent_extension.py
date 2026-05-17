@@ -282,24 +282,57 @@ class MTLSAgentExtension:
             )
 
     # ------------------------------------------------------------------
-    # Client material (Phase 4)
+    # Client material
     # ------------------------------------------------------------------
 
-    def get_httpx_client_kwargs(self) -> dict:
+    def build_client_ssl_context(self) -> ssl.SSLContext:
+        """Return an ``ssl.SSLContext`` for outbound (client-side) connections.
+
+        The context carries this agent's cert/key as the client identity and
+        trusts the CA bundle for verifying peer (server) certs. Suitable for
+        passing as ``ssl=...`` to ``aiohttp.TCPConnector`` or as ``verify=...``
+        / ``cert=...`` to httpx.
+        """
+        self._require_initialized()
+        context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+        context.load_cert_chain(
+            certfile=str(self._store.cert_path),
+            keyfile=str(self._store.key_path),
+        )
+        context.load_verify_locations(cafile=str(self._store.ca_bundle_path))
+        context.check_hostname = app_settings.mtls.verify_server_cert
+        context.verify_mode = (
+            ssl.CERT_REQUIRED if app_settings.mtls.verify_server_cert else ssl.CERT_NONE
+        )
+        return context
+
+    def get_httpx_client_kwargs(self) -> dict[str, Any]:
         """Return kwargs to splat into ``httpx.AsyncClient(...)``.
 
-        Includes ``cert=(cert_path, key_path)`` and ``verify=ca_bundle_path``
-        so outbound calls authenticate as this agent and validate peers
-        against the cluster CA.
+        Hands httpx the cert+key tuple and the CA-bundle path. The project's
+        primary HTTP client is aiohttp-backed (``AsyncHTTPClient``), but this
+        is provided for any callers that integrate with httpx directly.
         """
-        raise NotImplementedError(
-            "MTLSAgentExtension.get_httpx_client_kwargs lands in Phase 4"
-        )
+        self._require_initialized()
+        return {
+            "cert": (str(self._store.cert_path), str(self._store.key_path)),
+            "verify": str(self._store.ca_bundle_path),
+        }
 
-    def build_grpc_channel_credentials(self):
-        """Return ``grpc.ChannelCredentials`` for outbound gRPC."""
-        raise NotImplementedError(
-            "MTLSAgentExtension.build_grpc_channel_credentials lands in Phase 4"
+    def build_grpc_channel_credentials(self) -> grpc.ChannelCredentials:
+        """Return ``grpc.ChannelCredentials`` for outbound gRPC.
+
+        Built from the same on-disk PEM files as the server credentials so a
+        downgrade is impossible.
+        """
+        self._require_initialized()
+        cert = self._store.read_cert()
+        key = self._store.read_key()
+        ca_bundle = self._store.read_ca_bundle()
+        return grpc.ssl_channel_credentials(
+            root_certificates=ca_bundle,
+            private_key=key,
+            certificate_chain=cert,
         )
 
     # ------------------------------------------------------------------

@@ -314,3 +314,55 @@ class TestServerMaterial:
             ext.get_uvicorn_ssl_kwargs()
         with pytest.raises(FileNotFoundError):
             ext.build_grpc_server_credentials()
+
+
+class TestClientMaterial:
+    """Phase 4: client-side (outbound) TLS material builders."""
+
+    def _seed_extension_with_real_pki(
+        self, tmp_path: Path, fake_step_ca: MagicMock, token_provider: AsyncMock
+    ) -> MTLSAgentExtension:
+        """Reuse the server-material seed; same on-disk layout."""
+        return TestServerMaterial()._seed_extension_with_real_pki(
+            tmp_path, fake_step_ca, token_provider
+        )
+
+    def test_build_client_ssl_context_loads_cert_chain(
+        self, tmp_path: Path, fake_step_ca: MagicMock, token_provider: AsyncMock
+    ) -> None:
+        import ssl
+
+        ext = self._seed_extension_with_real_pki(tmp_path, fake_step_ca, token_provider)
+        ctx = ext.build_client_ssl_context()
+        assert isinstance(ctx, ssl.SSLContext)
+        # Default settings: verify_server_cert=True -> CERT_REQUIRED.
+        assert ctx.verify_mode == ssl.CERT_REQUIRED
+
+    def test_httpx_kwargs_returns_cert_tuple_and_verify_path(
+        self, tmp_path: Path, fake_step_ca: MagicMock, token_provider: AsyncMock
+    ) -> None:
+        ext = self._seed_extension_with_real_pki(tmp_path, fake_step_ca, token_provider)
+        kwargs = ext.get_httpx_client_kwargs()
+        assert kwargs["cert"] == (
+            str(ext.store.cert_path),
+            str(ext.store.key_path),
+        )
+        assert kwargs["verify"] == str(ext.store.ca_bundle_path)
+
+    def test_build_grpc_channel_credentials_returns_creds(
+        self, tmp_path: Path, fake_step_ca: MagicMock, token_provider: AsyncMock
+    ) -> None:
+        import grpc
+
+        ext = self._seed_extension_with_real_pki(tmp_path, fake_step_ca, token_provider)
+        creds = ext.build_grpc_channel_credentials()
+        assert isinstance(creds, grpc.ChannelCredentials)
+
+    def test_client_material_raises_when_uninitialized(self, tmp_path: Path) -> None:
+        ext = _make_extension(tmp_path)
+        with pytest.raises(FileNotFoundError):
+            ext.build_client_ssl_context()
+        with pytest.raises(FileNotFoundError):
+            ext.get_httpx_client_kwargs()
+        with pytest.raises(FileNotFoundError):
+            ext.build_grpc_channel_credentials()

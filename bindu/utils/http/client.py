@@ -7,6 +7,7 @@ to avoid duplicating HTTP request logic, retry mechanisms, and session managemen
 from __future__ import annotations
 
 import asyncio
+import ssl
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -42,19 +43,26 @@ class AsyncHTTPClient:
         verify_ssl: bool = True,
         max_retries: int = 3,
         default_headers: dict[str, str] | None = None,
+        ssl_context: ssl.SSLContext | None = None,
     ) -> None:
         """Initialize HTTP client.
 
         Args:
             base_url: Base URL for all requests (e.g., https://api.example.com)
             timeout: Request timeout in seconds
-            verify_ssl: Whether to verify SSL certificates
+            verify_ssl: Whether to verify SSL certificates. Ignored when
+                ``ssl_context`` is provided.
             max_retries: Maximum number of retry attempts (used by retry decorators)
             default_headers: Default headers to include in all requests
+            ssl_context: Optional ``ssl.SSLContext`` for mutual-TLS client
+                authentication. When provided, takes precedence over
+                ``verify_ssl`` and is handed directly to the underlying
+                ``aiohttp.TCPConnector``.
         """
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.verify_ssl = verify_ssl
+        self.ssl_context = ssl_context
         self.max_retries = max_retries
         self.default_headers = default_headers or {}
         self._session: aiohttp.ClientSession | None = None
@@ -73,7 +81,11 @@ class AsyncHTTPClient:
     async def _ensure_session(self) -> None:
         """Ensure aiohttp session exists."""
         if self._session is None or self._session.closed:
-            connector = aiohttp.TCPConnector(ssl=self.verify_ssl)
+            # ssl_context (mTLS) overrides verify_ssl when both are set.
+            ssl_param: ssl.SSLContext | bool = (
+                self.ssl_context if self.ssl_context is not None else self.verify_ssl
+            )
+            connector = aiohttp.TCPConnector(ssl=ssl_param)
             timeout = aiohttp.ClientTimeout(total=self.timeout)
             self._session = aiohttp.ClientSession(
                 connector=connector,
