@@ -1,0 +1,243 @@
+Release: bindu-communication Inbox and Secured Outbound A2A
+Version: 2026.20.7
+Date: May 17, 2026
+
+OVERVIEW
+--------
+This release ships bindu-communication, an operator inbox for watching
+agent-to-agent traffic, together with the authentication and
+observability work that lets it talk to Hydra-protected peers
+end-to-end. The inbox is a three-pane Gmail-shape surface backed by
+SQLite that stitches outbound sends, agent webhooks, and gateway plan
+traces into one conversation per A2A context_id. Outbound calls are
+now JWT-bearer plus DID-signed using the operator's personal agent as
+the signing identity, so the same operator can compose against any
+peer that enforces AUTH__ENABLED=true. The gateway gets a stateless
+Path A refactor (it no longer owns a session DB; the client carries
+history per /plan call) and a fix for AI SDK v6 tool-error chunks so
+peer failures surface in the trace instead of disappearing into a
+hanging task-started row.
+
+PROBLEM SOLVED
+--------------
+Before this release:
+- The bindu-communication scaffold was a visual prototype against mock
+  data. There was no SQLite persistence, no wired-up SSE, no thread
+  grouping, no compose flow, and no real authentication on outbound
+  sends. The "Register agent" affordance was UI theatre that didn't
+  produce real registrations.
+- Outbound A2A from the comms server to any Hydra-protected peer
+  returned JSON-RPC error -32009 ("Authentication is required")
+  wrapped inside HTTP 200. The compose flow surfaced this as a
+  silent "HTTP 200 with red X" with no actionable signal.
+- Multi-agent plans through the gateway also failed: the comms server
+  declared auth: { type: "none" } on every plan-catalog entry, so the
+  gateway sent unauthenticated requests, got 403s, then silently
+  swallowed those tool errors because session/prompt.ts had no
+  "tool-error" case in its AI SDK chunk switch. The planner LLM saw
+  missing tool results and invented plausible-sounding explanations
+  like "authentication is not available in this session" — making it
+  impossible for the operator to tell hallucination apart from real
+  outage.
+- When peer calls did fail, the comms inbox showed a task-started row
+  with no terminal state and no error body. From the operator's
+  perspective the call simply hung forever.
+- Gateway owned its own session DB, duplicating state the client
+  already had. This made the gateway stateful where it didn't need to
+  be and complicated per-plan isolation.
+- The frontend/ SvelteKit POC was sitting unused alongside the new
+  bindu-communication tree, doubling the surface area to maintain.
+
+After this release:
+- bindu-communication is a real product surface: three-pane Gmail
+  layout (folders + thread list + thread view), SQLite event store,
+  server-side thread state and first-contact tracking, real-time SSE
+  of inbound webhooks and outbound sends, threads grouped by
+  context_id with stitching across the outbox and per-agent lanes,
+  Inbox / Sent / Drafts / Archive folders, in-folder search, bulk
+  select, hover actions, autosaved draft compose, read tracking, and
+  reply-in-thread that resumes the existing task when the previous
+  state is still open.
+- Outbound message/send now authenticates correctly. The comms server
+  mints short-lived Hydra access tokens via the client_credentials
+  grant using the personal agent's OAuth client credentials at
+  ~/.bindu/personal/.bindu/oauth_credentials.json (cached, refreshed
+  60s before expiry), signs the exact request body with the personal
+  agent's Ed25519 private key, base58-encodes the signature, and
+  attaches X-DID / X-DID-Signature / X-DID-Timestamp on every send.
+  The X-DID value is derived from the OAuth client_id so it always
+  matches the JWT sub the verifier checks against.
+- Comms now declares auth: { type: "did_signed" } on every plan-
+  catalog entry it sends to the gateway. The gateway uses its own
+  pre-registered DID identity (BINDU_GATEWAY_DID_SEED) to mint a
+  token and sign peer calls. Multi-agent plans actually invoke peers
+  now and the planner synthesizes real results.
+- AI SDK v6 tool-error chunks are handled. When a peer call throws
+  (any HTTP 4xx/5xx, network failure, schema mismatch), the gateway
+  updates the ToolPart to status="error", publishes ToolCallEnd with
+  the error string, and the SSE bridge emits task.finished with
+  state="failed" and the error body. The comms inbox renders these
+  as failed rows with the error text inline — no more hanging
+  task-started rows and no more planner hallucination about what
+  went wrong.
+- Comms /api/plan synthesizes its own task-started / task-artifact /
+  task-finished / plan-reply / plan-summary events from the gateway
+  SSE stream and persists them. The inbox liveStream mapper
+  recognises every kind, normalises state, strips the
+  <remote_content> wrapper from artifact bodies, and renders the
+  planner reply with a "self" trust pill.
+- Gateway is stateless on the new Path A. The client owns the session
+  record and posts history+prior_summary on every /plan call; the
+  gateway carries no DB.
+- frontend/ POC is removed; bindu-communication is the only operator
+  UI in tree.
+
+PERSONAL AGENT (new)
+--------------------
+A wizard inside the inbox sidebar spawns a server-side bindufied
+agent under ~/.bindu/personal/. The directory holds:
+
+- agent.py — auto-generated from the persona JSON; bindufy()
+  invocation with OpenRouter as the model provider and an in-process
+  Pipedream Connect MCP wiring (Gmail / Notion) added per connected
+  account.
+- persona.json — the persona traits, interests, occupation. Editing
+  this is the supported way to change the agent.
+- .env — model + Pipedream env vars (OPENROUTER_API_KEY,
+  OPENROUTER_MODEL, PIPEDREAM_*, AUTH__ENABLED, HYDRA__*). 0600.
+- .bindu/private.pem + public.pem — Ed25519 keypair for DID
+  signatures. 0600 on the private key.
+- .bindu/oauth_credentials.json — Hydra OAuth client metadata
+  registered at first boot; the deterministic client_secret derived
+  from the Ed25519 seed.
+
+The wizard handles spawn/stop. Stop is graceful; restart is a
+relaunch of the same persona. The personal agent serves
+/.well-known/agent.json publicly (standard A2A discovery) and
+rejects unauth message/send (AUTH__ENABLED=true, Hydra introspection
+plus DID signature mandatory). It is the operator's signing identity
+for everything the comms server sends outbound — without it, sends
+fall back to did:bindu:operator:local and most peers will reject.
+
+GATEWAY_TEST_FLEET
+------------------
+Five example agents now run on dedicated ports with published skill
+metadata:
+
+- joke_agent       port 5773  skill tell_joke
+- math_agent       port 5775  skill calculate
+- poet_agent       port 5776  skill write_poem
+- research_agent   port 5777  skill research
+- bindu_docs_agent port 5778  skill bindu_docs_qa  (was faq_agent)
+
+A new examples/gateway_test_fleet/hydra_smoke_test.sh exercises the
+full auth path against a chosen agent (token mint + signed send) and
+prints a pass/fail summary. Useful as a one-shot health check after
+restarts or config changes.
+
+OPERATIONAL CHANGES
+-------------------
+- SSE auth in comms now uses ?token query param (browsers cannot set
+  custom headers on EventSource), in addition to Authorization
+  Bearer for fetch-based clients.
+- Webhook endpoint validates the agentId path segment and optionally
+  requires BINDU_WEBHOOK_TOKEN.
+- SSRF allowlist on the lifecycle webhook forwarder was dropped (was
+  causing more friction than the security marginal it gained;
+  webhooks are authenticated downstream by AUTH__ENABLED anyway).
+- Agent prompts on intermediate states (input-required, payment-
+  required, auth-required) are now forwarded on the lifecycle
+  webhook so the comms inbox can render the agent's question
+  inline; previously the operator only saw the state pill.
+- UUID serialization in the server fixed (was emitting non-RFC
+  strings under certain task-transition orderings).
+- TinyTroupe references removed from the persona scaffolding —
+  unused vendor code that was confusing new operators.
+
+FILES OF NOTE
+-------------
+Comms server (TypeScript, hono):
+- bindu-communication/server/index.ts — ~600 lines added: SSE feed,
+  outbound compose with Hydra+DID auth, /api/plan stream ingestion,
+  webhook handler, personal-agent endpoints, thread state.
+- bindu-communication/server/personal-agent.ts — spawn/stop, render
+  agent.py from persona, register Hydra client.
+- bindu-communication/server/db.ts — SQLite schema for events,
+  agents, contexts, thread_state, personal_agent, settings.
+
+Comms UI (React 19 + React Router v7):
+- bindu-communication/src/lib/liveStream.ts — webhook -> StreamEvent
+  mapper; gateway-event + outbound + plan-trace dispatch.
+- bindu-communication/src/lib/threads.ts — context_id grouping +
+  cross-lane stitching.
+- bindu-communication/src/components/* — Sidebar, ThreadList,
+  ThreadView, DetailRail, ComposeModal, PersonalAgentWizard,
+  AddAgentModal, AgentInfoModal, SettingsModal.
+
+Gateway:
+- gateway/src/session/llm.ts — tool-error chunk added to StreamEvent
+  union; AI SDK chunk mapper handles the new case.
+- gateway/src/session/prompt.ts — tool-error case in the switch
+  updates ToolPart state and publishes ToolCallEnd with error.
+- gateway/src/comms-forwarder.ts — forwards bus events to the
+  comms /webhooks endpoint when BINDU_COMMS_URL is set.
+- gateway/src/api/plan-route.ts — already knew how to read
+  ToolCallEnd.error and emit task.finished {state: "failed", error}.
+
+Examples:
+- examples/gateway_test_fleet/*.py — ports moved to 5xxx,
+  AgentSkill metadata added.
+- examples/gateway_test_fleet/hydra_smoke_test.sh — new.
+
+Removed:
+- frontend/ — entire SvelteKit POC tree.
+
+KNOWN ISSUES
+------------
+- Plan-trace task-started rows render with agent_did=null in the
+  counterparty position. The resolved DID from the fetched
+  AgentCard is held in observedByName at the gateway boundary but
+  is not threaded into the task-started SSE frame (only
+  task-artifact / task-finished receive it via findAgentDID). The
+  fix is to plumb peer.trust?.pinnedDID or the observed DID through
+  the planner skill-tool result metadata. Cosmetic; everything
+  works.
+- Streaming responses are still not implemented for gRPC agents
+  (see docs/grpc/limitations.md).
+- No mTLS in production. The transport stack is plaintext + OAuth2
+  + DID signatures; the latter two are sufficient on a trusted
+  network but not on the public internet.
+- Each multi-agent plan request spawns a fresh gateway process
+  (gateway-spawned-<port>). Exits are cleaned up but the per-plan
+  isolation means no shared planner state across plans. This is
+  by design for the dev surface; production deployments will run
+  a single long-lived gateway.
+
+UPGRADE NOTES
+-------------
+- bindu-communication requires a running personal agent for
+  outbound auth. Use the in-app wizard ("Sidebar -> + -> Personal
+  agent") to set one up. Without it, sends fall back to
+  did:bindu:operator:local and any peer with AUTH__ENABLED=true
+  will reject with -32009.
+- Default ports: 3773 (agents), 3774 (gateway), 3775 (comms UI),
+  3787 (comms API). Fleet agents have moved to 5773-5778. If you
+  had ad-hoc agents on 5775 or 5777 they now collide with
+  math_agent / research_agent — pick a free port.
+- The comms server reads OAuth credentials from
+  ~/.bindu/personal/.bindu/oauth_credentials.json. If you wipe
+  ~/.bindu/personal/ you must rerun the wizard before sends will
+  authenticate.
+- If you connected to the previous bindu-communication scaffold
+  while it was running on mock data, drop your local
+  bindu-communication/data/events.db once — the schema added
+  thread_state, contexts, and personal_agent tables.
+
+CONTRIBUTORS
+------------
+Lead maintainer:
+- Raahul Dutta (45 commits since 2026.20.3)
+
+Pair-programming assist:
+- Claude Opus 4.7 (1M context) — co-author on every commit in
+  this release.
