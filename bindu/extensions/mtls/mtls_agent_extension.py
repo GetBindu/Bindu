@@ -26,6 +26,7 @@ Phase coverage
 
 from __future__ import annotations
 
+import asyncio
 import ssl
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Optional
@@ -161,9 +162,50 @@ class MTLSAgentExtension:
             still good or when step-ca is unreachable and the cycle is
             skipped.
         """
-        raise NotImplementedError(
-            "MTLSAgentExtension.renew_if_needed lands in Phase 6 of the mTLS rollout"
+        if not self._store.is_renewal_due(app_settings.mtls.renew_before_hours):
+            return False
+        # step-ca down? Don't burn cycles thrashing — wait for the next tick.
+        # The cert has hours of headroom by design, so a few missed cycles
+        # are fine.
+        if not await self._ca.health_check():
+            logger.warning("step-ca unhealthy; deferring renewal")
+            return False
+        logger.info(
+            "mTLS cert near expiry (renew_before_hours=%d); renewing",
+            app_settings.mtls.renew_before_hours,
         )
+        return await self.initialize(force_renew=True)
+
+    async def run_renewal_loop(self, interval_seconds: int | None = None) -> None:
+        """Run the renewal check forever; intended for ``asyncio.create_task``.
+
+        Sleeps for ``interval_seconds`` between checks (defaults to
+        ``MTLSSettings.renew_check_interval_seconds``). Exits cleanly on
+        cancellation; logs and continues on any other exception.
+
+        Args:
+            interval_seconds: Override for the renew check cadence. The
+                renewal margin (``renew_before_hours``) gives the loop ample
+                room to miss a check or two without the cert lapsing.
+        """
+        interval = (
+            interval_seconds
+            if interval_seconds is not None
+            else app_settings.mtls.renew_check_interval_seconds
+        )
+        logger.info("mTLS renewal loop started (interval=%ds)", interval)
+        try:
+            while True:
+                await asyncio.sleep(interval)
+                try:
+                    await self.renew_if_needed()
+                except Exception as exc:  # noqa: BLE001
+                    # Renewal loop must never die from a transient error;
+                    # logging + continuing is the right shape.
+                    logger.exception("mTLS renewal cycle failed: %s", exc)
+        except asyncio.CancelledError:
+            logger.info("mTLS renewal loop cancelled")
+            raise
 
     async def close(self) -> None:
         """Release the underlying step-ca HTTP sessions."""

@@ -75,6 +75,7 @@ class BinduApplication(Starlette):
         telemetry_config: TelemetryConfig | None = None,
         sentry_config: SentryConfig | None = None,
         cors_origins: list[str] | None = None,
+        mtls_extension: Any | None = None,
     ):
         """Initialize Bindu application.
 
@@ -103,6 +104,10 @@ class BinduApplication(Starlette):
         self._scheduler_config = scheduler_config
         self._telemetry_config = telemetry_config or TelemetryConfig()
         self._sentry_config = sentry_config or SentryConfig()
+        # Optional mTLS extension; the lifespan starts its renewal loop when
+        # set so the cert is re-issued before expiry without the operator
+        # having to run a sidecar process.
+        self._mtls_extension = mtls_extension
 
         # Create default lifespan if none provided
         if lifespan is None:
@@ -390,19 +395,41 @@ class BinduApplication(Starlette):
             if app._payment_session_manager:
                 await app._payment_session_manager.start_cleanup_task()
 
-            # Start TaskManager
-            if manifest:
-                logger.info("🔧 Starting TaskManager...")
-                task_manager = TaskManager(
-                    scheduler=scheduler, storage=storage, manifest=manifest
+            # Start the mTLS renewal loop if configured. Spawned here (vs in
+            # bindufy) so it runs inside uvicorn's event loop and gets clean
+            # cancellation on app shutdown.
+            import asyncio as _asyncio
+
+            renewal_task: _asyncio.Task | None = None
+            if self._mtls_extension is not None:
+                renewal_task = _asyncio.create_task(
+                    self._mtls_extension.run_renewal_loop(),
+                    name="mtls-renewal-loop",
                 )
-                async with task_manager:
-                    app.task_manager = task_manager
-                    logger.info("✅ TaskManager started")
+
+            try:
+                # Start TaskManager
+                if manifest:
+                    logger.info("🔧 Starting TaskManager...")
+                    task_manager = TaskManager(
+                        scheduler=scheduler, storage=storage, manifest=manifest
+                    )
+                    async with task_manager:
+                        app.task_manager = task_manager
+                        logger.info("✅ TaskManager started")
+                        yield
+                    logger.info("🛑 TaskManager stopped")
+                else:
                     yield
-                logger.info("🛑 TaskManager stopped")
-            else:
-                yield
+            finally:
+                if renewal_task is not None:
+                    renewal_task.cancel()
+                    try:
+                        await renewal_task
+                    except _asyncio.CancelledError:
+                        pass
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning("mTLS renewal task exited with: %s", exc)
 
             # Stop payment session manager cleanup task
             if app._payment_session_manager:

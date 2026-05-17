@@ -606,6 +606,7 @@ def _bindufy_core(
         scheduler_config=scheduler_config,
         sentry_config=sentry_config,
         cors_origins=deployment_config.cors_origins if deployment_config else None,
+        mtls_extension=mtls_extension,
     )
 
     # Parse deployment URL

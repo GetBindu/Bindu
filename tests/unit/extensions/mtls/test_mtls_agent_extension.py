@@ -55,6 +55,7 @@ def fake_step_ca() -> MagicMock:
     ca.sign_csr = AsyncMock(
         return_value=(_build_signed_cert(hours_valid=24), CA_BUNDLE)
     )
+    ca.health_check = AsyncMock(return_value=True)
     ca.close = AsyncMock()
     return ca
 
@@ -366,3 +367,159 @@ class TestClientMaterial:
             ext.get_httpx_client_kwargs()
         with pytest.raises(FileNotFoundError):
             ext.build_grpc_channel_credentials()
+
+
+class TestRenewIfNeeded:
+    """Phase 6: cert renewal decision logic."""
+
+    @pytest.mark.asyncio
+    async def test_returns_false_when_cert_fresh(
+        self, tmp_path: Path, fake_step_ca: MagicMock, token_provider: AsyncMock
+    ) -> None:
+        # Seed a cert with 24h validity — well above the 8h renewal margin.
+        store = CertStore(tmp_path)
+        store.write_ca_bundle(CA_BUNDLE)
+        store.generate_keypair()
+        store.write_cert(_build_signed_cert(hours_valid=24))
+
+        ext = _make_extension(
+            tmp_path,
+            step_ca=fake_step_ca,
+            oidc_token_provider=token_provider,
+            cert_store=store,
+        )
+        renewed = await ext.renew_if_needed()
+        assert renewed is False
+        fake_step_ca.sign_csr.assert_not_awaited()
+        fake_step_ca.health_check.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_renews_when_cert_near_expiry_and_ca_healthy(
+        self, tmp_path: Path, fake_step_ca: MagicMock, token_provider: AsyncMock
+    ) -> None:
+        # Cert valid for only 1h — inside the 8h renewal margin.
+        store = CertStore(tmp_path)
+        store.write_ca_bundle(CA_BUNDLE)
+        store.generate_keypair()
+        store.write_cert(_build_signed_cert(hours_valid=1))
+        fake_step_ca.health_check = AsyncMock(return_value=True)
+
+        ext = _make_extension(
+            tmp_path,
+            step_ca=fake_step_ca,
+            oidc_token_provider=token_provider,
+            cert_store=store,
+        )
+        renewed = await ext.renew_if_needed()
+        assert renewed is True
+        fake_step_ca.health_check.assert_awaited_once()
+        fake_step_ca.sign_csr.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_skips_renewal_when_ca_unhealthy(
+        self, tmp_path: Path, fake_step_ca: MagicMock, token_provider: AsyncMock
+    ) -> None:
+        store = CertStore(tmp_path)
+        store.write_ca_bundle(CA_BUNDLE)
+        store.generate_keypair()
+        store.write_cert(_build_signed_cert(hours_valid=1))
+        fake_step_ca.health_check = AsyncMock(return_value=False)
+
+        ext = _make_extension(
+            tmp_path,
+            step_ca=fake_step_ca,
+            oidc_token_provider=token_provider,
+            cert_store=store,
+        )
+        renewed = await ext.renew_if_needed()
+        assert renewed is False
+        fake_step_ca.health_check.assert_awaited_once()
+        fake_step_ca.sign_csr.assert_not_awaited()
+
+
+class TestRenewalLoop:
+    """Phase 6: the long-running renewal task."""
+
+    @pytest.mark.asyncio
+    async def test_loop_invokes_renew_if_needed_each_tick(
+        self, tmp_path: Path, fake_step_ca: MagicMock, token_provider: AsyncMock
+    ) -> None:
+        import asyncio
+
+        ext = _make_extension(
+            tmp_path,
+            step_ca=fake_step_ca,
+            oidc_token_provider=token_provider,
+        )
+
+        call_count = 0
+
+        async def fake_renew():
+            nonlocal call_count
+            call_count += 1
+            return False
+
+        ext.renew_if_needed = fake_renew  # type: ignore[method-assign]  # ty: ignore[invalid-assignment]
+
+        task = asyncio.create_task(ext.run_renewal_loop(interval_seconds=0))
+        # Yield enough times to let the loop tick multiple times.
+        for _ in range(5):
+            await asyncio.sleep(0)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        assert call_count >= 1
+
+    @pytest.mark.asyncio
+    async def test_loop_survives_renew_exception(
+        self, tmp_path: Path, fake_step_ca: MagicMock, token_provider: AsyncMock
+    ) -> None:
+        import asyncio
+
+        ext = _make_extension(
+            tmp_path,
+            step_ca=fake_step_ca,
+            oidc_token_provider=token_provider,
+        )
+
+        calls = 0
+
+        async def flaky_renew():
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise RuntimeError("network glitch")
+            return False
+
+        ext.renew_if_needed = flaky_renew  # type: ignore[method-assign]  # ty: ignore[invalid-assignment]
+
+        task = asyncio.create_task(ext.run_renewal_loop(interval_seconds=0))
+        for _ in range(10):
+            await asyncio.sleep(0)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        # The loop kept ticking past the first failure.
+        assert calls >= 2
+
+    @pytest.mark.asyncio
+    async def test_loop_propagates_cancellation(
+        self, tmp_path: Path, fake_step_ca: MagicMock, token_provider: AsyncMock
+    ) -> None:
+        import asyncio
+
+        ext = _make_extension(
+            tmp_path,
+            step_ca=fake_step_ca,
+            oidc_token_provider=token_provider,
+        )
+        task = asyncio.create_task(ext.run_renewal_loop(interval_seconds=60))
+        # Let the task start.
+        await asyncio.sleep(0)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
