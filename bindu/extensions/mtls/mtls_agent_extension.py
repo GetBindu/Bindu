@@ -14,27 +14,33 @@ the on-disk cert store, and the step-ca client. It mirrors the role
 ``DIDAgentExtension`` plays for identity — both are constructed once at
 startup and reused for the lifetime of the agent.
 
-Phase 1 scope (this commit)
----------------------------
-- Class signature, settings/state wiring, property surface.
-- Method skeletons documenting the public API.
-
-Phase 2 will land the bootstrap flow (cert fetch + Vault backup), Phase 3 the
-server TLS wrapping (``ssl.SSLContext`` + gRPC server credentials), Phase 4
-the client TLS wrapping, and Phase 6 the in-process renewal task.
+Phase coverage
+--------------
+* Phase 2 (this commit): ``initialize()`` bootstraps the agent's cert from
+  step-ca and persists it. Server / client material builders and the
+  background renewal task remain stubs.
+* Phase 3 will return live ``ssl.SSLContext`` and ``grpc.ServerCredentials``.
+* Phase 4 will hand outbound clients their cert/key.
+* Phase 6 will land the renewal loop.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
+from typing import Awaitable, Callable, Optional
 
 from bindu.extensions.mtls.cert_store import CertStore
-from bindu.extensions.mtls.step_ca_client import StepCAClient
+from bindu.extensions.mtls.step_ca_client import StepCAClient, StepCAError
 from bindu.settings import app_settings
 from bindu.utils.logging import get_logger
 
 logger = get_logger("bindu.mtls.extension")
+
+
+# A token provider is any async callable returning a Hydra OIDC access token.
+# Injecting it keeps the extension free of direct Hydra imports — the wiring
+# lives in ``bindu.penguin.mtls_setup``.
+OIDCTokenProvider = Callable[[], Awaitable[str]]
 
 
 class MTLSAgentExtension:
@@ -58,7 +64,9 @@ class MTLSAgentExtension:
         pki_dir: Path,
         agent_did: str,
         agent_url: Optional[str] = None,
-        oidc_token_provider=None,
+        oidc_token_provider: Optional[OIDCTokenProvider] = None,
+        step_ca: Optional[StepCAClient] = None,
+        cert_store: Optional[CertStore] = None,
     ):
         """Wire dependencies.
 
@@ -73,35 +81,74 @@ class MTLSAgentExtension:
             oidc_token_provider: Async callable returning a fresh Hydra OIDC
                 token. Injected so the extension does not import Hydra glue
                 directly, keeping the dependency graph one-way.
+            step_ca: Optional pre-built step-ca client. Tests pass a fake;
+                production code lets the constructor build one from settings.
+            cert_store: Optional pre-built cert store. Same rationale as
+                ``step_ca``.
         """
         self.pki_dir = Path(pki_dir)
         self.agent_did = agent_did
         self.agent_url = agent_url
         self._oidc_token_provider = oidc_token_provider
-        self._store = CertStore(self.pki_dir)
-        self._ca = StepCAClient()
+        self._store = cert_store if cert_store is not None else CertStore(self.pki_dir)
+        self._ca = step_ca if step_ca is not None else StepCAClient()
         self._initialized = False
 
     # ------------------------------------------------------------------
-    # Lifecycle (bodies land in Phase 2 and Phase 6)
+    # Lifecycle
     # ------------------------------------------------------------------
 
-    async def initialize(self) -> bool:
+    async def initialize(self, force_renew: bool = False) -> bool:
         """Bootstrap the agent's mTLS material.
 
         Steps:
             1. Ensure the CA bundle is on disk (fetch from step-ca if missing).
-            2. If a valid cert exists and is not near expiry, use it.
-            3. Otherwise generate a fresh keypair + CSR and sign via step-ca.
-            4. Optionally back up to Vault.
+            2. If a valid cert exists and is not near expiry — and ``force_renew``
+               is False — reuse it.
+            3. Otherwise generate a fresh keypair + CSR and have step-ca sign it.
+
+        Args:
+            force_renew: When True, skip the reuse-existing-cert path and
+                always go to step-ca. The renewal loop sets this to True.
 
         Returns:
-            True on success. Logs and returns False on a recoverable failure;
-            raises only on misconfiguration the operator must fix.
+            True on success. Logs and returns False on recoverable failure
+            (e.g. step-ca temporarily unreachable); raises only on
+            misconfiguration the operator must fix.
         """
-        raise NotImplementedError(
-            "MTLSAgentExtension.initialize lands in Phase 2 of the mTLS rollout"
-        )
+        if self._oidc_token_provider is None:
+            raise RuntimeError(
+                "MTLSAgentExtension.initialize() requires an oidc_token_provider; "
+                "the agent must complete Hydra registration first."
+            )
+
+        try:
+            await self._ensure_ca_bundle()
+            renewal_due = self._store.is_renewal_due(
+                app_settings.mtls.renew_before_hours
+            )
+            if not force_renew and self._store.has_cert() and not renewal_due:
+                logger.info(
+                    "mTLS cert already on disk and valid (fingerprint=%s)",
+                    self._store.get_cert_fingerprint(),
+                )
+                self._initialized = True
+                return True
+
+            await self._issue_new_cert()
+            self._initialized = True
+            logger.info(
+                "mTLS bootstrap complete for %s (fingerprint=%s)",
+                self.agent_did,
+                self._store.get_cert_fingerprint(),
+            )
+            return True
+        except StepCAError as exc:
+            logger.error("mTLS bootstrap failed against step-ca: %s", exc)
+            return False
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Unexpected mTLS bootstrap error: %s", exc)
+            return False
 
     async def renew_if_needed(self) -> bool:
         """Re-issue the cert when fewer than ``renew_before_hours`` remain.
@@ -114,6 +161,48 @@ class MTLSAgentExtension:
         raise NotImplementedError(
             "MTLSAgentExtension.renew_if_needed lands in Phase 6 of the mTLS rollout"
         )
+
+    async def close(self) -> None:
+        """Release the underlying step-ca HTTP sessions."""
+        await self._ca.close()
+
+    # ------------------------------------------------------------------
+    # Internal — bootstrap steps
+    # ------------------------------------------------------------------
+
+    async def _ensure_ca_bundle(self) -> None:
+        """Fetch the CA bundle from step-ca when it isn't already on disk."""
+        if self._store.has_ca_bundle():
+            return
+        logger.info("Fetching CA bundle from step-ca…")
+        bundle = await self._ca.fetch_root_ca()
+        self._store.write_ca_bundle(bundle)
+
+    async def _issue_new_cert(self) -> None:
+        """Generate a keypair, build a CSR, and have step-ca sign it.
+
+        Always rotates the private key. Reusing a key across renewals would
+        defeat the point of having a short-TTL cert.
+        """
+        assert self._oidc_token_provider is not None  # type guard
+
+        private_key, _ = self._store.generate_keypair()
+        csr_pem = self._store.build_csr(
+            private_key, self.agent_did, agent_url=self.agent_url
+        )
+
+        token = await self._oidc_token_provider()
+        if not token:
+            raise StepCAError(
+                "OIDC token provider returned an empty token; Hydra likely rejected the credentials"
+            )
+
+        cert_pem, chain_pem = await self._ca.sign_csr(csr_pem, token)
+        self._store.write_cert(cert_pem)
+        # Refresh the CA bundle from the sign response — step-ca returns the
+        # currently-active chain, which may have rotated since the agent last
+        # fetched ``/roots.pem``.
+        self._store.write_ca_bundle(chain_pem)
 
     # ------------------------------------------------------------------
     # Server material (Phase 3)
@@ -179,3 +268,8 @@ class MTLSAgentExtension:
     def enabled(self) -> bool:
         """Convenience accessor for the global toggle."""
         return app_settings.mtls.enabled
+
+    @property
+    def initialized(self) -> bool:
+        """True once ``initialize()`` has completed successfully."""
+        return self._initialized

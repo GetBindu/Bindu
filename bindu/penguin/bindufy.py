@@ -25,6 +25,7 @@ from bindu.common.models import (
 from bindu.extensions.x402 import X402AgentExtension
 from bindu.penguin.did_setup import initialize_did_extension
 from bindu.penguin.manifest import create_manifest, validate_agent_function
+from bindu.penguin.mtls_setup import initialize_mtls_extension
 from bindu.settings import app_settings
 from bindu.utils import add_extension_to_capabilities
 from bindu.utils.config import (
@@ -560,6 +561,31 @@ def _bindufy_core(
         did_extension,
         caller_dir or Path.cwd(),
     )
+
+    # Bootstrap mTLS. Off by default (mtls.enabled=False) so existing
+    # deployments are unaffected. When on, requires Hydra credentials because
+    # step-ca's OIDC provisioner validates the cert request against Hydra.
+    mtls_extension = initialize_mtls_extension(
+        agent_id=agent_id_str,
+        agent_did=did_extension.did,
+        agent_url=agent_url,
+        pki_dir=resolved_key_dir / app_settings.did.pki_dir,
+        hydra_credentials=credentials,
+    )
+    if mtls_extension is not None:
+        # Populate AgentTrust on the manifest so the cert fingerprint flows
+        # into the agent card and downstream trust decisions.
+        fingerprint = mtls_extension.cert_fingerprint
+        if fingerprint is not None:
+            _manifest.agent_trust["certificate_fingerprint"] = fingerprint
+    elif app_settings.mtls.enabled and app_settings.mtls.require_client_cert:
+        # Operator asked for strict mTLS but bootstrap failed — refuse to start
+        # rather than fall through to plain HTTP and create a false sense of
+        # security.
+        raise RuntimeError(
+            "mTLS is enabled with require_client_cert=True but cert bootstrap "
+            "failed. Check step-ca reachability and Hydra OIDC config."
+        )
 
     logger.info(f"Starting deployment for agent: {agent_id}")
 
