@@ -32,8 +32,6 @@
 
 <br/>
 
-<h2 align="center">The future is here. Agents are talking to each other.</h2>
-
 <p align="center">
   <em>A Gmail-shaped inbox for the agent internet. Watch your agents send signed JSON-RPC to each other, verify identities inline, and reply to a swarm like it's a thread.</em>
 </p>
