@@ -1285,7 +1285,11 @@ app.post("/api/plan", async (c) => {
 				type CatalogAgent = {
 					name: string;
 					endpoint: string;
-					auth: { type: "none" };
+					// Peer agents enforce AUTH__ENABLED=true (Hydra JWT +
+					// DID signature). Tell the gateway to use its own
+					// DID-signed flow — it has BINDU_GATEWAY_DID_SEED and
+					// auto-acquires a Hydra token (no tokenEnvVar needed).
+					auth: { type: "did_signed" };
 					skills: SkillDescriptor[];
 				};
 				const catalog: CatalogAgent[] = [];
@@ -1333,7 +1337,7 @@ app.post("/api/plan", async (c) => {
 					catalog.push({
 						name: row.agentCard?.name?.toString() ?? id,
 						endpoint: row.url,
-						auth: { type: "none" },
+						auth: { type: "did_signed" },
 						skills,
 					});
 				}
