@@ -12,7 +12,7 @@ uv sync --extra agents
 export OPENROUTER_API_KEY=<get one at https://openrouter.ai/keys>
 ```
 
-`OPENROUTER_API_KEY` is the single key the whole catalog runs on by default — most examples point their LLM client at OpenRouter regardless of framework, so one key unlocks the Agno, LangChain, AG2, and TypeScript agents alike. A few examples need additional service keys (Mem0, ScrapeGraph, Notte, etc.); their READMEs spell that out.
+`OPENROUTER_API_KEY` is the single key the whole catalog runs on by default — most examples point their LLM client at OpenRouter regardless of framework, so one key unlocks the Agno, LangChain, AG2, and TypeScript agents alike. A few examples need additional service keys (Mem0, ScrapeGraph, Notte, etc.); their READMEs spell that out. One alternative: `beginner/minimax_example.py` uses the MiniMax API instead — set `MINIMAX_API_KEY` (from [platform.minimaxi.com](https://platform.minimaxi.com)) to try that one.
 
 `AUTH__ENABLED=true` is the default. Every request needs an OAuth token from Hydra plus a DID-signed body — see [`docs/AUTH.md`](../docs/AUTH.md). To poke around without that ceremony, set `AUTH__ENABLED=false` in `examples/.env` and use plain curl.
 
