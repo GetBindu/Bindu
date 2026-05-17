@@ -42,9 +42,14 @@ def _build_signed_cert(*, hours_valid: int) -> bytes:
     return cert.public_bytes(serialization.Encoding.PEM)
 
 
-CA_BUNDLE = b"-----BEGIN CERTIFICATE-----\nCA-CONTENT\n-----END CERTIFICATE-----\n"
+# A real PEM (self-signed) used as the fake CA bundle. The Phase-2 fix makes
+# the bootstrap write leaf+intermediate concatenated into the cert file, so
+# the fixture's bundle has to parse cleanly as PEM — a placeholder like
+# b"CA-CONTENT" inside BEGIN/END markers no longer survives the cert-store
+# fingerprint pass that runs at the end of initialize().
 DID = "did:bindu:raahul:test:abc123"
 AGENT_URL = "https://agent.example.com"
+CA_BUNDLE = _build_signed_cert(hours_valid=24 * 365)
 
 
 @pytest.fixture
@@ -155,6 +160,38 @@ class TestInitializeHappyPath:
         ok = await ext.initialize()
         assert ok is True
         fake_step_ca.sign_csr.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_bootstrap_preserves_ca_bundle_as_trust_anchor(
+        self, tmp_path: Path, fake_step_ca: MagicMock, token_provider: AsyncMock
+    ) -> None:
+        """Regression: ``_issue_new_cert`` must not overwrite ``ca_bundle.pem``.
+
+        The CA bundle is the trust anchor (root) used by peers to verify
+        chains. step-ca's sign response includes the *intermediate* in the
+        ``ca`` field — concatenating that into the cert file is correct
+        (it forms the chain a TLS handshake presents), but writing it
+        over the bundle would silently break peer verification.
+        """
+        leaf = _build_signed_cert(hours_valid=24)
+        intermediate = _build_signed_cert(hours_valid=24 * 365)
+        root_pem_at_bootstrap = b"root-bundle-marker-" + CA_BUNDLE
+        fake_step_ca.fetch_root_ca = AsyncMock(return_value=root_pem_at_bootstrap)
+        fake_step_ca.sign_csr = AsyncMock(return_value=(leaf, intermediate))
+
+        ext = _make_extension(
+            tmp_path,
+            step_ca=fake_step_ca,
+            oidc_token_provider=token_provider,
+        )
+        await ext.initialize()
+
+        # The cert file is leaf + intermediate concatenated.
+        on_disk_cert = ext.store.read_cert()
+        assert on_disk_cert == leaf + intermediate
+
+        # The CA bundle is whatever fetch_root_ca returned — untouched.
+        assert ext.store.read_ca_bundle() == root_pem_at_bootstrap
 
     @pytest.mark.asyncio
     async def test_force_renew_triggers_resign(

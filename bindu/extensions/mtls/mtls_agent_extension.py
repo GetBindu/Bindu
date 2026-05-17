@@ -243,11 +243,16 @@ class MTLSAgentExtension:
             )
 
         cert_pem, chain_pem = await self._ca.sign_csr(csr_pem, token)
-        self._store.write_cert(cert_pem)
-        # Refresh the CA bundle from the sign response — step-ca returns the
-        # currently-active chain, which may have rotated since the agent last
-        # fetched ``/roots.pem``.
-        self._store.write_ca_bundle(chain_pem)
+        # Write the leaf + intermediate concatenated so the TLS handshake
+        # presents the full chain to peers. step-ca's response is shaped:
+        #   crt = leaf
+        #   ca  = the intermediate that signed the leaf
+        # The trust anchor (root) is fetched separately via
+        # ``_ensure_ca_bundle`` and lives in ``ca_bundle.pem``; we
+        # deliberately do NOT overwrite it here. Doing so would replace
+        # the root with the intermediate, leaving peers unable to verify
+        # any chain back to the trust anchor.
+        self._store.write_cert(cert_pem + chain_pem)
 
     # ------------------------------------------------------------------
     # Server material
