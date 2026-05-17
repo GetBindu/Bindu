@@ -240,7 +240,8 @@ If your model provider speaks the OpenAI or Anthropic API, it works — [OpenRou
 ## Documentation
 
 - [Full docs site](https://docs.getbindu.com)
-- [Calling a secured agent](docs/AUTHENTICATION.md) — the auth flow with DID signing and Hydra tokens, with a working Python client
+- [Calling a secured agent](docs/AUTH.md) — the shortest path: the two things you do when auth is on (token + DID signature), in one page
+- [Auth — long form](docs/AUTHENTICATION.md) and [DID signing — long form](docs/DID.md) — when the short version isn't enough
 - [Cloud deployment](docs/runtime/quickstart.md) — `bindu deploy` walkthrough
 - [Gateway](docs/GATEWAY.md) — multi-agent orchestration
 - [Private skills](docs/PRIVATE_SKILLS.md) — hide your commercial menu from the public catalog; show it only to allowlisted partner DIDs
