@@ -235,7 +235,6 @@ function useMode(): Mode {
 
 export function StreamPanel() {
 	const mode = useMode();
-	const agents = useUI((s) => s.agents);
 	const allEvents = useAllEvents();
 	const selectedThreadId = useUI((s) => s.selectedThreadId);
 	const selectThread = useUI((s) => s.selectThread);
@@ -269,9 +268,7 @@ export function StreamPanel() {
 		archive: "Archive",
 	};
 	const title =
-		mode.kind === "folder"
-			? FOLDER_TITLES[mode.folder]
-			: agents.find((a) => a.id === mode.agentId)?.name ?? mode.agentId;
+		mode.kind === "folder" ? FOLDER_TITLES[mode.folder] : mode.agentId;
 
 	return (
 		<main className="flex min-w-0 flex-1 flex-col">

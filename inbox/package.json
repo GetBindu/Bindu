@@ -1,9 +1,9 @@
 {
-	"name": "@bindu/communication",
+	"name": "@bindu/inbox",
 	"private": true,
 	"version": "0.1.0",
 	"type": "module",
-	"description": "Bindu Communications — observable, verifiable A2A traffic for operators, auditors, and developers.",
+	"description": "Bindu Inbox — observable, verifiable A2A traffic for operators, auditors, and developers.",
 	"license": "Apache-2.0",
 	"scripts": {
 		"dev": "concurrently -n web,api -c blue,yellow \"npm:dev:web\" \"npm:dev:api\"",

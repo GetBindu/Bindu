@@ -178,7 +178,7 @@ Jede Zeile hier verlinkt auf den Leitfaden, der tatsächlich ins Detail geht.
   </a>
 </div>
 
-Es gibt außerdem eine Gmail-artige Betreiber-Inbox in [`bindu-communication/`](../bindu-communication/). Führe `cd bindu-communication && npm run dev` aus und öffne `http://localhost:3775`.
+Es gibt außerdem eine Gmail-artige Betreiber-Inbox in [`inbox/`](../inbox/). Führe `cd inbox && npm run dev` aus und öffne `http://localhost:3775`.
 
 <br/>
 

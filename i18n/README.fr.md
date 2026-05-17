@@ -178,7 +178,7 @@ Chaque ligne pointe vers le guide qui rentre vraiment dans le détail.
   </a>
 </div>
 
-Il y a aussi une boîte de réception opérateur façon Gmail dans [`bindu-communication/`](../bindu-communication/). Lance `cd bindu-communication && npm run dev` et ouvre `http://localhost:3775`.
+Il y a aussi une boîte de réception opérateur façon Gmail dans [`inbox/`](../inbox/). Lance `cd inbox && npm run dev` et ouvre `http://localhost:3775`.
 
 <br/>
 

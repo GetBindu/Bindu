@@ -178,7 +178,7 @@ curl -X POST http://localhost:3773/ \
   </a>
 </div>
 
-[`bindu-communication/`](../bindu-communication/)-ல் ஒரு Gmail வடிவ operator inbox-ம் உள்ளது. `cd bindu-communication && npm run dev` இயக்கி `http://localhost:3775`-ஐ திறக்கவும்.
+[`inbox/`](../inbox/)-ல் ஒரு Gmail வடிவ operator inbox-ம் உள்ளது. `cd inbox && npm run dev` இயக்கி `http://localhost:3775`-ஐ திறக்கவும்.
 
 <br/>
 

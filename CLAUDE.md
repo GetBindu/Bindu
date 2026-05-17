@@ -3,7 +3,7 @@
 ## Critical Context (Read First)
 
 - **Language**: Python 3.12+ (core), TypeScript (SDK + comms UI + gateway)
-- **Framework**: FastAPI/Starlette (HTTP), gRPC (cross-language), React/Vite (bindu-communication UI)
+- **Framework**: FastAPI/Starlette (HTTP), gRPC (cross-language), React/Vite (inbox UI)
 - **Database**: MongoDB (primary), PostgreSQL (optional), Redis (caching)
 - **Architecture**: Microservices with DID-based identity, OAuth2 auth, x402 payments
 - **Testing**: pytest (Python), Jest (TypeScript), Playwright (E2E)
@@ -40,8 +40,8 @@ npm run build                    # Compile TypeScript
 npm test                         # Run tests
 npm run lint                     # ESLint
 
-# Communications UI (operator inbox)
-cd bindu-communication
+# Operator inbox UI
+cd inbox
 npm install
 npm run dev                      # Dev server (port 3775)
 npm run build                    # Production build
@@ -142,7 +142,7 @@ bindu/
 │       │   ├── client.ts       # BinduService gRPC client
 │       │   └── core-launcher.ts # Spawns Python core
 │       └── proto/              # gRPC proto files
-├── bindu-communication/        # Operator inbox UI (React + Vite + Hono)
+├── inbox/                      # Operator inbox UI (React + Vite + Hono)
 │   ├── server/                 # Hono API on :3787 (SQLite-backed events log)
 │   └── src/                    # React app on :3775
 ├── examples/

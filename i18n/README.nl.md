@@ -178,7 +178,7 @@ Elke rij linkt naar de gids die echt in detail treedt.
   </a>
 </div>
 
-Er is ook een Gmail-achtige operator-inbox in [`bindu-communication/`](../bindu-communication/). Draai `cd bindu-communication && npm run dev` en open `http://localhost:3775`.
+Er is ook een Gmail-achtige operator-inbox in [`inbox/`](../inbox/). Draai `cd inbox && npm run dev` en open `http://localhost:3775`.
 
 <br/>
 

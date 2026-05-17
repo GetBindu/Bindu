@@ -1,4 +1,4 @@
-# Bindu Communications
+# Bindu Inbox
 
 The human-visible layer of secured A2A communication — a three-pane inbox for watching agent traffic land, verifying signatures, and inspecting payloads.
 
@@ -7,7 +7,7 @@ Each row is a JSON-RPC message between two DIDs, threaded by `context_id` so mul
 ## Run it
 
 ```bash
-cd bindu-communication
+cd inbox
 npm install
 npm run dev
 ```

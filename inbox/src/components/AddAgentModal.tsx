@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { XIcon, GlobeIcon } from "@phosphor-icons/react";
+import { GlobeIcon } from "@phosphor-icons/react";
 import { Modal } from "./Modal";
+import { FormError } from "./FormError";
+import { ModalCloseButton } from "./ModalCloseButton";
 import { postJson } from "~/lib/fetch";
 
 interface Props {
@@ -55,13 +57,7 @@ export function AddAgentModal({ open, onClose, onAdded }: Props) {
 							Paste the agent's base URL. We'll fetch its agent card + DID document.
 						</div>
 					</div>
-					<button
-						type="button"
-						onClick={onClose}
-						className="rounded p-1 text-fg-dim transition hover:bg-slate-100 hover:text-fg"
-					>
-						<XIcon size={14} weight="bold" />
-					</button>
+					<ModalCloseButton onClick={onClose} />
 				</div>
 
 				<div className="space-y-3 px-5 py-5">
@@ -82,11 +78,7 @@ export function AddAgentModal({ open, onClose, onAdded }: Props) {
 						</div>
 					</div>
 
-					{status === "error" && errMsg && (
-						<div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] text-rose-700">
-							✗ {errMsg}
-						</div>
-					)}
+					{status === "error" && <FormError message={errMsg} />}
 				</div>
 
 				<div className="flex items-center justify-end gap-2 border-t border-(--color-border-soft) bg-slate-50 px-5 py-3">

@@ -120,9 +120,6 @@ const recentEvents = db.prepare(
 const getEventById = db.prepare(
 	"SELECT id, agent_id AS agentId, received_at AS receivedAt, payload, first_contact AS firstContact FROM events WHERE id = ?",
 );
-const distinctAgents = db.prepare(
-	"SELECT DISTINCT agent_id AS agentId FROM events",
-);
 const upsertContext = db.prepare(
 	"INSERT OR IGNORE INTO contexts (agent_id, context_id, first_seen_at) VALUES (?, ?, ?)",
 );
@@ -197,11 +194,6 @@ export function listRecentEvents(limit = 50): EventRow[] {
 export function readEvent(id: string): EventRow | null {
 	const row = getEventById.get(id) as EventDbRow | undefined;
 	return row ? dbRowToEvent(row) : null;
-}
-
-export function listAgents(): string[] {
-	type Row = { agentId: string };
-	return (distinctAgents.all() as Row[]).map((r) => r.agentId);
 }
 
 export interface AgentRecord {
@@ -385,8 +377,6 @@ const upsertPersonalAgent = db.prepare(`
 		updated_at  = excluded.updated_at
 `);
 
-const deletePersonalAgent = db.prepare("DELETE FROM personal_agent WHERE id = 'me'");
-
 type PersonalAgentDbRow = {
 	persona: string;
 	tools: string;
@@ -430,10 +420,6 @@ export function writePersonalAgent(row: PersonalAgentRow): void {
 		createdAt: row.createdAt,
 		updatedAt: row.updatedAt,
 	});
-}
-
-export function clearPersonalAgent(): void {
-	deletePersonalAgent.run();
 }
 
 // --- settings (single row 'global') -------------------------------------

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import clsx from "clsx";
 import {
-	XIcon,
 	PaperPlaneTiltIcon,
 	TrashIcon,
 	UsersThreeIcon,
@@ -13,6 +12,8 @@ import {
 import { useUI } from "~/state";
 import { Modal } from "./Modal";
 import { AgentPicker } from "./AgentPicker";
+import { FormError } from "./FormError";
+import { ModalCloseButton } from "./ModalCloseButton";
 import { postJson } from "~/lib/fetch";
 import { postSse } from "~/lib/sse";
 import { OUTBOX_AGENT_ID } from "~/lib/constants";
@@ -327,13 +328,7 @@ export function ComposeModal({ open, onClose }: Props) {
 								: "Send a message to an agent."}
 						</div>
 					</div>
-					<button
-						type="button"
-						onClick={handleCloseClick}
-						className="rounded p-1 text-fg-dim transition hover:bg-slate-100 hover:text-fg"
-					>
-						<XIcon size={14} weight="bold" />
-					</button>
+					<ModalCloseButton onClick={handleCloseClick} />
 				</div>
 
 				<div className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
@@ -488,11 +483,7 @@ function ComposeForm({
 				</div>
 			</div>
 
-			{errMsg && (
-				<div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] text-rose-700">
-					✗ {errMsg}
-				</div>
-			)}
+			<FormError message={errMsg} />
 		</>
 	);
 }

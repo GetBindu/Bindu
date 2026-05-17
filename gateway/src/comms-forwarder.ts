@@ -2,7 +2,7 @@ import { Effect, Stream } from "effect"
 import { Service as BusService } from "./bus"
 
 /**
- * Forward bus events to bindu-communication so its inbox can render
+ * Forward bus events to the inbox so it can render
  * gateway-originated A2A traffic alongside per-agent webhooks.
  *
  * Wire it in by calling `runtime.runFork(forwarderEffect)` after the

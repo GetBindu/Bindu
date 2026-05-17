@@ -93,7 +93,7 @@ curl --location 'http://localhost:3773/' \
 ### Via Operator Inbox UI
 
 ```bash
-cd bindu-communication && npm run dev
+cd inbox && npm run dev
 # Open http://localhost:3775
 ```
 

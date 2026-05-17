@@ -178,7 +178,7 @@ Cada fila enlaza a la guía que realmente entra en detalle.
   </a>
 </div>
 
-También hay un buzón de operador con aspecto de Gmail en [`bindu-communication/`](../bindu-communication/). Ejecuta `cd bindu-communication && npm run dev` y abre `http://localhost:3775`.
+También hay un buzón de operador con aspecto de Gmail en [`inbox/`](../inbox/). Ejecuta `cd inbox && npm run dev` y abre `http://localhost:3775`.
 
 <br/>
 

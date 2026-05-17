@@ -5,9 +5,9 @@ import {
 	PlugIcon,
 	SparkleIcon,
 	UserCircleIcon,
-	XIcon,
 } from "@phosphor-icons/react";
 import { Modal } from "./Modal";
+import { ModalCloseButton } from "./ModalCloseButton";
 import { postJson } from "~/lib/fetch";
 import type { Persona, PersonalAgent, PersonalAgentTools } from "~/lib/api-types";
 import { useUI } from "~/state";
@@ -449,13 +449,7 @@ function WizardHeader({ step, onClose }: { step: Step; onClose: () => void }) {
 					);
 				})}
 			</div>
-			<button
-				type="button"
-				onClick={onClose}
-				className="ml-2 rounded p-1 text-fg-dim transition hover:bg-slate-100 hover:text-fg"
-			>
-				<XIcon size={14} weight="bold" />
-			</button>
+			<ModalCloseButton onClick={onClose} className="ml-2" />
 		</div>
 	);
 }

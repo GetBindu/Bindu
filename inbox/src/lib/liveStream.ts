@@ -176,7 +176,6 @@ function mapGatewayEvent(raw: RawWebhook): StreamEvent {
 	return {
 		id: raw.id,
 		agentId: raw.agentId,
-		parentId: p.parent_id || undefined,
 		ts: hms,
 		relTs: "live",
 		at: iso,

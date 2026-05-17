@@ -116,7 +116,7 @@ Users must pay 0.01 USDC before the agent responds.
 
 ### Web UI
 ```bash
-cd bindu-communication
+cd inbox
 npm run dev
 ```
 

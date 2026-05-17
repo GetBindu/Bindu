@@ -17,7 +17,7 @@ import {
 	threadInFolder,
 	type Thread,
 } from "~/lib/threads";
-import { formatListDate } from "~/lib/format-date";
+import { formatListDate } from "~/lib/format";
 import type { StreamEvent } from "~/types";
 
 interface Props {
@@ -468,4 +468,3 @@ function Avatar({ seed }: { seed: string }) {
 		</div>
 	);
 }
-

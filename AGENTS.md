@@ -27,7 +27,7 @@ lsof -ti:3773 -ti:3774           # Check which ports are bound
 cd sdks/typescript && npm run build
 
 # Operator inbox UI (port 3775)
-cd bindu-communication && npm run dev
+cd inbox && npm run dev
 
 # gRPC stub regeneration (after editing proto/agent_handler.proto)
 bash scripts/generate_protos.sh all

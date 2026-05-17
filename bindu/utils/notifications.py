@@ -17,6 +17,7 @@ from bindu.utils.retry import create_retry_decorator
 
 logger = get_logger("bindu.utils.notifications")
 
+
 def _resolve_and_check_ip(hostname: str) -> str:
     """Resolve hostname to an IP address.
 

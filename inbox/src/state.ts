@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Agent, DetailTab, StreamEvent } from "~/types";
+import type { DetailTab, StreamEvent } from "~/types";
 import type { PersonalAgent } from "~/lib/api-types";
 
 export interface Draft {
@@ -15,7 +15,6 @@ interface UIState {
 	selectedThreadId: string | null;
 	detailTab: DetailTab;
 	showCompose: boolean;
-	agents: Agent[];
 	liveEvents: StreamEvent[];
 	/** ctx ids the user has explicitly marked read */
 	readOverrides: Set<string>;
@@ -61,6 +60,13 @@ interface UIState {
 }
 
 const DRAFTS_LS_KEY = "bindu-comms:drafts";
+
+/** Soft cap on the in-memory event ring buffer. Older events fall off
+ * silently when the buffer fills — the server keeps the full history,
+ * so refreshing the page rehydrates from `/api/events/...`. 500 is
+ * roughly two days of dev-fleet traffic; raise it if you start losing
+ * threads on long-running sessions. */
+export const LIVE_EVENTS_CAP = 500;
 
 interface ThreadStateRow {
 	contextId: string;
@@ -118,7 +124,6 @@ export const useUI = create<UIState>((set) => ({
 	selectedThreadId: null,
 	detailTab: "glance",
 	showCompose: false,
-	agents: [],
 	liveEvents: [],
 	readOverrides: new Set(),
 	unreadOverrides: new Set(),
@@ -241,18 +246,5 @@ export const useUI = create<UIState>((set) => ({
 		}
 	},
 	addLiveEvent: (e) =>
-		set((s) => {
-			const agents = s.agents.find((a) => a.id === e.agentId)
-				? s.agents
-				: [
-						...s.agents,
-						{
-							id: e.agentId,
-							name: e.agentId,
-							did: `did:bindu:?:${e.agentId}`,
-							role: "agent" as const,
-						},
-					];
-			return { liveEvents: [e, ...s.liveEvents].slice(0, 500), agents };
-		}),
+		set((s) => ({ liveEvents: [e, ...s.liveEvents].slice(0, LIVE_EVENTS_CAP) })),
 }));

@@ -20,15 +20,6 @@ export type EventKind =
 	| "plan-step"
 	| "heartbeat";
 
-export type AgentRole = "agent" | "gateway";
-
-export interface Agent {
-	id: string;
-	name: string;
-	did: string;
-	role: AgentRole;
-}
-
 export interface Counterparty {
 	name: string;
 	did: string;
@@ -38,7 +29,6 @@ export interface Counterparty {
 export interface StreamEvent {
 	id: string;
 	agentId: string;
-	parentId?: string;
 	ts: string;
 	relTs: string;
 	/** Full ISO datetime (`2026-05-14T22:42:11.614Z`) when known.

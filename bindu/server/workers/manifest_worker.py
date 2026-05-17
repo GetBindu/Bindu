@@ -659,12 +659,14 @@ class ManifestWorker(Worker):
                 # have the 4-arg shape) working.
                 try:
                     result = self.lifecycle_notifier(
-                        task_id, context_id, state, final, status_message
+                        task_id,
+                        context_id,
+                        state,
+                        final,
+                        status_message,  # ty: ignore[too-many-positional-arguments]
                     )
                 except TypeError:
-                    result = self.lifecycle_notifier(
-                        task_id, context_id, state, final
-                    )
+                    result = self.lifecycle_notifier(task_id, context_id, state, final)
                 # Handle both sync and async notifiers
                 if hasattr(result, "__await__"):
                     await result

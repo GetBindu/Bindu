@@ -178,7 +178,7 @@ Every row here links out to the guide that actually goes into it.
   </a>
 </div>
 
-There's also a Gmail-shaped operator inbox in [`bindu-communication/`](bindu-communication/). Run `cd bindu-communication && npm run dev` and open `http://localhost:3775`.
+There's also a Gmail-shaped operator inbox in [`inbox/`](inbox/). Run `cd inbox && npm run dev` and open `http://localhost:3775`.
 
 <br/>
 

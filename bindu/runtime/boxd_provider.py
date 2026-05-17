@@ -62,7 +62,7 @@ _BINDU_SHIP_EXCLUDES = (
     "alembic/",
     ".github/",
     ".vscode/",
-    "bindu-communication/",
+    "inbox/",
 )
 
 _VM_READY_TIMEOUT = 60.0

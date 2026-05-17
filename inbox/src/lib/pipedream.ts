@@ -56,7 +56,7 @@ export async function connectPipedreamApp(
 		return {
 			ok: false,
 			errMsg:
-				"Pipedream SDK not installed. Run `npm i @pipedream/sdk` in bindu-communication.",
+				"Pipedream SDK not installed. Run `npm i @pipedream/sdk` in inbox.",
 		};
 	}
 

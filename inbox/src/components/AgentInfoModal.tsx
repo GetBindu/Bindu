@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-	XIcon,
 	InfoIcon,
 	CopyIcon,
 	CheckIcon,
@@ -9,6 +8,7 @@ import {
 	BrainIcon,
 } from "@phosphor-icons/react";
 import { Modal } from "./Modal";
+import { ModalCloseButton } from "./ModalCloseButton";
 import { isGateway as isGatewayByName } from "~/lib/agent-kind";
 import type { EcosystemAgent } from "~/lib/api-types";
 
@@ -164,13 +164,7 @@ export function AgentInfoModal({ open, onClose, agent }: Props) {
 							</>
 						)}
 					</button>
-					<button
-						type="button"
-						onClick={onClose}
-						className="rounded p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
-					>
-						<XIcon size={14} weight="bold" />
-					</button>
+					<ModalCloseButton onClick={onClose} />
 				</div>
 
 				<div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
@@ -269,7 +263,11 @@ function HealthSection({
 	const uptime = typeof health.uptime_seconds === "number"
 		? formatUptime(health.uptime_seconds as number)
 		: null;
-	const version = (health.version as Record<string, unknown> | undefined)?.version;
+	const versionRaw = (health.version as Record<string, unknown> | undefined)?.version;
+	const version =
+		typeof versionRaw === "string" || typeof versionRaw === "number"
+			? String(versionRaw)
+			: undefined;
 	const healthy = status.toLowerCase() === "healthy" || status.toLowerCase() === "ok";
 	return (
 		<section>
@@ -290,7 +288,7 @@ function HealthSection({
 				/>
 				{uptime && <Pill tone="slate" label={`up ${uptime}`} title="uptime" />}
 				{version && (
-					<Pill tone="slate" label={`v${String(version)}`} title="version" />
+					<Pill tone="slate" label={`v${version}`} title="version" />
 				)}
 			</div>
 		</section>
@@ -582,7 +580,7 @@ function formatUptime(seconds: number): string {
  * wins. Input is HTML-escaped first to neutralise any payload that
  * happens to contain `<` etc. */
 function PrettyJson({ source }: { source: string }) {
-	const html = highlight(source);
+	const html = useMemo(() => highlight(source), [source]);
 	return (
 		<pre className="scrollbar max-h-[400px] overflow-auto rounded-md border border-slate-200 bg-slate-950 p-4 font-mono text-[11px] leading-relaxed text-slate-200">
 			<code

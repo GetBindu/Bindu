@@ -178,7 +178,7 @@ curl -X POST http://localhost:3773/ \
   </a>
 </div>
 
-[`bindu-communication/`](../bindu-communication/) 里还有一个 Gmail 风格的操作员收件箱。运行 `cd bindu-communication && npm run dev`，然后打开 `http://localhost:3775`。
+[`inbox/`](../inbox/) 里还有一个 Gmail 风格的操作员收件箱。运行 `cd inbox && npm run dev`，然后打开 `http://localhost:3775`。
 
 <br/>
 

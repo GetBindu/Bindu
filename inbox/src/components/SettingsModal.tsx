@@ -6,9 +6,10 @@ import {
 	EyeSlashIcon,
 	GearIcon,
 	TrashIcon,
-	XIcon,
 } from "@phosphor-icons/react";
 import { Modal } from "./Modal";
+import { FormError } from "./FormError";
+import { ModalCloseButton } from "./ModalCloseButton";
 import { postJson } from "~/lib/fetch";
 import type { MaskedSettings, SettingsField } from "~/lib/api-types";
 
@@ -157,13 +158,7 @@ export function SettingsModal({ open, onClose }: Props) {
 							spawn — restart the agent for changes to take effect.
 						</div>
 					</div>
-					<button
-						type="button"
-						onClick={onClose}
-						className="rounded p-1 text-fg-dim transition hover:bg-slate-100 hover:text-fg"
-					>
-						<XIcon size={14} weight="bold" />
-					</button>
+					<ModalCloseButton onClick={onClose} />
 				</div>
 
 				<div className="max-h-[60vh] space-y-4 overflow-y-auto px-5 py-5">
@@ -235,11 +230,7 @@ export function SettingsModal({ open, onClose }: Props) {
 					})}
 				</div>
 
-				{errMsg && (
-					<div className="mx-5 mb-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] text-rose-700">
-						{errMsg}
-					</div>
-				)}
+				<FormError message={errMsg} className="mx-5 mb-3" />
 
 				<div className="flex items-center justify-between border-t border-(--color-border-soft) bg-slate-50 px-5 py-3">
 					<div className="text-[10px] text-fg-dim">

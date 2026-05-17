@@ -3,7 +3,6 @@ import { serve } from "@hono/node-server";
 import { type ChildProcess, spawn } from "node:child_process";
 import crypto from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import net from "node:net";
 import { resolve as pathResolve } from "node:path";
 import {
 	type AgentRecord,
@@ -13,10 +12,8 @@ import {
 	type SettingsField,
 	type SettingsRow,
 	archiveThread,
-	clearPersonalAgent,
 	clearSetting,
 	deleteAgent,
-	listAgents,
 	listConversationHistory,
 	listEcosystem,
 	listRecentEvents,
@@ -36,6 +33,7 @@ import {
 	writeSettings,
 } from "./db";
 import { spawnPersonalAgent, stopPersonalAgent } from "./personal-agent";
+import { pickFreePort, pollHealth } from "./utils";
 
 // Path A: comms is the canonical record, gateway is stateless. We send
 // the most recent N user/assistant turns on every /api/plan call;
@@ -133,11 +131,11 @@ function loadGatewayApiKey(): string {
 const GATEWAY_API_KEY = loadGatewayApiKey();
 if (GATEWAY_API_KEY) {
 	console.log(
-		`[bindu-communication] gateway bearer token loaded (${GATEWAY_API_KEY.length} chars)`,
+		`[inbox] gateway bearer token loaded (${GATEWAY_API_KEY.length} chars)`,
 	);
 } else {
 	console.warn(
-		"[bindu-communication] GATEWAY_API_KEY not set — /api/plan will fail with 401 if the gateway has auth.mode=bearer",
+		"[inbox] GATEWAY_API_KEY not set — /api/plan will fail with 401 if the gateway has auth.mode=bearer",
 	);
 }
 
@@ -145,19 +143,6 @@ if (GATEWAY_API_KEY) {
 // rule out traversal-style inputs and pathological lengths.
 const AGENT_ID_RE = /^[a-zA-Z0-9_-]{1,64}$/;
 
-function authMiddleware(c: {
-	req: {
-		header: (name: string) => string | undefined;
-		query: (name: string) => string | undefined;
-	};
-}) {
-	if (!REQUIRED_TOKEN) return null;
-	const header = c.req.header("authorization") ?? "";
-	if (header === `Bearer ${REQUIRED_TOKEN}`) return null;
-	const query = c.req.query("token") ?? "";
-	if (query === REQUIRED_TOKEN) return null;
-	return { error: "unauthorized" } as const;
-}
 
 async function fetchWellKnown(base: string) {
 	const [didR, cardR] = await Promise.all([
@@ -211,6 +196,21 @@ function slugify(s: string): string {
 
 const app = new Hono();
 
+// Operator-side auth. Every /api/* route used to do this inline; the
+// middleware below collapses that into one rule. Token comes from the
+// BINDU_COMMS_TOKEN env var — when unset the inbox is open (single-user
+// dev default). Webhooks have their own auth (WEBHOOK_TOKEN) on the
+// /webhooks/* path and are not covered by this middleware.
+app.use("/api/*", async (c, next) => {
+	if (!REQUIRED_TOKEN) return next();
+	const header = c.req.header("authorization") ?? "";
+	const query = c.req.query("token") ?? "";
+	if (header === `Bearer ${REQUIRED_TOKEN}` || query === REQUIRED_TOKEN) {
+		return next();
+	}
+	return c.json({ error: "unauthorized" }, 401);
+});
+
 app.post("/webhooks/bindu/:agentId", async (c) => {
 	if (WEBHOOK_TOKEN) {
 		const header = c.req.header("authorization") ?? "";
@@ -248,8 +248,6 @@ app.post("/webhooks/bindu/:agentId", async (c) => {
 });
 
 app.get("/api/events/stream", (c) => {
-	const blocked = authMiddleware(c);
-	if (blocked) return c.json(blocked, 401);
 	const agentFilter = c.req.query("agentId");
 	const stream = new ReadableStream({
 		start(controller) {
@@ -275,15 +273,7 @@ app.get("/api/events/stream", (c) => {
 	});
 });
 
-app.get("/api/agents", (c) => {
-	const blocked = authMiddleware(c);
-	if (blocked) return c.json(blocked, 401);
-	return c.json(listAgents());
-});
-
 app.get("/api/agents/:agentId", async (c) => {
-	const blocked = authMiddleware(c);
-	if (blocked) return c.json(blocked, 401);
 	const rec = await resolveAgent(c.req.param("agentId"));
 	return c.json(rec);
 });
@@ -303,8 +293,6 @@ app.get("/api/agents/:agentId", async (c) => {
  * own ok/error so the modal can render what it has.
  */
 app.get("/api/agents/:agentId/live", async (c) => {
-	const blocked = authMiddleware(c);
-	if (blocked) return c.json(blocked, 401);
 	const id = c.req.param("agentId");
 	if (!AGENT_ID_RE.test(id)) return c.json({ error: "invalid-agent-id" }, 400);
 	const row = readAgent(id);
@@ -342,14 +330,10 @@ app.get("/api/agents/:agentId/live", async (c) => {
 // here to add a third-party agent by URL; the server fetches its well-known
 // docs and stores a slugified record.
 app.get("/api/ecosystem", (c) => {
-	const blocked = authMiddleware(c);
-	if (blocked) return c.json(blocked, 401);
 	return c.json(listEcosystem());
 });
 
 app.delete("/api/ecosystem/:agentId", (c) => {
-	const blocked = authMiddleware(c);
-	if (blocked) return c.json(blocked, 401);
 	const id = c.req.param("agentId");
 	if (!AGENT_ID_RE.test(id)) return c.json({ error: "invalid-agent-id" }, 400);
 	const removed = deleteAgent(id);
@@ -357,8 +341,6 @@ app.delete("/api/ecosystem/:agentId", (c) => {
 });
 
 app.post("/api/ecosystem", async (c) => {
-	const blocked = authMiddleware(c);
-	if (blocked) return c.json(blocked, 401);
 	const body = (await c.req.json().catch(() => ({}))) as {
 		url?: string;
 		id?: string;
@@ -406,14 +388,10 @@ app.post("/api/ecosystem", async (c) => {
 // keyed by context_id. Source of truth lives in SQLite; the frontend's
 // localStorage caches are gone in favor of this.
 app.get("/api/threads/state", (c) => {
-	const blocked = authMiddleware(c);
-	if (blocked) return c.json(blocked, 401);
 	return c.json(listThreadState());
 });
 
 app.post("/api/threads/:contextId/:action", async (c) => {
-	const blocked = authMiddleware(c);
-	if (blocked) return c.json(blocked, 401);
 	const contextId = c.req.param("contextId");
 	const action = c.req.param("action");
 	if (!contextId) return c.json({ error: "missing-context" }, 400);
@@ -519,7 +497,7 @@ async function mintHydraToken(): Promise<string | null> {
 			});
 			if (!r.ok) {
 				console.warn(
-					`[bindu-communication] hydra token mint failed: ${r.status}`,
+					`[inbox] hydra token mint failed: ${r.status}`,
 				);
 				return null;
 			}
@@ -536,7 +514,7 @@ async function mintHydraToken(): Promise<string | null> {
 			return j.access_token;
 		} catch (err) {
 			console.warn(
-				`[bindu-communication] hydra token mint error: ${(err as Error).message}`,
+				`[inbox] hydra token mint error: ${(err as Error).message}`,
 			);
 			return null;
 		} finally {
@@ -676,15 +654,7 @@ function effectiveFromDid(): { did: string; reason: "agent" | "fallback" } {
 	return { did: OPERATOR_DID, reason: "fallback" };
 }
 
-app.get("/api/me/from-did", (c) => {
-	const blocked = authMiddleware(c);
-	if (blocked) return c.json(blocked, 401);
-	return c.json(effectiveFromDid());
-});
-
 app.post("/api/compose", async (c) => {
-	const blocked = authMiddleware(c);
-	if (blocked) return c.json(blocked, 401);
 	const body = (await c.req.json().catch(() => ({}))) as {
 		agentId?: string;
 		text?: string;
@@ -876,43 +846,6 @@ app.post("/api/compose", async (c) => {
  * persist these across restarts; that's a phase-3 concern.
  */
 const spawnedGateways = new Map<string, ChildProcess>();
-
-function pickFreePort(): Promise<number> {
-	return new Promise((resolveOk, rejectErr) => {
-		const srv = net.createServer();
-		srv.unref();
-		srv.on("error", rejectErr);
-		srv.listen(0, "127.0.0.1", () => {
-			const addr = srv.address();
-			srv.close(() => {
-				if (typeof addr === "object" && addr && "port" in addr) {
-					resolveOk(addr.port);
-				} else {
-					rejectErr(new Error("server.address() returned unexpected shape"));
-				}
-			});
-		});
-	});
-}
-
-async function pollHealth(
-	url: string,
-	timeoutMs: number,
-	signal?: AbortSignal,
-): Promise<boolean> {
-	const start = Date.now();
-	while (Date.now() - start < timeoutMs) {
-		if (signal?.aborted) return false;
-		try {
-			const r = await fetch(`${url}/health`, { signal });
-			if (r.ok) return true;
-		} catch {
-			/* ECONNREFUSED while the gateway is still booting — keep trying */
-		}
-		await new Promise((res) => setTimeout(res, 400));
-	}
-	return false;
-}
 
 type GatewayHandle =
 	| {
@@ -1141,23 +1074,6 @@ async function ensureGateway(): Promise<GatewayHandle> {
 	return inFlightSpawn;
 }
 
-app.post("/api/gateway/spawn", async (c) => {
-	const blocked = authMiddleware(c);
-	if (blocked) return c.json(blocked, 401);
-	const result = await ensureGateway();
-	if (!result.ok) {
-		return c.json({ error: result.error, detail: result.detail }, 500);
-	}
-	return c.json({
-		ok: true,
-		id: result.id,
-		url: result.url,
-		reused: result.reused,
-		spawned: result.spawned,
-		warnings: result.warnings,
-	});
-});
-
 // Best-effort cleanup: SIGTERM all spawned gateways when comms exits.
 // Without this, child processes outlive their parent and the operator
 // has to `pkill -f 'gateway/src/index.ts'` to clean up.
@@ -1210,8 +1126,6 @@ process.once("SIGTERM", () => {
  * `event: error` + `event: done` ourselves if anything goes wrong
  * before "planning" lands. */
 app.post("/api/plan", async (c) => {
-	const blocked = authMiddleware(c);
-	if (blocked) return c.json(blocked, 401);
 	const body = (await c.req.json().catch(() => ({}))) as {
 		question?: string;
 		agentIds?: string[];
@@ -1334,8 +1248,9 @@ app.post("/api/plan", async (c) => {
 					} catch {
 						/* leave empty */
 					}
+					const card = (row.agentCard ?? null) as { name?: unknown } | null;
 					catalog.push({
-						name: row.agentCard?.name?.toString() ?? id,
+						name: typeof card?.name === "string" ? card.name : id,
 						endpoint: row.url,
 						auth: { type: "did_signed" },
 						skills,
@@ -1612,8 +1527,6 @@ app.post("/api/plan", async (c) => {
 // to-end today; `approve`/`pay`/`decline` are recorded but not yet wired to
 // the underlying protocol moves (we say so honestly in the response).
 app.post("/api/events/:id/action", async (c) => {
-	const blocked = authMiddleware(c);
-	if (blocked) return c.json(blocked, 401);
 	const evId = c.req.param("id");
 	const ev = readEvent(evId);
 	if (!ev) return c.json({ error: "event-not-found" }, 404);
@@ -1694,14 +1607,10 @@ function isToolsShape(t: unknown): t is PersonalAgentTools {
 }
 
 app.get("/api/me", (c) => {
-	const blocked = authMiddleware(c);
-	if (blocked) return c.json(blocked, 401);
 	return c.json(readPersonalAgent());
 });
 
 app.post("/api/me", async (c) => {
-	const blocked = authMiddleware(c);
-	if (blocked) return c.json(blocked, 401);
 	const body = (await c.req.json().catch(() => ({}))) as {
 		persona?: unknown;
 		tools?: unknown;
@@ -1733,15 +1642,6 @@ app.post("/api/me", async (c) => {
 	return c.json(row);
 });
 
-app.delete("/api/me", (c) => {
-	const blocked = authMiddleware(c);
-	if (blocked) return c.json(blocked, 401);
-	// Phase 3 will also SIGTERM the child process and rm -rf agent_dir.
-	// For now we just drop the row.
-	clearPersonalAgent();
-	return c.json({ ok: true });
-});
-
 // Spawn / stop the personal agent. The heavy lifting lives in
 // `personal-agent.ts`; the route just translates the result shape into
 // HTTP. Spawning may take 30-60s (uv resolves deps, bindufy boots a
@@ -1750,8 +1650,6 @@ app.delete("/api/me", (c) => {
 // is still pending after 60s, the agent's boot itself timed out and
 // the response will carry the captured stderr.
 app.post("/api/me/spawn", async (c) => {
-	const blocked = authMiddleware(c);
-	if (blocked) return c.json(blocked, 401);
 	const row = readPersonalAgent();
 	if (!row) return c.json({ error: "no-personal-agent" }, 404);
 	const result = await spawnPersonalAgent();
@@ -1767,8 +1665,6 @@ app.post("/api/me/spawn", async (c) => {
 });
 
 app.post("/api/me/stop", (c) => {
-	const blocked = authMiddleware(c);
-	if (blocked) return c.json(blocked, 401);
 	const row = readPersonalAgent();
 	if (!row) return c.json({ error: "no-personal-agent" }, 404);
 	const result = stopPersonalAgent();
@@ -1816,8 +1712,6 @@ async function pipedreamOAuthToken(
 }
 
 app.post("/api/pipedream/connect-token", async (c) => {
-	const blocked = authMiddleware(c);
-	if (blocked) return c.json(blocked, 401);
 	// Settings table wins; env vars are a fallback for the shell-env
 	// workflow we shipped pre-Settings-tab.
 	const s = readSettings();
@@ -1954,14 +1848,10 @@ const SETTINGS_FIELD_NAMES: SettingsField[] = [
 ];
 
 app.get("/api/settings", (c) => {
-	const blocked = authMiddleware(c);
-	if (blocked) return c.json(blocked, 401);
 	return c.json(maskSettings(readSettings()));
 });
 
 app.post("/api/settings", async (c) => {
-	const blocked = authMiddleware(c);
-	if (blocked) return c.json(blocked, 401);
 	const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
 	const partial: Partial<Record<SettingsField, string>> = {};
 	for (const field of SETTINGS_FIELD_NAMES) {
@@ -1977,8 +1867,6 @@ app.post("/api/settings", async (c) => {
 });
 
 app.delete("/api/settings/:field", (c) => {
-	const blocked = authMiddleware(c);
-	if (blocked) return c.json(blocked, 401);
 	const field = c.req.param("field") as SettingsField;
 	if (!SETTINGS_FIELD_NAMES.includes(field)) {
 		return c.json({ error: "unknown-field", detail: field }, 400);
@@ -1987,11 +1875,11 @@ app.delete("/api/settings/:field", (c) => {
 });
 
 serve({ fetch: app.fetch, port: 3787 }, (info) => {
-	console.log(`[bindu-communication] api on http://127.0.0.1:${info.port}`);
+	console.log(`[inbox] api on http://127.0.0.1:${info.port}`);
 	if (REQUIRED_TOKEN) {
-		console.log(`[bindu-communication] /api/* requires Bearer token`);
+		console.log(`[inbox] /api/* requires Bearer token`);
 	}
 	if (WEBHOOK_TOKEN) {
-		console.log(`[bindu-communication] webhooks require Bearer token`);
+		console.log(`[inbox] webhooks require Bearer token`);
 	}
 });
