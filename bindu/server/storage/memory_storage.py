@@ -95,8 +95,11 @@ class InMemoryStorage(Storage[dict[str, Any]]):
         task_copy = copy.deepcopy(task)
 
         # Limit history if requested
-        if history_length is not None and history_length > 0 and "history" in task:
-            task_copy["history"] = task["history"][-history_length:]
+        if history_length is not None and "history" in task:
+            if history_length == 0:
+                task_copy["history"] = []
+            elif history_length > 0:
+                task_copy["history"] = task["history"][-history_length:]
 
         return task_copy
 
@@ -412,6 +415,8 @@ class InMemoryStorage(Storage[dict[str, Any]]):
         if offset > 0:
             all_tasks = all_tasks[offset:]
 
+        if length == 0:
+            return []
         if length is not None and length > 0:
             all_tasks = all_tasks[:length]
 
@@ -463,6 +468,8 @@ class InMemoryStorage(Storage[dict[str, Any]]):
         if offset > 0:
             tasks = tasks[offset:]
 
+        if length == 0:
+            return []
         if length is not None and length > 0:
             tasks = tasks[:length]
 
@@ -496,6 +503,8 @@ class InMemoryStorage(Storage[dict[str, Any]]):
         if offset > 0:
             contexts = contexts[offset:]
 
+        if length == 0:
+            return []
         if length is not None and length > 0:
             contexts = contexts[:length]
 

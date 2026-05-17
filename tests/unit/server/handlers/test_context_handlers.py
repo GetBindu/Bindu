@@ -57,6 +57,52 @@ class TestContextHandlers:
         assert response["result"] == []
 
     @pytest.mark.asyncio
+    async def test_list_contexts_preserves_explicit_zero_length(self):
+        """Test explicit zero length is not replaced by history_length fallback."""
+        mock_storage = AsyncMock()
+        mock_storage.list_contexts.return_value = []
+
+        handler = ContextHandlers(storage=mock_storage)
+        request = {
+            "jsonrpc": "2.0",
+            "id": "2",
+            "params": {"length": 0, "history_length": 5},
+        }
+
+        response = await handler.list_contexts(request)
+
+        assert response["result"] == []
+        mock_storage.list_contexts.assert_called_once_with(0, owner_did=None)
+
+    @pytest.mark.asyncio
+    async def test_list_contexts_rejects_invalid_length_type(self):
+        """Test invalid length values are rejected before reaching storage."""
+        mock_storage = AsyncMock()
+        handler = ContextHandlers(storage=mock_storage)
+        request = {"jsonrpc": "2.0", "id": "2", "params": {"length": "0"}}
+
+        with pytest.raises(
+            ValueError, match="Field 'length' must be a non-negative integer"
+        ):
+            await handler.list_contexts(request)
+
+        mock_storage.list_contexts.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_list_contexts_rejects_negative_history_length(self):
+        """Test negative fallback history_length values are rejected."""
+        mock_storage = AsyncMock()
+        handler = ContextHandlers(storage=mock_storage)
+        request = {"jsonrpc": "2.0", "id": "2", "params": {"history_length": -1}}
+
+        with pytest.raises(
+            ValueError, match="Field 'history_length' must be a non-negative integer"
+        ):
+            await handler.list_contexts(request)
+
+        mock_storage.list_contexts.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_clear_context_success(self):
         """Test clearing context successfully (unauthenticated caller on an
         unowned context — the dev-mode default where caller_did and owner
