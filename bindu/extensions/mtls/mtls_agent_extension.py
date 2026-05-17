@@ -26,8 +26,11 @@ Phase coverage
 
 from __future__ import annotations
 
+import ssl
 from pathlib import Path
-from typing import Awaitable, Callable, Optional
+from typing import Any, Awaitable, Callable, Optional
+
+import grpc
 
 from bindu.extensions.mtls.cert_store import CertStore
 from bindu.extensions.mtls.step_ca_client import StepCAClient, StepCAError
@@ -205,29 +208,78 @@ class MTLSAgentExtension:
         self._store.write_ca_bundle(chain_pem)
 
     # ------------------------------------------------------------------
-    # Server material (Phase 3)
+    # Server material
     # ------------------------------------------------------------------
 
-    def build_server_ssl_context(self):
-        """Return an ``ssl.SSLContext`` for uvicorn.
+    def build_server_ssl_context(self) -> ssl.SSLContext:
+        """Return an ``ssl.SSLContext`` configured for mTLS.
 
-        Configured with the agent cert/key, the CA bundle as the trust root
-        for peer verification, and ``CERT_REQUIRED`` when
-        ``mtls.require_client_cert`` is true.
+        The context loads the agent cert/key as the server identity and the
+        CA bundle as the trust root for verifying peer (client) certs. Verify
+        mode is ``CERT_REQUIRED`` when ``mtls.require_client_cert`` is true
+        (full mTLS) or ``CERT_OPTIONAL`` otherwise.
+
+        Raises:
+            FileNotFoundError: when cert / key / CA-bundle are not on disk.
+                ``initialize()`` must run first.
         """
-        raise NotImplementedError(
-            "MTLSAgentExtension.build_server_ssl_context lands in Phase 3"
+        self._require_initialized()
+        context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        context.load_cert_chain(
+            certfile=str(self._store.cert_path),
+            keyfile=str(self._store.key_path),
         )
+        context.load_verify_locations(cafile=str(self._store.ca_bundle_path))
+        context.verify_mode = (
+            ssl.CERT_REQUIRED
+            if app_settings.mtls.require_client_cert
+            else ssl.CERT_OPTIONAL
+        )
+        return context
 
-    def build_grpc_server_credentials(self):
+    def get_uvicorn_ssl_kwargs(self) -> dict[str, Any]:
+        """Return the ``ssl_*`` kwargs to splat into ``uvicorn.run(...)``.
+
+        Uvicorn accepts file paths and an ssl_cert_reqs flag rather than a
+        constructed ``SSLContext``, so this method hands back the file-path
+        form. Use ``build_server_ssl_context`` when a Python ``SSLContext`` is
+        needed directly (tests, diagnostics).
+        """
+        self._require_initialized()
+        return {
+            "ssl_certfile": str(self._store.cert_path),
+            "ssl_keyfile": str(self._store.key_path),
+            "ssl_ca_certs": str(self._store.ca_bundle_path),
+            "ssl_cert_reqs": (
+                ssl.CERT_REQUIRED
+                if app_settings.mtls.require_client_cert
+                else ssl.CERT_OPTIONAL
+            ),
+        }
+
+    def build_grpc_server_credentials(self) -> grpc.ServerCredentials:
         """Return ``grpc.ServerCredentials`` for the gRPC bind.
 
-        Equivalent of ``ssl_server_credentials(..., require_client_auth=True)``
-        built from the same on-disk PEM files as the HTTP context.
+        Built from the same on-disk PEM files as the HTTP context, so an
+        attacker can't downgrade by hitting the gRPC port instead.
         """
-        raise NotImplementedError(
-            "MTLSAgentExtension.build_grpc_server_credentials lands in Phase 3"
+        self._require_initialized()
+        cert = self._store.read_cert()
+        key = self._store.read_key()
+        ca_bundle = self._store.read_ca_bundle()
+        return grpc.ssl_server_credentials(
+            [(key, cert)],
+            root_certificates=ca_bundle,
+            require_client_auth=app_settings.mtls.require_client_cert,
         )
+
+    def _require_initialized(self) -> None:
+        """Guard rail — server material is only valid post-bootstrap."""
+        if not self._store.has_cert():
+            raise FileNotFoundError(
+                f"No mTLS cert at {self._store.cert_path}; "
+                "call MTLSAgentExtension.initialize() before building server material"
+            )
 
     # ------------------------------------------------------------------
     # Client material (Phase 4)

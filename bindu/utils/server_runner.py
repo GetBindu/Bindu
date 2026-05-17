@@ -42,7 +42,13 @@ def setup_signal_handlers() -> None:
     logger.debug("Signal handlers registered for graceful shutdown")
 
 
-def run_server(app: Any, host: str, port: int, display_info: bool = True) -> None:
+def run_server(
+    app: Any,
+    host: str,
+    port: int,
+    display_info: bool = True,
+    ssl_kwargs: dict[str, Any] | None = None,
+) -> None:
     """Run uvicorn server with graceful shutdown handling.
 
     Supports being called from both the main thread (normal bindufy flow)
@@ -54,16 +60,24 @@ def run_server(app: Any, host: str, port: int, display_info: bool = True) -> Non
         host: Host address to bind to
         port: Port number to bind to
         display_info: Whether to display startup info messages
+        ssl_kwargs: Optional dict produced by ``MTLSAgentExtension.get_uvicorn_ssl_kwargs``.
+            When provided, uvicorn serves over TLS with mutual-auth verification
+            of peer client certificates against the bundled CA.
     """
     # Setup signal handlers (skips automatically if not in main thread)
     setup_signal_handlers()
 
+    scheme = "https" if ssl_kwargs else "http"
     if display_info:
-        logger.info(f"Starting uvicorn server at {host}:{port}...")
+        logger.info(f"Starting uvicorn server at {scheme}://{host}:{port}...")
+        if ssl_kwargs:
+            logger.info(
+                "mTLS enabled — clients must present a cert chained to the CA bundle"
+            )
         logger.info("Press Ctrl+C to stop the server gracefully")
 
     try:
-        uvicorn.run(app, host=host, port=port)
+        uvicorn.run(app, host=host, port=port, **(ssl_kwargs or {}))
     except KeyboardInterrupt:
         # This shouldn't be reached due to signal handler, but just in case
         logger.info("\n🛑 Server interrupted, shutting down...")

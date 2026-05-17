@@ -627,6 +627,20 @@ def _bindufy_core(
             tunnel_url=tunnel_url,
         )
 
+        # When mTLS is configured and bootstrap succeeded, hand uvicorn the
+        # cert/key/CA-bundle paths so the HTTP server runs over TLS with
+        # mutual-auth peer verification.
+        ssl_kwargs = (
+            mtls_extension.get_uvicorn_ssl_kwargs()
+            if mtls_extension is not None
+            else None
+        )
+        if ssl_kwargs and agent_url.startswith("http://"):
+            logger.warning(
+                "mTLS is on but agent_url starts with http://; downstream callers "
+                "will fail TLS. Set deployment URL to https://… to match."
+            )
+
         if run_server_in_background:
             # Start uvicorn in a background thread (used by gRPC service)
             import threading
@@ -634,7 +648,12 @@ def _bindufy_core(
             server_thread = threading.Thread(
                 target=start_uvicorn_server,
                 args=(bindu_app,),
-                kwargs={"host": host, "port": port, "display_info": True},
+                kwargs={
+                    "host": host,
+                    "port": port,
+                    "display_info": True,
+                    "ssl_kwargs": ssl_kwargs,
+                },
                 daemon=True,
                 name=f"uvicorn-{validated_config['name']}",
             )
@@ -642,7 +661,13 @@ def _bindufy_core(
             logger.info(f"HTTP server started in background thread on {host}:{port}")
         else:
             # Run server blocking (normal Python bindufy path)
-            start_uvicorn_server(bindu_app, host=host, port=port, display_info=True)
+            start_uvicorn_server(
+                bindu_app,
+                host=host,
+                port=port,
+                display_info=True,
+                ssl_kwargs=ssl_kwargs,
+            )
     else:
         logger.info(
             "Server not started (run_server=False). Manifest returned for programmatic use."

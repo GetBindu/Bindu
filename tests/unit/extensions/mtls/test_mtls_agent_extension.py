@@ -224,3 +224,93 @@ class TestInitializeFailureModes:
         )
         ok = await ext.initialize()
         assert ok is False
+
+
+class TestServerMaterial:
+    """Phase 3: server-side TLS material builders."""
+
+    def _seed_extension_with_real_pki(
+        self, tmp_path: Path, fake_step_ca: MagicMock, token_provider: AsyncMock
+    ) -> MTLSAgentExtension:
+        """Run a real bootstrap so the on-disk PEM files exist for SSLContext."""
+        import asyncio
+
+        ext = _make_extension(
+            tmp_path,
+            step_ca=fake_step_ca,
+            oidc_token_provider=token_provider,
+        )
+        # Replace the fake's returned cert with one whose key actually matches
+        # what generate_keypair() writes — ssl.SSLContext.load_cert_chain
+        # checks that the cert's public key is the pair of the private key.
+        store = ext.store
+        pk, _ = store.generate_keypair()
+        from datetime import timedelta
+        from cryptography.x509 import (
+            CertificateBuilder,
+            Name,
+            NameAttribute,
+            random_serial_number,
+        )
+
+        now = datetime.now(timezone.utc)
+        cert = (
+            CertificateBuilder()
+            .subject_name(Name([NameAttribute(NameOID.COMMON_NAME, "test")]))
+            .issuer_name(Name([NameAttribute(NameOID.COMMON_NAME, "test")]))
+            .public_key(pk.public_key())
+            .serial_number(random_serial_number())
+            .not_valid_before(now - timedelta(minutes=1))
+            .not_valid_after(now + timedelta(hours=24))
+            .sign(pk, hashes.SHA256())
+        )
+        store.write_cert(cert.public_bytes(serialization.Encoding.PEM))
+        # CA bundle just needs to be a valid PEM cert for SSLContext.load_verify_locations.
+        store.write_ca_bundle(cert.public_bytes(serialization.Encoding.PEM))
+        # Mark as initialized so the require_initialized guard passes.
+        ext._initialized = True
+        asyncio.run(ext.close())
+        return ext
+
+    def test_build_server_ssl_context_returns_configured_context(
+        self, tmp_path: Path, fake_step_ca: MagicMock, token_provider: AsyncMock
+    ) -> None:
+        import ssl
+
+        ext = self._seed_extension_with_real_pki(tmp_path, fake_step_ca, token_provider)
+        ctx = ext.build_server_ssl_context()
+        assert isinstance(ctx, ssl.SSLContext)
+        # Default settings: require_client_cert=True
+        assert ctx.verify_mode == ssl.CERT_REQUIRED
+
+    def test_get_uvicorn_ssl_kwargs_returns_file_paths(
+        self, tmp_path: Path, fake_step_ca: MagicMock, token_provider: AsyncMock
+    ) -> None:
+        import ssl
+
+        ext = self._seed_extension_with_real_pki(tmp_path, fake_step_ca, token_provider)
+        kwargs = ext.get_uvicorn_ssl_kwargs()
+        assert kwargs["ssl_certfile"] == str(ext.store.cert_path)
+        assert kwargs["ssl_keyfile"] == str(ext.store.key_path)
+        assert kwargs["ssl_ca_certs"] == str(ext.store.ca_bundle_path)
+        assert kwargs["ssl_cert_reqs"] == ssl.CERT_REQUIRED
+
+    def test_build_grpc_server_credentials_returns_grpc_creds(
+        self, tmp_path: Path, fake_step_ca: MagicMock, token_provider: AsyncMock
+    ) -> None:
+        import grpc
+
+        ext = self._seed_extension_with_real_pki(tmp_path, fake_step_ca, token_provider)
+        creds = ext.build_grpc_server_credentials()
+        assert isinstance(creds, grpc.ServerCredentials)
+
+    def test_server_material_raises_when_uninitialized(self, tmp_path: Path) -> None:
+        ext = _make_extension(tmp_path)
+        with pytest.raises(
+            FileNotFoundError, match="call MTLSAgentExtension.initialize"
+        ):
+            ext.build_server_ssl_context()
+        with pytest.raises(FileNotFoundError):
+            ext.get_uvicorn_ssl_kwargs()
+        with pytest.raises(FileNotFoundError):
+            ext.build_grpc_server_credentials()
