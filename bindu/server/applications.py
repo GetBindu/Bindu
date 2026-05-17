@@ -698,16 +698,31 @@ class BinduApplication(Starlette):
             )
             middleware_list.append(x402_middleware)
 
+        # Install mTLS first so the peer DID is on scope before Hydra checks
+        # the token's client_id against it. In mtls-only mode this is the sole
+        # auth layer; in hybrid mode both run; off/disabled is a no-op.
+        mtls_runs = app_settings.mtls.enabled and app_settings.mtls.mode != "off"
+        if mtls_runs:
+            from .middleware.auth import MTLSMiddleware
+
+            logger.info("mTLS middleware enabled (mode=%s)", app_settings.mtls.mode)
+            mtls_middleware = Middleware(MTLSMiddleware, mtls_config=app_settings.mtls)  # type: ignore[arg-type]
+            middleware_list.append(mtls_middleware)
+
         # Add authentication middleware if requested or globally enabled
         # (previous behavior required both flags; we now treat settings as authoritative
         # so that enabling auth via config always installs the middleware).
-        if auth_enabled or app_settings.auth.enabled:
+        # In mtls-only mode we skip Hydra: the cert is the credential.
+        hydra_skipped = mtls_runs and app_settings.mtls.mode == "mtls"
+        if (auth_enabled or app_settings.auth.enabled) and not hydra_skipped:
             if app_settings.auth.enabled:
                 # ensure config value drives logging
                 logger.info("Authentication middleware enabled")
             auth_middleware = self._create_auth_middleware()
             # Add auth middleware after CORS and X402
             middleware_list.append(auth_middleware)
+        elif hydra_skipped:
+            logger.info("mTLS-only mode — skipping Hydra auth middleware")
 
         # Add metrics middleware (should be last to capture all requests)
         from .middleware import MetricsMiddleware
