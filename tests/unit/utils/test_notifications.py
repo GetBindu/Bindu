@@ -65,46 +65,10 @@ class TestNotificationService:
         with pytest.raises(ValueError, match="must include a network location"):
             service.validate_config(config)
 
-    def test_validate_config_blocks_loopback(self):
-        """Test validation blocks loopback addresses."""
-        service = NotificationService()
-        config = cast(
-            PushNotificationConfig, {"id": uuid4(), "url": "http://localhost/webhook"}
-        )
-
-        with patch(
-            "socket.getaddrinfo", return_value=[("", "", "", "", ("127.0.0.1", 0))]
-        ):
-            with pytest.raises(ValueError, match="blocked address range"):
-                service.validate_config(config)
-
-    def test_validate_config_blocks_private_network(self):
-        """Test validation blocks private network addresses."""
-        service = NotificationService()
-        config = cast(
-            PushNotificationConfig, {"id": uuid4(), "url": "http://192.168.1.1/webhook"}
-        )
-
-        with patch(
-            "socket.getaddrinfo", return_value=[("", "", "", "", ("192.168.1.1", 0))]
-        ):
-            with pytest.raises(ValueError, match="blocked address range"):
-                service.validate_config(config)
-
-    def test_validate_config_blocks_link_local(self):
-        """Test validation blocks link-local addresses."""
-        service = NotificationService()
-        config = cast(
-            PushNotificationConfig,
-            {"id": uuid4(), "url": "http://169.254.169.254/webhook"},
-        )
-
-        with patch(
-            "socket.getaddrinfo",
-            return_value=[("", "", "", "", ("169.254.169.254", 0))],
-        ):
-            with pytest.raises(ValueError, match="blocked address range"):
-                service.validate_config(config)
+    # SSRF allowlist was intentionally dropped in 270f4b94 ("drop SSRF
+    # allowlist"); the previous test_validate_config_blocks_{loopback,
+    # private_network,link_local} cases asserted the old blocking
+    # behavior and were removed alongside it.
 
     def test_validate_config_hostname_resolution_fails(self):
         """Test validation handles hostname resolution failure."""

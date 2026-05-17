@@ -99,7 +99,12 @@ class TestManifestWorker:
 
         await worker._notify_lifecycle(task_id, context_id, "completed", True)
 
-        mock_callback.assert_called_once_with(task_id, context_id, "completed", True)
+        # Notifier is called with the 5-arg shape (task_id, context_id, state,
+        # final, status_message) introduced in 270f4b94. status_message defaults
+        # to None when _notify_lifecycle is called without one.
+        mock_callback.assert_called_once_with(
+            task_id, context_id, "completed", True, None
+        )
 
     @pytest.mark.asyncio
     async def test_notify_lifecycle_without_callback(self):
