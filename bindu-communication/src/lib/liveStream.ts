@@ -10,7 +10,16 @@ interface RawWebhook {
 		event_id?: string;
 		sequence?: number;
 		timestamp?: string;
-		kind?: "status-update" | "artifact-update" | "gateway-event" | string;
+		kind?:
+			| "status-update"
+			| "artifact-update"
+			| "gateway-event"
+			| "task-started"
+			| "task-artifact"
+			| "task-finished"
+			| "plan-reply"
+			| "plan-summary"
+			| string;
 		task_id?: string;
 		context_id?: string;
 		status?: { state?: string; message?: unknown };
@@ -33,6 +42,17 @@ interface RawWebhook {
 		text?: string;
 		upstream_status?: number;
 		upstream_error?: string | null;
+		// gateway plan-trace extras (synthesized by /api/plan from the
+		// gateway's SSE stream — task.started / task.artifact /
+		// task.finished / compaction-summary / final answer).
+		agent?: string;
+		agent_did?: string | null;
+		skill?: string;
+		input?: unknown;
+		content?: string | null;
+		title?: string | null;
+		state?: string;
+		error?: string | null;
 	};
 }
 
@@ -201,11 +221,98 @@ function extractTextParts(container: unknown): string | undefined {
 	return texts.length > 0 ? texts.join("\n\n") : undefined;
 }
 
+// Strip the `<remote_content agent="..." verified="...">…</remote_content>`
+// wrapper the gateway puts around peer agent text so the inbox shows the
+// raw answer instead of XML noise. Keeps signature/trust info in
+// payloadJson for the inspect tab.
+function stripRemoteContent(s: string | null | undefined): string | undefined {
+	if (!s) return undefined;
+	const m = s.match(/<remote_content[^>]*>([\s\S]*?)<\/remote_content>/);
+	return (m ? m[1] : s).trim() || undefined;
+}
+
+function mapPlanTraceEvent(raw: RawWebhook): StreamEvent {
+	const p = raw.payload;
+	const { hms, iso } = pickTs(raw);
+	const agentName = p.agent ?? "agent";
+	const taskShort = (p.task_id ?? "").slice(0, 12) || "task";
+	const did =
+		p.agent_did && p.agent_did.length > 0
+			? p.agent_did
+			: `did:bindu:task:${p.task_id ?? "?"}`;
+
+	let kind: EventKind = "state-change";
+	let state: EventState | undefined;
+	let summary = "";
+	let body: string | undefined;
+	let counterpartyName = agentName;
+
+	if (p.kind === "task-started") {
+		kind = "plan-step";
+		state = "working";
+		summary = p.skill ? `→ ${agentName} · ${p.skill}` : `→ ${agentName}`;
+	} else if (p.kind === "task-artifact") {
+		kind = "artifact";
+		state = "completed";
+		body = stripRemoteContent(p.content);
+		summary = p.title || `${agentName} returned`;
+	} else if (p.kind === "task-finished") {
+		kind = "state-change";
+		state = normalizeState(p.state, false);
+		const err = p.error ? ` · ${String(p.error).slice(0, 80)}` : "";
+		summary = state ? `${agentName} ${state}${err}` : `${agentName} finished${err}`;
+	} else if (p.kind === "plan-reply") {
+		kind = "artifact";
+		state = "completed";
+		body = p.text;
+		summary = "Plan answer";
+		counterpartyName = "planner";
+	} else if (p.kind === "plan-summary") {
+		kind = "state-change";
+		summary = "Compaction summary";
+		counterpartyName = "planner";
+	}
+
+	return {
+		id: raw.id,
+		agentId: raw.agentId,
+		ts: hms,
+		relTs: "live",
+		at: iso,
+		counterparty: {
+			name: counterpartyName,
+			did,
+			trust: p.kind === "plan-reply" || p.kind === "plan-summary" ? "self" : "known",
+		},
+		kind,
+		state,
+		summary,
+		body,
+		signed: false,
+		verify: {
+			signature: false,
+			didMatch: false,
+			nonce: (p.event_id ?? "").slice(0, 8) || taskShort,
+		},
+		payload: JSON.stringify(p, null, 2),
+		payloadJson: p as Record<string, unknown>,
+	};
+}
+
+const PLAN_TRACE_KINDS = new Set([
+	"task-started",
+	"task-artifact",
+	"task-finished",
+	"plan-reply",
+	"plan-summary",
+]);
+
 export function mapWebhookToEvent(raw: RawWebhook): StreamEvent {
 	const p = raw.payload;
 
 	if (p.kind === "gateway-event") return mapGatewayEvent(raw);
 	if (p.kind === "outbound") return mapOutboundEvent(raw);
+	if (p.kind && PLAN_TRACE_KINDS.has(p.kind)) return mapPlanTraceEvent(raw);
 
 	const isArtifact = p.kind === "artifact-update";
 	const state = normalizeState(p.status?.state, isArtifact);
