@@ -1,165 +1,125 @@
-# Bindu Examples
+# Examples
 
-Example agents demonstrating Bindu's capabilities - from simple bots to multi-agent systems with payments.
+A working catalog of bindu agents — every one is a single command away from running on your machine, signing its own A2A traffic with a DID, and being reachable on `http://localhost:3773`. Pick an example, open its folder README, follow the four steps in it.
 
-## Quick Start
+Each folder has its own README with the specific keys, run command, and curl recipe. This page is just the map.
 
-### Prerequisites
-- Python 3.12+
-- uv package manager
-- OpenRouter API key
-
-### Setup
+## Prereqs (one-time)
 
 ```bash
-git clone https://github.com/getbindu/bindu.git
-cd bindu
-uv sync --dev --extra agents
-export OPENROUTER_API_KEY="your-key-here"  # pragma: allowlist secret
+git clone https://github.com/getbindu/Bindu.git && cd Bindu
+uv sync --extra agents
+export OPENROUTER_API_KEY=<get one at https://openrouter.ai/keys>
 ```
 
-### Run an Agent
+`OPENROUTER_API_KEY` is the single key the whole catalog runs on by default — most examples point their LLM client at OpenRouter regardless of framework, so one key unlocks the Agno, LangChain, AG2, and TypeScript agents alike. A few examples need additional service keys (Mem0, ScrapeGraph, Notte, etc.); their READMEs spell that out.
+
+`AUTH__ENABLED=true` is the default. Every request needs an OAuth token from Hydra plus a DID-signed body — see [`docs/AUTH.md`](../docs/AUTH.md). To poke around without that ceremony, set `AUTH__ENABLED=false` in `examples/.env` and use plain curl.
+
+## Python — single agent
+
+The cleanest starting point. Each is one file, one framework, runnable in under a minute.
+
+| Folder | What it is | Notable |
+| --- | --- | --- |
+| [`beginner/`](beginner/) | Twelve small agents in one folder — echo, agno, ag2, dspy, paywall variants. | Start here. |
+| [`summarizer/`](summarizer/) | Text → 2–3 sentence summary. | Agno + OpenRouter. |
+| [`weather-research/`](weather-research/) | Weather report for any city. | DuckDuckGo search. |
+| [`medical_agent/`](medical_agent/) | Educational medical Q&A with disclaimers baked into the prompt. | DuckDuckGo. |
+| [`cybersecurity-newsletter/`](cybersecurity-newsletter/) | Topic → headlines + CVEs + brief. | DuckDuckGo. |
+| [`document-analyzer/`](document-analyzer/) | PDF/DOCX → Q&A. | Reads the document from a `file` part. |
+| [`pdf_research_agent/`](pdf_research_agent/) | PDF → summary by host path or `file` part. | `pypdf`. |
+| [`speech-to-text/`](speech-to-text/) | Audio → transcript. | Gemini 2.0 Flash via OpenRouter. |
+| [`ai-data-analysis-agent/`](ai-data-analysis-agent/) | CSV → profile + chart. | pandas + matplotlib + seaborn. |
+| [`news-summarizer/`](news-summarizer/) | News headlines + sentiment, **local LLM**. | Ollama, no API key. |
+| [`multilingual-collab-agent/`](multilingual-collab-agent/) | English/Hindi/Bengali, persistent memory. | Mem0. |
+| [`web-scraping-agent/`](web-scraping-agent/) | URL + prompt → structured JSON. | ScrapeGraph + Mem0. |
+| [`notte-browser-agent/`](notte-browser-agent/) | Drives a real headless browser. | Notte SDK. |
+
+## Python — multi-agent
+
+Where you see what bindu was actually built for.
+
+| Folder | What it is | Notable |
+| --- | --- | --- |
+| [`agent_swarm/`](agent_swarm/) | Planner → Researcher → Summarizer → Critic → Reflection. | 5-stage in-process chain. |
+| [`ag2_research_team/`](ag2_research_team/) | researcher / analyst / writer under AutoPattern GroupChat. | AG2 (AutoGen) with LLM-driven speaker selection. |
+| [`cerina_bindu/`](cerina_bindu/cbt/) | CBT exercise generator: Drafter → SafetyGuardian → ClinicalCritic, supervised. | Real LangGraph `StateGraph`. |
+| [`langgraph_blog_writing_agent/`](langgraph_blog_writing_agent/) | Plan → fan out → reduce, map-reduce style. | LangGraph `Send` for fan-out. |
+| [`hermes_agent/`](hermes_agent/) | Nous Research's hermes-agent (web/file/code tools) with tiered safety. | Includes `call.py` — the reference signed-request client. |
+| [`gateway_test_fleet/`](gateway_test_fleet/) | Five agents on local ports + a 13-case test matrix for the Gateway. | What `docs/GATEWAY.md` uses. |
+
+## Payments + private surface
+
+| Folder | What it is |
+| --- | --- |
+| [`premium-advisor/`](premium-advisor/) | x402 paywall: 0.01 USDC on Base Sepolia per query. |
+| [`beginner/echo_agent_behind_paywall.py`](beginner/) | Echo agent gated by x402. |
+| [`beginner/agno_paywall_example.py`](beginner/) | Agno + paywall. |
+| [`private_skills_agent/`](private_skills_agent/) | Public vs `/agent/private.json` with `allowed_dids` gating. |
+
+## TypeScript
+
+Same `bindufy(config, handler)` shape, written in TypeScript via [`@bindu/sdk`](../sdks/typescript/). The SDK launches the Python core in the background; you only see your language.
+
+| Folder | What it is |
+| --- | --- |
+| [`typescript-openai-agent/`](typescript-openai-agent/) | OpenAI SDK assistant, pointed at OpenRouter. |
+| [`typescript-langchain-agent/`](typescript-langchain-agent/) | LangChain.js research agent. |
+| [`typescript-langchain-quiz-agent/`](typescript-langchain-quiz-agent/) | LangChain.js quiz generator. |
+
+## Kotlin
+
+| Folder | What it is |
+| --- | --- |
+| [`kotlin-openai-agent/`](kotlin-openai-agent/) | Kotlin assistant via [`sdks/kotlin/`](../sdks/kotlin/), pointed at OpenRouter. Needs JDK 17 + gradle. |
+
+## Deployment
+
+| Folder | What it is |
+| --- | --- |
+| [`runtime-boxd-agent/`](runtime-boxd-agent/) | Same vanilla agent code, deploys to a [boxd](https://boxd.sh) microVM via `bindu deploy --runtime=boxd`. |
+
+## Shared bits
+
+| Folder | What it is |
+| --- | --- |
+| [`skills/`](skills/) | Reusable `skill.yaml` definitions referenced by agents via `config["skills"]`. |
+
+## Sending a message in 30 seconds
+
+Once an agent is running on `:3773` with `AUTH__ENABLED=false`:
 
 ```bash
-uv run examples/beginner/echo_simple_agent.py
-```
-
-Agents run on ports 3773-3780 with UI at `http://localhost:[port]/docs`
-
-You can override the port for any example without editing code:
-
-```bash
-# Linux/macOS
-export BINDU_PORT=4000
-
-# Windows PowerShell
-$env:BINDU_PORT="4000"
-```
-
-For full URL override, use `BINDU_DEPLOYMENT_URL` (e.g. `http://127.0.0.1:5001`).
-
-## Examples
-
-### Beginner
-- `beginner/echo_simple_agent.py` - Minimal echo bot
-- `beginner/beginner_zero_config_agent.py` - Zero-config agent with web search
-- `beginner/agno_simple_example.py` - Joke generator
-- `beginner/agno_example.py` - Research assistant with DuckDuckGo
-- `beginner/faq_agent.py` - Documentation search agent
-- `beginner/agno_notion_agent.py` - Notion integration
-- `beginner/ag2_simple_example.py` - AG2 (AutoGen) simple agent
-- `beginner/minimax_example.py` - MiniMax AI research agent (OpenAI-compatible)
-- `beginner/dspy_agent.py` - DSPy framework integration
-- `beginner/agno_paywall_example.py` - Paywall-protected agent
-- `beginner/echo_agent_behind_paywall.py` - Echo agent with payment requirement
-
-### Specialized
-- `summarizer/` - Text summarization agent
-- `weather-research/` - Weather intelligence agent
-- `web-scraping-agent/` - AI web scraping agent with ScrapeGraph + Mem0 memory
-- `premium-advisor/` - Paid agent with X402 payments (0.01 USDC per query)
-- `news-summarizer/` - Real-time news search and summarization using local Ollama
-- `document-analyzer/` - PDF/DOCX document analysis and Q&A agent
-- `speech-to-text/` - Audio transcription using Gemini 2.0 Flash (MP3, WAV, OGG, M4A)
-- `ai-data-analysis-agent/` - Autonomous data analyst with CSV profiling and visualization
-- `cybersecurity-newsletter/` - Security news aggregator with CVE tracking
-
-### TypeScript (Language-Agnostic via gRPC)
-- `typescript-openai-agent/` - OpenAI SDK agent bindufied with TypeScript SDK
-- `typescript-langchain-agent/` - LangChain.js agent bindufied with TypeScript SDK
-
-### Runtime Providers
-- `runtime-boxd-agent/` - Echo agent that runs as a real microservice inside a
-  [boxd](https://boxd.sh) microVM (own URL, DID, persistent disk). See
-  `docs/runtime/` for the runtime-provider abstraction.
-
-> TypeScript agents use `@bindu/sdk` which automatically launches the Bindu Python core in the background. Same A2A protocol, same DID, same everything — just a different language. See the [gRPC documentation](../docs/GRPC_LANGUAGE_AGNOSTIC.md) for details.
-
-### Advanced
-- `agent_swarm/` - Multi-agent collaboration system
-- `cerina_bindu/cbt/` - CBT therapy protocol generator
-- `ag2_research_team/` - Multi-agent research pipeline using AG2 (AutoGen)
-- `langgraph_blog_writing_agent/` - Map-Reduce blog writing with LangGraph
-- `hermes_agent/` - Nous Research's tool-using coding/research agent (web, file, code-exec) bindufied with tiered safety controls
-
-### Components
-- `skills/` - Reusable agent capabilities
-
-## Environment Variables
-
-```bash
-# Required (at least one LLM provider)
-OPENROUTER_API_KEY=sk-or-v1-your-api-key-here
-MINIMAX_API_KEY=your-minimax-api-key  # Alternative: MiniMax AI (https://platform.minimaxi.com)
-
-# Optional
-PORT=4000
-BINDU_PORT=4000
-BINDU_DEPLOYMENT_URL=http://localhost:4000
-HYDRA__ADMIN_URL=https://hydra-admin.getbindu.com
-HYDRA__PUBLIC_URL=https://hydra.getbindu.com
-DATABASE_URL=postgresql+asyncpg://user:pass@host/db  # pragma: allowlist secret
-REDIS_URL=rediss://default:pass@host:6379  # pragma: allowlist secret
-```
-
-## X402 Payments
-
-The `premium-advisor/` example shows how to monetize agents with X402 payments:
-
-```bash
-uv run examples/premium-advisor/premium_advisor.py
-```
-
-Users must pay 0.01 USDC before the agent responds.
-
-## Testing
-
-### Web UI
-```bash
-cd inbox
-npm run dev
-```
-
-### API
-```bash
-curl -X POST ${BINDU_DEPLOYMENT_URL:-http://localhost:${BINDU_PORT:-3773}}/ \
+curl -sS http://localhost:3773/ \
   -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"message/send","params":{...},"id":"1"}'
+  -d '{"jsonrpc":"2.0","method":"message/send","id":"1","params":{"message":{"role":"user","parts":[{"kind":"text","text":"hello"}],"kind":"message","messageId":"m1","contextId":"c1","taskId":"t1"}}}'
 ```
 
-## Building Your Own
+That returns a `Task` object. Poll `tasks/get` with the same `taskId` for the final artifact. With auth on, sign each body with the agent's DID key — `examples/hermes_agent/call.py` is the working reference client.
+
+## Building your own
+
+Start from the smallest possible shape:
 
 ```python
-from bindu import Agent
+from bindu.penguin.bindufy import bindufy
 
-agent = Agent(
-    name="My Agent",
-    description="What it does",
-    model="openai/gpt-4o",
+def handler(messages):
+    return f"You said: {messages[-1]['content']}"
+
+bindufy(
+    {
+        "author": "you@example.com",
+        "name": "my_agent",
+        "description": "what my agent does",
+        "deployment": {"url": "http://localhost:3773", "expose": True},
+        "skills": [],
+    },
+    handler,
 )
-
-agent.instructions = ["Behavior guidelines"]
-
-if __name__ == "__main__":
-    agent.serve(port=3773)
 ```
 
-## Documentation
+That's a live agent at `http://localhost:3773` with a DID, an agent card at `/.well-known/agent.json`, A2A, and (by default) auth. Swap in your framework — Agno, LangChain, DSPy, OpenAI SDK directly, your own thing — and you're done.
 
-- [Bindu Docs](https://docs.getbindu.com)
-- [gRPC Language-Agnostic Guide](../docs/GRPC_LANGUAGE_AGNOSTIC.md)
-- [TypeScript SDK](../sdks/typescript/README.md)
-- [Payment Guide](../docs/PAYMENT.md)
-- [DID Guide](../docs/DID.md)
-- [Skills Guide](../docs/SKILLS.md)
-
-## Contributing
-
-1. Create your agent in the appropriate folder
-2. Add README with usage instructions
-3. Include .env.example
-4. Submit pull request
-
-## License
-
-See [LICENSE.md](../LICENSE.md)
+Beyond this page: [docs.getbindu.com](https://docs.getbindu.com) for the full reference, [`docs/`](../docs/) for the deep dives, [Discord](https://discord.gg/3w5zuYUuwt) when you get stuck.
