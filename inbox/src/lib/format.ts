@@ -12,6 +12,43 @@ export function shortDid(did: string, tailChars = 6): string {
 	return parts.slice(0, -1).join(":") + ":" + last.slice(0, tailChars) + "…";
 }
 
+/** Render a bindu DID as a Gmail-shape address.
+ *
+ * Bindu DIDs are `did:bindu:<author>:<name>:<uuid>` where `<author>` was
+ * sanitised by `bindu/extensions/did/did_agent_extension.py:_sanitize`
+ * (lowercase, space→`_`, `@`→`_at_`, `.`→`_`). Reverse the transform
+ * and present the result as `<agent_name>+<operator_local>@<domain>`
+ * (Gmail subaddress style), so the operator's identity stays the base
+ * email and the agent name lives in the `+` slot — same shape as
+ * `you+filter@gmail.com`.
+ *
+ * Returns `null` for inputs that aren't bindu DIDs (e.g. external DID
+ * methods, plain agent_ids) so callers can fall back to `shortDid`.
+ *
+ * Examples:
+ *   did:bindu:gateway_test_fleet_at_getbindu_com:joke_agent:47191e40-…
+ *     → "gateway_test_fleet+joke_agent@getbindu.com"
+ *   did:bindu:you_at_local:leonard-hofstadter:53f9d49f-…
+ *     → "you+leonard-hofstadter@local"
+ */
+export function didToEmail(did: string): string | null {
+	const parts = did.split(":");
+	if (parts.length < 4 || parts[0] !== "did" || parts[1] !== "bindu") {
+		return null;
+	}
+	const author = parts[2];
+	const name = parts[3];
+	const atIdx = author.indexOf("_at_");
+	if (atIdx === -1) {
+		// Author wasn't an email-shaped string (e.g. legacy plain author).
+		// Show name@author verbatim — readable, lossless.
+		return `${name}@${author}`;
+	}
+	const local = author.slice(0, atIdx);
+	const domain = author.slice(atIdx + "_at_".length).replace(/_/g, ".");
+	return `${name}+${local}@${domain}`;
+}
+
 /** Normalise a free-form name into a URL/agent-id-safe slug.
  *
  * Used wherever the UI mints an id from a human-readable name. Falls

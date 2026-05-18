@@ -14,6 +14,7 @@ import type { PeerDescriptor } from "../bindu/client"
 import type { PeerAuth } from "../bindu/auth/resolver"
 import { newMessageID, type SessionID } from "../session/schema"
 import { buildSkillTool } from "./skill-tool"
+import { buildPriorTaskIdLookup } from "./task-continuity"
 
 /**
  * Planner — turns External's agent catalog into dynamic tools, then runs
@@ -174,6 +175,15 @@ export const PlanRequest = z.object({
    * synthetic user turn so the planner can still reference earlier
    * conversation that was compacted away. */
   prior_summary: z.string().optional(),
+  /** Per-recipient task-id continuity. Optional `{peerName: taskId}` map
+   * the client supplies based on its own event log — the most recent
+   * A2A `taskId` it observed for each peer in this thread on prior /plan
+   * calls. The planner threads each entry into the next outbound
+   * `callPeer` as `referenceTaskIds: [taskId]`, so stateful agents see
+   * the new task chained to its predecessor and can recover prior
+   * artifacts/state. Path A's `history` is text-only and can't carry
+   * tool metadata, hence this side-channel. */
+  prior_task_ids: z.record(z.string(), z.string()).optional(),
 })
 export type PlanRequest = z.infer<typeof PlanRequest>
 
@@ -394,6 +404,31 @@ export const layer = Layer.effect(
           const contextId = ctx.sessionID
           const tools: Def[] = []
 
+          // Resolve the prior-task lookup for cross-turn continuity. Two
+          // sources, in order:
+          //   1. `request.prior_task_ids` — the client (e.g. inbox-server)
+          //      explicitly tells us each peer's most-recent taskId from
+          //      its own event log. Authoritative when present because
+          //      the client owns the cross-call audit trail.
+          //   2. Session-history walk via buildPriorTaskIdLookup. Useful
+          //      in future modes where the gateway persists tool parts
+          //      with metadata; harmless today (Path A history is text-
+          //      only, so the walk returns no entries).
+          // Errors are non-fatal: continuity is a nice-to-have, not a
+          // correctness requirement — silently degrade to "fresh task
+          // per call" so a load-bearing read can't kill the request.
+          const priorTaskIdMap = request.prior_task_ids ?? {}
+          const priorTaskIdFromHistory = yield* sessions
+            .history(ctx.sessionID)
+            .pipe(
+              Effect.map(buildPriorTaskIdLookup),
+              Effect.catch(() =>
+                Effect.succeed(((_: string) => undefined) as ReturnType<typeof buildPriorTaskIdLookup>),
+              ),
+            )
+          const priorTaskId = (peerName: string): string | undefined =>
+            priorTaskIdMap[peerName] ?? priorTaskIdFromHistory(peerName)
+
           for (const ag of request.agents) {
             const peer: PeerDescriptor = {
               name: ag.name,
@@ -402,7 +437,13 @@ export const layer = Layer.effect(
               trust: ag.trust,
             }
             for (const sk of ag.skills) {
-              tools.push(buildSkillTool(peer, sk, { client, contextId }))
+              tools.push(
+                buildSkillTool(peer, sk, {
+                  client,
+                  contextId,
+                  priorTaskId: priorTaskId(ag.name),
+                }),
+              )
             }
           }
 

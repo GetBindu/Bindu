@@ -1,7 +1,10 @@
 import "./bindu/identity" // bootstrap ed25519 sha512 hook FIRST
+import { createServer as createHttpsServer } from "node:https"
 import { Effect, Layer, ManagedRuntime } from "effect"
 import { serve } from "@hono/node-server"
 import { Hono } from "hono"
+import type { Server as HttpsServer } from "node:https"
+import { attachServerCertReloader, getServerTLSOptions } from "./bindu/client/mtls"
 import * as Config from "./config"
 import * as Bus from "./bus"
 import * as Auth from "./auth"
@@ -312,13 +315,34 @@ export async function main(): Promise<{ close: () => Promise<void> }> {
   }
 
   const { port, hostname } = cfg.gateway.server
-  const httpServer = serve({ fetch: app.fetch, port, hostname })
+  // mTLS when the inbox passes us a cert via BINDU_GATEWAY_TLS_*. Otherwise
+  // plain HTTP (today's default, also the path when no personal agent has
+  // bootstrapped a cert yet on the spawning inbox).
+  const tlsOpts = getServerTLSOptions()
+  const httpServer = tlsOpts
+    ? serve({
+        fetch: app.fetch,
+        port,
+        hostname,
+        createServer: createHttpsServer,
+        serverOptions: tlsOpts,
+      })
+    : serve({ fetch: app.fetch, port, hostname })
+  const scheme = tlsOpts ? "https" : "http"
 
-  console.log(`[bindu-gateway] listening on http://${hostname}:${port}`)
+  // Hot-reload the cert in-place when step-ca rotates it. Without this
+  // the server keeps serving the original cert until expiry breaks
+  // handshakes. No-op when running plain HTTP.
+  const stopCertWatcher = tlsOpts
+    ? attachServerCertReloader(httpServer as unknown as HttpsServer)
+    : () => {}
+
+  console.log(`[bindu-gateway] listening on ${scheme}://${hostname}:${port}`)
   console.log(`[bindu-gateway] session mode: ${cfg.gateway.session.mode}`)
 
   return {
     close: async () => {
+      stopCertWatcher()
       httpServer.close()
       await runtime.dispose()
     },

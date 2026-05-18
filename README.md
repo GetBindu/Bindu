@@ -12,6 +12,13 @@
     <a href="https://discord.gg/3w5zuYUuwt"><img alt="Discord" src="https://img.shields.io/badge/Discord-7289DA?logo=discord&logoColor=white"></a>
     <a href="https://github.com/getbindu/Bindu/graphs/contributors"><img alt="Contributors" src="https://img.shields.io/github/contributors/getbindu/Bindu"></a>
     <a href="https://hits.sh/github.com/Saptha-me/Bindu.svg"><img alt="Hits" src="https://hits.sh/github.com/Saptha-me/Bindu.svg"></a>
+    <a href="https://www.star-history.com/getbindu/bindu">
+        <picture>
+            <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/badge?repo=GetBindu/Bindu&theme=dark" />
+            <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/badge?repo=GetBindu/Bindu" />
+            <img alt="Star History Rank" src="https://api.star-history.com/badge?repo=GetBindu/Bindu" />
+        </picture>
+    </a>
 </p>
 
 <h4 align="center">

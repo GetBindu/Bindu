@@ -192,9 +192,17 @@ export const layer = Layer.effect(
         // SSE stream can surface them.
         const metadataByCall = new Map<string, Record<string, unknown>>()
 
+        // Doom-loop log — every wrapped tool pushes its `(tool, inputHash)`
+        // before executing. wrapTool short-circuits identical chains of
+        // DOOM_LOOP_THRESHOLD length, so this prevents the planner from
+        // grinding through `max_steps` re-calling the same recipient with
+        // the same prompt. Scoped to this prompt invocation so noise from
+        // one user turn can't bleed into the next.
+        const recentToolCalls: import("./doom-loop").ToolCallRecord[] = []
+
         const aiTools = yield* Effect.all(
           (input.tools ?? []).map((t) =>
-            wrapTool(t, input.sessionID, messageID, metadataByCall),
+            wrapTool(t, input.sessionID, messageID, metadataByCall, recentToolCalls),
           ),
         )
         const toolMap: Record<string, any> = {}
@@ -298,6 +306,15 @@ export const layer = Layer.effect(
                 case "tool-result": {
                   const existing = partsByCall.get(evt.toolCallId)
                   if (!existing) return
+                  // Capture the tool's metadata into the persisted tool part
+                  // so subsequent /plan calls in the same session can recover
+                  // it from history. Today the only consumer is per-recipient
+                  // task_id continuity — buildSkillTool stamps each peer call
+                  // with `{peer, skill, taskId, ...}` and the planner reads it
+                  // back on the next turn to chain via `referenceTaskIds`. The
+                  // SSE bridge already gets the metadata directly from the
+                  // bus, so storing here is purely about cross-turn replay.
+                  const metaForPart = metadataByCall.get(evt.toolCallId)
                   existing.state = {
                     status: "completed",
                     input:
@@ -305,6 +322,7 @@ export const layer = Layer.effect(
                         ? existing.state.input
                         : undefined,
                     output: typeof evt.output === "string" ? evt.output : JSON.stringify(evt.output),
+                    ...(metaForPart ? { metadata: metaForPart } : {}),
                     time: {
                       start: existing.state.time?.start ?? Date.now(),
                       end: Date.now(),

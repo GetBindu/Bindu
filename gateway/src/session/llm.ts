@@ -2,6 +2,33 @@ import { Effect, Stream } from "effect"
 import { streamText, type LanguageModel, type ModelMessage, type Tool as AITool, type StopCondition } from "ai"
 
 /**
+ * Injected as a system reminder on the FINAL agentic step when `maxSteps`
+ * is about to be hit. Mirrors opencode's `session/prompt/max-steps.txt`:
+ * instead of letting the AI SDK silently cut off mid-tool-call when the
+ * loop's step cap trips, we let the loop run normally up to `maxSteps - 1`
+ * and force the final step to be tool-free with a summarize-and-stop
+ * instruction. The result is a graceful final assistant turn ("hit the
+ * step budget; here's what got done, here's what didn't") instead of a
+ * truncated `finishReason: "length"` from the model's POV.
+ */
+const MAX_STEPS_SOFT_TERMINATION = [
+  "CRITICAL — MAXIMUM PLANNER STEPS REACHED",
+  "",
+  "The agentic loop's step budget for this request is exhausted. Tools are",
+  "disabled for this step. Respond with text only.",
+  "",
+  "STRICT REQUIREMENTS:",
+  "1. Do NOT call any tools.",
+  "2. Provide a final response that:",
+  "   - States that the maximum number of planner steps was reached.",
+  "   - Summarizes which recipients were invoked so far and what they returned.",
+  "   - Lists any parts of the user's request that could not be completed.",
+  "   - Recommends a next action the user can take (rephrase, re-submit, etc.).",
+  "",
+  "This constraint overrides any prior instruction to call a tool or continue planning.",
+].join("\n")
+
+/**
  * Thin wrapper around AI SDK's `streamText` that returns an Effect Stream
  * of the LLM events.
  *
@@ -68,6 +95,11 @@ export function stream(input: StreamInput): Stream.Stream<StreamEvent, Error> {
 }
 
 function streamTextToEffect(model: LanguageModel, input: StreamInput): Stream.Stream<StreamEvent, Error> {
+  const maxSteps = input.maxSteps
+  // Soft termination only makes sense when maxSteps >= 2 — a 1-step budget
+  // means the FIRST step is already the final step, and we can't both make
+  // the agent useful and forbid it from calling tools.
+  const softTerminate = typeof maxSteps === "number" && maxSteps >= 2
   const result = streamText({
     model,
     system: input.systemPrompt,
@@ -75,8 +107,21 @@ function streamTextToEffect(model: LanguageModel, input: StreamInput): Stream.St
     tools: input.tools,
     temperature: input.temperature,
     topP: input.topP,
-    stopWhen: input.maxSteps ? (stepCountIs(input.maxSteps) as StopCondition<any>) : undefined,
+    stopWhen: maxSteps ? (stepCountIs(maxSteps) as StopCondition<any>) : undefined,
     abortSignal: input.abortSignal,
+    prepareStep: softTerminate
+      ? ({ stepNumber }) => {
+          // On the final permitted step, disable every tool and append a
+          // summarize-and-stop reminder to the system prompt so the model
+          // produces a clean text finish instead of trying to fire a
+          // tool that we'd silently cut off when stopWhen kicks in.
+          if (stepNumber !== maxSteps! - 1) return undefined
+          return {
+            activeTools: [],
+            system: `${input.systemPrompt}\n\n${MAX_STEPS_SOFT_TERMINATION}`,
+          }
+        }
+      : undefined,
   })
 
   // Pull from AI SDK's AsyncIterable<fullStream event>, map each event to

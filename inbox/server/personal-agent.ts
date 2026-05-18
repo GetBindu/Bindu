@@ -18,7 +18,7 @@
  * post-spawn via `/.well-known/did.json`.
  */
 
-import { type ChildProcess, spawn } from "node:child_process";
+import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync, chmodSync, openSync, closeSync } from "node:fs";
 import { resolve as pathResolve } from "node:path";
 import {
@@ -28,11 +28,22 @@ import {
 	readSettings,
 	writePersonalAgent,
 } from "./db";
-import { pickFreePort, pollHealth } from "./utils";
+// `dispatcherFetch` MUST be used whenever an undici dispatcher is passed —
+// Node's bundled undici (6.x) global fetch and our pinned undici@8 dispatcher
+// don't interop. See utils.ts.
+import {
+	dispatcherFetch,
+	insecureLoopbackDispatcher,
+	pickFreePort,
+	pollHealth,
+} from "./utils";
 
 /** Pick the first non-empty string from a list of candidates. Used to
- * layer "settings table → process.env → default" without `??` falling
- * through on empty strings (which `??` treats as truthy). */
+ * layer "settings table → process.env → default". `??` would short-
+ * circuit on null/undefined only, treating `""` as a real value and
+ * locking in an empty secret — this helper treats empty strings as
+ * absent, so a blank field in the Settings tab correctly falls through
+ * to the env var or default. */
 function firstNonEmpty(...vals: (string | null | undefined)[]): string {
 	for (const v of vals) if (typeof v === "string" && v.length > 0) return v;
 	return "";
@@ -139,8 +150,9 @@ function renderAgentPy(opts: {
 	webhookUrl: string;
 	tools: PersonalAgentTools;
 	corsOrigin: string;
+	scheme: "http" | "https";
 }): string {
-	const { slug, agentName, port, webhookUrl, tools, corsOrigin } = opts;
+	const { slug, agentName, port, webhookUrl, tools, corsOrigin, scheme } = opts;
 	// Header lists the user-facing facts so a human dropping into the
 	// file knows what changed and why. Persona is loaded at runtime so
 	// the user can edit persona.json (or re-run the wizard) without
@@ -157,16 +169,25 @@ function renderAgentPy(opts: {
 # webhook:     ${webhookUrl}
 # tools:       ${Object.keys(tools).length ? Object.keys(tools).join(", ") : "(none connected)"}
 
-import json
-import os
+# Load .env BEFORE importing bindu. bindu/settings.py constructs
+# \`app_settings = Settings()\` at module import time — any env var set
+# after that import (via a later load_dotenv) lands in os.environ but
+# never makes it into the singleton. The personal agent ships with
+# MTLS__ENABLED=true; if .env loads too late, mtls.enabled defaults to
+# False, the agent silently serves plain HTTP on https://… URL, and
+# the inbox spawn poller hangs on the HTTPS handshake.
 from pathlib import Path
 
 from dotenv import load_dotenv
-from bindu.penguin.bindufy import bindufy
-from agno.agent import Agent
-from agno.models.openrouter import OpenRouter
 
 load_dotenv(Path(__file__).parent / ".env")
+
+import json  # noqa: E402
+import os  # noqa: E402
+
+from agno.agent import Agent  # noqa: E402
+from agno.models.openrouter import OpenRouter  # noqa: E402
+from bindu.penguin.bindufy import bindufy  # noqa: E402
 
 PERSONA = json.loads((Path(__file__).parent / "persona.json").read_text())
 
@@ -264,7 +285,12 @@ config = {
     "name": "${agentName}",
     "description": f"Personal agent for {PERSONA['name']}",
     "deployment": {
-        "url": "http://localhost:${port}",
+        # 127.0.0.1, not localhost — the inbox tracks the agent URL
+        # as <scheme>://127.0.0.1:<port> and "localhost" can resolve to
+        # ::1 on some systems, which breaks loopback dispatchers that
+        # only match the IPv4 form. With mTLS on, cert SAN is the DID,
+        # so hostname verify is bypassed at the dispatcher layer.
+        "url": "${scheme}://127.0.0.1:${port}",
         "expose": True,
         "cors_origins": ["${corsOrigin}"],
     },
@@ -377,6 +403,14 @@ export async function spawnPersonalAgent(
 		pipedreamAccessToken = (await mintPipedreamAccessToken().catch(() => "")) ?? "";
 	}
 
+	// mTLS is gated behind BINDU_PERSONAL_MTLS=1. Default off because the
+	// public Hydra (hydra.getbindu.com) doesn't currently whitelist the
+	// `step-ca` audience that the OIDC provisioner requires — bootstrap
+	// fails, bindu silently falls back to plain HTTP, and the spawner
+	// (which polls https://) hangs forever. Once Hydra is configured to
+	// accept aud=step-ca on client_credentials grants, flip this on (or
+	// expose it via the Settings tab).
+	const mtlsEnabled = process.env.BINDU_PERSONAL_MTLS === "1";
 	writePersona(paths, row.persona);
 	writeEnvFile(paths, {
 		OPENROUTER_API_KEY: openrouterKey,
@@ -400,6 +434,13 @@ export async function spawnPersonalAgent(
 			process.env.HYDRA__ADMIN_URL ?? "https://hydra-admin.getbindu.com",
 		HYDRA__PUBLIC_URL:
 			process.env.HYDRA__PUBLIC_URL ?? "https://hydra.getbindu.com",
+		MTLS__ENABLED: mtlsEnabled ? "true" : "false",
+		MTLS__MODE: "hybrid",
+		MTLS__REQUIRE_CLIENT_CERT: "false",
+		MTLS__CA_URL: process.env.MTLS__CA_URL ?? "https://ca.getbindu.com",
+		MTLS__CA_ROOT_URL:
+			process.env.MTLS__CA_ROOT_URL ??
+			"https://ca.getbindu.com/roots.pem",
 	});
 	writeFileSync(
 		paths.agentPy,
@@ -412,6 +453,7 @@ export async function spawnPersonalAgent(
 			webhookUrl,
 			tools: row.tools,
 			corsOrigin,
+			scheme: mtlsEnabled ? "https" : "http",
 		}),
 		"utf8",
 	);
@@ -437,7 +479,12 @@ export async function spawnPersonalAgent(
 		};
 	}
 
-	const baseUrl = `http://127.0.0.1:${port}`;
+	// Scheme follows mtlsEnabled (see writeEnvFile above). With mTLS on,
+	// the cert is real but its SAN is the DID, not 127.0.0.1 — callers
+	// on the loopback skip hostname verification via
+	// insecureLoopbackDispatcher. With mTLS off, plain HTTP loopback.
+	const scheme = mtlsEnabled ? "https" : "http";
+	const baseUrl = `${scheme}://127.0.0.1:${port}`;
 	const now = new Date().toISOString();
 	writePersonalAgent({
 		...row,
@@ -454,7 +501,7 @@ export async function spawnPersonalAgent(
 		? ["uv", ["run", "python", paths.agentPy]]
 		: existsSync(venvPython)
 			? [venvPython, [paths.agentPy]]
-			: [process.execPath === "" ? "python" : "python3", [paths.agentPy]];
+			: ["python3", [paths.agentPy]];
 
 	const child = spawn(argv[0], argv[1], {
 		cwd: binduRepo,
@@ -531,8 +578,12 @@ export async function spawnPersonalAgent(
 	// payload exposes `application.agent_did` directly. Try health
 	// first — it's the cheapest probe and the response is small.
 	let did: string | null = null;
+	const loopbackFetch = (path: string) =>
+		dispatcherFetch(`${baseUrl}${path}`, {
+			dispatcher: insecureLoopbackDispatcher,
+		});
 	try {
-		const r = await fetch(`${baseUrl}/health`);
+		const r = await loopbackFetch("/health");
 		if (r.ok) {
 			const j = (await r.json()) as {
 				application?: { agent_did?: string };
@@ -547,7 +598,7 @@ export async function spawnPersonalAgent(
 	}
 	if (!did) {
 		try {
-			const r = await fetch(`${baseUrl}/.well-known/agent.json`);
+			const r = await loopbackFetch("/.well-known/agent.json");
 			if (r.ok) {
 				const j = (await r.json()) as {
 					capabilities?: { extensions?: Array<{ uri?: string }> };
@@ -603,12 +654,8 @@ export function stopPersonalAgent(): { ok: boolean; wasAlive: boolean } {
  * trying to spawn it — spawn errors are async and don't compose well
  * with our spawn flow. `which uv` is synchronous and fast. */
 function commandExists(cmd: string): boolean {
-	const which = spawn.bind(null);
-	void which;
 	try {
-		const result = require("node:child_process").spawnSync("which", [cmd], {
-			stdio: "ignore",
-		}) as { status: number | null };
+		const result = spawnSync("which", [cmd], { stdio: "ignore" });
 		return result.status === 0;
 	} catch {
 		return false;

@@ -60,6 +60,108 @@ export function formatErrorDetail(e: unknown): {
 
 type ConfigInfo = z.infer<typeof Config>
 
+/* --------------------------------------------------------------------------
+ * Idempotency layer
+ *
+ * Two concurrent /plan calls with identical bodies (the canonical example:
+ * an inbox operator's draft is resubmitted after a timeout) used to produce
+ * two independent sessions with two independent agent fan-outs — every
+ * recipient invoked twice, every billing event doubled. The empirical test
+ * in run_matrix.sh's `dup-check` mode demonstrates the gap.
+ *
+ * Process-local map; keyed by an explicit `Idempotency-Key` header when the
+ * caller supplies one, otherwise by a sha256 of the raw request body. The
+ * entry survives DEDUP_TTL_MS past completion so very-fast resubmits (the
+ * common shape of this bug) get the dedup signal instead of a re-run. After
+ * the TTL a fresh request with the same body becomes a new session — that's
+ * "I meant it this time," not "I clicked submit twice."
+ * -------------------------------------------------------------------------- */
+const DEDUP_TTL_MS = 5 * 60_000
+
+/** Bound on how long a duplicate caller will wait for the original
+ * request's session row to materialize. Longer than typical prepareSession
+ * latency (single-digit ms) but short enough that a stalled upstream
+ * doesn't pin the duplicate caller indefinitely. */
+const DEDUP_SESSION_WAIT_MS = 5_000
+
+/**
+ * `sessionID` is a Promise rather than a bare string so a duplicate caller
+ * that lands in the same event-loop tick as the original — before the
+ * original's prepareSession returns — can still receive a real session id
+ * instead of the placeholder empty string. The original resolves the
+ * promise once prepareSession completes; if it fails, the promise rejects
+ * and the duplicate caller sees an explicit error rather than a stale id.
+ */
+type DedupEntry = {
+  sessionID: Promise<string>
+  resolveSessionID: (id: string) => void
+  rejectSessionID: (err: Error) => void
+  startedAt: number
+  completedAt?: number
+}
+
+function makeDedupEntry(now: number): DedupEntry {
+  let resolveSessionID!: (id: string) => void
+  let rejectSessionID!: (err: Error) => void
+  const sessionID = new Promise<string>((res, rej) => {
+    resolveSessionID = res
+    rejectSessionID = rej
+  })
+  // The promise may settle before any duplicate caller attaches a handler.
+  // Without this, an unhandled rejection from a never-observed entry would
+  // bubble to the Node process exit handler.
+  sessionID.catch(() => {
+    /* observed-or-not, swallowing rejection here is intentional */
+  })
+  return {
+    sessionID,
+    resolveSessionID,
+    rejectSessionID,
+    startedAt: now,
+  }
+}
+
+const dedupMap = new Map<string, DedupEntry>()
+
+/**
+ * Wait up to `timeoutMs` for the in-flight original's sessionID. Returns
+ * `null` if it doesn't settle in time, or if the underlying prepareSession
+ * rejected. Callers treat `null` as "session not yet known" and surface an
+ * empty id to the duplicate consumer — better than blocking the SSE stream.
+ */
+async function waitForSessionID(
+  entry: DedupEntry,
+  timeoutMs: number,
+): Promise<string | null> {
+  return Promise.race([
+    entry.sessionID.catch(() => null),
+    new Promise<null>((res) => setTimeout(() => res(null), timeoutMs)),
+  ])
+}
+
+function dedupKey(idempHeader: string | undefined, rawBody: string): string {
+  if (idempHeader && idempHeader.length > 0) return `hdr:${idempHeader}`
+  return `body:${createHash("sha256").update(rawBody).digest("hex")}`
+}
+
+function gcDedup(now: number): void {
+  for (const [k, v] of dedupMap.entries()) {
+    if (v.completedAt !== undefined && now - v.completedAt > DEDUP_TTL_MS) {
+      dedupMap.delete(k)
+    }
+  }
+}
+
+function findDedupEntry(key: string, now: number): DedupEntry | null {
+  const entry = dedupMap.get(key)
+  if (!entry) return null
+  if (entry.completedAt !== undefined && now - entry.completedAt > DEDUP_TTL_MS) {
+    dedupMap.delete(key)
+    return null
+  }
+  return entry
+}
+
 export const buildPlanHandler = Effect.gen(function* () {
   const planner = yield* PlannerService
   const bus = yield* BusService
@@ -84,14 +186,67 @@ async function handleRequest(
     }
   }
 
-  // 2. Parse body
+  // 2. Parse body. Read raw text first so the idempotency hash keys on the
+  //    exact bytes the caller sent — JSON.stringify(parsed) would re-serialize
+  //    and could drift across runtimes if any field order changed.
+  const rawBody = await c.req.text()
   let request: PlanRequest
   try {
-    const body = await c.req.json()
+    const body = JSON.parse(rawBody)
     request = PlanRequest.parse(body)
   } catch (e) {
     return c.json({ error: "invalid_request", ...formatErrorDetail(e) }, 400)
   }
+
+  // 2c. Idempotency dedup. Check BEFORE prepareSession so a duplicate doesn't
+  //     allocate a fresh session row in Supabase, doesn't enqueue a plan run,
+  //     and doesn't fan out a second copy of the request to every recipient.
+  //     `Idempotency-Key` header beats body hash: when the caller is explicit
+  //     about "this is a retry of submit X", honor it (covers cases where two
+  //     resubmits have small inconsequential differences like a re-stamped
+  //     `session_id`).
+  const idempKey = dedupKey(c.req.header("Idempotency-Key"), rawBody)
+  const now = Date.now()
+  gcDedup(now)
+  const existing = findDedupEntry(idempKey, now)
+  if (existing) {
+    // Block briefly on the in-flight original's sessionID so the duplicate
+    // consumer receives a real id (not the empty placeholder from the
+    // same-event-loop-tick race). The original normally resolves it within
+    // single-digit milliseconds — well under DEDUP_SESSION_WAIT_MS.
+    const resolvedSessionID = await waitForSessionID(
+      existing,
+      DEDUP_SESSION_WAIT_MS,
+    )
+    const sessionID = resolvedSessionID ?? ""
+    return streamSSE(c, async (stream) => {
+      await stream.writeSSE({
+        event: "session",
+        data: JSON.stringify({
+          session_id: sessionID,
+          external_session_id: request.session_id ?? null,
+          created: false,
+        }),
+      })
+      await stream.writeSSE({
+        event: "duplicate",
+        data: JSON.stringify({
+          session_id: sessionID,
+          in_flight: existing.completedAt === undefined,
+          message:
+            existing.completedAt === undefined
+              ? "Plan with identical body is in flight; not re-running."
+              : "Plan with identical body recently completed (within idempotency TTL).",
+        }),
+      })
+      await stream.writeSSE({ event: "done", data: "{}" })
+    })
+  }
+  // Register before prepareSession to close the check-and-set race. Two
+  // requests landing in the same event-loop tick would otherwise both see
+  // no entry; the set is synchronous so whichever runs second loses.
+  const dedupEntry = makeDedupEntry(now)
+  dedupMap.set(idempKey, dedupEntry)
 
   // 2a. Reject catalogs that would produce colliding tool ids — silent
   //     last-write-wins in the AI SDK's toolMap was masking caller bugs
@@ -152,8 +307,18 @@ async function handleRequest(
   try {
     sessionCtx = await Effect.runPromise(planner.prepareSession(request))
   } catch (e) {
+    // Free the dedup slot so the caller can legitimately retry. Without
+    // this, the first attempt's failure would shadow the dedup map and
+    // block every retry within the TTL window. Reject the in-flight
+    // sessionID promise too so any concurrent duplicate caller breaks
+    // out of its waitForSessionID instead of timing out at the 5s bound.
+    dedupEntry.rejectSessionID(e instanceof Error ? e : new Error(String(e)))
+    dedupMap.delete(idempKey)
     return c.json({ error: "session_failed", ...formatErrorDetail(e) }, 500)
   }
+  // Resolve the in-flight sessionID promise so any concurrent duplicate
+  // caller awaiting it receives the real id.
+  dedupEntry.resolveSessionID(sessionCtx.sessionID)
 
   // 4. SSE response
   return streamSSE(c, async (stream) => {
@@ -304,6 +469,11 @@ async function handleRequest(
       // so no PubSub subscriptions leak past this request.
       ac.abort()
       await stream.writeSSE({ event: "done", data: "{}" })
+      // Mark the dedup slot as completed. Subsequent identical bodies inside
+      // DEDUP_TTL_MS see this as "recently completed" and get the dup signal;
+      // beyond the TTL the entry is garbage-collected and a fresh body starts
+      // a new session.
+      dedupEntry.completedAt = Date.now()
     }
   })
 }

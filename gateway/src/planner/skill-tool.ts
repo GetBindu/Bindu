@@ -32,6 +32,13 @@ export interface BuildToolDeps {
     ) => Effect.Effect<import("../bindu/client").CallPeerOutcome, import("../bindu/protocol/jsonrpc").BinduError>
   }
   contextId: string
+  /** Most recent `taskId` recorded for this peer in the loaded session
+   * history, or undefined if this is the first call. When set, threaded
+   * into `callPeer` as `referenceTaskIds: [prior]` so the recipient sees
+   * the new task chained to its predecessor and can recover prior context.
+   * Computed once by `buildPriorTaskIdLookup` at planner setup so every
+   * skill-tool for the same peer sees the same id. */
+  priorTaskId?: string
 }
 
 export function buildSkillTool(
@@ -88,6 +95,15 @@ export function buildSkillTool(
             input: peerInput,
             contextId: deps.contextId,
             signal: ctx.abort,
+            // Per-recipient task_id continuity: link this turn's task to the
+            // last task we sent to the same peer in this thread, so the
+            // recipient can resolve referenceTaskIds[0] against its own
+            // store and recover prior artifacts/state. On the first turn
+            // priorTaskId is undefined and we fall through to the
+            // single-task-no-references shape.
+            ...(deps.priorTaskId
+              ? { referenceTaskIds: [deps.priorTaskId] }
+              : {}),
           })
           .pipe(Effect.mapError((err) => err as unknown as Error))
 

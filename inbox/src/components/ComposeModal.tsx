@@ -17,7 +17,7 @@ import { ModalCloseButton } from "./ModalCloseButton";
 import { postJson } from "~/lib/fetch";
 import { postSse } from "~/lib/sse";
 import { OUTBOX_AGENT_ID } from "~/lib/constants";
-import { shortDid } from "~/lib/format";
+import { didToEmail, shortDid } from "~/lib/format";
 import type { EcosystemAgent, PersonalAgent } from "~/lib/api-types";
 
 interface Props {
@@ -118,8 +118,13 @@ export function ComposeModal({ open, onClose }: Props) {
 			.then((j: EcosystemAgent[]) => {
 				const filtered = j.filter((a) => a.id !== OUTBOX_AGENT_ID);
 				setAgents(filtered);
-				if (draftToLoad?.agentId) {
-					setSelected([draftToLoad.agentId]);
+				// Restore the FULL recipient list from the draft. Previously
+				// drafts only kept one agent — reopening a multi-recipient
+				// draft would silently collapse to the first pick, which is
+				// how the math+joke compose lost joke_agent in the inbox log.
+				if (draftToLoad?.agentIds?.length) {
+					const known = new Set(filtered.map((a) => a.id));
+					setSelected(draftToLoad.agentIds.filter((id) => known.has(id)));
 				} else {
 					setSelected([]);
 				}
@@ -134,12 +139,10 @@ export function ComposeModal({ open, onClose }: Props) {
 			if (draftId) deleteDraft(draftId);
 			return;
 		}
-		// Drafts still carry a single agentId — only the first pick
-		// persists. Multi-recipient draft support is a phase-2 problem.
 		const id = draftId ?? crypto.randomUUID();
 		saveDraft({
 			id,
-			agentId: selected[0],
+			agentIds: [...selected],
 			text: trimmed,
 			savedAt: new Date().toISOString(),
 		});
@@ -669,7 +672,7 @@ function FromDidStrip({ me }: { me: PersonalAgent | null | undefined }) {
 					<span className="text-fg">{personaName ?? "you"}</span>
 				</div>
 				<code className="truncate text-fg-dim" title={me.did}>
-					{shortDid(me.did, 8)}
+					{didToEmail(me.did) ?? shortDid(me.did, 8)}
 				</code>
 			</div>
 		);

@@ -4,6 +4,12 @@ import type { Def as ToolDef, Context as ToolContext } from "../tool/tool"
 import type { AssistantMessageInfo } from "./message"
 import type { SessionID, MessageID } from "./schema"
 import type { Info as AgentInfo } from "../agent"
+import {
+	type ToolCallRecord,
+	doomLoopBailMessage,
+	hashToolInput,
+	isDoomLoop,
+} from "./doom-loop"
 
 /**
  * Helpers extracted from `./prompt.ts` — pure/near-pure logic that has no
@@ -54,18 +60,38 @@ export function evtUsage(u: AssistantMessageInfo["tokens"]) {
  * execution into the AI SDK's Promise-based `execute`. Metadata returned by
  * the tool is stashed in `metadataByCall` keyed on toolCallId, because the
  * AI SDK's tool result can only carry a string.
+ *
+ * `recentCalls` is a session-scoped sliding log used by the doom-loop
+ * detector. Each invocation pushes its `(tool, inputHash)`; before pushing,
+ * the helper checks whether the previous (THRESHOLD - 1) entries already
+ * match — if so, the actual `execute` is skipped and a synthetic "stop
+ * retrying" message is returned to the LLM. The model receives it as a
+ * tool result and can recover within the same agentic turn.
  */
 export function wrapTool(
   tool: ToolDef,
   sessionID: SessionID,
   messageID: MessageID,
   metadataByCall: Map<string, Record<string, unknown>>,
+  recentCalls: ToolCallRecord[],
 ): Effect.Effect<[string, any]> {
   return Effect.sync(() => {
     const wrapped = aiTool({
       description: tool.description,
       inputSchema: tool.parameters as any,
       execute: async (args: any, opts: { toolCallId: string; abortSignal?: AbortSignal }) => {
+        const incoming: ToolCallRecord = {
+          tool: tool.id,
+          inputHash: hashToolInput(args),
+        }
+        if (isDoomLoop(recentCalls, incoming)) {
+          // Record the bailed call too so the next identical one still
+          // sees a saturated tail and bails as well. The model has to do
+          // something different to break out.
+          recentCalls.push(incoming)
+          return doomLoopBailMessage(tool.id)
+        }
+        recentCalls.push(incoming)
         const ctx: ToolContext = {
           sessionId: sessionID,
           messageId: messageID,

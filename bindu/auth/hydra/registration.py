@@ -180,6 +180,41 @@ async def register_agent_in_hydra(
                 if existing_creds:
                     logger.info(f"OAuth credentials verified for DID: {did}")
 
+                    # Reconcile audience drift. When mTLS is enabled we need
+                    # `oidc_audience` in the client's allowed audiences, or
+                    # step-ca token requests later fail with
+                    # "Requested audience '<x>' has not been whitelisted".
+                    # Agents first registered with mTLS off (or before mTLS
+                    # support shipped) have an empty/stale audience array;
+                    # patch them in place rather than forcing a manual
+                    # admin-side fix.
+                    if app_settings.mtls.enabled:
+                        desired_aud = app_settings.mtls.oidc_audience
+                        current_aud = existing_client.get("audience") or []
+                        if desired_aud not in current_aud:
+                            # Hydra's PUT /admin/clients/{id} is a FULL replace.
+                            # GET never returns the client_secret hash, so a PUT
+                            # built from the GET response would either drop the
+                            # secret or trigger a rotation — either way the next
+                            # client_credentials call fails with 401
+                            # "passwords do not match". Re-send the secret from
+                            # the local creds we just loaded so Hydra preserves
+                            # the existing password row.
+                            updated = {
+                                **existing_client,
+                                "audience": [*current_aud, desired_aud],
+                                "client_secret": existing_creds.client_secret,
+                            }
+                            try:
+                                await hydra.update_oauth_client(client_id, updated)
+                                logger.info(
+                                    f"Patched Hydra client {client_id} to include audience={desired_aud}"
+                                )
+                            except Exception as e:
+                                logger.warning(
+                                    f"Failed to patch audience on existing Hydra client {client_id}: {e}"
+                                )
+
                     # Backup to Vault if enabled and not already there
                     if vault_client and not vault_creds:
                         try:

@@ -4,7 +4,13 @@ import type { PersonalAgent } from "~/lib/api-types";
 
 export interface Draft {
 	id: string;
-	agentId: string;
+	/** Recipients the draft is addressed to. Multi-recipient drafts were
+	 * previously collapsed to a single `agentId: string` field, which
+	 * broke the inbox's multi-agent compose flow when a draft was
+	 * resubmitted (the operator picked N agents, saved, reopened, and
+	 * only the first one was reloaded). `loadDrafts` migrates legacy
+	 * entries in-place so old localStorage payloads keep working. */
+	agentIds: string[];
 	text: string;
 	contextId?: string;
 	savedAt: string;
@@ -98,13 +104,36 @@ function loadDrafts(): Draft[] {
 		if (!raw) return [];
 		const arr = JSON.parse(raw) as unknown;
 		if (!Array.isArray(arr)) return [];
-		return arr.filter(
-			(d): d is Draft =>
-				!!d &&
-				typeof (d as Draft).id === "string" &&
-				typeof (d as Draft).agentId === "string" &&
-				typeof (d as Draft).text === "string",
-		);
+		const out: Draft[] = [];
+		for (const d of arr) {
+			if (!d || typeof d !== "object") continue;
+			const row = d as Record<string, unknown>;
+			if (typeof row.id !== "string" || typeof row.text !== "string") continue;
+			// Migrate legacy single-recipient drafts (agentId: string) to the
+			// multi-recipient shape (agentIds: string[]). Without this, a
+			// user with an old draft in localStorage would lose it on first
+			// reload after upgrading.
+			let agentIds: string[];
+			if (Array.isArray(row.agentIds)) {
+				agentIds = (row.agentIds as unknown[]).filter(
+					(v): v is string => typeof v === "string" && v.length > 0,
+				);
+			} else if (typeof row.agentId === "string" && row.agentId.length > 0) {
+				agentIds = [row.agentId];
+			} else {
+				continue;
+			}
+			if (agentIds.length === 0) continue;
+			out.push({
+				id: row.id,
+				agentIds,
+				text: row.text,
+				contextId:
+					typeof row.contextId === "string" ? row.contextId : undefined,
+				savedAt: typeof row.savedAt === "string" ? row.savedAt : "",
+			});
+		}
+		return out;
 	} catch {
 		return [];
 	}

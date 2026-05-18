@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import { XIcon } from "@phosphor-icons/react";
-import { shortDid } from "~/lib/format";
+import { didToEmail, shortDid } from "~/lib/format";
 import { isGateway } from "~/lib/agent-kind";
 import type { EcosystemAgent } from "~/lib/api-types";
 
@@ -179,7 +179,7 @@ export function AgentPicker({
 								<div className="min-w-0 flex-1">
 									<div className="truncate text-slate-900">{name}</div>
 									<div className="truncate font-mono text-[10px] text-slate-500">
-										{did ? shortDid(did) : a.id}
+										{did ? (didToEmail(did) ?? shortDid(did)) : a.id}
 									</div>
 								</div>
 							</li>
