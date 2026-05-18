@@ -33,7 +33,7 @@ import {
 	writeSettings,
 } from "./db";
 import { spawnPersonalAgent, stopPersonalAgent } from "./personal-agent";
-import { pickFreePort, pollHealth } from "./utils";
+import { buildPeerDispatcher, pickFreePort, pollHealth } from "./utils";
 
 // Path A: comms is the canonical record, gateway is stateless. We send
 // the most recent N user/assistant turns on every /api/plan call;
@@ -145,9 +145,21 @@ const AGENT_ID_RE = /^[a-zA-Z0-9_-]{1,64}$/;
 
 
 async function fetchWellKnown(base: string) {
+	// Discovery hits the peer's HTTPS endpoint when the peer is
+	// mTLS-enabled. Present our personal-agent cert if we have one;
+	// otherwise fall through to the default dispatcher (works for
+	// HTTP peers and any HTTPS peer with a publicly-trusted cert).
+	const dispatcher = buildPeerDispatcher();
+	const init = (dispatcher ? { dispatcher } : {}) as RequestInit & {
+		dispatcher?: ReturnType<typeof buildPeerDispatcher>;
+	};
 	const [didR, cardR] = await Promise.all([
-		fetch(`${base}/.well-known/did.json`).then((r) => (r.ok ? r.json() : null)),
-		fetch(`${base}/.well-known/agent.json`).then((r) => (r.ok ? r.json() : null)),
+		fetch(`${base}/.well-known/did.json`, init).then((r) =>
+			r.ok ? r.json() : null,
+		),
+		fetch(`${base}/.well-known/agent.json`, init).then((r) =>
+			r.ok ? r.json() : null,
+		),
 	]);
 	return { did: didR as unknown, agentCard: cardR as unknown };
 }
@@ -769,10 +781,14 @@ app.post("/api/compose", async (c) => {
 	let upstreamError: string | null = null;
 	try {
 		const rpcBody = JSON.stringify(rpc);
+		const peerDispatcher = buildPeerDispatcher();
 		const r = await fetch(base, {
 			method: "POST",
 			headers: await a2aHeaders(rpcBody),
 			body: rpcBody,
+			...(peerDispatcher
+				? ({ dispatcher: peerDispatcher } as unknown as RequestInit)
+				: {}),
 		});
 		upstreamStatus = r.status;
 		upstreamBody = await r.json().catch(() => null);
@@ -1559,10 +1575,14 @@ app.post("/api/events/:id/action", async (c) => {
 		};
 		try {
 			const msgBody = JSON.stringify(msg);
+			const peerDispatcher = buildPeerDispatcher();
 			const r = await fetch(base, {
 				method: "POST",
 				headers: await a2aHeaders(msgBody),
 				body: msgBody,
+				...(peerDispatcher
+					? ({ dispatcher: peerDispatcher } as unknown as RequestInit)
+					: {}),
 			});
 			return c.json({ ok: r.ok, status: r.status, delivered: r.ok });
 		} catch (err) {

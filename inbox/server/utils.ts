@@ -1,4 +1,7 @@
+import { existsSync, readFileSync, statSync } from "node:fs";
 import net from "node:net";
+import { homedir } from "node:os";
+import path from "node:path";
 import { Agent } from "undici";
 
 /** Loopback-only HTTPS dispatcher.
@@ -14,6 +17,60 @@ import { Agent } from "undici";
 export const insecureLoopbackDispatcher = new Agent({
 	connect: { rejectUnauthorized: false },
 });
+
+/* -------------------------------------------------------------------------- */
+/*  Peer-A2A dispatcher (Phase B)                                             */
+/* -------------------------------------------------------------------------- */
+
+/** Resolve the personal agent's PKI dir. The personal-agent spawner writes
+ *  cert/key/CA-bundle here once the agent has bootstrapped (Phase A wired
+ *  the env that triggers the bootstrap). */
+const PERSONAL_PKI_DIR =
+	process.env.BINDU_PERSONAL_PKI_DIR ??
+	path.join(homedir(), ".bindu", "personal", ".bindu");
+const CERT_PATH = path.join(PERSONAL_PKI_DIR, "tls_cert.pem");
+const KEY_PATH = path.join(PERSONAL_PKI_DIR, "tls_key.pem");
+const CA_PATH = path.join(PERSONAL_PKI_DIR, "ca_bundle.pem");
+
+let cachedPeerDispatcher: { agent: Agent; mtimeMs: number } | null = null;
+
+/** Returns an undici Agent that presents the personal agent's mTLS cert
+ *  on outbound A2A calls and trusts peers signed by the same private CA.
+ *
+ *  Behavior:
+ *    - If cert files don't exist yet (personal agent not spawned): returns
+ *      undefined → caller falls back to the default (no client cert).
+ *    - On HTTP destinations the dispatcher options are ignored; works.
+ *    - On HTTPS destinations we present the cert and trust ONLY the
+ *      bundled CA. Cert SANs are DIDs, not hostnames, so hostname
+ *      verification is disabled — identity is enforced at the app layer
+ *      via X-DID-Signature (a2aHeaders) and the cert chain still has
+ *      to reach our Root CA.
+ *    - File mtime is checked on every call; the cert renews every ~16h
+ *      and we pick the new one up automatically without restart.
+ */
+export function buildPeerDispatcher(): Agent | undefined {
+	if (!existsSync(CERT_PATH) || !existsSync(KEY_PATH) || !existsSync(CA_PATH)) {
+		return undefined;
+	}
+	const mtimeMs = statSync(CERT_PATH).mtimeMs;
+	if (cachedPeerDispatcher && cachedPeerDispatcher.mtimeMs === mtimeMs) {
+		return cachedPeerDispatcher.agent;
+	}
+	const agent = new Agent({
+		connect: {
+			cert: readFileSync(CERT_PATH),
+			key: readFileSync(KEY_PATH),
+			ca: readFileSync(CA_PATH),
+			// Peer cert SANs are DIDs (did:bindu:...), not hostnames. We
+			// rely on (a) chain verification against our private CA and
+			// (b) app-layer DID signature verification via a2aHeaders.
+			checkServerIdentity: () => undefined,
+		},
+	});
+	cachedPeerDispatcher = { agent, mtimeMs };
+	return agent;
+}
 
 /** Ask the OS for an unused TCP port on 127.0.0.1. Used by both the
  * gateway spawner (index.ts) and the personal-agent spawner so we don't
