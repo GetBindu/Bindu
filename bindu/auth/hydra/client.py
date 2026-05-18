@@ -178,6 +178,33 @@ class HydraClient:
             logger.error(f"Failed to get OAuth client: {error}")
             raise
 
+    async def update_oauth_client(
+        self, client_id: str, client_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Replace an OAuth2 client's config.
+
+        Hydra's PUT /admin/clients/{id} is a full replace, not a patch — the
+        caller must supply the complete desired state. Used by the agent's
+        registration flow to reconcile drift (e.g. adding the step-ca audience
+        when mTLS is turned on against a client that was first registered
+        without it).
+        """
+        try:
+            encoded_client_id = quote(client_id, safe="")
+            response = await self._http_client.put(
+                f"/admin/clients/{encoded_client_id}", json=client_data
+            )
+
+            if response.status not in (200, 201):
+                error_text = await response.text()
+                raise ValueError(f"Failed to update OAuth client: {error_text}")
+
+            return await response.json()
+
+        except Exception as error:
+            logger.error(f"Failed to update OAuth client: {error}")
+            raise
+
     async def list_oauth_clients(
         self, limit: int = 100, offset: int = 0
     ) -> List[Dict[str, Any]]:
