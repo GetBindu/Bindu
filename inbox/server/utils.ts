@@ -1,4 +1,19 @@
 import net from "node:net";
+import { Agent } from "undici";
+
+/** Loopback-only HTTPS dispatcher.
+ *
+ * Inbox subprocesses (the personal agent today, the gateway tomorrow) now
+ * default to mTLS. Their cert is real — signed by the production Bindu
+ * Intermediate CA — but its CN/SAN is the agent's DID, not "127.0.0.1",
+ * so Node's stock hostname verification rejects it. We're calling our own
+ * spawned-child on the loopback interface, so we deliberately skip the
+ * verify here. Outbound-to-peers (Phase B) gets a properly verifying
+ * dispatcher with a CA bundle + client cert.
+ */
+export const insecureLoopbackDispatcher = new Agent({
+	connect: { rejectUnauthorized: false },
+});
 
 /** Ask the OS for an unused TCP port on 127.0.0.1. Used by both the
  * gateway spawner (index.ts) and the personal-agent spawner so we don't
@@ -37,7 +52,14 @@ export async function pollHealth(
 	while (Date.now() - start < timeoutMs) {
 		if (signal?.aborted) return false;
 		try {
-			const r = await fetch(`${url}/health`, { signal });
+			const r = await fetch(`${url}/health`, {
+				signal,
+				// Spawned children may be on HTTPS with a DID-named cert;
+				// see insecureLoopbackDispatcher above. Peers on the public
+				// internet are unaffected (their certs verify normally
+				// regardless of this dispatcher).
+				dispatcher: insecureLoopbackDispatcher,
+			} as RequestInit & { dispatcher: Agent });
 			if (r.ok) return true;
 		} catch {
 			/* ECONNREFUSED while the child is still booting — keep trying */

@@ -28,7 +28,7 @@ import {
 	readSettings,
 	writePersonalAgent,
 } from "./db";
-import { pickFreePort, pollHealth } from "./utils";
+import { insecureLoopbackDispatcher, pickFreePort, pollHealth } from "./utils";
 
 /** Pick the first non-empty string from a list of candidates. Used to
  * layer "settings table → process.env → default" without `??` falling
@@ -264,7 +264,7 @@ config = {
     "name": "${agentName}",
     "description": f"Personal agent for {PERSONA['name']}",
     "deployment": {
-        "url": "http://localhost:${port}",
+        "url": "https://localhost:${port}",
         "expose": True,
         "cors_origins": ["${corsOrigin}"],
     },
@@ -400,6 +400,21 @@ export async function spawnPersonalAgent(
 			process.env.HYDRA__ADMIN_URL ?? "https://hydra-admin.getbindu.com",
 		HYDRA__PUBLIC_URL:
 			process.env.HYDRA__PUBLIC_URL ?? "https://hydra.getbindu.com",
+		// mTLS is on by default for every personal agent. The agent
+		// exchanges its Hydra OIDC token (audience=step-ca) for a 24h
+		// X.509 cert from step-ca and serves uvicorn over TLS.
+		// REQUIRE_CLIENT_CERT is soft for now — the inbox itself talks
+		// to its own agent on loopback without presenting a client cert
+		// (Phase B will flip that). Mode "hybrid" keeps Hydra
+		// introspection on inbound so the auth gate still has identity
+		// to work with even when no peer cert reaches the middleware.
+		MTLS__ENABLED: "true",
+		MTLS__MODE: "hybrid",
+		MTLS__REQUIRE_CLIENT_CERT: "false",
+		MTLS__CA_URL: process.env.MTLS__CA_URL ?? "https://ca.getbindu.com",
+		MTLS__CA_ROOT_URL:
+			process.env.MTLS__CA_ROOT_URL ??
+			"https://ca.getbindu.com/roots.pem",
 	});
 	writeFileSync(
 		paths.agentPy,
@@ -437,7 +452,11 @@ export async function spawnPersonalAgent(
 		};
 	}
 
-	const baseUrl = `http://127.0.0.1:${port}`;
+	// Personal agents serve over HTTPS now (mTLS by default — see the
+	// MTLS__* env vars below). The cert is real, but its SAN is the DID,
+	// not 127.0.0.1, so callers on the loopback skip hostname
+	// verification via insecureLoopbackDispatcher.
+	const baseUrl = `https://127.0.0.1:${port}`;
 	const now = new Date().toISOString();
 	writePersonalAgent({
 		...row,
@@ -531,8 +550,12 @@ export async function spawnPersonalAgent(
 	// payload exposes `application.agent_did` directly. Try health
 	// first — it's the cheapest probe and the response is small.
 	let did: string | null = null;
+	const loopbackFetch = (path: string) =>
+		fetch(`${baseUrl}${path}`, {
+			dispatcher: insecureLoopbackDispatcher,
+		} as RequestInit & { dispatcher: typeof insecureLoopbackDispatcher });
 	try {
-		const r = await fetch(`${baseUrl}/health`);
+		const r = await loopbackFetch("/health");
 		if (r.ok) {
 			const j = (await r.json()) as {
 				application?: { agent_did?: string };
@@ -547,7 +570,7 @@ export async function spawnPersonalAgent(
 	}
 	if (!did) {
 		try {
-			const r = await fetch(`${baseUrl}/.well-known/agent.json`);
+			const r = await loopbackFetch("/.well-known/agent.json");
 			if (r.ok) {
 				const j = (await r.json()) as {
 					capabilities?: { extensions?: Array<{ uri?: string }> };
