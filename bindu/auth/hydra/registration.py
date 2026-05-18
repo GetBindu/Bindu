@@ -245,6 +245,17 @@ async def register_agent_in_hydra(
                 "response_types": ["code", "token"],
                 "scope": " ".join(app_settings.hydra.default_agent_scopes),
                 "token_endpoint_auth_method": "client_secret_post",
+                # When mTLS is on, the agent will exchange a Hydra token for
+                # an X.509 cert at step-ca. step-ca rejects tokens whose
+                # ``aud`` claim doesn't include its configured client ID, so
+                # we declare the allowed audience at client-registration
+                # time. Off-by-default to keep the blast radius zero for
+                # deployments not using mTLS.
+                **(
+                    {"audience": [app_settings.mtls.oidc_audience]}
+                    if app_settings.mtls.enabled
+                    else {}
+                ),
                 "metadata": {
                     "agent_id": agent_id,
                     "agent_url": agent_url,

@@ -38,6 +38,7 @@ def start_grpc_server(
     host: str | None = None,
     port: int | None = None,
     max_workers: int | None = None,
+    server_credentials: grpc.ServerCredentials | None = None,
 ) -> grpc.Server:
     """Start the Bindu gRPC server for SDK agent registration.
 
@@ -49,6 +50,11 @@ def start_grpc_server(
         host: Bind host. Defaults to app_settings.grpc.host.
         port: Bind port. Defaults to app_settings.grpc.port (3774).
         max_workers: Thread pool size. Defaults to app_settings.grpc.max_workers.
+        server_credentials: Optional mTLS credentials produced by
+            ``MTLSAgentExtension.build_grpc_server_credentials``. When provided,
+            the gRPC port is bound over TLS with mutual-auth verification.
+            When None, the server falls back to ``add_insecure_port`` — used
+            for SDK-on-the-same-host setups where the bus is over localhost.
 
     Returns:
         The started grpc.Server instance. Call wait_for_termination() to block,
@@ -80,13 +86,19 @@ def start_grpc_server(
         server,
     )
 
-    # Bind to address
+    # Bind to address. mTLS-enabled deployments pass server_credentials so the
+    # gRPC port can't be downgraded relative to the HTTP A2A port.
     bind_address = f"{host}:{port}"
-    server.add_insecure_port(bind_address)
+    if server_credentials is not None:
+        server.add_secure_port(bind_address, server_credentials)
+        scheme = "grpcs"
+    else:
+        server.add_insecure_port(bind_address)
+        scheme = "grpc"
 
     # Start serving
     server.start()
-    logger.info(f"gRPC server started on {bind_address}")
+    logger.info(f"gRPC server started on {scheme}://{bind_address}")
     logger.info(
         "Waiting for SDK agent registrations... "
         "(TypeScript, Kotlin, Rust agents can now connect)"

@@ -61,6 +61,7 @@ class GrpcAgentClient:
         callback_address: str,
         timeout: float = 30.0,
         use_streaming: bool = False,
+        channel_credentials: grpc.ChannelCredentials | None = None,
     ) -> None:
         """Initialize the gRPC agent client.
 
@@ -71,25 +72,36 @@ class GrpcAgentClient:
             use_streaming: If True, use HandleMessagesStream (server-side streaming)
                 instead of HandleMessages (unary). The streaming RPC returns a
                 generator that ResultProcessor.collect_results() will drain.
+            channel_credentials: Optional mTLS credentials produced by
+                ``MTLSAgentExtension.build_grpc_channel_credentials``. When
+                provided, the channel is built with ``grpc.secure_channel``
+                so the agent authenticates over mTLS. When None, falls back
+                to ``grpc.insecure_channel`` for same-host SDK setups.
         """
         self._address = callback_address
         self._timeout = timeout
         self._use_streaming = use_streaming
+        self._channel_credentials = channel_credentials
         self._channel: grpc.Channel | None = None
         self._stub: agent_handler_pb2_grpc.AgentHandlerStub | None = None
 
     def _ensure_connected(self) -> None:
         """Lazily create the gRPC channel and stub on first use."""
         if self._channel is None:
-            self._channel = grpc.insecure_channel(
-                self._address,
-                options=[
-                    ("grpc.max_receive_message_length", 4 * 1024 * 1024),
-                    ("grpc.max_send_message_length", 4 * 1024 * 1024),
-                ],
-            )
+            options = [
+                ("grpc.max_receive_message_length", 4 * 1024 * 1024),
+                ("grpc.max_send_message_length", 4 * 1024 * 1024),
+            ]
+            if self._channel_credentials is not None:
+                self._channel = grpc.secure_channel(
+                    self._address, self._channel_credentials, options=options
+                )
+                scheme = "grpcs"
+            else:
+                self._channel = grpc.insecure_channel(self._address, options=options)
+                scheme = "grpc"
             self._stub = agent_handler_pb2_grpc.AgentHandlerStub(self._channel)
-            logger.debug(f"Connected to agent handler at {self._address}")
+            logger.debug(f"Connected to agent handler at {scheme}://{self._address}")
 
     def _build_request(
         self, messages: list[dict[str, str]]

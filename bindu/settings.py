@@ -720,6 +720,84 @@ class HydraSettings(BaseSettings):
     ]
 
 
+class MTLSSettings(BaseSettings):
+    """Mutual TLS (mTLS) configuration for end-to-end encrypted agent communication.
+
+    Bindu agents fetch short-lived X.509 certificates from a Smallstep step-ca
+    server, using a Hydra OIDC token as the provisioner credential. Certificates
+    live on disk alongside the DID keypair (``DIDSettings.pki_dir``), are backed
+    up to Vault when ``VaultSettings.enabled`` is true, and are renewed in-process
+    before expiry.
+
+    See ``docs/MTLS_DEPLOYMENT_GUIDE.md`` for the CA architecture.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_prefix="MTLS__",
+        extra="allow",
+    )
+
+    # Enable/disable mTLS. Off by default so existing deployments are unaffected
+    # until the step-ca service is up and an agent is explicitly opted in.
+    enabled: bool = False
+
+    # step-ca service endpoints. The root URL serves the public PEM bundle and
+    # does not require authentication; the API URL is mTLS-protected on the
+    # CA side once the agent is enrolled.
+    ca_url: str = "https://ca.getbindu.com"
+    ca_root_url: str = "https://ca.getbindu.com/roots.pem"
+    ca_provisioner: str = "hydra"  # OIDC provisioner name configured in step-ca
+
+    # Connection settings
+    timeout: int = 10
+    verify_ssl: bool = True
+    max_retries: int = 3
+
+    # Certificate lifecycle. Short TTL + passive renewal is the revocation
+    # strategy (see deployment guide); there is no CRL.
+    cert_ttl_hours: int = 24
+    renew_before_hours: int = 8  # re-fetch when fewer than this many hours remain
+    renew_check_interval_seconds: int = 3600  # how often the renewal task wakes up
+
+    # Key type for agent certs. step-ca templates expect EC P-256.
+    key_type: str = "EC"
+    key_curve: str = "P-256"
+
+    # On-disk filenames. These live next to the DID key files inside
+    # ``DIDSettings.pki_dir`` so a single backup captures both identities.
+    cert_filename: str = "tls_cert.pem"
+    key_filename: str = "tls_key.pem"
+    ca_bundle_filename: str = "ca_bundle.pem"
+    csr_filename: str = "tls.csr"  # written for debugging; not load-bearing
+
+    # Server-side TLS behavior. When ``require_client_cert`` is true, the HTTP
+    # and gRPC servers reject any connection that doesn't present a verified
+    # peer cert (full mTLS).
+    require_client_cert: bool = True
+
+    # Client-side TLS behavior. Verify peer server certs against the bundled CA.
+    verify_server_cert: bool = True
+
+    # Rollout mode controls how inbound auth is validated:
+    #   "hybrid" - mTLS + Hydra both required; cert CN must match Hydra client_id
+    #              (default during the migration window)
+    #   "mtls"   - mTLS only; skip Hydra introspection entirely on inbound
+    #   "off"    - same effect as enabled=False; mTLS is wired but not enforced
+    mode: str = "hybrid"
+
+    # Vault paths for cert backup. Only used when ``VaultSettings.enabled`` is
+    # true; ``{agent_id}`` is substituted at runtime.
+    vault_path_template: str = "secret/bindu/agents/{agent_id}/mtls"
+
+    # OIDC audience that step-ca's OIDC provisioner expects in the token's
+    # ``aud`` claim. step-ca rejects sign requests whose token doesn't carry
+    # this audience, so Hydra registration and the token request both need
+    # to include it. Matches the ``clientID`` field in step-ca's
+    # ``ca-config.json`` on the infra side.
+    oidc_audience: str = "step-ca"
+
+
 class StorageSettings(BaseSettings):
     """Storage backend configuration settings.
 
@@ -1133,6 +1211,7 @@ class Settings(BaseSettings):
     agent: AgentSettings = AgentSettings()
     auth: AuthSettings = AuthSettings()
     hydra: HydraSettings = HydraSettings()
+    mtls: MTLSSettings = MTLSSettings()
     vault: VaultSettings = VaultSettings()
     oauth: OAuthSettings = OAuthSettings()
     storage: StorageSettings = StorageSettings()

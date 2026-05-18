@@ -261,6 +261,77 @@ class VaultClient:
             logger.error(f"Failed to delete DID keys from Vault for agent: {agent_id}")
             return False
 
+    async def store_mtls_material(
+        self,
+        agent_id: str,
+        cert_pem: str,
+        key_pem: str,
+        ca_bundle_pem: str,
+    ) -> bool:
+        """Store mTLS cert + key + CA bundle in Vault.
+
+        Mirrors ``store_did_keys`` so a single Vault namespace per agent
+        holds the agent's full identity (DID keys + X.509 material).
+
+        Args:
+            agent_id: Unique agent identifier
+            cert_pem: Agent X.509 certificate PEM
+            key_pem: Agent EC private key PEM
+            ca_bundle_pem: CA chain PEM
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.enabled:
+            logger.debug("Vault disabled, skipping mTLS material storage")
+            return False
+
+        path = app_settings.mtls.vault_path_template.format(agent_id=agent_id)
+        path = f"/v1/secret/data/{path.lstrip('/')}"
+        data = {
+            "data": {
+                "cert": cert_pem,
+                "key": key_pem,
+                "ca_bundle": ca_bundle_pem,
+            }
+        }
+
+        result = await self._make_request("POST", path, data)
+        if result:
+            logger.info(f"✅ mTLS material stored in Vault for agent: {agent_id}")
+            return True
+        logger.error(f"Failed to store mTLS material in Vault for agent: {agent_id}")
+        return False
+
+    async def get_mtls_material(self, agent_id: str) -> Optional[dict[str, str]]:
+        """Retrieve mTLS cert + key + CA bundle from Vault.
+
+        Args:
+            agent_id: Unique agent identifier
+
+        Returns:
+            Dictionary with 'cert', 'key', 'ca_bundle' keys or None if not found
+        """
+        if not self.enabled:
+            logger.debug("Vault disabled, skipping mTLS material retrieval")
+            return None
+
+        path = app_settings.mtls.vault_path_template.format(agent_id=agent_id)
+        path = f"/v1/secret/data/{path.lstrip('/')}"
+        result = await self._make_request("GET", path)
+
+        if result and "data" in result and "data" in result["data"]:
+            payload = result["data"]["data"]
+            logger.info(f"✅ mTLS material retrieved from Vault for agent: {agent_id}")
+            return {
+                "cert": payload.get("cert"),
+                "key": payload.get("key"),
+                "ca_bundle": payload.get("ca_bundle"),
+            }
+
+        logger.debug(f"No mTLS material found in Vault for agent: {agent_id}")
+        return None
+
     async def delete_hydra_credentials(self, did: str) -> bool:
         """Delete Hydra credentials from Vault.
 

@@ -25,6 +25,7 @@ from bindu.common.models import (
 from bindu.extensions.x402 import X402AgentExtension
 from bindu.penguin.did_setup import initialize_did_extension
 from bindu.penguin.manifest import create_manifest, validate_agent_function
+from bindu.penguin.mtls_setup import initialize_mtls_extension
 from bindu.settings import app_settings
 from bindu.utils import add_extension_to_capabilities
 from bindu.utils.config import (
@@ -561,6 +562,31 @@ def _bindufy_core(
         caller_dir or Path.cwd(),
     )
 
+    # Bootstrap mTLS. Off by default (mtls.enabled=False) so existing
+    # deployments are unaffected. When on, requires Hydra credentials because
+    # step-ca's OIDC provisioner validates the cert request against Hydra.
+    mtls_extension = initialize_mtls_extension(
+        agent_id=agent_id_str,
+        agent_did=did_extension.did,
+        agent_url=agent_url,
+        pki_dir=resolved_key_dir / app_settings.did.pki_dir,
+        hydra_credentials=credentials,
+    )
+    if mtls_extension is not None:
+        # Populate AgentTrust on the manifest so the cert fingerprint flows
+        # into the agent card and downstream trust decisions.
+        fingerprint = mtls_extension.cert_fingerprint
+        if fingerprint is not None:
+            _manifest.agent_trust["certificate_fingerprint"] = fingerprint
+    elif app_settings.mtls.enabled and app_settings.mtls.require_client_cert:
+        # Operator asked for strict mTLS but bootstrap failed — refuse to start
+        # rather than fall through to plain HTTP and create a false sense of
+        # security.
+        raise RuntimeError(
+            "mTLS is enabled with require_client_cert=True but cert bootstrap "
+            "failed. Check step-ca reachability and Hydra OIDC config."
+        )
+
     logger.info(f"Starting deployment for agent: {agent_id}")
 
     # Import server components (deferred to avoid circular import)
@@ -580,6 +606,7 @@ def _bindufy_core(
         scheduler_config=scheduler_config,
         sentry_config=sentry_config,
         cors_origins=deployment_config.cors_origins if deployment_config else None,
+        mtls_extension=mtls_extension,
     )
 
     # Parse deployment URL
@@ -601,6 +628,20 @@ def _bindufy_core(
             tunnel_url=tunnel_url,
         )
 
+        # When mTLS is configured and bootstrap succeeded, hand uvicorn the
+        # cert/key/CA-bundle paths so the HTTP server runs over TLS with
+        # mutual-auth peer verification.
+        ssl_kwargs = (
+            mtls_extension.get_uvicorn_ssl_kwargs()
+            if mtls_extension is not None
+            else None
+        )
+        if ssl_kwargs and agent_url.startswith("http://"):
+            logger.warning(
+                "mTLS is on but agent_url starts with http://; downstream callers "
+                "will fail TLS. Set deployment URL to https://… to match."
+            )
+
         if run_server_in_background:
             # Start uvicorn in a background thread (used by gRPC service)
             import threading
@@ -608,7 +649,12 @@ def _bindufy_core(
             server_thread = threading.Thread(
                 target=start_uvicorn_server,
                 args=(bindu_app,),
-                kwargs={"host": host, "port": port, "display_info": True},
+                kwargs={
+                    "host": host,
+                    "port": port,
+                    "display_info": True,
+                    "ssl_kwargs": ssl_kwargs,
+                },
                 daemon=True,
                 name=f"uvicorn-{validated_config['name']}",
             )
@@ -616,7 +662,13 @@ def _bindufy_core(
             logger.info(f"HTTP server started in background thread on {host}:{port}")
         else:
             # Run server blocking (normal Python bindufy path)
-            start_uvicorn_server(bindu_app, host=host, port=port, display_info=True)
+            start_uvicorn_server(
+                bindu_app,
+                host=host,
+                port=port,
+                display_info=True,
+                ssl_kwargs=ssl_kwargs,
+            )
     else:
         logger.info(
             "Server not started (run_server=False). Manifest returned for programmatic use."

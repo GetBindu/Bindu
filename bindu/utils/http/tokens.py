@@ -16,7 +16,10 @@ logger = get_logger("bindu.utils.token_utils")
 
 
 async def get_client_credentials_token(
-    client_id: str, client_secret: str, scope: Optional[str] = None
+    client_id: str,
+    client_secret: str,
+    scope: Optional[str] = None,
+    audience: Optional[str] = None,
 ) -> Optional[dict]:
     """Get access token using client credentials grant.
 
@@ -24,6 +27,10 @@ async def get_client_credentials_token(
         client_id: OAuth client ID
         client_secret: OAuth client secret
         scope: Optional space-separated scopes
+        audience: Optional audience to request. When provided, Hydra
+            includes the value in the issued token's ``aud`` claim — needed
+            by step-ca's OIDC provisioner, which rejects tokens without
+            ``aud: step-ca``.
 
     Returns:
         Token response dict with access_token, token_type, expires_in
@@ -43,6 +50,8 @@ async def get_client_credentials_token(
 
         if scope:
             data["scope"] = scope
+        if audience:
+            data["audience"] = audience
 
         async with http_client(
             base_url=app_settings.hydra.public_url,

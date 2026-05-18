@@ -20,8 +20,10 @@ from __future__ import annotations as _annotations
 
 from .base import AuthMiddleware
 from .hydra import HydraMiddleware
+from .mtls import MTLSMiddleware
 
 __all__ = [
     "AuthMiddleware",
     "HydraMiddleware",
+    "MTLSMiddleware",
 ]

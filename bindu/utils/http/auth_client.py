@@ -33,6 +33,7 @@ class HybridAuthClient:
         agent_id: str,
         credentials_dir: Path,
         did_extension,
+        mtls_extension=None,
     ):
         """Initialize hybrid auth client.
 
@@ -40,12 +41,32 @@ class HybridAuthClient:
             agent_id: Agent identifier
             credentials_dir: Directory containing oauth_credentials.json
             did_extension: DIDExtension instance with private key
+            mtls_extension: Optional MTLSAgentExtension. When provided, all
+                outbound requests use mTLS — the client's cert authenticates
+                this agent at the transport layer, and the CA bundle verifies
+                peer servers. Layered on top of the existing OAuth2 + DID
+                signature stack (defense in depth during the migration
+                window).
         """
         self.agent_id = agent_id
         self.credentials_dir = credentials_dir
         self.did_extension = did_extension
+        self.mtls_extension = mtls_extension
         self.credentials = None
         self.access_token = None
+
+    def _build_http_client(self, base_url: str) -> AsyncHTTPClient:
+        """Build an ``AsyncHTTPClient`` for the given base URL.
+
+        Threads the mTLS SSL context through when configured; otherwise the
+        client uses default TLS settings (system trust store).
+        """
+        ssl_context = (
+            self.mtls_extension.build_client_ssl_context()
+            if self.mtls_extension is not None
+            else None
+        )
+        return AsyncHTTPClient(base_url=base_url, ssl_context=ssl_context)
 
     async def initialize(self):
         """Load credentials and get initial access token."""
@@ -142,7 +163,7 @@ class HybridAuthClient:
             auth_headers.update(headers)
 
         # Make request
-        async with AsyncHTTPClient(base_url=base_url) as client:
+        async with self._build_http_client(base_url) as client:
             response = await client.post(path, headers=auth_headers, json=data)
 
             if response.status == 401:
@@ -195,7 +216,7 @@ class HybridAuthClient:
             auth_headers.update(headers)
 
         # Make request
-        async with AsyncHTTPClient(base_url=base_url) as client:
+        async with self._build_http_client(base_url) as client:
             response = await client.get(path, headers=auth_headers)
 
             if response.status == 401:
