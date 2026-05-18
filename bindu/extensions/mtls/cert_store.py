@@ -177,7 +177,11 @@ class CertStore:
         builder = (
             x509.CertificateSigningRequestBuilder()
             .subject_name(
-                x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, agent_did)])
+                x509.Name(
+                    [
+                        x509.NameAttribute(NameOID.COMMON_NAME, _shorten_cn(agent_did)),
+                    ]
+                )
             )
             .add_extension(x509.SubjectAlternativeName(san_entries), critical=False)
         )
@@ -259,3 +263,29 @@ def _hostname_from_url(url: str) -> Optional[str]:
     except ValueError:
         return None
     return parsed.hostname
+
+
+# X.509 CommonName is capped at 64 bytes by RFC 5280. Real Bindu DIDs of
+# the shape ``did:bindu:{author}:{name}:{agent_id}`` routinely exceed
+# that — an email author + a meaningful agent name + a 36-char UUID
+# easily clears 80 chars. The full DID still goes in the URI SAN (which
+# has no length cap), and step-ca's OIDC provisioner overrides whatever
+# we put in CN with the token's ``sub`` claim anyway, so the CN we send
+# is largely cosmetic. We use the last colon-delimited segment (the
+# agent UUID for the canonical DID format) as the CN — short, stable,
+# unique, and human-readable.
+_CN_MAX_LEN = 64
+
+
+def _shorten_cn(agent_did: str) -> str:
+    """Produce a CN value ≤ 64 bytes from any DID.
+
+    Tries the last ``:``-delimited segment first (the agent UUID under the
+    canonical ``did:bindu:author:name:id`` shape). Falls back to a hard
+    truncation for DIDs whose tail segment is itself >64 bytes — both
+    pathways yield a stable derivative of the input.
+    """
+    last_segment = agent_did.rsplit(":", 1)[-1]
+    if 0 < len(last_segment) <= _CN_MAX_LEN:
+        return last_segment
+    return agent_did[:_CN_MAX_LEN]

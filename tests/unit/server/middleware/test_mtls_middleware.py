@@ -184,13 +184,24 @@ class TestDIDExtraction:
 
 class TestRejection:
     @pytest.mark.asyncio
-    async def test_missing_cert_with_require_client_cert_rejects(self) -> None:
+    async def test_empty_scope_passes_through_trusting_transport(self) -> None:
+        """When uvicorn doesn't expose the cert in scope, the middleware
+        trusts the TLS-layer enforcement (ssl_cert_reqs=CERT_REQUIRED).
+
+        Rationale: uvicorn 0.46 doesn't implement the ASGI TLS extension
+        for client_cert_chain. If the connection reached ASGI, uvicorn
+        already validated the cert at the handshake. Rejecting here
+        would just double-enforce, and break the request path entirely.
+        Downstream code that wants DID-based authorization needs another
+        identity source (the Hydra Bearer token in hybrid mode).
+        """
         middleware, downstream = _install_middleware(_mtls_config())
         events, send = await _collect_send()
         await middleware(_make_scope(), lambda: None, send)
-        assert not downstream.called
-        assert events[0]["type"] == "http.response.start"
-        assert events[0]["status"] == 403
+        assert downstream.called
+        # No peer DID injected — we couldn't extract one.
+        assert downstream.last_scope is not None
+        assert SCOPE_KEY_PEER_DID not in downstream.last_scope
 
     @pytest.mark.asyncio
     async def test_missing_cert_with_soft_mode_passes_through(self) -> None:
