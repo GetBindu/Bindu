@@ -19,13 +19,17 @@ Environment:
 
 import os
 
-from agno.agent import Agent
-from agno.models.openrouter import OpenRouter
 from dotenv import load_dotenv
 
-from bindu.penguin.bindufy import bindufy
-
+# Load .env BEFORE importing bindu — `bindu.settings:app_settings = Settings()`
+# is constructed at module-import time, so any MTLS__/AUTH__/HYDRA__ vars set
+# by a later load_dotenv land in os.environ but never reach the singleton.
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
+
+from agno.agent import Agent  # noqa: E402
+from agno.models.openrouter import OpenRouter  # noqa: E402
+
+from bindu.penguin.bindufy import bindufy  # noqa: E402
 
 PORT = int(os.getenv("BINDU_PORT", "5773"))
 
@@ -52,9 +56,12 @@ config = {
     "name": "joke_agent",
     "description": "Tells jokes on request. Declines anything else.",
     "deployment": {
-        "url": f"http://localhost:{PORT}",
+        # https + 127.0.0.1: matches what bindu actually serves when
+        # MTLS__ENABLED=true (peers fetching /.well-known/agent.json
+        # would otherwise see http://localhost and fail to reach back).
+        "url": f"https://127.0.0.1:{PORT}",
         "expose": True,
-        "cors_origins": ["http://localhost:5173"],
+        "cors_origins": ["http://localhost:5173", "http://localhost:3775"],
     },
     "capabilities": {"push_notifications": True},
     "global_webhook_url": "http://127.0.0.1:3787/webhooks/bindu/joke_agent",

@@ -14,11 +14,7 @@ Environment:
 
 import os
 
-from agno.agent import Agent
-from agno.models.openrouter import OpenRouter
 from dotenv import load_dotenv
-
-from bindu.penguin.bindufy import bindufy
 
 # Per-agent override: this agent demos Hydra-protected calls even when
 # the shared examples/.env keeps AUTH__ENABLED=false for the rest of the
@@ -27,7 +23,15 @@ from bindu.penguin.bindufy import bindufy
 os.environ["AUTH__ENABLED"] = "true"
 os.environ.setdefault("AUTH__PROVIDER", "hydra")
 
+# Load .env BEFORE importing bindu — `bindu.settings:app_settings = Settings()`
+# is constructed at module-import time, so any MTLS__/AUTH__/HYDRA__ vars set
+# by a later load_dotenv land in os.environ but never reach the singleton.
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
+
+from agno.agent import Agent  # noqa: E402
+from agno.models.openrouter import OpenRouter  # noqa: E402
+
+from bindu.penguin.bindufy import bindufy  # noqa: E402
 
 PORT = int(os.getenv("BINDU_PORT", "5776"))
 
@@ -55,9 +59,9 @@ config = {
     "name": "poet_agent",
     "description": "Writes short poems (max 4 lines). Declines anything else.",
     "deployment": {
-        "url": f"http://localhost:{PORT}",
+        "url": f"https://127.0.0.1:{PORT}",
         "expose": True,
-        "cors_origins": ["http://localhost:5173"],
+        "cors_origins": ["http://localhost:5173", "http://localhost:3775"],
     },
     "capabilities": {"push_notifications": True},
     "global_webhook_url": "http://127.0.0.1:3787/webhooks/bindu/poet_agent",
