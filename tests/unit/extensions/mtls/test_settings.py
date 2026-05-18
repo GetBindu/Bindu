@@ -33,6 +33,15 @@ class TestMTLSSettingsDefaults:
         # "mtls" once every deployed agent is on a cert.
         assert app_settings.mtls.mode == "hybrid"
 
+    def test_oidc_audience_matches_step_ca_client_id(self) -> None:
+        from bindu.settings import app_settings
+
+        # The string must match the ``clientID`` field in step-ca's
+        # ca-config.json. Changing one without the other 403s every sign
+        # request — that's an operator concern, but pin the default here
+        # so the symmetry is obvious from a single source of truth.
+        assert app_settings.mtls.oidc_audience == "step-ca"
+
     def test_key_filenames_are_distinct_from_did(self) -> None:
         from bindu.settings import app_settings
 

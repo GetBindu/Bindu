@@ -790,6 +790,13 @@ class MTLSSettings(BaseSettings):
     # true; ``{agent_id}`` is substituted at runtime.
     vault_path_template: str = "secret/bindu/agents/{agent_id}/mtls"
 
+    # OIDC audience that step-ca's OIDC provisioner expects in the token's
+    # ``aud`` claim. step-ca rejects sign requests whose token doesn't carry
+    # this audience, so Hydra registration and the token request both need
+    # to include it. Matches the ``clientID`` field in step-ca's
+    # ``ca-config.json`` on the infra side.
+    oidc_audience: str = "step-ca"
+
 
 class StorageSettings(BaseSettings):
     """Storage backend configuration settings.

@@ -48,6 +48,9 @@ def _build_token_provider(credentials: AgentCredentials):
             client_id=credentials.client_id,
             client_secret=credentials.client_secret,
             scope="openid",
+            # step-ca's OIDC provisioner enforces this — without an ``aud``
+            # claim matching its configured client ID the sign request 403s.
+            audience=app_settings.mtls.oidc_audience,
         )
         if not result:
             logger.error("Hydra returned no token for client %s", credentials.client_id)
