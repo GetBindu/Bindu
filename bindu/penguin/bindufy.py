@@ -595,10 +595,15 @@ def _bindufy_core(
     # Create telemetry configuration
     telemetry_config = _create_telemetry_config(validated_config)
 
-    # Create Bindu application with configs
+    # Create Bindu application with configs. `url=agent_url` is load-bearing:
+    # the agent-card endpoint reads `app.url` (not `manifest.url`) when
+    # building /.well-known/agent.json, so without this the card advertises
+    # the BinduApplication default of "http://localhost" — peers fetching
+    # the card can't reach back. See bindu/server/endpoints/agent_card.py:126.
     bindu_app = BinduApplication(
         penguin_id=agent_id,
         manifest=_manifest,
+        url=agent_url,
         version=validated_config["version"],
         auth_enabled=app_settings.auth.enabled,
         telemetry_config=telemetry_config,
