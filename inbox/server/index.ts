@@ -1813,6 +1813,18 @@ app.post("/api/me/spawn", async (c) => {
 	// route outbound through the personal agent (Phase 5).
 	if (result.row.url) {
 		AGENT_URLS["me"] = result.row.url;
+		// Also sync the ecosystem `agents` row. Each spawn picks a fresh
+		// free port, so the prior row's url goes stale immediately and
+		// the inspector (`/api/agents/:id/live`, which reads from this
+		// table) ends up fetching a dead port and surfacing "fetch
+		// failed" across all four panels.
+		writeAgent({
+			id: "me",
+			url: result.row.url,
+			did: result.row.did ?? undefined,
+			resolvedAt: new Date().toISOString(),
+			source: "manual",
+		});
 	}
 	// Phase C cold-start fix: if a gateway was already running on plain
 	// HTTP (spawned before the personal agent had a cert), SIGTERM it so
