@@ -33,7 +33,12 @@ import {
 	writeSettings,
 } from "./db";
 import { spawnPersonalAgent, stopPersonalAgent } from "./personal-agent";
-import { buildPeerDispatcher, pickFreePort, pollHealth } from "./utils";
+import {
+	buildPeerDispatcher,
+	insecureLoopbackDispatcher,
+	pickFreePort,
+	pollHealth,
+} from "./utils";
 
 // Path A: comms is the canonical record, gateway is stateless. We send
 // the most recent N user/assistant turns on every /api/plan call;
@@ -998,7 +1003,36 @@ async function spawnGatewayProcess(): Promise<GatewayHandle> {
 		};
 	}
 
-	const baseUrl = `http://127.0.0.1:${port}`;
+	// Phase C: if the personal agent has bootstrapped a cert from
+	// step-ca, pass its paths into the gateway env so the gateway can
+	// serve over TLS and present the cert on outbound A2A. The
+	// gateway shares the personal agent's identity ("co-opt"
+	// model) — same DID, same cert, simpler rotation. Phase C2 will
+	// give the gateway its own identity.
+	//
+	// Soft fallback: no cert files → plain HTTP gateway (today's
+	// behavior). The inbox handles both via insecureLoopbackDispatcher
+	// for loopback calls regardless of scheme.
+	const personalPkiDir =
+		process.env.BINDU_PERSONAL_PKI_DIR ??
+		`${process.env.HOME}/.bindu/personal/.bindu`;
+	const personalCert = `${personalPkiDir}/tls_cert.pem`;
+	const personalKey = `${personalPkiDir}/tls_key.pem`;
+	const personalCa = `${personalPkiDir}/ca_bundle.pem`;
+	const haveCert =
+		existsSync(personalCert) &&
+		existsSync(personalKey) &&
+		existsSync(personalCa);
+	const scheme = haveCert ? "https" : "http";
+	const tlsEnv: Record<string, string> = haveCert
+		? {
+				BINDU_GATEWAY_TLS_CERT: personalCert,
+				BINDU_GATEWAY_TLS_KEY: personalKey,
+				BINDU_GATEWAY_TLS_CA: personalCa,
+			}
+		: {};
+
+	const baseUrl = `${scheme}://127.0.0.1:${port}`;
 	const id = `gateway-spawned-${port}`;
 	const child = spawn("npm", ["start"], {
 		cwd: gatewayDir,
@@ -1012,6 +1046,7 @@ async function spawnGatewayProcess(): Promise<GatewayHandle> {
 			// Hydra was unreachable). When Hydra is healthy, this object
 			// is empty and the gateway uses whatever's in .env.local.
 			...hydraOverride,
+			...tlsEnv,
 		},
 		stdio: ["ignore", "pipe", "pipe"],
 		detached: false,
@@ -1338,6 +1373,10 @@ app.post("/api/plan", async (c) => {
 					if (GATEWAY_API_KEY) {
 						planHeaders.Authorization = `Bearer ${GATEWAY_API_KEY}`;
 					}
+					// Spawned gateway may be HTTPS now (Phase C — see
+					// spawnGatewayProcess). Its cert SAN is the DID, not
+					// 127.0.0.1, so we route loopback calls through the
+					// insecure dispatcher that skips hostname verify.
 					upstream = await fetch(`${gatewayUrl}/plan`, {
 						method: "POST",
 						headers: planHeaders,
@@ -1348,7 +1387,8 @@ app.post("/api/plan", async (c) => {
 							history: fullHistory,
 							prior_summary: priorSummary,
 						}),
-					});
+						dispatcher: insecureLoopbackDispatcher,
+					} as RequestInit & { dispatcher: typeof insecureLoopbackDispatcher });
 				} catch (err) {
 					fatal((err as Error).message, "gateway-unreachable");
 					return;

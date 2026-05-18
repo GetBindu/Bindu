@@ -1,4 +1,5 @@
 import { AgentCard } from "../protocol/agent-card"
+import { getPeerDispatcher } from "./mtls"
 
 /**
  * Fetch and parse a peer's AgentCard from `/.well-known/agent.json`.
@@ -56,7 +57,13 @@ export async function fetchAgentCard(
 
   try {
     const target = new URL(WELL_KNOWN_PATH, peerUrl).toString()
-    const res = await fetch(target, { signal: ac.signal })
+    const peerDispatcher = getPeerDispatcher()
+    const res = await fetch(target, {
+      signal: ac.signal,
+      ...(peerDispatcher
+        ? ({ dispatcher: peerDispatcher } as unknown as RequestInit)
+        : {}),
+    })
     if (!res.ok) {
       cache.set(peerUrl, null)
       return null

@@ -28,6 +28,7 @@
     "minimatch": "^10.2.5",
     "remeda": "2.26.0",
     "semver": "^7.6.3",
+    "undici": "^8.3.0",
     "xdg-basedir": "5.1.0",
     "zod": "4.1.8"
   },

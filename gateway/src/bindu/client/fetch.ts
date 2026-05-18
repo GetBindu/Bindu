@@ -2,6 +2,7 @@ import { buildAuthHeaders, type PeerAuth } from "../auth/resolver"
 import type { LocalIdentity } from "../identity/local"
 import type { TokenProvider } from "../identity/hydra-token"
 import { BinduError, JsonRpcResponse, type JsonRpcRequest } from "../protocol/jsonrpc"
+import { getPeerDispatcher } from "./mtls"
 
 /**
  * HTTP transport for Bindu JSON-RPC calls.
@@ -88,6 +89,12 @@ export async function rpc<T = unknown>(input: RpcInput): Promise<RpcOutcome<T>> 
       input.identity,
       input.tokenProvider,
     )
+    // Present the gateway's mTLS cert when one is configured via the
+    // BINDU_GATEWAY_TLS_* env (the inbox passes these when spawning).
+    // No cert → undefined dispatcher → default fetch behavior, fine
+    // for HTTP peers. On HTTPS peers signed by our private CA, this
+    // is what makes the handshake succeed.
+    const peerDispatcher = getPeerDispatcher()
     const resp = await fetcher(url, {
       method: "POST",
       headers: {
@@ -98,6 +105,9 @@ export async function rpc<T = unknown>(input: RpcInput): Promise<RpcOutcome<T>> 
       },
       body: bodyStr,
       signal: ac.signal,
+      ...(peerDispatcher
+        ? ({ dispatcher: peerDispatcher } as unknown as RequestInit)
+        : {}),
     })
 
     if (!resp.ok) {
