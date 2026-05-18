@@ -80,12 +80,51 @@ class TestKeyGeneration:
 class TestCSRBuilding:
     DID = "did:bindu:raahul:test:abc123"
 
-    def test_csr_contains_did_in_subject(self, store: CertStore) -> None:
+    def test_csr_cn_carries_short_identifier(self, store: CertStore) -> None:
+        """CN is the DID's last colon-delimited segment.
+
+        Full DID lands in the URI SAN (no length cap). CN gets the
+        ``agent_id`` segment so long DIDs don't blow the X.509 64-byte
+        cap. Either way, step-ca's OIDC provisioner overrides the CN
+        with the token's ``sub`` claim in the issued cert.
+        """
         private_key, _ = store.generate_keypair()
         csr_pem = store.build_csr(private_key, self.DID)
         csr = x509.load_pem_x509_csr(csr_pem)
         cn_attr = csr.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
-        assert cn_attr[0].value == self.DID
+        assert cn_attr[0].value == "abc123"  # last segment of self.DID
+
+    def test_csr_cn_truncates_when_segment_too_long(
+        self, store: CertStore, tmp_path
+    ) -> None:
+        """Pathological DIDs whose tail segment itself >64b fall back to truncation."""
+        private_key, _ = store.generate_keypair()
+        ridiculous = "did:weird:" + ("x" * 200)
+        csr_pem = store.build_csr(private_key, ridiculous)
+        csr = x509.load_pem_x509_csr(csr_pem)
+        cn = csr.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
+        assert len(cn) == 64
+
+    def test_csr_handles_real_world_long_did(self, store: CertStore) -> None:
+        """Production-shape DIDs (>64 chars) build a valid CSR.
+
+        Regression: an 80-char DID like
+        did:bindu:author@example.com:agent-name:<uuid> used to blow up
+        with ``Attribute's length must be >= 1 and <= 64`` because the
+        full DID landed in the CN.
+        """
+        private_key, _ = store.generate_keypair()
+        long_did = (
+            "did:bindu:author@example.com:realistic_agent_name:"
+            "ef87a1d5-ea3b-4c34-d590-ad07fb18f864"
+        )
+        assert len(long_did) > 64
+        # Must not raise.
+        csr_pem = store.build_csr(private_key, long_did)
+        csr = x509.load_pem_x509_csr(csr_pem)
+        # Full DID still present in URI SAN — only CN is shortened.
+        san = csr.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
+        assert long_did in san.get_values_for_type(x509.UniformResourceIdentifier)
 
     def test_csr_includes_did_as_uri_san(self, store: CertStore) -> None:
         private_key, _ = store.generate_keypair()

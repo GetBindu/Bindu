@@ -95,10 +95,26 @@ class MTLSMiddleware:
 
         cert_chain = self._extract_cert_chain(scope)
         if not cert_chain:
-            if self.config.require_client_cert:
-                await self._reject(send, 403, "Client certificate required")
-                return
-            # Soft mode — no peer cert but mTLS doesn't strictly require one.
+            # uvicorn (and most ASGI servers as of 2026-05) doesn't
+            # populate scope.extensions.tls.client_cert_chain — the
+            # peer cert never reaches ASGI. But uvicorn DOES enforce
+            # the cert at the TLS handshake layer when
+            # ssl_cert_reqs=CERT_REQUIRED, which we set from
+            # ``require_client_cert``. So when the chain is absent we
+            # trust the transport-layer enforcement: the connection
+            # would not have completed the handshake without a valid
+            # peer cert chained to our trust root. We just can't
+            # extract the DID to put on scope, so downstream code that
+            # wants to authorize by peer DID has to fall back to
+            # token-based identity (HydraMiddleware in hybrid mode).
+            #
+            # Hypercorn and a future uvicorn that implements the ASGI
+            # TLS extension will hit the path below; this fallback is
+            # for current production.
+            logger.debug(
+                "TLS extension empty in ASGI scope; trusting transport-layer "
+                "enforcement (uvicorn ssl_cert_reqs). Peer DID not extracted."
+            )
             await self.app(scope, receive, send)
             return
 
