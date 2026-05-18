@@ -174,8 +174,16 @@ export function buildLoopbackDispatcherForDid(
 			// the point of pinning. The cert object Node hands us exposes
 			// SANs as a comma-separated string in `subjectaltname`.
 			checkServerIdentity: (_hostname, cert) => {
+				// step-ca's Hydra OIDC provisioner emits the DID as a URL
+				// fragment on the issuer URL — e.g.
+				// `https://hydra.getbindu.com#did:bindu:...` — not a bare
+				// `did:bindu:...` URI. Accept both forms: a literal match,
+				// OR a fragment whose value equals expectedDid.
 				const sans = parseSans(cert.subjectaltname);
-				if (sans.includes(expectedDid)) return undefined;
+				const match = sans.some(
+					(san) => san === expectedDid || san.split("#")[1] === expectedDid,
+				);
+				if (match) return undefined;
 				return new Error(
 					`cert SAN [${sans.join(", ")}] does not include expected DID ${expectedDid}`,
 				);

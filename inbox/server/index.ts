@@ -40,6 +40,7 @@ import {
 	buildPeerDispatcher,
 	dispatcherFetch,
 	insecureLoopbackDispatcher,
+	isLoopbackHttpsUrl,
 	pickFreePort,
 	pickPeerDispatcher,
 	pollHealth,
@@ -156,20 +157,31 @@ const AGENT_ID_RE = /^[a-zA-Z0-9_-]{1,64}$/;
 
 async function fetchWellKnown(base: string) {
 	// Discovery hits the peer's HTTPS endpoint when the peer is
-	// mTLS-enabled. Present our personal-agent cert if we have one;
-	// otherwise fall through to the default dispatcher (works for
-	// HTTP peers and any HTTPS peer with a publicly-trusted cert).
-	const dispatcher = buildPeerDispatcher();
-	const init = (dispatcher ? { dispatcher } : {}) as RequestInit & {
-		dispatcher?: ReturnType<typeof buildPeerDispatcher>;
-	};
+	// mTLS-enabled. Present our personal-agent cert if we have one
+	// (peers may require client cert); otherwise fall back to the
+	// insecure-loopback dispatcher for spawned 127.0.0.1 children
+	// (their cert SAN is a DID, not the hostname); plain global
+	// fetch for HTTP peers and HTTPS peers with publicly-trusted
+	// certs.
+	//
+	// Route through dispatcherFetch whenever a dispatcher is in
+	// play — Node 22's bundled undici 6.x global fetch can't accept
+	// our pinned undici 8.x dispatcher and throws an opaque
+	// "fetch failed".
+	const peerCertDispatcher = buildPeerDispatcher();
+	const dispatcher =
+		peerCertDispatcher ??
+		(isLoopbackHttpsUrl(base) ? insecureLoopbackDispatcher : undefined);
+
+	const get = (path: string) =>
+		(dispatcher
+			? dispatcherFetch(`${base}${path}`, { dispatcher })
+			: fetch(`${base}${path}`)
+		).then((r) => (r.ok ? r.json() : null));
+
 	const [didR, cardR] = await Promise.all([
-		fetch(`${base}/.well-known/did.json`, init).then((r) =>
-			r.ok ? r.json() : null,
-		),
-		fetch(`${base}/.well-known/agent.json`, init).then((r) =>
-			r.ok ? r.json() : null,
-		),
+		get("/.well-known/did.json"),
+		get("/.well-known/agent.json"),
 	]);
 	return { did: didR as unknown, agentCard: cardR as unknown };
 }
@@ -349,12 +361,15 @@ app.get("/api/agents/:agentId/live", async (c) => {
 	const dispatcher = pickPeerDispatcher(base, expectedDid);
 
 	const fetchJson = async (path: string) => {
-		const r = await fetch(
-			`${base}${path}`,
-			(dispatcher ? { dispatcher } : {}) as RequestInit & {
-				dispatcher?: typeof insecureLoopbackDispatcher;
-			},
-		);
+		// When the personal agent serves HTTPS (mTLS on), `dispatcher` is the
+		// DID-pinned loopback agent; global `fetch` (Node-bundled undici 6.x)
+		// can't accept our pinned undici 8.x dispatcher and throws an opaque
+		// "fetch failed". Route through dispatcherFetch (undici.fetch) when
+		// we have one; fall back to global fetch on plain HTTP for external
+		// peers that don't need a dispatcher.
+		const r = dispatcher
+			? await dispatcherFetch(`${base}${path}`, { dispatcher })
+			: await fetch(`${base}${path}`);
 		if (!r.ok) throw new Error(`${path} → HTTP ${r.status}`);
 		return r.json();
 	};
