@@ -1,3 +1,4 @@
+import { fetch as undiciFetch } from "undici"
 import { buildAuthHeaders, type PeerAuth } from "../auth/resolver"
 import type { LocalIdentity } from "../identity/local"
 import type { TokenProvider } from "../identity/hydra-token"
@@ -67,7 +68,14 @@ export interface RpcFailure {
 export type RpcOutcome<T = unknown> = RpcSuccess<T> | RpcFailure
 
 export async function rpc<T = unknown>(input: RpcInput): Promise<RpcOutcome<T>> {
-  const fetcher = input.fetch ?? fetch
+  // Pick fetch flavor based on whether we'll pass an undici dispatcher.
+  // Node 22's bundled undici 6.x global fetch throws an opaque
+  // "fetch failed" when handed our pinned undici 8.x Agent — must route
+  // through undici.fetch in that case. Tests can still inject their own
+  // fetcher via input.fetch.
+  const peerDispatcher = getPeerDispatcher()
+  const fetcher =
+    input.fetch ?? (peerDispatcher ? (undiciFetch as typeof fetch) : fetch)
   const url = stripTrailingSlash(input.peerUrl) + "/"
   const timeoutMs = input.timeoutMs ?? 60_000
 
@@ -89,12 +97,11 @@ export async function rpc<T = unknown>(input: RpcInput): Promise<RpcOutcome<T>> 
       input.identity,
       input.tokenProvider,
     )
-    // Present the gateway's mTLS cert when one is configured via the
-    // BINDU_GATEWAY_TLS_* env (the inbox passes these when spawning).
-    // No cert → undefined dispatcher → default fetch behavior, fine
-    // for HTTP peers. On HTTPS peers signed by our private CA, this
-    // is what makes the handshake succeed.
-    const peerDispatcher = getPeerDispatcher()
+    // peerDispatcher was resolved at the top of the function so we
+    // could pick the right fetch flavor. Present the gateway's mTLS
+    // cert when one is configured via the BINDU_GATEWAY_TLS_* env
+    // (the inbox passes these when spawning). No cert → undefined
+    // dispatcher → default fetch behavior, fine for HTTP peers.
     const resp = await fetcher(url, {
       method: "POST",
       headers: {

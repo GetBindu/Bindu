@@ -1,3 +1,4 @@
+import { fetch as undiciFetch } from "undici"
 import { AgentCard } from "../protocol/agent-card"
 import { getPeerDispatcher } from "./mtls"
 
@@ -58,7 +59,11 @@ export async function fetchAgentCard(
   try {
     const target = new URL(WELL_KNOWN_PATH, peerUrl).toString()
     const peerDispatcher = getPeerDispatcher()
-    const res = await fetch(target, {
+    // Route through undici.fetch when a dispatcher is in play —
+    // Node 22's bundled undici 6.x global fetch throws an opaque
+    // "fetch failed" when handed our pinned undici 8.x Agent.
+    const fetcher = peerDispatcher ? (undiciFetch as typeof fetch) : fetch
+    const res = await fetcher(target, {
       signal: ac.signal,
       ...(peerDispatcher
         ? ({ dispatcher: peerDispatcher } as unknown as RequestInit)
