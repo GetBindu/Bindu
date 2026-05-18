@@ -38,7 +38,10 @@ export function DraftList() {
 						<div className="min-w-0 flex-1">
 							<div className="flex items-center gap-2">
 								<span className="truncate text-[13px] font-semibold text-fg">
-									To: {d.agentId}
+									To:{" "}
+									{d.agentIds.length === 1
+										? d.agentIds[0]
+										: `${d.agentIds.length} agents`}
 								</span>
 								<span className="rounded-full bg-rose-50 px-1.5 py-0.5 text-[10px] font-medium text-rose-700">
 									Draft

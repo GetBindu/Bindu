@@ -253,7 +253,65 @@ case_Q13() {
 EOF
 }
 
-ALL_CASES=(Q1 Q2 Q3 Q4 Q5 Q6 Q7 Q8 Q9 Q10 Q11 Q12 Q_MULTIHOP)
+# --------------------------------------------------------------------
+# Inbox-reproduction regression cases.
+#
+# These three cases mirror bugs first observed in the operator inbox
+# (compound prompt produced only one agent's reply; turn-2 follow-up
+# stuck to turn-1's agent; resubmitting a draft after a timeout
+# double-billed). The first two pass against /plan today and exist as
+# regression guards. The third (_C) currently fails — /plan has no
+# idempotency — and is excluded from ALL_CASES so the matrix stays
+# green. Run it explicitly with `run_dup_check` (see below the matrix).
+# --------------------------------------------------------------------
+
+case_Q_INBOX_REPRO_A() {
+  # The exact prompt that surfaced the bug in the inbox log: a single
+  # message requiring TWO agents (math, then joke about the result).
+  # Today /plan handles this correctly — both task.started events fire.
+  cat <<EOF
+{
+  "question": "solve 10+10-10 and write a joke with the result.",
+  "agents": [
+    { "name": "math", "endpoint": "${MATH_URL}", ${AUTH_BLOCK},
+      "skills": [{ "id": "solve_math", "description": "Solve math problems step by step" }] },
+    { "name": "joke", "endpoint": "${JOKE_URL}", ${AUTH_BLOCK},
+      "skills": [{ "id": "tell_joke", "description": "Tell a joke on any topic" }] }
+  ]
+}
+EOF
+}
+
+case_Q_INBOX_REPRO_B() {
+  # Turn-2 routing under a multi-recipient roster. Turn 1 was a math
+  # question; turn 2 asks for a joke about that result. The planner
+  # must re-route turn 2 to joke alone, NOT stick to math. Tests that
+  # client-owned history doesn't leak sticky routing.
+  cat <<EOF
+{
+  "question": "now tell me a joke about that result.",
+  "history": [
+    { "role": "user", "parts": [{ "type": "text", "text": "what is 10+10-10?" }] },
+    { "role": "assistant", "parts": [{ "type": "text", "text": "The result of 10 + 10 - 10 is 10." }] }
+  ],
+  "agents": [
+    { "name": "math", "endpoint": "${MATH_URL}", ${AUTH_BLOCK},
+      "skills": [{ "id": "solve_math", "description": "Solve math problems step by step" }] },
+    { "name": "joke", "endpoint": "${JOKE_URL}", ${AUTH_BLOCK},
+      "skills": [{ "id": "tell_joke", "description": "Tell a joke on any topic" }] }
+  ]
+}
+EOF
+}
+
+case_Q_INBOX_REPRO_C() {
+  # Body for the duplicate-submit check. Fired twice in parallel by
+  # run_dup_check (below). Body is intentionally identical to _A so
+  # the dedup layer keys on (content, agents) instead of body diffing.
+  case_Q_INBOX_REPRO_A
+}
+
+ALL_CASES=(Q1 Q2 Q3 Q4 Q5 Q6 Q7 Q8 Q9 Q10 Q11 Q12 Q_MULTIHOP Q_INBOX_REPRO_A Q_INBOX_REPRO_B)
 
 # --------------------------------------------------------------------
 # Runner
@@ -341,7 +399,77 @@ run_case() {
   [[ "${verdict}" == "ok" ]]
 }
 
+# Idempotency check for /plan. Fires Q_INBOX_REPRO_C's body twice in
+# parallel and verifies that the gateway deduplicates: post-fix both
+# responses share the same session_id; today they don't (two separate
+# runs, double agent invocations, double bill).
+#
+# Until the gateway lands an Idempotency-Key/(session,content_hash)
+# layer, this command is expected to FAIL — it's the regression guard
+# for that Phase 2 work.
+run_dup_check() {
+  local body
+  body="$(case_Q_INBOX_REPRO_C)"
+  local out1="${LOG_DIR}/Q_INBOX_REPRO_C.1.sse"
+  local out2="${LOG_DIR}/Q_INBOX_REPRO_C.2.sse"
+
+  echo "▶ Q_INBOX_REPRO_C (parallel dup-submit)"
+
+  curl -sN --max-time 90 -o "${out1}" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer ${GATEWAY_API_KEY}" \
+    -H "Accept: text/event-stream" \
+    -X POST "${GATEWAY_URL}/plan" -d "${body}" &
+  local pid1=$!
+  curl -sN --max-time 90 -o "${out2}" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer ${GATEWAY_API_KEY}" \
+    -H "Accept: text/event-stream" \
+    -X POST "${GATEWAY_URL}/plan" -d "${body}" &
+  local pid2=$!
+  wait "${pid1}" "${pid2}"
+
+  # Extract each run's session_id from the first SSE `session` event.
+  # Pattern allows an empty session_id ([^"]*, not [^"]+) — when a duplicate
+  # request lands in the same event-loop tick as the original, the dedup
+  # responder hasn't seen the placeholder entry's sessionID populated yet.
+  # That's correct behavior; we surface it via the `duplicate` event instead.
+  local sid1 sid2 dup1 dup2 tasks1 tasks2
+  sid1=$(grep -m1 '"session_id":' "${out1}" | sed -E 's/.*"session_id":"([^"]*)".*/\1/' || true)
+  sid2=$(grep -m1 '"session_id":' "${out2}" | sed -E 's/.*"session_id":"([^"]*)".*/\1/' || true)
+  dup1=$(grep -c "^event: duplicate$" "${out1}" || true)
+  dup2=$(grep -c "^event: duplicate$" "${out2}" || true)
+  tasks1=$(grep -c "^event: task.started$" "${out1}" || true)
+  tasks2=$(grep -c "^event: task.started$" "${out2}" || true)
+
+  echo "  run1: session=${sid1:-<empty>}  duplicate=${dup1}  tasks=${tasks1}"
+  echo "  run2: session=${sid2:-<empty>}  duplicate=${dup2}  tasks=${tasks2}"
+
+  # PASS conditions (post-Phase 2 idempotency):
+  #   * either response emitted a `duplicate` SSE event, OR
+  #   * both responses share the same non-empty session_id (full replay).
+  # FAIL: two distinct non-empty sessions, both running tasks — the
+  # double-execution scenario the layer was added to prevent.
+  if (( dup1 > 0 || dup2 > 0 )); then
+    local total_tasks=$(( tasks1 + tasks2 ))
+    echo "  ✓ Q_INBOX_REPRO_C: dedup ON — duplicate event emitted; total task.started=${total_tasks}"
+    return 0
+  fi
+  if [[ -n "${sid1}" && "${sid1}" == "${sid2}" ]]; then
+    echo "  ✓ Q_INBOX_REPRO_C: dedup ON — both submits share session_id"
+    return 0
+  fi
+  echo "  ✗ Q_INBOX_REPRO_C: NO DEDUP — two distinct sessions, two billings"
+  echo "    (expected before Phase 2 idempotency lands)"
+  return 1
+}
+
 main() {
+  if [[ "${1:-}" == "dup-check" ]]; then
+    run_dup_check
+    return $?
+  fi
+
   local to_run=( )
   if [[ $# -gt 0 ]]; then
     to_run=( "$@" )

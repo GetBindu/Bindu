@@ -6,6 +6,7 @@ import { eventsInThread, shortContextId } from "~/lib/threads";
 import { EventRow } from "./EventRow";
 import { useAllEvents } from "~/lib/hooks";
 import { postJson } from "~/lib/fetch";
+import { postSse } from "~/lib/sse";
 import { OUTBOX_AGENT_ID } from "~/lib/constants";
 import type { StreamEvent } from "~/types";
 
@@ -32,12 +33,18 @@ export function ThreadView({ contextId }: Props) {
 	const counterpartyName = first?.counterparty.name ?? "—";
 	const agentLanes = Array.from(new Set(ordered.map((e) => e.agentId)));
 
-	// Derive the target agent for the reply: prefer the recipient declared
-	// on an outbound event (operator-canonical), else the first non-outbox
-	// lane (the agent processing this context). Mock-data threads have no
-	// outbound + no non-outbox lane events to draw from — replies stay
-	// disabled in that case.
-	const replyTarget = useMemo(() => deriveReplyTarget(ordered), [ordered]);
+	// Derive the full recipient set for replies. When the thread was
+	// originally a multi-agent compose, every reply should fan back out
+	// to the same roster — otherwise turn 2 sticks to whichever agent
+	// happened to answer first (the bug seen in the math+joke log: the
+	// user asked "now write a joke with the result" and the inbox sent
+	// it back to math_agent only, who correctly refused). The planner
+	// re-evaluates per turn against the full roster, so we hand it the
+	// whole set and let it pick.
+	const replyRecipients = useMemo(
+		() => deriveReplyRecipients(ordered),
+		[ordered],
+	);
 
 	return (
 		<>
@@ -88,37 +95,58 @@ export function ThreadView({ contextId }: Props) {
 				)}
 			</div>
 
-			<ReplyBox contextId={contextId} target={replyTarget} />
+			<ReplyBox contextId={contextId} recipients={replyRecipients} />
 		</>
 	);
 }
 
-function deriveReplyTarget(events: StreamEvent[]): string | null {
-	// First preference: an outbound event with to_agent_id field.
+function deriveReplyRecipients(events: StreamEvent[]): string[] {
+	// Collect every distinct recipient seen on this thread, preserving
+	// insertion order. Two sources contribute:
+	//   1. `to_agent_id` from outbound /api/compose events (one peer per
+	//      event), and `plan_agents` from `plan-question` events (the
+	//      roster of a prior multi-agent compose — recorded verbatim by
+	//      inbox/server's /api/plan handler).
+	//   2. Any non-outbox lane the thread has lit up. That covers
+	//      mock-data threads and any peer that replied without an
+	//      explicit outbound first.
+	// Without (1)'s `plan_agents`, a multi-agent thread would collapse
+	// to a single recipient on first reply — exactly the sticky-routing
+	// bug.
+	const seen = new Set<string>();
+	const out: string[] = [];
+	const add = (id: unknown) => {
+		if (typeof id !== "string" || id.length === 0) return;
+		if (seen.has(id)) return;
+		seen.add(id);
+		out.push(id);
+	};
 	for (const e of events) {
 		if (e.agentId !== OUTBOX_AGENT_ID) continue;
-		const to = e.payloadJson?.to_agent_id;
-		if (typeof to === "string" && to.length > 0) return to;
+		add(e.payloadJson?.to_agent_id);
+		const planAgents = (e.payloadJson as { plan_agents?: unknown })
+			?.plan_agents;
+		if (Array.isArray(planAgents)) for (const a of planAgents) add(a);
 	}
-	// Fallback: the first non-outbox lane is the agent processing this thread.
 	for (const e of events) {
-		if (e.agentId !== OUTBOX_AGENT_ID) return e.agentId;
+		if (e.agentId === OUTBOX_AGENT_ID) continue;
+		add(e.agentId);
 	}
-	return null;
+	return out;
 }
 
 function ReplyBox({
 	contextId,
-	target,
+	recipients,
 }: {
 	contextId: string;
-	target: string | null;
+	recipients: string[];
 }) {
 	const [text, setText] = useState("");
 	const [status, setStatus] = useState<"idle" | "sending" | "error">("idle");
 	const [errMsg, setErrMsg] = useState<string | null>(null);
 
-	if (!target) {
+	if (recipients.length === 0) {
 		return (
 			<div className="border-t border-(--color-border-soft) bg-slate-50 px-6 py-3 text-[11px] text-fg-dim">
 				Replies aren't available for this thread (no agent target identified).
@@ -126,6 +154,7 @@ function ReplyBox({
 		);
 	}
 
+	const isMulti = recipients.length >= 2;
 	const canSubmit = text.trim().length > 0 && status !== "sending";
 
 	async function handleSend(e: React.FormEvent) {
@@ -133,8 +162,57 @@ function ReplyBox({
 		if (!canSubmit) return;
 		setStatus("sending");
 		setErrMsg(null);
+
+		// Multi-recipient thread → /api/plan. The gateway's planner
+		// re-evaluates the roster per turn (verified empirically against
+		// the gateway_test_fleet: turn 2 "now tell me a joke about that
+		// result" routed to joke alone even with math also in the
+		// catalog). Passing `sessionId: contextId` keeps the thread
+		// stitched in the inbox; /api/plan also records the question as
+		// a `plan-question` outbox event for thread display.
+		//
+		// We drain the SSE so the connection closes cleanly, but ignore
+		// frame-level state — the inbox already shows live progress via
+		// webhook ingestion from each peer agent. This keeps ReplyBox
+		// thin (no embedded planner UI) and matches its compose-modal
+		// counterpart's "fire and let the webhooks paint" behavior.
+		if (isMulti) {
+			try {
+				const res = await postSse(
+					"/api/plan",
+					{
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({
+							question: text.trim(),
+							agentIds: recipients,
+							sessionId: contextId,
+						}),
+					},
+					() => {},
+				);
+				if (!res.ok) {
+					const j = (await res.json().catch(() => ({}))) as {
+						detail?: string;
+						error?: string;
+					};
+					setStatus("error");
+					setErrMsg(j.detail ?? j.error ?? `HTTP ${res.status}`);
+					return;
+				}
+			} catch (err) {
+				setStatus("error");
+				setErrMsg((err as Error).message);
+				return;
+			}
+			setText("");
+			setStatus("idle");
+			return;
+		}
+
+		// Single-recipient thread → direct A2A.
 		const r = await postJson("/api/compose", {
-			agentId: target,
+			agentId: recipients[0],
 			text: text.trim(),
 			contextId,
 		});
@@ -147,6 +225,10 @@ function ReplyBox({
 		setStatus("idle");
 	}
 
+	const replyingTo = isMulti
+		? `${recipients.length} agents`
+		: recipients[0];
+
 	return (
 		<form
 			onSubmit={handleSend}
@@ -154,7 +236,7 @@ function ReplyBox({
 		>
 			<div className="mb-1.5 flex items-center justify-between text-[10px] text-fg-dim">
 				<span>
-					Replying to <span className="text-fg-muted">{target}</span> on this thread
+					Replying to <span className="text-fg-muted">{replyingTo}</span> on this thread
 				</span>
 				{status === "error" && errMsg && (
 					<span className="text-rose-700">✗ {errMsg}</span>

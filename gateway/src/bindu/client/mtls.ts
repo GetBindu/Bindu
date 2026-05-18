@@ -25,8 +25,19 @@
  * the same caller. Tenant separation lives at a future Phase C2 where
  * the gateway gets its own DID.
  */
-import { existsSync, readFileSync, statSync } from "node:fs"
+import { existsSync, readFileSync, statSync, watchFile, unwatchFile, type Stats } from "node:fs"
+import type { Server as HttpsServer } from "node:https"
+import tls from "node:tls"
 import { Agent } from "undici"
+
+/** Trust bundle = our private step-ca + Node's default Mozilla roots.
+ *  Setting `ca` on undici.Agent.connect REPLACES the default CA store;
+ *  without this concat, gateway calls to public-CA peers would fail
+ *  with UNABLE_TO_VERIFY_LEAF_SIGNATURE. Mirrors withSystemRoots() in
+ *  inbox/server/utils.ts. */
+function withSystemRoots(caBundle: Buffer): string[] {
+  return [...tls.rootCertificates, caBundle.toString("utf8")]
+}
 
 const CERT_ENV = "BINDU_GATEWAY_TLS_CERT"
 const KEY_ENV = "BINDU_GATEWAY_TLS_KEY"
@@ -63,6 +74,44 @@ export function getServerTLSOptions(): TLSServerOptions | undefined {
   }
 }
 
+/**
+ * Watch the TLS cert file and swap the live https.Server's secure context
+ * in-place when step-ca rotates it (~every 16h).
+ *
+ * Without this, `getServerTLSOptions()` is consulted exactly once at boot
+ * and Node's https.Server keeps serving the old cert forever. When the
+ * cert expires the TLS handshake just stops working and operators have
+ * to bounce the gateway by hand.
+ *
+ * `fs.watchFile` polls (1s default) rather than relying on inotify, which
+ * matches how step-ca's renewal CLI atomically replaces the file via
+ * write-and-rename — inotify would miss the original file's events.
+ *
+ * Returns a disposer so callers can cancel the watch on shutdown. No-op
+ * if no cert env is set (plain HTTP boot — nothing to reload).
+ */
+export function attachServerCertReloader(server: HttpsServer): () => void {
+  const paths = readEnvPaths()
+  if (!paths) return () => {}
+  let lastMtime = statSync(paths.cert).mtimeMs
+  const onChange = (curr: Stats) => {
+    if (curr.mtimeMs === lastMtime) return
+    lastMtime = curr.mtimeMs
+    const opts = getServerTLSOptions()
+    if (!opts) return
+    try {
+      server.setSecureContext(opts)
+      console.log(
+        `[bindu-gateway] reloaded TLS cert (mtime=${new Date(curr.mtimeMs).toISOString()})`,
+      )
+    } catch (err) {
+      console.error("[bindu-gateway] cert reload failed:", err)
+    }
+  }
+  watchFile(paths.cert, { interval: 60_000 }, onChange)
+  return () => unwatchFile(paths.cert, onChange)
+}
+
 let cachedPeerDispatcher: { agent: Agent; mtimeMs: number } | null = null
 
 /**
@@ -83,11 +132,12 @@ export function getPeerDispatcher(): Agent | undefined {
     connect: {
       cert: readFileSync(paths.cert),
       key: readFileSync(paths.key),
-      ca: readFileSync(paths.ca),
+      ca: withSystemRoots(readFileSync(paths.ca)),
       // Peer cert SANs are DIDs, not hostnames. Identity is enforced
       // at the application layer via X-DID-Signature (auth/resolver.ts
       // builds these for did_signed peers) and the cert chain still
-      // has to verify against our private CA bundle.
+      // has to verify against our private CA bundle (or the Mozilla
+      // bundle for public-CA peers — see withSystemRoots above).
       checkServerIdentity: () => undefined,
     },
   })

@@ -3,7 +3,8 @@ import { createServer as createHttpsServer } from "node:https"
 import { Effect, Layer, ManagedRuntime } from "effect"
 import { serve } from "@hono/node-server"
 import { Hono } from "hono"
-import { getServerTLSOptions } from "./bindu/client/mtls"
+import type { Server as HttpsServer } from "node:https"
+import { attachServerCertReloader, getServerTLSOptions } from "./bindu/client/mtls"
 import * as Config from "./config"
 import * as Bus from "./bus"
 import * as Auth from "./auth"
@@ -329,11 +330,19 @@ export async function main(): Promise<{ close: () => Promise<void> }> {
     : serve({ fetch: app.fetch, port, hostname })
   const scheme = tlsOpts ? "https" : "http"
 
+  // Hot-reload the cert in-place when step-ca rotates it. Without this
+  // the server keeps serving the original cert until expiry breaks
+  // handshakes. No-op when running plain HTTP.
+  const stopCertWatcher = tlsOpts
+    ? attachServerCertReloader(httpServer as unknown as HttpsServer)
+    : () => {}
+
   console.log(`[bindu-gateway] listening on ${scheme}://${hostname}:${port}`)
   console.log(`[bindu-gateway] session mode: ${cfg.gateway.session.mode}`)
 
   return {
     close: async () => {
+      stopCertWatcher()
       httpServer.close()
       await runtime.dispose()
     },

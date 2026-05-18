@@ -33,10 +33,15 @@ import {
 	writeSettings,
 } from "./db";
 import { spawnPersonalAgent, stopPersonalAgent } from "./personal-agent";
+// `dispatcherFetch` MUST be used whenever an undici dispatcher is passed —
+// Node's bundled undici (6.x) global fetch and our pinned undici@8 dispatcher
+// don't interop. See utils.ts.
 import {
 	buildPeerDispatcher,
+	dispatcherFetch,
 	insecureLoopbackDispatcher,
 	pickFreePort,
+	pickPeerDispatcher,
 	pollHealth,
 } from "./utils";
 
@@ -167,6 +172,24 @@ async function fetchWellKnown(base: string) {
 		),
 	]);
 	return { did: didR as unknown, agentCard: cardR as unknown };
+}
+
+/** Pull the DID string for a given agentId, normalising between the two
+ *  shapes the inbox stores DIDs in:
+ *    - `me` (personal agent): a flat string in personal_agent.did
+ *    - everyone else: a parsed DID document object in agents.did with `.id`
+ *  Used by pickPeerDispatcher() callers to enable Option C identity
+ *  pinning when the DID is known, with insecure-loopback fallback during
+ *  the cold-start window when it isn't. Returns null when no DID is on
+ *  record (typical for HTTP peers, ecosystem agents the inbox hasn't
+ *  resolved yet, etc.). */
+function resolveExpectedDid(
+	agentId: string,
+	row?: AgentRecord | null,
+): string | null {
+	if (agentId === "me") return readPersonalAgent()?.did ?? null;
+	const did = (row?.did as { id?: string } | null)?.id;
+	return typeof did === "string" ? did : null;
 }
 
 async function resolveAgent(
@@ -317,8 +340,21 @@ app.get("/api/agents/:agentId/live", async (c) => {
 	if (!base) {
 		return c.json({ error: "no-url-for-agent", id }, 404);
 	}
+
+	// pickPeerDispatcher handles three cases: DID-pinned for known-DID
+	// loopback children, insecure-loopback fallback during the cold-start
+	// window, and undefined (default fetch with system CA roots) for
+	// external peers. See utils.ts for the matrix.
+	const expectedDid = resolveExpectedDid(id, row);
+	const dispatcher = pickPeerDispatcher(base, expectedDid);
+
 	const fetchJson = async (path: string) => {
-		const r = await fetch(`${base}${path}`);
+		const r = await fetch(
+			`${base}${path}`,
+			(dispatcher ? { dispatcher } : {}) as RequestInit & {
+				dispatcher?: typeof insecureLoopbackDispatcher;
+			},
+		);
 		if (!r.ok) throw new Error(`${path} → HTTP ${r.status}`);
 		return r.json();
 	};
@@ -787,14 +823,21 @@ app.post("/api/compose", async (c) => {
 	try {
 		const rpcBody = JSON.stringify(rpc);
 		const peerDispatcher = buildPeerDispatcher();
-		const r = await fetch(base, {
-			method: "POST",
-			headers: await a2aHeaders(rpcBody),
-			body: rpcBody,
-			...(peerDispatcher
-				? ({ dispatcher: peerDispatcher } as unknown as RequestInit)
-				: {}),
-		});
+		// Dispatcher path goes through undici's fetch (must match the
+		// Agent's undici version); the no-dispatcher branch keeps global
+		// fetch so we don't shadow it for the whole file.
+		const r = peerDispatcher
+			? await dispatcherFetch(base, {
+					method: "POST",
+					headers: await a2aHeaders(rpcBody),
+					body: rpcBody,
+					dispatcher: peerDispatcher,
+				})
+			: await fetch(base, {
+					method: "POST",
+					headers: await a2aHeaders(rpcBody),
+					body: rpcBody,
+				});
 		upstreamStatus = r.status;
 		upstreamBody = await r.json().catch(() => null);
 	} catch (err) {
@@ -866,7 +909,16 @@ app.post("/api/compose", async (c) => {
  * comms exits, SIGTERM cascades. We intentionally don't try to
  * persist these across restarts; that's a phase-3 concern.
  */
-const spawnedGateways = new Map<string, ChildProcess>();
+interface SpawnedGateway {
+	child: ChildProcess;
+	/** True iff this gateway was started with BINDU_GATEWAY_TLS_* in its
+	 * env (Phase C). False means it serves plain HTTP and presents no
+	 * client cert on outbound A2A. We track this so that when the personal
+	 * agent comes up AFTER a gateway was already spawned, recycleStaleGateways
+	 * can SIGTERM the HTTP one so the next /api/plan respawns it with TLS. */
+	hasTls: boolean;
+}
+const spawnedGateways = new Map<string, SpawnedGateway>();
 
 type GatewayHandle =
 	| {
@@ -954,9 +1006,9 @@ async function spawnGatewayProcess(): Promise<GatewayHandle> {
 	// Idempotency: reuse an alive spawned gateway if we have one.
 	// Misclick-protection; also makes a second /api/plan call within a
 	// session land on the same process so session continuity holds.
-	for (const [id, child] of spawnedGateways.entries()) {
+	for (const [id, entry] of spawnedGateways.entries()) {
 		const row = readAgent(id);
-		if (row?.url && child.exitCode === null) {
+		if (row?.url && entry.child.exitCode === null) {
 			const alive = await pollHealth(row.url, 1000);
 			if (alive) {
 				return {
@@ -1084,7 +1136,7 @@ async function spawnGatewayProcess(): Promise<GatewayHandle> {
 	writeAgent({ id, url: baseUrl, source: "manual", addedAt });
 	resolveAgent(id).catch(() => {});
 
-	spawnedGateways.set(id, child);
+	spawnedGateways.set(id, { child, hasTls: haveCert });
 	child.once("exit", () => {
 		spawnedGateways.delete(id);
 		// Drop the row from Contacts too — otherwise the sidebar keeps
@@ -1129,7 +1181,7 @@ async function ensureGateway(): Promise<GatewayHandle> {
 // Without this, child processes outlive their parent and the operator
 // has to `pkill -f 'gateway/src/index.ts'` to clean up.
 const cleanupSpawned = () => {
-	for (const child of spawnedGateways.values()) {
+	for (const { child } of spawnedGateways.values()) {
 		if (child.exitCode === null) {
 			try {
 				child.kill("SIGTERM");
@@ -1142,6 +1194,31 @@ const cleanupSpawned = () => {
 	// is safe even if nothing's running.
 	stopPersonalAgent();
 };
+
+/** SIGTERM any spawned gateway that was started before the personal
+ *  agent had a cert on disk. These gateways serve plain HTTP and
+ *  present no client cert outbound — once the personal agent is up
+ *  with mTLS the next /api/plan would route to a stale HTTP gateway,
+ *  silently losing Phase C end-to-end. We kill them so the next
+ *  spawnGatewayProcess re-evaluates `haveCert` and boots over TLS.
+ *
+ *  Safe to call repeatedly: gateways already on TLS are left alone,
+ *  and a freshly-killed gateway's `exit` listener cleans up the map
+ *  + the Contacts row. */
+function recycleStaleGateways(): number {
+	let killed = 0;
+	for (const { child, hasTls } of spawnedGateways.values()) {
+		if (hasTls) continue;
+		if (child.exitCode !== null) continue;
+		try {
+			child.kill("SIGTERM");
+			killed += 1;
+		} catch {
+			/* already exiting — ignore */
+		}
+	}
+	return killed;
+}
 process.once("SIGINT", () => {
 	cleanupSpawned();
 	process.exit(0);
@@ -1262,10 +1339,22 @@ app.post("/api/plan", async (c) => {
 					const row = readAgent(id);
 					if (!row?.url) continue;
 					let skills: SkillDescriptor[] = [];
+					// Same dispatcher selection as /api/agents/:id/live —
+					// without it, fetching /agent/skills on an HTTPS loopback
+					// agent (the personal agent under Phase A) fails TLS verify
+					// and the skill catalog quietly empties. The planner's
+					// "fewer than two callable agents" gate then trips.
+					const skillsBase = row.url.replace(/\/+$/, "");
+					const skillsDispatcher = pickPeerDispatcher(
+						skillsBase,
+						resolveExpectedDid(id, row),
+					);
 					try {
-						const r = await fetch(
-							`${row.url.replace(/\/+$/, "")}/agent/skills`,
-						);
+						const r = skillsDispatcher
+							? await dispatcherFetch(`${skillsBase}/agent/skills`, {
+									dispatcher: skillsDispatcher,
+								})
+							: await fetch(`${skillsBase}/agent/skills`);
 						if (r.ok) {
 							// Bindu's /agent/skills returns `{skills: [...], total: N}`
 							// (wrapped object). Earlier code assumed a bare array and
@@ -1377,7 +1466,7 @@ app.post("/api/plan", async (c) => {
 					// spawnGatewayProcess). Its cert SAN is the DID, not
 					// 127.0.0.1, so we route loopback calls through the
 					// insecure dispatcher that skips hostname verify.
-					upstream = await fetch(`${gatewayUrl}/plan`, {
+					upstream = await dispatcherFetch(`${gatewayUrl}/plan`, {
 						method: "POST",
 						headers: planHeaders,
 						body: JSON.stringify({
@@ -1388,7 +1477,7 @@ app.post("/api/plan", async (c) => {
 							prior_summary: priorSummary,
 						}),
 						dispatcher: insecureLoopbackDispatcher,
-					} as RequestInit & { dispatcher: typeof insecureLoopbackDispatcher });
+					});
 				} catch (err) {
 					fatal((err as Error).message, "gateway-unreachable");
 					return;
@@ -1616,14 +1705,18 @@ app.post("/api/events/:id/action", async (c) => {
 		try {
 			const msgBody = JSON.stringify(msg);
 			const peerDispatcher = buildPeerDispatcher();
-			const r = await fetch(base, {
-				method: "POST",
-				headers: await a2aHeaders(msgBody),
-				body: msgBody,
-				...(peerDispatcher
-					? ({ dispatcher: peerDispatcher } as unknown as RequestInit)
-					: {}),
-			});
+			const r = peerDispatcher
+				? await dispatcherFetch(base, {
+						method: "POST",
+						headers: await a2aHeaders(msgBody),
+						body: msgBody,
+						dispatcher: peerDispatcher,
+					})
+				: await fetch(base, {
+						method: "POST",
+						headers: await a2aHeaders(msgBody),
+						body: msgBody,
+					});
 			return c.json({ ok: r.ok, status: r.status, delivered: r.ok });
 		} catch (err) {
 			return c.json({ ok: false, error: (err as Error).message }, 502);
@@ -1720,6 +1813,17 @@ app.post("/api/me/spawn", async (c) => {
 	// route outbound through the personal agent (Phase 5).
 	if (result.row.url) {
 		AGENT_URLS["me"] = result.row.url;
+	}
+	// Phase C cold-start fix: if a gateway was already running on plain
+	// HTTP (spawned before the personal agent had a cert), SIGTERM it so
+	// the next /api/plan respawns it with BINDU_GATEWAY_TLS_* env. Without
+	// this the gateway stays HTTP for its whole lifetime, silently
+	// disabling Phase C even after the personal agent comes up healthy.
+	const recycled = recycleStaleGateways();
+	if (recycled > 0) {
+		console.log(
+			`[me/spawn] recycled ${recycled} HTTP gateway(s) so next plan respawns with TLS`,
+		);
 	}
 	return c.json(result.row);
 });

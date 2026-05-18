@@ -18,7 +18,7 @@
  * post-spawn via `/.well-known/did.json`.
  */
 
-import { type ChildProcess, spawn } from "node:child_process";
+import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync, chmodSync, openSync, closeSync } from "node:fs";
 import { resolve as pathResolve } from "node:path";
 import {
@@ -28,11 +28,22 @@ import {
 	readSettings,
 	writePersonalAgent,
 } from "./db";
-import { insecureLoopbackDispatcher, pickFreePort, pollHealth } from "./utils";
+// `dispatcherFetch` MUST be used whenever an undici dispatcher is passed —
+// Node's bundled undici (6.x) global fetch and our pinned undici@8 dispatcher
+// don't interop. See utils.ts.
+import {
+	dispatcherFetch,
+	insecureLoopbackDispatcher,
+	pickFreePort,
+	pollHealth,
+} from "./utils";
 
 /** Pick the first non-empty string from a list of candidates. Used to
- * layer "settings table → process.env → default" without `??` falling
- * through on empty strings (which `??` treats as truthy). */
+ * layer "settings table → process.env → default". `??` would short-
+ * circuit on null/undefined only, treating `""` as a real value and
+ * locking in an empty secret — this helper treats empty strings as
+ * absent, so a blank field in the Settings tab correctly falls through
+ * to the env var or default. */
 function firstNonEmpty(...vals: (string | null | undefined)[]): string {
 	for (const v of vals) if (typeof v === "string" && v.length > 0) return v;
 	return "";
@@ -264,7 +275,12 @@ config = {
     "name": "${agentName}",
     "description": f"Personal agent for {PERSONA['name']}",
     "deployment": {
-        "url": "https://localhost:${port}",
+        # 127.0.0.1, not localhost — the inbox tracks the agent URL
+        # as https://127.0.0.1:<port> and "localhost" can resolve to
+        # ::1 on some systems, which breaks loopback dispatchers that
+        # only match the IPv4 form. Cert SAN is the DID either way,
+        # so hostname verify is bypassed at the dispatcher layer.
+        "url": "https://127.0.0.1:${port}",
         "expose": True,
         "cors_origins": ["${corsOrigin}"],
     },
@@ -473,7 +489,7 @@ export async function spawnPersonalAgent(
 		? ["uv", ["run", "python", paths.agentPy]]
 		: existsSync(venvPython)
 			? [venvPython, [paths.agentPy]]
-			: [process.execPath === "" ? "python" : "python3", [paths.agentPy]];
+			: ["python3", [paths.agentPy]];
 
 	const child = spawn(argv[0], argv[1], {
 		cwd: binduRepo,
@@ -551,9 +567,9 @@ export async function spawnPersonalAgent(
 	// first — it's the cheapest probe and the response is small.
 	let did: string | null = null;
 	const loopbackFetch = (path: string) =>
-		fetch(`${baseUrl}${path}`, {
+		dispatcherFetch(`${baseUrl}${path}`, {
 			dispatcher: insecureLoopbackDispatcher,
-		} as RequestInit & { dispatcher: typeof insecureLoopbackDispatcher });
+		});
 	try {
 		const r = await loopbackFetch("/health");
 		if (r.ok) {
@@ -626,12 +642,8 @@ export function stopPersonalAgent(): { ok: boolean; wasAlive: boolean } {
  * trying to spawn it — spawn errors are async and don't compose well
  * with our spawn flow. `which uv` is synchronous and fast. */
 function commandExists(cmd: string): boolean {
-	const which = spawn.bind(null);
-	void which;
 	try {
-		const result = require("node:child_process").spawnSync("which", [cmd], {
-			stdio: "ignore",
-		}) as { status: number | null };
+		const result = spawnSync("which", [cmd], { stdio: "ignore" });
 		return result.status === 0;
 	} catch {
 		return false;
