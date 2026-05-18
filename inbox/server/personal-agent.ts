@@ -150,8 +150,9 @@ function renderAgentPy(opts: {
 	webhookUrl: string;
 	tools: PersonalAgentTools;
 	corsOrigin: string;
+	scheme: "http" | "https";
 }): string {
-	const { slug, agentName, port, webhookUrl, tools, corsOrigin } = opts;
+	const { slug, agentName, port, webhookUrl, tools, corsOrigin, scheme } = opts;
 	// Header lists the user-facing facts so a human dropping into the
 	// file knows what changed and why. Persona is loaded at runtime so
 	// the user can edit persona.json (or re-run the wizard) without
@@ -168,16 +169,25 @@ function renderAgentPy(opts: {
 # webhook:     ${webhookUrl}
 # tools:       ${Object.keys(tools).length ? Object.keys(tools).join(", ") : "(none connected)"}
 
-import json
-import os
+# Load .env BEFORE importing bindu. bindu/settings.py constructs
+# \`app_settings = Settings()\` at module import time — any env var set
+# after that import (via a later load_dotenv) lands in os.environ but
+# never makes it into the singleton. The personal agent ships with
+# MTLS__ENABLED=true; if .env loads too late, mtls.enabled defaults to
+# False, the agent silently serves plain HTTP on https://… URL, and
+# the inbox spawn poller hangs on the HTTPS handshake.
 from pathlib import Path
 
 from dotenv import load_dotenv
-from bindu.penguin.bindufy import bindufy
-from agno.agent import Agent
-from agno.models.openrouter import OpenRouter
 
 load_dotenv(Path(__file__).parent / ".env")
+
+import json  # noqa: E402
+import os  # noqa: E402
+
+from agno.agent import Agent  # noqa: E402
+from agno.models.openrouter import OpenRouter  # noqa: E402
+from bindu.penguin.bindufy import bindufy  # noqa: E402
 
 PERSONA = json.loads((Path(__file__).parent / "persona.json").read_text())
 
@@ -276,11 +286,11 @@ config = {
     "description": f"Personal agent for {PERSONA['name']}",
     "deployment": {
         # 127.0.0.1, not localhost — the inbox tracks the agent URL
-        # as https://127.0.0.1:<port> and "localhost" can resolve to
+        # as <scheme>://127.0.0.1:<port> and "localhost" can resolve to
         # ::1 on some systems, which breaks loopback dispatchers that
-        # only match the IPv4 form. Cert SAN is the DID either way,
+        # only match the IPv4 form. With mTLS on, cert SAN is the DID,
         # so hostname verify is bypassed at the dispatcher layer.
-        "url": "https://127.0.0.1:${port}",
+        "url": "${scheme}://127.0.0.1:${port}",
         "expose": True,
         "cors_origins": ["${corsOrigin}"],
     },
@@ -393,6 +403,14 @@ export async function spawnPersonalAgent(
 		pipedreamAccessToken = (await mintPipedreamAccessToken().catch(() => "")) ?? "";
 	}
 
+	// mTLS is gated behind BINDU_PERSONAL_MTLS=1. Default off because the
+	// public Hydra (hydra.getbindu.com) doesn't currently whitelist the
+	// `step-ca` audience that the OIDC provisioner requires — bootstrap
+	// fails, bindu silently falls back to plain HTTP, and the spawner
+	// (which polls https://) hangs forever. Once Hydra is configured to
+	// accept aud=step-ca on client_credentials grants, flip this on (or
+	// expose it via the Settings tab).
+	const mtlsEnabled = process.env.BINDU_PERSONAL_MTLS === "1";
 	writePersona(paths, row.persona);
 	writeEnvFile(paths, {
 		OPENROUTER_API_KEY: openrouterKey,
@@ -416,15 +434,7 @@ export async function spawnPersonalAgent(
 			process.env.HYDRA__ADMIN_URL ?? "https://hydra-admin.getbindu.com",
 		HYDRA__PUBLIC_URL:
 			process.env.HYDRA__PUBLIC_URL ?? "https://hydra.getbindu.com",
-		// mTLS is on by default for every personal agent. The agent
-		// exchanges its Hydra OIDC token (audience=step-ca) for a 24h
-		// X.509 cert from step-ca and serves uvicorn over TLS.
-		// REQUIRE_CLIENT_CERT is soft for now — the inbox itself talks
-		// to its own agent on loopback without presenting a client cert
-		// (Phase B will flip that). Mode "hybrid" keeps Hydra
-		// introspection on inbound so the auth gate still has identity
-		// to work with even when no peer cert reaches the middleware.
-		MTLS__ENABLED: "true",
+		MTLS__ENABLED: mtlsEnabled ? "true" : "false",
 		MTLS__MODE: "hybrid",
 		MTLS__REQUIRE_CLIENT_CERT: "false",
 		MTLS__CA_URL: process.env.MTLS__CA_URL ?? "https://ca.getbindu.com",
@@ -443,6 +453,7 @@ export async function spawnPersonalAgent(
 			webhookUrl,
 			tools: row.tools,
 			corsOrigin,
+			scheme: mtlsEnabled ? "https" : "http",
 		}),
 		"utf8",
 	);
@@ -468,11 +479,12 @@ export async function spawnPersonalAgent(
 		};
 	}
 
-	// Personal agents serve over HTTPS now (mTLS by default — see the
-	// MTLS__* env vars below). The cert is real, but its SAN is the DID,
-	// not 127.0.0.1, so callers on the loopback skip hostname
-	// verification via insecureLoopbackDispatcher.
-	const baseUrl = `https://127.0.0.1:${port}`;
+	// Scheme follows mtlsEnabled (see writeEnvFile above). With mTLS on,
+	// the cert is real but its SAN is the DID, not 127.0.0.1 — callers
+	// on the loopback skip hostname verification via
+	// insecureLoopbackDispatcher. With mTLS off, plain HTTP loopback.
+	const scheme = mtlsEnabled ? "https" : "http";
+	const baseUrl = `${scheme}://127.0.0.1:${port}`;
 	const now = new Date().toISOString();
 	writePersonalAgent({
 		...row,
