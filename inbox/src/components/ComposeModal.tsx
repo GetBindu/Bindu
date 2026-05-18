@@ -17,7 +17,7 @@ import { ModalCloseButton } from "./ModalCloseButton";
 import { postJson } from "~/lib/fetch";
 import { postSse } from "~/lib/sse";
 import { OUTBOX_AGENT_ID } from "~/lib/constants";
-import { shortDid } from "~/lib/format";
+import { didToEmail, shortDid } from "~/lib/format";
 import type { EcosystemAgent, PersonalAgent } from "~/lib/api-types";
 
 interface Props {
@@ -672,7 +672,7 @@ function FromDidStrip({ me }: { me: PersonalAgent | null | undefined }) {
 					<span className="text-fg">{personaName ?? "you"}</span>
 				</div>
 				<code className="truncate text-fg-dim" title={me.did}>
-					{shortDid(me.did, 8)}
+					{didToEmail(me.did) ?? shortDid(me.did, 8)}
 				</code>
 			</div>
 		);

@@ -18,7 +18,7 @@ import {
 	IdentificationCardIcon,
 } from "@phosphor-icons/react";
 import { useUI } from "~/state";
-import { shortDid } from "~/lib/format";
+import { didToEmail, shortDid } from "~/lib/format";
 import { isGateway } from "~/lib/agent-kind";
 import { AddAgentModal } from "./AddAgentModal";
 import { AgentInfoModal } from "./AgentInfoModal";
@@ -328,8 +328,11 @@ function ContactRow({
 	const name = agent.agentCard?.name ?? agent.id;
 	const didFromCard = pickDidFromCard(agent.agentCard);
 	const realDid = agent.did?.id ?? didFromCard;
+	// Prefer the Gmail-shape email rendering of the DID (joke_agent rendered
+	// as gateway_test_fleet+joke_agent@getbindu.com). Falls back to the
+	// truncated DID for non-bindu DID methods, then to the URL.
 	const subline = realDid
-		? shortDid(realDid)
+		? (didToEmail(realDid) ?? shortDid(realDid))
 		: agent.url ?? "no URL yet";
 	return (
 		<div
@@ -522,7 +525,9 @@ function PersonalAgentAliveCard({ me }: { me: PersonalAgent }) {
 						className="truncate text-[10px] text-fg-dim"
 						title={me.did ?? undefined}
 					>
-						{me.did ? shortDid(me.did) : "DID generated on start"}
+						{me.did
+							? (didToEmail(me.did) ?? shortDid(me.did))
+							: "DID generated on start"}
 					</div>
 				</div>
 				{status !== "alive" && status !== "starting" && (

@@ -11,6 +11,7 @@ import { Modal } from "./Modal";
 import { ModalCloseButton } from "./ModalCloseButton";
 import { isGateway as isGatewayByName } from "~/lib/agent-kind";
 import type { EcosystemAgent } from "~/lib/api-types";
+import { didToEmail } from "~/lib/format";
 
 interface Props {
 	open: boolean;
@@ -104,7 +105,11 @@ export function AgentInfoModal({ open, onClose, agent }: Props) {
 		agent.agentCard?.name ??
 		agent.id;
 	const did = agent.did?.id ?? null;
-	const subline = did ?? agent.url ?? agent.id;
+	// Prefer the Gmail-shape rendering of the DID; the full DID lives in
+	// the title attribute below so power users can still copy the raw
+	// form. Non-bindu DIDs (didToEmail returns null) fall through to the
+	// raw DID; non-DID agents (HTTP peers, mocks) fall through to URL/id.
+	const subline = (did && didToEmail(did)) ?? did ?? agent.url ?? agent.id;
 
 	const skills =
 		snap?.skills.ok && Array.isArray(snap.skills.data) ? snap.skills.data : [];
@@ -134,7 +139,10 @@ export function AgentInfoModal({ open, onClose, agent }: Props) {
 						<h2 className="truncate text-[14px] font-medium text-slate-900">
 							{cardName}
 						</h2>
-						<div className="truncate font-mono text-[10px] text-slate-500">
+						<div
+							className="truncate font-mono text-[10px] text-slate-500"
+							title={did ?? undefined}
+						>
 							{subline}
 						</div>
 					</div>

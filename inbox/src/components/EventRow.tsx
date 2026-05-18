@@ -2,7 +2,7 @@ import { useState } from "react";
 import clsx from "clsx";
 import { InfoIcon, PaperPlaneTiltIcon } from "@phosphor-icons/react";
 import { useUI } from "~/state";
-import { kindGlyph, shortDid, stateMeta, trustMeta } from "~/lib/format";
+import { didToEmail, kindGlyph, shortDid, stateMeta, trustMeta } from "~/lib/format";
 import { postJson } from "~/lib/fetch";
 import type { StreamEvent } from "~/types";
 
@@ -42,8 +42,12 @@ export function EventRow({ event, attentionLane }: Props) {
 				<div className="min-w-0 flex-1">
 					<div className="flex flex-wrap items-center gap-x-2 gap-y-1">
 						<span className="text-[13px] text-fg">{event.counterparty.name}</span>
-						<span className="text-[10px] text-fg-dim">
-							{shortDid(event.counterparty.did)}
+						<span
+							className="text-[10px] text-fg-dim"
+							title={event.counterparty.did}
+						>
+							{didToEmail(event.counterparty.did) ??
+								shortDid(event.counterparty.did)}
 						</span>
 						<span
 							className={clsx(
