@@ -126,6 +126,31 @@ class ManifestWorker(Worker):
 
         await TaskStateManager.validate_task_state(task)
 
+        # Settle BEFORE doing any work (settle-first ordering).
+        #
+        # Rationale: x402 `/verify` is a probabilistic check, not a reservation —
+        # the payer's balance can change between verify and settle, and parallel
+        # nonces from the same wallet can pass verify independently. If we settle
+        # only after the LLM call, every failed settle costs the agent the LLM
+        # bill. Settling first means a failed settle has zero LLM cost.
+        #
+        # Google A2A's x402 extension takes the same approach for long-running
+        # tasks; the latency is dominated by the LLM call anyway, so happy-path
+        # wall-clock is unchanged.
+        settlement_metadata: dict[str, Any] | None = None
+        if payment_context:
+            settlement_metadata = await self._settle_payment(payment_context)
+            settled_ok = (
+                settlement_metadata.get(app_settings.x402.meta_status_key)
+                == app_settings.x402.status_completed
+            )
+            if not settled_ok:
+                # No state transition to "working", no LLM call — just record
+                # the failure and exit. Reconciliation metadata is already in
+                # settlement_metadata (nonce, authorization, network).
+                await self._handle_settlement_failure(task, settlement_metadata)
+                return
+
         # Add span event for state transition
         self._add_state_change_event(to_state="working")
 
@@ -216,7 +241,7 @@ class ManifestWorker(Worker):
                 # Add span event for state transition
                 self._add_state_change_event(from_state="working", to_state=state)
                 await self._handle_terminal_state(
-                    task, results, state, payment_context=payment_context
+                    task, results, state, settlement_metadata=settlement_metadata
                 )
 
         except Exception as e:
@@ -225,7 +250,13 @@ class ManifestWorker(Worker):
             self._add_state_change_event(
                 from_state="working", to_state="failed", error=str(e)
             )
-            await self._handle_task_failure(task, str(e))
+            # If we already debited the payer (settle-first succeeded), the work
+            # failure is an "orphan payment" — money moved, no artifact delivered.
+            # x402 has no native refund; persist enough metadata for an operator
+            # to issue a manual transfer back.
+            await self._handle_task_failure(
+                task, str(e), settlement_metadata=settlement_metadata
+            )
             raise
         return
 
@@ -440,7 +471,7 @@ class ManifestWorker(Worker):
         results: Any,
         state: TaskState = "completed",
         additional_metadata: dict[str, Any] | None = None,
-        payment_context: dict[str, Any] | None = None,
+        settlement_metadata: dict[str, Any] | None = None,
     ) -> None:
         """Handle terminal task states (completed/failed).
 
@@ -455,15 +486,16 @@ class ManifestWorker(Worker):
         - Task becomes immutable after reaching terminal state
 
         X402 Payment Flow:
-        - If payment_context is provided and state is completed, settle payment
-        - Payment settlement happens ONLY when task successfully completes
+        - Settlement happens upfront in run_task (settle-first), so by the time
+          we get here the payer has already been debited. We just attach the
+          settlement metadata (receipts) to the task.
 
         Args:
             task: Task dict being finalized
             results: Agent execution results
             state: Terminal state (completed or failed)
             additional_metadata: Optional metadata to attach to task
-            payment_context: Optional payment details from x402 middleware
+            settlement_metadata: Pre-settled payment metadata from run_task
 
         Raises:
             ValueError: If state is not a terminal state
@@ -484,22 +516,10 @@ class ManifestWorker(Worker):
             )
             artifacts = self.build_artifacts(results)
 
-            # Handle payment settlement if payment context is available.
-            # Verify-ok does not imply settle-ok: between verify and settle the
-            # payer can double-spend, the facilitator can fail, or the EIP-3009
-            # validBefore window can lapse. If settlement does not succeed,
-            # withhold the artifact and mark the task failed — otherwise the
-            # client walks away with paid output the agent never got paid for
-            # (issue #562).
-            if payment_context:
-                settlement_metadata = await self._settle_payment(payment_context)
-                settled_ok = (
-                    settlement_metadata.get(app_settings.x402.meta_status_key)
-                    == app_settings.x402.status_completed
-                )
-                if not settled_ok:
-                    await self._handle_settlement_failure(task, settlement_metadata)
-                    return
+            # Attach pre-settled payment metadata (receipts, tx hash) to the task.
+            # Settlement itself happened upfront in run_task; if it had failed we
+            # would not be in the "completed" branch.
+            if settlement_metadata:
                 if additional_metadata:
                     additional_metadata.update(settlement_metadata)
                 else:
@@ -544,25 +564,23 @@ class ManifestWorker(Worker):
     async def _handle_settlement_failure(
         self, task: Task, settlement_metadata: dict[str, Any]
     ) -> None:
-        """Mark task failed after settlement failure; withhold the paid artifact.
+        """Mark task failed because settle-first rejected the payment.
 
-        Called from the completed branch when ``_settle_payment`` reports a
-        non-success status. The agent already did the work, so we cannot
-        recover the LLM cost — but we can refuse to deliver the artifact to
-        the unpaid client. ``settlement_metadata`` carries the recovery
-        fields (nonce, authorization, network) that an operator/reconciler
-        needs to reason about the on-chain state.
+        Called from run_task BEFORE the task transitions to "working" — so
+        no LLM call ran, no artifact was generated, nothing to withhold.
+        ``settlement_metadata`` carries the recovery fields (nonce,
+        authorization, network) for operator visibility.
         """
         error_text = settlement_metadata.get(
             app_settings.x402.meta_error_key, "settlement failed"
         )
         error_message = MessageConverter.to_protocol_messages(
-            f"Payment settlement failed; output withheld. Reason: {error_text}",
+            f"Payment settlement failed; task not executed. Reason: {error_text}",
             task["id"],
             task["context_id"],
         )
         self._add_state_change_event(
-            from_state="working", to_state="failed", error="settlement_failed"
+            from_state="submitted", to_state="failed", error="settlement_failed"
         )
         await self.storage.update_task(
             task["id"],
@@ -572,7 +590,12 @@ class ManifestWorker(Worker):
         )
         await self._notify_lifecycle(task["id"], task["context_id"], "failed", True)
 
-    async def _handle_task_failure(self, task: Task, error: str) -> None:
+    async def _handle_task_failure(
+        self,
+        task: Task,
+        error: str,
+        settlement_metadata: dict[str, Any] | None = None,
+    ) -> None:
         """Handle task execution failure.
 
         Creates an error message and marks task as failed without artifacts.
@@ -581,15 +604,32 @@ class ManifestWorker(Worker):
         - Error message added to task.history
         - Task marked as failed (terminal state)
 
+        X402 Orphan-Payment Handling:
+        - Under settle-first, work failure happens AFTER the payer has been
+          debited on-chain. We cannot auto-refund (x402 has no refund
+          primitive), so we flag the payment as ``payment-orphaned`` and
+          persist the EIP-3009 fields so an operator can issue a manual
+          transfer back to the payer.
+
         Args:
             task: Task that failed
             error: Error description
+            settlement_metadata: Pre-settled payment metadata, if present
         """
         error_message = MessageConverter.to_protocol_messages(
             f"Task execution failed: {error}", task["id"], task["context_id"]
         )
+        metadata: dict[str, Any] | None = None
+        if settlement_metadata:
+            # Re-tag the status — the payment itself succeeded, but the work
+            # didn't, so this is a refund-required state, not a settlement
+            # failure. The receipts and EIP-3009 fields stay intact.
+            metadata = {
+                **settlement_metadata,
+                app_settings.x402.meta_status_key: "payment-orphaned",
+            }
         await self.storage.update_task(
-            task["id"], state="failed", new_messages=error_message
+            task["id"], state="failed", new_messages=error_message, metadata=metadata
         )
         await self._notify_lifecycle(task["id"], task["context_id"], "failed", True)
 
