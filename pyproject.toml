@@ -71,6 +71,7 @@ dependencies = [
 agents = [
     "ag2[openai]>=0.11.0",
     "agno>=2.5.2",
+    "crewai>=0.130.0",
     "langchain>=1.2.9",
     "langchain-openai>=1.1.8",
     "langgraph>=1.0.8",

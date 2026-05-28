@@ -43,6 +43,7 @@ Where you see what bindu was actually built for.
 | Folder | What it is | Notable |
 | --- | --- | --- |
 | [`agent_swarm/`](agent_swarm/) | Planner → Researcher → Summarizer → Critic → Reflection. | 5-stage in-process chain. |
+| [`crewai-agent/`](crewai-agent/) | Researcher + Writer crew — any topic in, clean summary out. | CrewAI. |
 | [`ag2_research_team/`](ag2_research_team/) | researcher / analyst / writer under AutoPattern GroupChat. | AG2 (AutoGen) with LLM-driven speaker selection. |
 | [`cerina_bindu/`](cerina_bindu/cbt/) | CBT exercise generator: Drafter → SafetyGuardian → ClinicalCritic, supervised. | Real LangGraph `StateGraph`. |
 | [`langgraph_blog_writing_agent/`](langgraph_blog_writing_agent/) | Plan → fan out → reduce, map-reduce style. | LangGraph `Send` for fan-out. |

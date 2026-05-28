@@ -1,0 +1,27 @@
+id: crewai-research
+name: CrewAI Research Skill
+version: 1.0.0
+author: your.email@example.com
+description: >
+  A two-agent CrewAI crew that researches any topic and returns a structured summary.
+  A Researcher agent gathers key facts and insights, then a Writer agent turns them
+  into a clear, readable summary.
+
+tags:
+  - crewai
+  - research
+  - multi-agent
+  - openrouter
+  - summarization
+
+input_modes:
+  - text/plain
+
+output_modes:
+  - text/plain
+
+examples:
+  - input: "What is quantum computing?"
+    output: |
+      Quantum computing is a type of computation that harnesses quantum mechanical
+      phenomena such as superposition and entanglement...
