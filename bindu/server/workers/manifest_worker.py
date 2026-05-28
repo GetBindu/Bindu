@@ -703,11 +703,17 @@ class ManifestWorker(Worker):
                 }
             else:
                 error_reason = settle_response.error_reason or "Unknown error"
-                logger.error(f"Payment settlement failed: {error_reason}")
+                # loguru parses braces in the message template; values that may
+                # contain JSON (`{...}`) — facilitator errors do — must go
+                # through positional placeholders, not f-string interpolation.
+                logger.error("Payment settlement failed: {}", error_reason)
                 return _failure_metadata(error_reason)
 
         except Exception as e:
-            logger.error(f"Error settling payment: {e}", exc_info=True)
+            # Same reason as above — exception strings from the x402 SDK
+            # routinely embed the failing JSON body, which trips loguru's
+            # template parser if we use an f-string here.
+            logger.opt(exception=True).error("Error settling payment: {}", e)
             return _failure_metadata(str(e))
 
     async def _notify_artifact(
