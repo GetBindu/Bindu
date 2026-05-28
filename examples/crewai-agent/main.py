@@ -1,13 +1,19 @@
-from bindu.penguin.bindufy import bindufy
-from crewai import Agent, Task, Crew, LLM
-from dotenv import load_dotenv
 import os
+
+from crewai import Agent, Crew, LLM, Task
+from dotenv import load_dotenv
+
+from bindu.penguin.bindufy import bindufy
 
 load_dotenv()
 
+openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
+if not openrouter_api_key:
+    raise RuntimeError("OPENROUTER_API_KEY environment variable is required")
+
 llm = LLM(
     model="openrouter/openai/gpt-4o-mini",
-    api_key=os.getenv("OPENROUTER_API_KEY"),
+    api_key=openrouter_api_key,
 )
 
 researcher = Agent(
@@ -28,6 +34,9 @@ writer = Agent(
 
 
 def handler(messages):
+    if not messages:
+        return "No messages received. Please provide a topic to research."
+
     last = messages[-1]
     query = last.get("content", "") if isinstance(last, dict) else str(last)
 
