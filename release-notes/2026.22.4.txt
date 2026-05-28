@@ -1,0 +1,139 @@
+Release: x402 settle-first + scenario hardening
+====================================================
+
+Version: 2026.22.4
+Date: May 28, 2026
+Author: Raahul Dutta
+
+OVERVIEW
+--------
+This release closes issue #562 — the verify-vs-settle gap in Bindu's
+x402 payment middleware — in two steps.
+
+First (#563): a failed settlement no longer delivers the artifact. The
+worker now gates artifact delivery on settle success, and persists the
+EIP-3009 nonce, full authorization, and network on every failed-settle
+path so an operator can reconcile against the chain instead of seeing
+only `str(e)` buried in metadata.
+
+Second (#565): settlement now happens BEFORE the agent runs, not after.
+A drained wallet, a parallel-nonce race, or a `validBefore` lapse now
+costs the agent zero LLM tokens — the worker exits before any state
+transition or model call. This matches Google's A2A x402 extension
+choice for long-running agent workloads (the closest peer protocol);
+total wall-clock on the happy path is unchanged because the settle
+latency moves rather than adds. The companion failure mode — work
+raising after a successful settle — is tagged `payment-orphaned` in
+metadata so the operator can reconcile manually.
+
+The release also ships an end-to-end demo (`tests/e2e/x402_scenarios/`)
+that boots a real Bindu agent + a programmable fake facilitator and
+walks through all four #562 scenarios via real HTTP, and bumps two
+dependency groups (OpenTelemetry 1.42 / 0.63b1, Starlette 1.0).
+
+BREAKING CHANGES
+----------------
+None for users of the public A2A protocol. Internal worker API:
+`ManifestWorker._handle_terminal_state` no longer accepts
+`payment_context` (replaced by `settlement_metadata`, computed upfront
+in `run_task`). Anyone subclassing the worker should update accordingly.
+
+IMPROVEMENTS
+------------
+🎯 Features
+  - feat(x402): adopt settle-first ordering + E2E scenario coverage (#565)
+
+🐛 Bug Fixes
+  - fix(x402): gate artifact delivery on settlement success (#562) (#563)
+  - fix(x402): keep facilitator error detail out of the user-facing
+    failure message (CodeRabbit follow-up to #563)
+  - fix(x402): loguru positional placeholders in _settle_payment —
+    a latent bug surfaced by the live E2E demo where JSON-bearing
+    exception strings caused logger.error to raise KeyError and
+    silently swallow the recovery-metadata return
+
+📦 Chores / Deps
+  - chore(deps): bump starlette 0.49.1 → 1.0.0 (#559)
+  - chore(deps): bump opentelemetry 1.35.0 → 1.42.1 and the matching
+    instrumentation 0.56b0 → 0.63b1 (#556)
+
+📚 Docs
+  - docs(known-issues): add x402-settle-false-negative-silent-orphans
+    and x402-no-auto-refund-for-orphan-payments medium entries (#566)
+  - docs(payment): explain settle-first ordering, the orphan-payment
+    failure mode, and point at the live E2E demo
+  - docs(inbox): refresh inbox screenshot
+  - docs(readme): promote the mTLS + Hydra + DID story to its own section
+  - docs: add SECURITY_STACK.md explaining mTLS + Hydra + DID together
+
+KNOWN LIMITATIONS (NEW)
+-----------------------
+Settle-first closes the LLM-cost half of the verify/settle gap but
+introduces a quieter failure mode: facilitator timeout vs Base
+confirmation race. Two new entries in bugs/known-issues.md:
+
+  - x402-settle-false-negative-silent-orphans — facilitator /settle can
+    time out while the chain confirms anyway. Reconciliation worker
+    (which would query AuthorizationUsed events and reverse the
+    failed-task tag) is scoped out as a follow-up. EIP-3009 fields
+    are persisted on every failed-settle task for manual reconciliation.
+
+  - x402-no-auto-refund-for-orphan-payments — when orphans exist,
+    refunding requires a manual USDC transfer. Bindu doesn't manage an
+    outbound wallet today (pay_to is a config string only). Scoped out
+    because of the custody surface — revisit when there's real volume
+    to justify it.
+
+Both entries include the operator workaround using the metadata we
+now persist.
+
+TECHNICAL DETAILS
+-----------------
+Files Modified: 13
+Lines Added: +1905
+Lines Removed: -111
+
+Test surface (post-merge):
+  - 139 x402-touching unit + integration tests pass
+  - 4 end-to-end scenario tests in tests/integration/x402/test_e2e_scenarios.py
+  - A runnable subprocess demo at tests/e2e/x402_scenarios/run_e2e.py
+
+TESTING
+-------
+✅ All unit tests passing (per-PR CI green on #563, #565, #556, #559, #566)
+✅ All integration tests passing
+✅ Pre-commit hooks passing (ruff, ruff-format, ty, bandit, detect-secrets, pydocstyle)
+✅ Live end-to-end demo exercises all four #562 scenarios against
+   a real Bindu agent via real HTTP
+
+COMMIT DETAILS
+--------------
+Key commits since 2026.21.1:
+
+  - 7905ea6d: docs(known-issues): add two payment-related medium entries (#566)
+  - b3f2cfee: chore(deps): bump starlette from 0.49.1 to 1.0.0 (#559)
+  - 4f336334: chore(deps): bump the production group across 1 directory with 6 updates (#556)
+  - 1a085f5b: feat(x402): adopt settle-first ordering + E2E scenario coverage (#565)
+  - c6b726c2: fix(x402): gate artifact delivery on settlement success (#562) (#563)
+  - 8d4b07a0: docs(inbox): refresh inbox screenshot
+  - 6c80846a: docs(readme): promote the mTLS + Hydra + DID story to its own section
+  - d16b0864: docs: add SECURITY_STACK.md explaining mTLS + Hydra + DID together
+
+USAGE WITH GIT
+--------------
+# View this release
+git show 2026.22.4
+
+# Compare to previous release
+git diff 2026.21.1..2026.22.4 --stat
+
+# Reproduce the live demo
+uv run python tests/e2e/x402_scenarios/run_e2e.py
+
+LINKS
+-----
+- Issue: https://github.com/GetBindu/Bindu/issues/562
+- Artifact-gate PR: https://github.com/GetBindu/Bindu/pull/563
+- Settle-first PR: https://github.com/GetBindu/Bindu/pull/565
+- Known-issues PR: https://github.com/GetBindu/Bindu/pull/566
+- Compare: https://github.com/GetBindu/Bindu/compare/2026.21.1...2026.22.4
