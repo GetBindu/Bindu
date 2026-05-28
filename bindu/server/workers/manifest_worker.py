@@ -570,12 +570,14 @@ class ManifestWorker(Worker):
         no LLM call ran, no artifact was generated, nothing to withhold.
         ``settlement_metadata`` carries the recovery fields (nonce,
         authorization, network) for operator visibility.
+
+        The user-facing message is intentionally generic — the facilitator's
+        raw error string (which can disclose internal infra detail) stays in
+        ``task.metadata[x402.payment.error]`` for the operator, not on the
+        wire to the caller.
         """
-        error_text = settlement_metadata.get(
-            app_settings.x402.meta_error_key, "settlement failed"
-        )
         error_message = MessageConverter.to_protocol_messages(
-            f"Payment settlement failed; task not executed. Reason: {error_text}",
+            "Payment settlement failed; task not executed.",
             task["id"],
             task["context_id"],
         )
