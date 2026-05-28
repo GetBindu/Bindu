@@ -157,6 +157,8 @@ That's it — Bindu picks it up at startup. For production though, please read t
 
 Here's the most useful thing you can do to understand how this whole flow hangs together: run it locally with a fake facilitator that always says yes. No wallet, no real money, no blockchain — just your agent, a stub facilitator, and curl.
 
+> **Already-built version:** [`tests/e2e/x402_scenarios/`](../tests/e2e/x402_scenarios/) has a one-command driver that boots a programmable fake facilitator plus an echo agent and walks through all four failure modes from issue [#562](https://github.com/GetBindu/Bindu/issues/562) (drain attack, settle timeout, parallel-nonce race, replay). Run it with `uv run python tests/e2e/x402_scenarios/run_e2e.py` to see real HTTP responses + task metadata for each scenario. The walkthrough below is the same idea, broken apart so you can follow along by hand.
+
 We'll do it in three small files. Open three terminals.
 
 ### Step 1 — a fake facilitator
@@ -489,8 +491,10 @@ If you want to read the actual implementation:
 
 * The middleware that does the 402 gatekeeping: [`bindu/server/middleware/x402/x402_middleware.py`](../bindu/server/middleware/x402/x402_middleware.py)
 * The nonce store that catches replays: [`bindu/server/middleware/x402/nonce_store.py`](../bindu/server/middleware/x402/nonce_store.py)
+* Where settle-first lives (and where orphan payments get tagged): [`bindu/server/workers/manifest_worker.py`](../bindu/server/workers/manifest_worker.py) (search for `_settle_payment` and `_handle_settlement_failure`)
 * How payment requirements get built from your config: [`bindu/server/applications.py`](../bindu/server/applications.py) (search for `_create_payment_requirements`)
-* The tests, which double as the most accurate spec: [`tests/unit/server/middleware/x402/`](../tests/unit/server/middleware/x402/)
+* Middleware tests, which double as the most accurate spec: [`tests/unit/server/middleware/x402/`](../tests/unit/server/middleware/x402/)
+* End-to-end failure-mode demo: [`tests/e2e/x402_scenarios/`](../tests/e2e/x402_scenarios/) — runnable subprocess driver that exercises all four #562 scenarios against a real agent + programmable fake facilitator
 
 ## Related
 
