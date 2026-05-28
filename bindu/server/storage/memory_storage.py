@@ -43,6 +43,28 @@ DEFAULT_STORAGE_RETRY_ATTEMPTS = 3
 DEFAULT_STORAGE_MIN_WAIT = 0.1
 DEFAULT_STORAGE_MAX_WAIT = 1.0
 
+# Leaf types that are immutable and can be shared across copies without risk.
+_IMMUTABLE_LEAF_TYPES = frozenset({str, int, float, bool, type(None), UUID, datetime})
+
+
+def _fast_deepcopy(value: Any) -> Any:
+    """Deep-copy JSON-shaped task data faster than ``copy.deepcopy``.
+
+    Task/Message/Artifact payloads are dicts, lists, and immutable scalars
+    (str/int/float/bool/None) plus UUID/datetime. Immutable leaves are returned
+    as-is; only containers are recursed. Any unexpected type falls back to
+    ``copy.deepcopy`` so the isolation guarantee is never weakened — this is
+    purely a faster path for the common shape, not a behavioral change.
+    """
+    t = type(value)
+    if t is dict:
+        return {k: _fast_deepcopy(v) for k, v in value.items()}
+    if t is list:
+        return [_fast_deepcopy(v) for v in value]
+    if t in _IMMUTABLE_LEAF_TYPES:
+        return value
+    return copy.deepcopy(value)
+
 
 class InMemoryStorage(Storage[dict[str, Any]]):
     """In-memory storage implementation for tasks and contexts.
@@ -91,14 +113,17 @@ class InMemoryStorage(Storage[dict[str, Any]]):
         if task is None:
             return None
 
-        # Always return a deep copy to prevent mutations affecting stored task
-        task_copy = copy.deepcopy(task)
-
-        # Limit history if requested
+        # Truncate history BEFORE copying so we only copy what we return.
+        # Slicing after the copy (the previous behavior) both wasted work
+        # copying the full history and silently leaked shared message
+        # references — the returned slice pointed at the stored dicts.
         if history_length is not None and history_length > 0 and "history" in task:
-            task_copy["history"] = task["history"][-history_length:]
+            return _fast_deepcopy(
+                {**task, "history": task["history"][-history_length:]}
+            )
 
-        return task_copy
+        # Return a deep copy to prevent mutations affecting the stored task.
+        return _fast_deepcopy(task)
 
     @retry_storage_operation(
         max_attempts=DEFAULT_STORAGE_RETRY_ATTEMPTS,
