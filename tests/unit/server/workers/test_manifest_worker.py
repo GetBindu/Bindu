@@ -756,6 +756,189 @@ class TestManifestWorker:
             assert result is not None
 
     @pytest.mark.asyncio
+    async def test_settle_failure_does_not_deliver_artifact(self):
+        """Verify-ok + settle-fail must NOT deliver paid output.
+
+        Reproduces the leak in issue #562: today, if facilitator.settle fails
+        after verify already passed, the worker still transitions the task to
+        completed and pushes the artifact. The fix gates artifact delivery on
+        settle success — task is marked failed and no artifact is notified.
+        """
+        mock_manifest = Mock()
+        mock_manifest.did_extension = Mock()
+        mock_manifest.did_extension.did = "did:example:123"
+        mock_manifest.x402_extension = Mock()
+        mock_scheduler = Mock()
+        mock_storage = AsyncMock()
+
+        task_id = uuid4()
+        context_id = uuid4()
+        task = cast(
+            Task,
+            {
+                "id": task_id,
+                "context_id": context_id,
+                "status": {"state": "working", "timestamp": "2024-01-01T00:00:00Z"},
+            },
+        )
+
+        worker = ManifestWorker(
+            manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage
+        )
+
+        # Simulate facilitator-reported settlement failure.
+        worker._settle_payment = AsyncMock(  # type: ignore[method-assign] # ty: ignore[invalid-assignment]
+            return_value={
+                "x402.payment.status": "payment-failed",
+                "x402.payment.error": "transfer reverted: insufficient balance",
+            }
+        )
+        worker._notify_artifact = AsyncMock()  # type: ignore[method-assign] # ty: ignore[invalid-assignment]
+
+        payment_context = {
+            "payment_payload": {
+                "payload": {
+                    "authorization": {
+                        "nonce": "0xdeadbeef",
+                        "from": "0xMallory",
+                        "to": "0xAlice",
+                        "value": "1000000",
+                    }
+                },
+            },
+            "payment_requirements": {},
+        }
+
+        await worker._handle_terminal_state(
+            task, "Paid summary contents", "completed", payment_context=payment_context
+        )
+
+        # The task must NOT end in "completed" — that's the leak.
+        update_calls = mock_storage.update_task.call_args_list
+        terminal_states = [call.kwargs.get("state") for call in update_calls]
+        assert "completed" not in terminal_states, (
+            f"Settle failed but task still marked completed: {terminal_states}"
+        )
+        assert "failed" in terminal_states
+
+        # And the artifact must not have been pushed to the client.
+        worker._notify_artifact.assert_not_called()  # ty: ignore[unresolved-attribute]
+
+    @pytest.mark.asyncio
+    async def test_settle_exception_persists_recovery_metadata(self):
+        """When settle raises, the task metadata must carry enough to reconcile.
+
+        Issue #562 calls out that today we lose the EIP-3009 nonce and signed
+        authorization on a settle exception (just str(e) is stored). A
+        recovery worker or operator can't tell whether the on-chain transfer
+        actually went through. The fix persists nonce + authorization.
+        """
+        from unittest.mock import patch
+
+        import asyncio
+
+        mock_manifest = Mock()
+        mock_manifest.x402_extension = Mock()
+        mock_scheduler = Mock()
+        mock_storage = AsyncMock()
+
+        worker = ManifestWorker(
+            manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage
+        )
+
+        payment_context = {
+            "payment_payload": {
+                "payload": {
+                    "authorization": {
+                        "nonce": "0xdeadbeef",
+                        "from": "0xCarol",
+                        "to": "0xAlice",
+                        "value": "1000000",
+                        "validBefore": "1735000300",
+                    }
+                },
+                "network": "base-sepolia",
+            },
+            "payment_requirements": {},
+        }
+
+        # Patch on the x402 module — `_settle_payment` does a local
+        # `from x402 import PaymentPayload, PaymentRequirements`, which
+        # resolves the attribute on x402 at call time.
+        with (
+            patch("x402.PaymentPayload") as mock_pp,
+            patch("x402.PaymentRequirements") as mock_pr,
+            patch(
+                "bindu.server.workers.manifest_worker.HTTPFacilitatorClient"
+            ) as mock_fac_class,
+        ):
+            mock_pp.model_validate = Mock(return_value=Mock())
+            mock_pr.model_validate = Mock(return_value=Mock())
+            mock_fac = AsyncMock()
+            mock_fac.settle = AsyncMock(side_effect=asyncio.TimeoutError("upstream"))
+            mock_fac_class.return_value = mock_fac
+
+            result = await worker._settle_payment(payment_context)
+
+        assert result["x402.payment.status"] == "payment-failed"
+        # Reconciliation needs the nonce and the full authorization block —
+        # str(e) alone is not enough.
+        assert result.get("x402_nonce") == "0xdeadbeef"
+        assert result.get("x402_authorization", {}).get("from") == "0xCarol"
+        assert result.get("x402_network") == "base-sepolia"
+
+    @pytest.mark.asyncio
+    async def test_settle_success_unchanged(self):
+        """Regression: happy path still delivers artifact and marks completed."""
+        mock_manifest = Mock()
+        mock_manifest.did_extension = Mock()
+        mock_manifest.did_extension.did = "did:example:123"
+        mock_manifest.x402_extension = Mock()
+        mock_scheduler = Mock()
+        mock_storage = AsyncMock()
+
+        task_id = uuid4()
+        context_id = uuid4()
+        task = cast(
+            Task,
+            {
+                "id": task_id,
+                "context_id": context_id,
+                "status": {"state": "working", "timestamp": "2024-01-01T00:00:00Z"},
+            },
+        )
+
+        worker = ManifestWorker(
+            manifest=mock_manifest, scheduler=mock_scheduler, storage=mock_storage
+        )
+
+        worker._settle_payment = AsyncMock(  # type: ignore[method-assign] # ty: ignore[invalid-assignment]
+            return_value={
+                "x402.payment.status": "payment-completed",
+                "x402.payment.receipts": [{"tx_hash": "0xreceipt"}],
+            }
+        )
+        worker._notify_artifact = AsyncMock()  # type: ignore[method-assign] # ty: ignore[invalid-assignment]
+
+        payment_context = {
+            "payment_payload": {"payload": {"authorization": {"nonce": "0xfeed"}}},
+            "payment_requirements": {},
+        }
+
+        await worker._handle_terminal_state(
+            task, "Paid result", "completed", payment_context=payment_context
+        )
+
+        # Task completed.
+        update_calls = mock_storage.update_task.call_args_list
+        terminal_states = [call.kwargs.get("state") for call in update_calls]
+        assert "completed" in terminal_states
+        assert "failed" not in terminal_states
+
+        # Artifact was pushed.
+        worker._notify_artifact.assert_called()  # ty: ignore[unresolved-attribute]
+
+    @pytest.mark.asyncio
     async def test_build_complete_message_history_with_context_disabled(self):
         """Test building message history with context-based history disabled."""
         mock_manifest = Mock()

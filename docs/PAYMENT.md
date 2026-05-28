@@ -471,6 +471,8 @@ That's it. Same code, same wallet, same payment shape — just real USDC on Base
 * **Each new task needs a new payment.** A finished task doesn't grant credit toward the next one. Within a single conversation, the same caller pays per task. If a task returns `"input_required"`, no new payment is needed to continue *that* task — but completing it and starting another is a fresh payment.
 * **Watch the facilitator.** If the facilitator goes down, your paid endpoints can't accept new requests. Either run your own, or accept the dependency consciously.
 * **Sessions expire.** A payment session — the browser flow where a caller clicks through MetaMask — expires after 60 seconds by default. Configurable.
+* **Verify is not settle.** When a caller sends `X-PAYMENT`, the facilitator's `/verify` confirms the signature is good and the wallet has enough USDC *right now*. The actual on-chain transfer happens later, when the task completes and Bindu calls `/settle`. Between those two calls, three things can go wrong: the payer drains the wallet to somewhere else, the facilitator can't broadcast, or the EIP-3009 `validBefore` window expires. In all three cases the work has already run — and as of [#562](https://github.com/GetBindu/Bindu/pull/562), Bindu refuses to deliver the artifact. The task ends in `failed`, no artifact is pushed, and `task.metadata` carries the EIP-3009 `nonce` and signed authorization so an operator can reconcile against the chain.
+* **Parallel-nonce double-spend is a known gap.** A payer with $1 USDC who sends two requests in parallel — each with a *different* nonce — passes verify twice (both see the same $1 balance). The first `/settle` succeeds, the second reverts on insufficient balance. The replay defense in `nonce_store.py` only catches identical nonces, not parallel ones. You eat the LLM cost of the second call. Two mitigations if this hurts you: keep `max_timeout_seconds` short so the window for parallel calls is small, or run your own facilitator with balance reservation.
 
 ## When something doesn't work
 
@@ -478,6 +480,7 @@ That's it. Same code, same wallet, same payment shape — just real USDC on Base
 * `"error": "Payment verification failed"` → the facilitator said no. Either the signature is wrong, the chain is wrong, or your facilitator doesn't know the chain you're asking for. Check the agent's server logs for the underlying error.
 * `"error": "Payment nonce already used (replay)"` → the caller is sending the same authorization twice. They need to sign a fresh one for each request.
 * `"error": "No matching payment requirements found"` → the payment payload doesn't match anything in your `execution_cost`. Usually a network or asset mismatch.
+* Task ends in `failed` with message `Payment settlement failed; output withheld.` → verify passed but `/settle` did not. Look at `task.metadata` — `x402.payment.error` is the facilitator's reason, `x402_nonce` and `x402_authorization` are what you need to ask the facilitator whether the on-chain transfer actually went through.
 
 ## Where to look in the code
 

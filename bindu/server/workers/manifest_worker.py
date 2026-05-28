@@ -484,9 +484,22 @@ class ManifestWorker(Worker):
             )
             artifacts = self.build_artifacts(results)
 
-            # Handle payment settlement if payment context is available
+            # Handle payment settlement if payment context is available.
+            # Verify-ok does not imply settle-ok: between verify and settle the
+            # payer can double-spend, the facilitator can fail, or the EIP-3009
+            # validBefore window can lapse. If settlement does not succeed,
+            # withhold the artifact and mark the task failed — otherwise the
+            # client walks away with paid output the agent never got paid for
+            # (issue #562).
             if payment_context:
                 settlement_metadata = await self._settle_payment(payment_context)
+                settled_ok = (
+                    settlement_metadata.get(app_settings.x402.meta_status_key)
+                    == app_settings.x402.status_completed
+                )
+                if not settled_ok:
+                    await self._handle_settlement_failure(task, settlement_metadata)
+                    return
                 if additional_metadata:
                     additional_metadata.update(settlement_metadata)
                 else:
@@ -528,6 +541,37 @@ class ManifestWorker(Worker):
             await self.storage.update_task(task["id"], state=state)
             await self._notify_lifecycle(task["id"], task["context_id"], state, True)
 
+    async def _handle_settlement_failure(
+        self, task: Task, settlement_metadata: dict[str, Any]
+    ) -> None:
+        """Mark task failed after settlement failure; withhold the paid artifact.
+
+        Called from the completed branch when ``_settle_payment`` reports a
+        non-success status. The agent already did the work, so we cannot
+        recover the LLM cost — but we can refuse to deliver the artifact to
+        the unpaid client. ``settlement_metadata`` carries the recovery
+        fields (nonce, authorization, network) that an operator/reconciler
+        needs to reason about the on-chain state.
+        """
+        error_text = settlement_metadata.get(
+            app_settings.x402.meta_error_key, "settlement failed"
+        )
+        error_message = MessageConverter.to_protocol_messages(
+            f"Payment settlement failed; output withheld. Reason: {error_text}",
+            task["id"],
+            task["context_id"],
+        )
+        self._add_state_change_event(
+            from_state="working", to_state="failed", error="settlement_failed"
+        )
+        await self.storage.update_task(
+            task["id"],
+            state="failed",
+            new_messages=error_message,
+            metadata=settlement_metadata,
+        )
+        await self._notify_lifecycle(task["id"], task["context_id"], "failed", True)
+
     async def _handle_task_failure(self, task: Task, error: str) -> None:
         """Handle task execution failure.
 
@@ -564,10 +608,32 @@ class ManifestWorker(Worker):
         Returns:
             Metadata dict containing settlement information to attach to task
         """
+        # Pull the EIP-3009 fields out of the raw dict up front so they end
+        # up in every failure return path. Validation or facilitator errors
+        # otherwise strip the nonce/authorization, and we lose any chance to
+        # reconcile a half-settled transaction later (issue #562).
+        payment_payload_dict = payment_context.get("payment_payload", {}) or {}
+        scheme_payload = payment_payload_dict.get("payload", {}) or {}
+        authorization = scheme_payload.get("authorization", {}) or {}
+        nonce = authorization.get("nonce")
+        network = payment_payload_dict.get("network")
+
+        def _failure_metadata(reason: str) -> dict[str, Any]:
+            md: dict[str, Any] = {
+                app_settings.x402.meta_status_key: app_settings.x402.status_failed,
+                app_settings.x402.meta_error_key: reason,
+            }
+            if nonce is not None:
+                md["x402_nonce"] = nonce
+            if authorization:
+                md["x402_authorization"] = authorization
+            if network is not None:
+                md["x402_network"] = network
+            return md
+
         try:
             from x402 import PaymentPayload, PaymentRequirements
 
-            payment_payload_dict = payment_context["payment_payload"]
             payment_requirements_dict = payment_context["payment_requirements"]
 
             # Convert dicts back to Pydantic models (they were serialized in a2a_protocol)
@@ -598,17 +664,11 @@ class ManifestWorker(Worker):
             else:
                 error_reason = settle_response.error_reason or "Unknown error"
                 logger.error(f"Payment settlement failed: {error_reason}")
-                return {
-                    app_settings.x402.meta_status_key: app_settings.x402.status_failed,
-                    app_settings.x402.meta_error_key: error_reason,
-                }
+                return _failure_metadata(error_reason)
 
         except Exception as e:
             logger.error(f"Error settling payment: {e}", exc_info=True)
-            return {
-                app_settings.x402.meta_status_key: app_settings.x402.status_failed,
-                app_settings.x402.meta_error_key: str(e),
-            }
+            return _failure_metadata(str(e))
 
     async def _notify_artifact(
         self, task_id: UUID, context_id: UUID, artifact: Artifact
