@@ -1,6 +1,16 @@
 # Known Issues
 
-_Last updated: 2026-05-12 — Added `skale-facilitator-cert-expired`
+_Last updated: 2026-05-28 — Added two payment-related medium entries
+under Bindu Core after #563/#565 landed settle-first ordering:
+`x402-settle-false-negative-silent-orphans` (facilitator timeout vs
+Base confirmation race creates undetected orphan payments) and
+`x402-no-auto-refund-for-orphan-payments` (Bindu has no outbound-wallet
+path; refunding is manual ops work). Both share the EIP-3009 recovery
+metadata persisted by `_settle_payment` in
+[`bindu/server/workers/manifest_worker.py`](../bindu/server/workers/manifest_worker.py);
+the detection (reconciliation worker) and remediation (auto-refund)
+pieces are scoped out as separate follow-ups.
+Earlier: 2026-05-12 — Added `skale-facilitator-cert-expired`
 (low/ops) under Bindu Core after adding operator-extensible network
 support to `X402Settings.extra_networks` and the `register_money_parser`
 plumbing in `applications.py`. SKALE-aware facilitator
@@ -61,7 +71,7 @@ Issue referencing the slug (e.g. "Fixes `context-window-hardcoded`").
 | Subsystem | High | Medium | Low | Nit |
 |---|---:|---:|---:|---:|
 | [Gateway](#gateway) | 2 | 14 | 19 | 9 |
-| [Bindu Core (Python)](#bindu-core-python) | 0 | 6 | 3 | 0 |
+| [Bindu Core (Python)](#bindu-core-python) | 0 | 8 | 3 | 0 |
 | [SDKs (TypeScript)](#sdks-typescript) | — | — | — | — |
 
 ---
@@ -938,6 +948,8 @@ explains it.
 | [`authz-scope-check-behind-optional-flag`](#authz-scope-check-behind-optional-flag) | medium (sec) | Scope check is optional; flipping the flag removes all authz |
 | [`cors-allow-credentials-with-user-origins`](#cors-allow-credentials-with-user-origins) | medium (sec) | Credentials + loose origins risk credentialed CORS |
 | [`no-rate-limit-or-quota-per-caller`](#no-rate-limit-or-quota-per-caller) | medium | No per-caller quota; single caller can exhaust resources |
+| [`x402-settle-false-negative-silent-orphans`](#x402-settle-false-negative-silent-orphans) | medium | Facilitator `/settle` times out, chain confirms anyway, payer debited but task failed |
+| [`x402-no-auto-refund-for-orphan-payments`](#x402-no-auto-refund-for-orphan-payments) | medium | Orphan payments need a manual USDC transfer; Bindu has no outbound-wallet path |
 
 ### Medium
 
@@ -1000,6 +1012,91 @@ at the `TaskManager.send_message` level plus an explicit body-size
 limit on the Starlette app.
 **Tracking:** _(no issue yet)_ (shape-equivalent to the gateway's
 `no-rate-limit-cors-body-size-limit` entry)
+
+### x402-settle-false-negative-silent-orphans
+
+**Severity:** medium (revenue / fairness)
+
+> **Scenario.** Carol pays your agent 1 USDC on Base mainnet. The
+> network is congested — block confirmation runs ~25s. Your
+> facilitator's `/settle` endpoint waits 10s and returns a timeout
+> failure. Bindu (settle-first) sees the failure, marks the task
+> `failed`, and refuses to run the LLM. ~15 seconds later, the chain
+> confirms the transfer anyway. Carol's wallet shows the debit. Your
+> agent's `pay_to` wallet shows the credit. Your task storage says
+> Carol's request `failed`. Nobody told you.
+
+**What's wrong.** Settle-first closes the LLM-cost half of #562 but
+introduces a quieter failure mode at the boundary between the
+facilitator's timeout (typically 5-10s) and Base's confirmation latency
+(2-28s under congestion). The facilitator can answer "no" while the
+chain ultimately answers "yes" — the result is an **orphan payment
+with no matching `payment-orphaned` tag**, because the worker's only
+signal was `success=False` from settle. Magnitude is operator-dependent;
+under quiet network conditions it's near-zero, but during congestion
+spikes (e.g. NFT mints, mainnet flash events) it's the dominant orphan
+source.
+
+The fields needed to reconcile are persisted on every failed-settle
+task (`_settle_payment` in
+[`bindu/server/workers/manifest_worker.py`](../bindu/server/workers/manifest_worker.py)
+extracts `x402_nonce`, `x402_authorization`, `x402_network` before
+attempting settle, so they land in metadata even on exception paths).
+What's missing is the **periodic worker that uses them** — queries the
+chain for `AuthorizationUsed(from, nonce)` on the USDC contract, and
+flips matching `payment-failed` tasks to `payment-orphaned-reconciled`
+once confirmation lands.
+
+**Workaround:** Periodically scan `task.metadata["x402.payment.status"]
+== "payment-failed"` tasks older than ~5 minutes. For each, re-call
+the facilitator's `/settle` with the same payload (idempotent — already-
+settled nonces return success with the existing tx hash) OR query
+`eth_getLogs` on the USDC contract for `AuthorizationUsed` filtered to
+`(from=x402_authorization.from, nonce=x402_nonce)`. If found, the
+on-chain transfer happened; refund or re-execute as the operator's
+policy dictates.
+
+**Tracking:** _(no issue yet)_ — pairs with
+`x402-no-auto-refund-for-orphan-payments`; reconciliation is the
+*detection* half, auto-refund is the *remediation* half.
+
+### x402-no-auto-refund-for-orphan-payments
+
+**Severity:** medium (operator friction)
+
+**Summary:** Bindu correctly identifies orphan payments today —
+`_handle_task_failure` in
+[`bindu/server/workers/manifest_worker.py`](../bindu/server/workers/manifest_worker.py)
+tags `task.metadata["x402.payment.status"] = "payment-orphaned"` when
+`manifest.run` raises after a successful settle, and persists the full
+EIP-3009 fields. But it can't *do* anything about them. x402 has no
+native refund primitive (the protocol is one-shot and one-directional —
+payer signs, server settles, transfer is final), and Bindu's
+architecture has never managed an outbound wallet: `pay_to_address`
+has only ever been a config string, no private key, no Base RPC
+connection, no gas balance. Refunding an orphan today is an entirely
+out-of-band ops process — the operator opens their own wallet, reads
+`x402_authorization.from` / `.value` / `x402_network` from the task
+metadata, and sends a regular USDC transfer back.
+
+**Workaround:** Manual USDC `transfer(to, amount)` from the agent's
+wallet. Fields are all in `task.metadata`:
+
+| Field | Use |
+|---|---|
+| `x402_authorization.from` | Recipient (the payer) |
+| `x402_authorization.value` | Amount in atomic units (1 USDC = 1_000_000) |
+| `x402_network` | Which chain (`eip155:8453` = Base mainnet, `eip155:84532` = Base Sepolia) |
+| `x402.payment.receipts[0].transaction` | Original payment tx hash, for audit linkage |
+
+To avoid double-refunding, record the refund tx hash back onto the
+task somehow (e.g. set `task.metadata["x402.refund.tx_hash"]` after
+sending) so a future scan can skip already-refunded orphans.
+
+**Tracking:** _(no issue yet)_ — scoped out in the #562/#565 work as
+"build when there's real volume to justify the custody surface."
+Pairs with `x402-settle-false-negative-silent-orphans` (detection
+without remediation is half-useful).
 
 ---
 
