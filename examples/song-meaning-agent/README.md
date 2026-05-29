@@ -13,8 +13,7 @@ to uncover and articulate the true meaning behind any musical work.
 
 ## Output Format
 
-```
-SUMMARY
+```text`r`nSUMMARY
 A single sentence (25 words max) capturing the song's core meaning.
 
 MEANING
@@ -47,8 +46,7 @@ The agent runs at `http://localhost:3773`.
 
 ## Project Structure
 
-```
-song-meaning-agent/
+```text`r`nsong-meaning-agent/
 ├── song_meaning_agent.py          # Main agent + bindufy()
 ├── .env.example                   # Environment variables
 ├── skills/
@@ -63,3 +61,4 @@ song-meaning-agent/
 |---|---|---|
 | `OPENROUTER_API_KEY` | Yes | OpenRouter API key |
 | `BINDU_DEPLOYMENT_URL` | No | Override default `http://localhost:3773` |
+

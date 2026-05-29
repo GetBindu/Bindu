@@ -43,7 +43,7 @@ When asked to analyze a song, you MUST follow this exact structure:
 A single sentence (25 words max) capturing the song's core meaning.
 
 **MEANING**
-3–5 bullet points (each ~165 words) exploring:
+3–5 bullet points (each ~65 words) exploring:
 - Central themes and emotional narrative
 - Symbolic imagery and metaphors used
 - Cultural, historical, or biographical context

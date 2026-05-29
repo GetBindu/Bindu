@@ -13,7 +13,7 @@ features:
   - Accept any song title, artist name, or pasted lyrics as input
   - Research lyrics, artist interviews, liner notes, and cultural context
   - Produce a 25-word SUMMARY sentence capturing the song's core meaning
-  - Write 3-5 MEANING bullets (~165 words each) covering themes, symbolism, and context
+  - Write 3-5 MEANING bullets (~65 words each) covering themes, symbolism, and context
   - Provide 3-5 EVIDENCE bullets (~15 words each) citing lyrics and artist statements
   - Handle ambiguous songs by surfacing multiple interpretations
   - Deployed as a live Bindu microservice via bindufy()
@@ -96,7 +96,7 @@ capabilities_detail:
   output_format:
     structure: SUMMARY → MEANING → EVIDENCE
     summary_length: 25 words maximum
-    meaning_bullets: 3-5 bullets, ~165 words each
+    meaning_bullets: 3-5 bullets, ~65 words each
     evidence_bullets: 3-5 bullets, ~15 words each
     markdown: plain Markdown, no bold or italics inside bullet points
 
