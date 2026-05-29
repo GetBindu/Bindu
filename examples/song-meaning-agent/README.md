@@ -61,5 +61,3 @@ The agent runs at `http://localhost:3773`.
 |---|---|---|
 | `OPENROUTER_API_KEY` | Yes | OpenRouter API key |
 | `BINDU_DEPLOYMENT_URL` | No | Override default `http://localhost:3773` |
-
-
