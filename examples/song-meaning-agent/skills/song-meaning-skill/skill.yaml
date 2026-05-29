@@ -1,0 +1,109 @@
+id: song-meaning-skill
+name: Song Meaning Skill
+version: 1.0.0
+author: your.email@example.com
+description: >
+  Deeply researches songs, lyrics, artists, and cultural context to uncover
+  and articulate the true meaning behind any musical work. Produces structured
+  analyses with a summary sentence, thematic bullet points, and evidence-backed
+  citations. Powered by OpenRouter and exposed as a live A2A-compliant Bindu
+  microservice.
+
+features:
+  - Accept any song title, artist name, or pasted lyrics as input
+  - Research lyrics, artist interviews, liner notes, and cultural context
+  - Produce a 25-word SUMMARY sentence capturing the song's core meaning
+  - Write 3-5 MEANING bullets (~165 words each) covering themes, symbolism, and context
+  - Provide 3-5 EVIDENCE bullets (~15 words each) citing lyrics and artist statements
+  - Handle ambiguous songs by surfacing multiple interpretations
+  - Deployed as a live Bindu microservice via bindufy()
+  - A2A / X402 protocol-compliant out of the box
+
+tags:
+  - music
+  - lyrics
+  - song-analysis
+  - thematic-extraction
+  - lyric-interpretation
+  - artist-context-research
+  - musical-symbolism
+  - evidence-based-conclusion
+  - openrouter
+
+input_modes:
+  - text/plain   # Song title + artist, or pasted lyrics
+
+output_modes:
+  - text/plain   # Structured Markdown analysis
+
+examples:
+  - input: "What does 'Bohemian Rhapsody' by Queen really mean?"
+    output: |
+      SUMMARY
+      A theatrical journey through guilt, fate, and acceptance told across
+      multiple operatic personas by Freddie Mercury.
+
+      MEANING
+      - The song opens with a condemned narrator facing execution, establishing
+        the central tension between agency and fate. Mercury reportedly described
+        it as a random collection of ideas, but the recurring motif of a young
+        man unable to escape consequences suggests a deeper autobiographical
+        thread about identity and self-reckoning.
+      - The operatic middle section fragments the narrator into multiple voices
+        arguing over culpability. Bismillah (Arabic for "in the name of God")
+        and Beelzebub represent the spiritual battle for the narrator's soul,
+        drawing on Mercury's Zoroastrian upbringing and his complex relationship
+        with religion and mortality.
+
+      EVIDENCE
+      - "Mama, just killed a man" establishes the irreversible act driving the narrative.
+      - Mercury told friends the lyrics were deliberately left open to interpretation.
+
+  - input: "Analyze the meaning of 'The Sound of Silence' by Simon & Garfunkel"
+    output: |
+      SUMMARY
+      A meditation on modern alienation where people worship mass media and
+      hollow spectacle instead of genuine human connection.
+
+      MEANING
+      - Written by Paul Simon in 1964 following the JFK assassination, the song
+        captures a generation's sense of disconnection and disillusionment with
+        American optimism. The darkness is not literal night but emotional isolation
+        that persists even in daylight.
+      - The neon god the people bow and pray to is widely read as television,
+        the dominant mass medium of the era. Simon observed people passively
+        consuming broadcast culture rather than speaking honestly to one another,
+        creating communities bound by spectacle rather than meaning.
+
+      EVIDENCE
+      - "People talking without speaking, hearing without listening" defines
+        the failure of communication as the song's core theme.
+      - Simon confirmed the song was written in a darkened bathroom to aid concentration.
+
+capabilities_detail:
+  lyric_analysis:
+    description: >
+      Interprets lyrical content through close reading, identifying metaphors,
+      narrative structure, and recurring motifs.
+    approach: Evidence-based; claims tied to specific lines or documented artist statements.
+
+  contextual_research:
+    description: >
+      Grounds interpretation in artist biography, historical moment, genre conventions,
+      and cultural reception.
+    sources: Artist interviews, liner notes, critical essays, documented fan analysis.
+
+  output_format:
+    structure: SUMMARY → MEANING → EVIDENCE
+    summary_length: 25 words maximum
+    meaning_bullets: 3-5 bullets, ~165 words each
+    evidence_bullets: 3-5 bullets, ~15 words each
+    markdown: plain Markdown, no bold or italics inside bullet points
+
+  transport:
+    protocol: A2A (JSON-RPC over HTTP)
+    endpoint: POST /
+    port: 3773
+    auth: disabled (configurable via config.auth.enabled)
+    storage: in-memory (configurable)
+    scheduler: in-memory (configurable)
