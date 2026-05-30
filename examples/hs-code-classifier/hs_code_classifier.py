@@ -24,13 +24,12 @@ Example queries:
     "HS code for green coffee beans from Ethiopia"
 """
 
-import os
-
 from agno.agent import Agent
 from agno.models.openrouter import OpenRouter
 from bindu.penguin.bindufy import bindufy
 from bindu.utils.logging import get_logger
 from dotenv import load_dotenv
+from pydantic import Field
 from pydantic_settings import BaseSettings
 
 load_dotenv()
@@ -45,9 +44,9 @@ logger = get_logger(__name__)
 class AppSettings(BaseSettings):
     """Application settings with validation."""
 
-    openrouter_api_key: str = os.getenv("OPENROUTER_API_KEY", "")
-    bindu_deployment_url: str = os.getenv(
-        "BINDU_DEPLOYMENT_URL", "http://localhost:3773"
+    openrouter_api_key: str = Field(default="", alias="OPENROUTER_API_KEY")
+    bindu_deployment_url: str = Field(
+        default="http://localhost:3773", alias="BINDU_DEPLOYMENT_URL"
     )
 
     class Config:
