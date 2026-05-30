@@ -1,0 +1,144 @@
+id: hs-classification-skill
+name: HS Classification Skill
+version: 1.0.0
+author: your.email@example.com
+description: >
+  Classifies any traded product into its correct 6-digit Harmonized System (HS)
+  code — the international standard used by customs authorities in every country.
+  Returns the code, rationale, indicative duty rates for common trade routes,
+  compliance risks, and alternative codes where applicable.
+
+features:
+  - Accept any product description as input
+  - Return the correct 6-digit HS code with WCO chapter heading
+  - Explain the classification rationale with chapter/heading/subheading references
+  - Provide indicative MFN duty rates for China→EU, India→EU, China→US, India→US
+  - Flag common misclassification risks for the product type
+  - Identify preferential trade agreements (GSP, FTA) that may reduce duty
+  - List alternative HS codes with conditions for when each applies
+  - Ask clarifying questions when product description is ambiguous
+  - Deployed as a live Bindu microservice via bindufy()
+  - A2A / X402 protocol-compliant out of the box
+
+tags:
+  - trade-compliance
+  - customs
+  - hs-code
+  - classification
+  - import-duty
+  - tariff
+  - harmonized-system
+  - wco
+  - smb
+  - openrouter
+
+input_modes:
+  - text/plain   # Product description in plain English
+
+output_modes:
+  - text/plain   # Structured Markdown with HS code, rationale, duty rates
+
+examples:
+  - input: "Classify cotton t-shirts for adults"
+    output: |
+      HS CODE
+      6109.10 — T-shirts, singlets and other vests, knitted or crocheted, of cotton
+
+      CLASSIFICATION RATIONALE
+      Cotton t-shirts for adults fall under HS Chapter 61 (knitted or crocheted
+      clothing), heading 6109 (t-shirts and vests), subheading 6109.10 (of cotton).
+      The key determinant is the fiber composition — cotton >50% by weight — and
+      that the garment is knitted or crocheted rather than woven.
+
+      DUTY RATES
+      | Trade Route   | Indicative MFN Rate |
+      |---------------|---------------------|
+      | China → EU    | 12%                 |
+      | India → EU    | 12% (may qualify for GSP: 9.6%) |
+      | China → US    | 32% (incl. Section 301 surcharge) |
+      | India → US    | 11.5%               |
+
+      Note: Actual rates depend on origin certificates, current tariff schedules,
+      and applicable trade agreements.
+
+      COMPLIANCE NOTES
+      - Common misclassification: 6105 (woven shirts) vs 6109 (knitted t-shirts).
+        Confirm the fabric construction before filing.
+      - India may qualify for EU GSP (Generalised Scheme of Preferences), reducing
+        duty from 12% to 9.6% with a valid Form A / REX declaration.
+      - Required docs: commercial invoice, packing list, certificate of origin,
+        and textile fiber content declaration.
+
+      ALTERNATIVE CODES
+      - 6109.90 — if fiber content is not cotton (e.g. polyester, blended)
+      - 6105.10 — if the shirt has a collar and buttons (woven, not knitted)
+      - 6111.20 — if the garment is for infants (under 86cm)
+
+  - input: "What HS code for lithium-ion batteries used in laptops?"
+    output: |
+      HS CODE
+      8507.60 — Lithium-ion accumulators (secondary cells and batteries)
+
+      CLASSIFICATION RATIONALE
+      Lithium-ion batteries fall under HS Chapter 85 (electrical machinery),
+      heading 8507 (electric accumulators), subheading 8507.60 (lithium-ion).
+      The classification applies regardless of the intended application (laptops,
+      phones, EVs) — the battery chemistry determines the subheading.
+
+      DUTY RATES
+      | Trade Route   | Indicative MFN Rate |
+      |---------------|---------------------|
+      | China → EU    | 1.7%                |
+      | India → EU    | 1.7%                |
+      | China → US    | 7.5% + Section 301  |
+      | India → US    | 1.7%                |
+
+      COMPLIANCE NOTES
+      - Lithium batteries are classified as dangerous goods (UN3480/UN3481).
+        IATA and IMDG regulations require specific packaging and labeling.
+      - EU Battery Regulation (2023/1542) requires a digital battery passport
+        for EV and industrial batteries from 2027; portable batteries from 2030.
+      - Required docs: MSDS/SDS, UN test summary, dangerous goods declaration.
+
+      ALTERNATIVE CODES
+      - 8507.80 — other accumulators (if not lithium-ion, e.g. NiMH)
+      - 8548.10 — waste and scrap of lithium batteries (for recycling shipments)
+      - 8471.30 — if shipped as an integral part of a complete laptop
+
+capabilities_detail:
+  hs_classification:
+    description: >
+      Determines the correct 6-digit HS code using WCO chapter, heading,
+      and subheading rules. Handles ambiguous cases by asking clarifying questions.
+    standard: Harmonized System 2022 (HS2022)
+    depth: 6-digit subheading (international standard)
+
+  duty_rates:
+    description: >
+      Provides indicative MFN (Most Favoured Nation) import duty rates for
+      common SMB trade routes. Not a substitute for official tariff databases.
+    disclaimer: >
+      Rates are indicative only. Always verify against the official tariff
+      schedule of the importing country before filing a customs declaration.
+    routes_covered:
+      - China → EU (TARIC)
+      - India → EU (TARIC, GSP eligible)
+      - China → US (HTS, incl. Section 301 surcharges)
+      - India → US (HTS)
+
+  compliance:
+    description: >
+      Flags common misclassification risks, applicable trade agreements
+      (GSP, FTA), required certifications, and documentation requirements.
+
+  output_format:
+    structure: HS CODE → CLASSIFICATION RATIONALE → DUTY RATES → COMPLIANCE NOTES → ALTERNATIVE CODES
+    markdown: plain Markdown tables and bullet points
+
+  transport:
+    protocol: A2A (JSON-RPC over HTTP)
+    endpoint: POST /
+    port: 3773
+    auth: disabled (configurable via config.auth.enabled)
+    storage: in-memory (configurable)
+    scheduler: in-memory (configurable)
