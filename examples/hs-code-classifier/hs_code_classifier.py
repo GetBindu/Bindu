@@ -10,7 +10,7 @@ This agent helps SMBs get it right without hiring a trade lawyer.
 
 Prerequisites
 -------------
-    uv add bindu agno python-dotenv
+    uv add bindu agno python-dotenv pydantic-settings
 
 Usage
 -----
@@ -29,12 +29,53 @@ import os
 from agno.agent import Agent
 from agno.models.openrouter import OpenRouter
 from bindu.penguin.bindufy import bindufy
+from bindu.utils.logging import get_logger
 from dotenv import load_dotenv
+from pydantic_settings import BaseSettings
 
 load_dotenv()
 
+logger = get_logger(__name__)
+
+
 # ---------------------------------------------------------------------------
-# 1. Agent definition
+# 1. Settings validation
+# ---------------------------------------------------------------------------
+
+class AppSettings(BaseSettings):
+    """Application settings with validation."""
+
+    openrouter_api_key: str = os.getenv("OPENROUTER_API_KEY", "")
+    bindu_deployment_url: str = os.getenv(
+        "BINDU_DEPLOYMENT_URL", "http://localhost:3773"
+    )
+
+    class Config:
+        env_file = ".env"
+
+    def validate(self) -> None:
+        """Validate required settings at startup."""
+        if not self.openrouter_api_key:
+            raise ValueError(
+                "OPENROUTER_API_KEY is not set. "
+                "Please set it in .env or as an environment variable."
+            )
+
+
+app_settings = AppSettings()
+
+
+def validate_settings() -> None:
+    """Startup-time validation of required settings."""
+    try:
+        app_settings.validate()
+    except ValueError as e:
+        logger.error(f"Configuration error: {e}")
+        raise
+
+
+# ---------------------------------------------------------------------------
+# 2. Agent definition
 # ---------------------------------------------------------------------------
 
 INSTRUCTIONS = """
@@ -82,14 +123,14 @@ agent = Agent(
     instructions=INSTRUCTIONS,
     model=OpenRouter(
         id="openai/gpt-4o-mini",
-        api_key=os.getenv("OPENROUTER_API_KEY"),  # pragma: allowlist secret
+        api_key=app_settings.openrouter_api_key,  # pragma: allowlist secret
     ),
     markdown=True,
 )
 
 
 # ---------------------------------------------------------------------------
-# 2. Bindu configuration
+# 3. Bindu configuration
 # ---------------------------------------------------------------------------
 
 config = {
@@ -111,7 +152,7 @@ config = {
     "storage": {"type": "memory"},
     "scheduler": {"type": "memory"},
     "deployment": {
-        "url": os.getenv("BINDU_DEPLOYMENT_URL", "http://localhost:3773"),
+        "url": app_settings.bindu_deployment_url,
         "expose": True,
         "cors_origins": ["http://localhost:5173"],
     },
@@ -119,8 +160,9 @@ config = {
 
 
 # ---------------------------------------------------------------------------
-# 3. Handler
+# 4. Handler
 # ---------------------------------------------------------------------------
+
 
 def handler(messages: list[dict[str, str]]):
     """Classify a product into its correct HS code.
@@ -153,14 +195,18 @@ def handler(messages: list[dict[str, str]]):
         return result
 
     except Exception as e:
-        return f"Classification error: {str(e)}"
+        logger.error(f"Classification error: {e}", exc_info=True)
+        return "Classification failed. Please try again or contact support."
 
 
 # ---------------------------------------------------------------------------
-# 4. Entry point
+# 5. Entry point
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    print("🛃 HS Code Classifier running at http://localhost:3773")
-    print("📦 Example: Classify cotton t-shirts for adults")
+    validate_settings()
+    logger.info(
+        "🛃 HS Code Classifier running at %s", app_settings.bindu_deployment_url
+    )
+    logger.info("📦 Example: Classify cotton t-shirts for adults")
     bindufy(config, handler)

@@ -43,7 +43,7 @@ Other codes that could apply depending on product specifications.
 cp .env.example .env
 # Add your OPENROUTER_API_KEY to .env
 
-uv add bindu agno python-dotenv
+uv add bindu agno python-dotenv pydantic-settings
 python hs_code_classifier.py
 ```
 
