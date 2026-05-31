@@ -8,9 +8,16 @@ by customs authorities in every country to identify goods crossing borders.
 Getting the HS code wrong means wrong tariffs, blocked shipments, or fines.
 This agent helps SMBs get it right without hiring a trade lawyer.
 
+Features
+--------
+- HS code classification backed by DuckDuckGo live web search
+- Duty rates sourced from live search (not LLM memory)
+- Compliance notes with misclassification risks
+- Alternative codes with conditions
+
 Prerequisites
 -------------
-    uv add bindu agno python-dotenv pydantic-settings
+    uv add bindu agno duckduckgo-search python-dotenv pydantic-settings
 
 Usage
 -----
@@ -26,6 +33,7 @@ Example queries:
 
 from agno.agent import Agent
 from agno.models.openrouter import OpenRouter
+from agno.tools.duckduckgo import DuckDuckGoTools
 from bindu.penguin.bindufy import bindufy
 from bindu.utils.logging import get_logger
 from dotenv import load_dotenv
@@ -69,7 +77,7 @@ def validate_settings() -> None:
     try:
         app_settings.validate()
     except ValueError as e:
-        logger.error(f"Configuration error: {e}")
+        logger.error("Configuration error: %s", e)
         raise
 
 
@@ -82,10 +90,20 @@ You are an expert customs classification specialist with deep knowledge of the
 Harmonized System (HS) — the international standard for classifying traded goods,
 maintained by the World Customs Organization (WCO).
 
+You have access to DuckDuckGo web search. You MUST use it to look up:
+1. The correct HS code for the product (search WCO or official tariff databases)
+2. Current duty rates for the trade routes requested (search official sources)
+3. Any applicable trade agreements or compliance requirements
+
+Never rely on memory alone for duty rates or tariff information — always search
+and cite the source. If search results are unavailable, state this explicitly
+and direct the user to official sources rather than providing unverified figures.
+
 When asked to classify a product, respond in this exact structure:
 
 HS CODE
 Provide the 6-digit HS code (format: XXXX.XX) and the official WCO chapter heading.
+Cite the source used to verify this code.
 
 CLASSIFICATION RATIONALE
 2-3 sentences explaining exactly why this code applies, referencing the relevant
@@ -97,8 +115,12 @@ A table of indicative import duty rates for the most relevant trade routes:
 - India → EU
 - China → US
 - India → US
-Note: Always clarify these are indicative MFN rates and actual rates depend on
-origin certificates, trade agreements, and current tariff schedules.
+Cite the source for each rate. Always include this disclaimer:
+
+⚠️ These rates are indicative only, sourced from web search.
+Verify before filing against official schedules:
+- EU TARIC: https://ec.europa.eu/taxation_customs/dds2/taric/
+- US HTS: https://hts.usitc.gov/
 
 COMPLIANCE NOTES
 2-3 bullet points covering:
@@ -113,8 +135,7 @@ specifications, list them with a one-line explanation of when each applies.
 Rules:
 - Always use 6-digit HS codes (the international standard)
 - If the product description is ambiguous, ask ONE clarifying question
-- Never invent HS codes — if genuinely uncertain, say so and suggest consulting
-  a licensed customs broker
+- Never invent HS codes or duty rates — search first, then cite sources
 - Output in plain Markdown
 """.strip()
 
@@ -124,6 +145,7 @@ agent = Agent(
         id="openai/gpt-4o-mini",
         api_key=app_settings.openrouter_api_key,  # pragma: allowlist secret
     ),
+    tools=[DuckDuckGoTools()],
     markdown=True,
 )
 
@@ -137,13 +159,15 @@ config = {
     "name": "hs_code_classifier",
     "description": (
         "A trade compliance agent that classifies products into their correct "
-        "Harmonized System (HS) codes, provides duty rates for common trade routes, "
-        "and flags compliance risks — helping SMBs avoid costly customs errors."
+        "Harmonized System (HS) codes using live web search, provides sourced "
+        "duty rates for common trade routes, and flags compliance risks — "
+        "helping SMBs avoid costly customs errors."
     ),
     "version": "1.0.0",
     "capabilities": {
         "classification": ["hs-code", "customs-classification", "trade-compliance"],
         "research": ["duty-rates", "trade-agreements", "compliance-notes"],
+        "search": ["live-tariff-lookup", "duckduckgo"],
         "streaming": False,
     },
     "skills": ["skills/hs-classification-skill"],
@@ -162,17 +186,16 @@ config = {
 # 4. Handler
 # ---------------------------------------------------------------------------
 
-
 def handler(messages: list[dict[str, str]]):
-    """Classify a product into its correct HS code.
+    """Classify a product into its correct HS code using live web search.
 
     Args:
         messages: Standard A2A message list, e.g.
                   [{"role": "user", "content": "Classify cotton t-shirts for adults"}]
 
     Returns:
-        HS code, classification rationale, duty rates, compliance notes,
-        and alternative codes.
+        HS code, classification rationale, duty rates (sourced from web search),
+        compliance notes, and alternative codes.
     """
     try:
         user_messages = [m for m in messages if m.get("role") == "user"]
@@ -194,7 +217,7 @@ def handler(messages: list[dict[str, str]]):
         return result
 
     except Exception as e:
-        logger.error(f"Classification error: {e}", exc_info=True)
+        logger.error("Classification error: %s", e, exc_info=True)
         return "Classification failed. Please try again or contact support."
 
 
