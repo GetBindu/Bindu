@@ -164,7 +164,7 @@ def handler(messages: list[dict[str, str]]):
             )
 
         query = user_messages[-1].get("content", "").strip()
-        if not query:
+        logger.debug("Query: %s", query)`n        if not query:
             return (
                 "Empty query. Please describe your import situation, e.g. "
                 "'Calculate CBAM cost for 200 tonnes of aluminium from Turkey'"
