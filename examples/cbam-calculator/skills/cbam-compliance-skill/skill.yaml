@@ -1,0 +1,176 @@
+id: cbam-compliance-skill
+name: CBAM Compliance Skill
+version: 1.0.0
+author: your.email@example.com
+description: >
+  Calculates Carbon Border Adjustment Mechanism (CBAM) obligations for EU importers
+  under EU Regulation 2023/956, which entered its definitive phase on 1 January 2026.
+  Covers applicability checks, 50-tonne exemption threshold, cost estimates using
+  EU ETS carbon prices, compliance requirements, and documentation checklists for
+  iron & steel, aluminium, cement, fertilizers, hydrogen, and electricity imports.
+
+features:
+  - Check whether CBAM applies to a specific product and origin country
+  - Apply the 50-tonne annual threshold exemption check
+  - Estimate CBAM certificate cost using embedded emissions × EU ETS price
+  - Use sector default emission factors when supplier data is unavailable
+  - List Authorised CBAM Declarant requirements (mandatory since 31 March 2026)
+  - Generate documentation checklist for the specific import
+  - Flag key compliance risks for the import scenario
+  - Identify exempt countries (Iceland, Liechtenstein, Norway, Switzerland)
+  - Deployed as a live Bindu microservice via bindufy()
+  - A2A / X402 protocol-compliant out of the box
+
+tags:
+  - cbam
+  - carbon-border-adjustment
+  - eu-regulation
+  - trade-compliance
+  - carbon-tax
+  - embedded-emissions
+  - eu-ets
+  - iron-steel
+  - aluminium
+  - cement
+  - fertilizers
+  - hydrogen
+  - electricity
+  - openrouter
+
+input_modes:
+  - text/plain   # Import description: product, origin country, annual tonnage
+
+output_modes:
+  - text/plain   # Structured Markdown compliance report
+
+covered_sectors:
+  - Iron & Steel (HS chapters 72, 73)
+  - Aluminium (HS chapter 76)
+  - Cement (HS chapter 25)
+  - Fertilizers (HS chapter 31)
+  - Hydrogen (HS 2804.10)
+  - Electricity (HS 2716.00)
+
+exempt_countries:
+  - Iceland (linked ETS)
+  - Liechtenstein (linked ETS)
+  - Norway (linked ETS)
+  - Switzerland (linked ETS)
+
+key_dates:
+  - "2023-10-01": Transitional phase began (reporting only)
+  - "2026-01-01": Definitive phase — financial liability starts
+  - "2026-03-31": Deadline for Authorised CBAM Declarant registration
+  - "2026-05-31": First annual CBAM declaration due
+  - "2034-12-31": Free ETS allowances fully phased out
+
+examples:
+  - input: "Calculate CBAM cost for 200 tonnes of aluminium from Turkey"
+    output: |
+      CBAM APPLICABILITY
+      Yes — aluminium is a covered CBAM sector under EU Regulation 2023/956.
+      CN codes 7601-7616 (unwrought aluminium, aluminium products).
+      Turkey is not an exempt country (not linked to EU ETS).
+
+      EXEMPTION CHECK
+      200 tonnes/year exceeds the 50-tonne annual threshold.
+      Full CBAM compliance is required.
+
+      COST ESTIMATE
+      Default emission factor for aluminium: ~6.7 tCO2e per tonne of product
+      Estimated embedded emissions: 200 × 6.7 = 1,340 tCO2e
+      EU ETS price (approximate, 2026): ~€65/tCO2e
+      Estimated CBAM certificate cost: 1,340 × €65 = €87,100/year
+
+      Note: Actual cost depends on the live EU ETS price and verified supplier
+      emissions data. Check current ETS price at https://ember-climate.org/data/
+
+      COMPLIANCE REQUIREMENTS
+      1. Authorised CBAM Declarant status — required since 31 March 2026
+      2. CBAM certificates — hold 50% of embedded emissions per quarter
+      3. Annual CBAM declaration — due 31 May each year
+      4. Embedded emissions data — request from Turkish supplier or use defaults
+      5. Third-party verification if using actual (non-default) emissions data
+
+      DOCUMENTATION CHECKLIST
+      - Authorised CBAM Declarant registration confirmation
+      - Commercial invoice showing product CN code and origin
+      - Certificate of origin (Turkey)
+      - Embedded emissions report from supplier (or default value declaration)
+      - CBAM certificate surrender records
+      - Quarterly account balance confirmation (50% threshold)
+
+      KEY RISKS
+      - Turkey is a major aluminium exporter with varying production methods;
+        actual emissions may differ significantly from default values.
+      - CBAM certificate prices mirror EU ETS — price volatility can materially
+        affect landed cost calculations and margin forecasts.
+      - Failure to hold Authorised CBAM Declarant status results in shipments
+        being blocked at EU customs.
+
+  - input: "Do I need CBAM for importing 30 tonnes of cement per year from Egypt?"
+    output: |
+      CBAM APPLICABILITY
+      Yes — cement is a covered CBAM sector under EU Regulation 2023/956.
+      CN codes 2523 (Portland cement, aluminous cement, slag cement).
+      Egypt is not an exempt country.
+
+      EXEMPTION CHECK
+      30 tonnes/year is BELOW the 50-tonne annual threshold.
+      You are largely exempt from CBAM reporting and authorisation obligations.
+      No CBAM certificates required at this import volume.
+
+      Note: If your import volume increases above 50 tonnes/year, full CBAM
+      compliance will apply immediately.
+
+      COMPLIANCE REQUIREMENTS
+      At current volumes: minimal — no certificate purchase required.
+      Recommended: monitor import volumes and prepare for compliance if
+      volumes approach the 50-tonne threshold.
+
+      KEY RISKS
+      - Volume creep: if a single shipment pushes annual total above 50 tonnes,
+        you become liable for the full year's embedded emissions.
+      - The 50-tonne threshold applies per importer, not per shipment.
+
+capabilities_detail:
+  applicability_check:
+    description: >
+      Determines whether CBAM applies based on product sector (CN code) and
+      origin country. Identifies exempt countries with linked ETS systems.
+
+  exemption_threshold:
+    description: >
+      Applies the 50-tonne annual mass-based threshold. Importers below this
+      are largely exempt (electricity and hydrogen always in scope).
+    threshold: 50 tonnes per calendar year
+    exceptions: electricity and hydrogen (always in scope)
+
+  cost_calculation:
+    description: >
+      Estimates CBAM certificate cost using embedded emissions × EU ETS price.
+      Uses sector default emission factors when supplier data unavailable.
+    formula: "Embedded emissions (tCO2e) × EU ETS price (€/tCO2e)"
+    ets_price_note: "Approximate €65/tCO2e as of 2026 — verify live price"
+    ets_price_source: "https://ember-climate.org/data/"
+
+  output_format:
+    structure: >
+      CBAM APPLICABILITY → EXEMPTION CHECK → COST ESTIMATE →
+      COMPLIANCE REQUIREMENTS → DOCUMENTATION CHECKLIST → KEY RISKS
+    markdown: plain Markdown
+
+  transport:
+    protocol: A2A (JSON-RPC over HTTP)
+    endpoint: POST /
+    port: 3773
+    auth: disabled (configurable via config.auth.enabled)
+    storage: in-memory (configurable)
+    scheduler: in-memory (configurable)
+
+legal_disclaimer: >
+  This agent provides general guidance only and does not constitute legal or
+  tax advice. CBAM obligations depend on specific product characteristics,
+  verified emissions data, and current EU ETS prices. Always consult a licensed
+  customs broker or trade compliance specialist before filing CBAM declarations.
+  Reference: EU Regulation 2023/956.
