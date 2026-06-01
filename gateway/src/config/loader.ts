@@ -126,7 +126,7 @@ function envOverrides(base: Record<string, any>): Record<string, any> {
 
   // Optional: comma-separated fallback model IDs. When primary fails
   // (rate limit, upstream error), OpenRouter tries each in order.
-  // Example: OPENROUTER_FALLBACK_MODELS="minimax/minimax-m2.7,openai/gpt-4o-mini"
+  // Example: OPENROUTER_FALLBACK_MODELS="minimax/minimax-m3,openai/gpt-4o-mini"
   if (process.env.OPENROUTER_FALLBACK_MODELS) {
     const fallbacks = process.env.OPENROUTER_FALLBACK_MODELS.split(",")
       .map((s) => s.trim())
