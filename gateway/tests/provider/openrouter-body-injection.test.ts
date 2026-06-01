@@ -72,11 +72,11 @@ describe("injectFallbackModels — OpenRouter fail-over routing", () => {
       messages: [],
     })
     const out = JSON.parse(
-      injectFallbackModels(body, ["minimax/minimax-m2.7", "openai/gpt-4o-mini"]),
+      injectFallbackModels(body, ["minimax/minimax-m3", "openai/gpt-4o-mini"]),
     )
     expect(out.models).toEqual([
       "anthropic/claude-sonnet-4.6",
-      "minimax/minimax-m2.7",
+      "minimax/minimax-m3",
       "openai/gpt-4o-mini",
     ])
     expect(out.route).toBe("fallback")

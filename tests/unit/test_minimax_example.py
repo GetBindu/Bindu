@@ -55,10 +55,10 @@ class TestMiniMaxExampleFile:
         source = EXAMPLE_PATH.read_text()
         assert "https://api.minimax.io/v1" in source
 
-    def test_example_uses_minimax_m27(self):
-        """Verify the example uses MiniMax-M2.7 model."""
+    def test_example_uses_minimax_m3(self):
+        """Verify the example uses MiniMax-M3 model."""
         source = EXAMPLE_PATH.read_text()
-        assert "MiniMax-M2.7" in source
+        assert "MiniMax-M3" in source
 
     def test_example_reads_api_key_from_env(self):
         """Verify the example reads MINIMAX_API_KEY from env."""
@@ -125,16 +125,15 @@ class TestMiniMaxModelConstants:
     def test_valid_minimax_models(self):
         """Verify known MiniMax model identifiers."""
         valid_models = {
+            "MiniMax-M3",
             "MiniMax-M2.7",
             "MiniMax-M2.7-highspeed",
-            "MiniMax-M2.5",
-            "MiniMax-M2.5-highspeed",
         }
         # Parse the example to check the model used
         source = EXAMPLE_PATH.read_text()
         for model in valid_models:
-            # At least M2.7 should be referenced
-            if model == "MiniMax-M2.7":
+            # At least M3 should be referenced
+            if model == "MiniMax-M3":
                 assert model in source
 
     def test_minimax_api_url_format(self):
@@ -200,7 +199,7 @@ class TestMiniMaxIntegration:
                 "Content-Type": "application/json",
             },
             json={
-                "model": "MiniMax-M2.7",
+                "model": "MiniMax-M3",
                 "messages": [{"role": "user", "content": "Hi"}],
                 "max_tokens": 5,
             },
@@ -219,7 +218,7 @@ class TestMiniMaxIntegration:
                 "Content-Type": "application/json",
             },
             json={
-                "model": "MiniMax-M2.7",
+                "model": "MiniMax-M3",
                 "messages": [{"role": "user", "content": "Say hello in one word."}],
                 "max_tokens": 10,
             },
