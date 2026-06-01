@@ -64,7 +64,6 @@ dependencies = [
     "grpcio>=1.78.0",
     "grpcio-tools>=1.78.0",
     "protobuf>=6.33.5",
-    "duckduckgo-search>=8.1.1",
 ]
 
 [project.optional-dependencies]
@@ -76,11 +75,11 @@ agents = [
     "langchain-openai>=1.1.8",
     "langgraph>=1.0.8",
     "ollama>=0.6.1",
-    "duckduckgo-search>=8.1.1",
     "openrouter>=0.6.0",
     "scrapegraph-py>=1.0.0",
     "mem0ai>=0.1.0",
     "ddgs>=9.10.0",
+    "duckduckgo-search>=8.1.1",
     "python-dotenv>=1.0.0",
     "pycryptodome>=3.20.0",
     "web3>=7.0.0",
@@ -183,3 +182,4 @@ fallback-version = "0.3.14"
 
 [tool.hatch.build.hooks.vcs]
 version-file = "bindu/_version.py"
+
