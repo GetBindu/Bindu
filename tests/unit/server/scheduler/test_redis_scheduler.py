@@ -178,9 +178,11 @@ async def test_receive_error_handling(scheduler, mock_redis_client):
             "span_id": None, "trace_id": None
         }
         
+        import redis
+        
         mock_redis_client.blpop.side_effect = [
             ("queue", "invalid-json"),
-            Exception("Redis temporarily down"),
+            redis.RedisError("Redis temporarily down"),
             ("queue", json.dumps(valid_task)),
             RuntimeError("StopLoop")
         ]

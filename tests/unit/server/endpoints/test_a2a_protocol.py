@@ -35,6 +35,8 @@ def mock_settings():
             "tasks/list": "mock_handler",
             "message/send": "mock_handler",
         }
+        mock.auth.enabled = False
+        mock.auth.require_permissions = False
         yield mock
 
 
@@ -51,11 +53,10 @@ async def test_valid_request(mock_app, mock_settings):
     
     mock_request = MagicMock(spec=Request)
     mock_request.body = AsyncMock(return_value=json.dumps(body).encode())
-    mock_request.state = MagicMock()
-    # Ensure payment attributes are not present to test plain request
-    del mock_request.state.payment_payload
-    del mock_request.state.payment_requirements
-    del mock_request.state.verify_response
+    
+    class MockState:
+        pass
+    mock_request.state = MockState()
 
     # Call endpoint
     response = await agent_run_endpoint(mock_app, mock_request)
@@ -78,9 +79,7 @@ async def test_invalid_json(mock_app):
 
     response = await agent_run_endpoint(mock_app, mock_request)
 
-    assert response.status_code == 400  # Invalid JSON results in 400 Bad Request
-    # Note: Starlette/FastAPI/Pydantic validation layer returns 400 for structural errors
-    # before reaching JSON-RPC handler logic that would return 200 with error object.
+    assert response.status_code == 400
 
 
 @pytest.mark.asyncio
@@ -114,6 +113,10 @@ async def test_internal_error(mock_app, mock_settings):
     mock_request = MagicMock(spec=Request)
     mock_request.body = AsyncMock(return_value=json.dumps(body).encode())
     
+    class MockState:
+        pass
+    mock_request.state = MockState()
+    
     # Simulate handler raising exception
     mock_app.task_manager.mock_handler.side_effect = Exception("Crash")
 
@@ -131,6 +134,8 @@ async def test_payment_context_injection(mock_app):
     # Mock settings specifically for this test to ensure handler is found
     with patch("bindu.server.endpoints.a2a_protocol.app_settings") as mock_settings:
         mock_settings.agent.method_handlers = {"message/send": "mock_handler"}
+        mock_settings.auth.enabled = False
+        mock_settings.auth.require_permissions = False
         
         body = {
             "jsonrpc": "2.0",
@@ -155,9 +160,11 @@ async def test_payment_context_injection(mock_app):
         mock_request.body = AsyncMock(return_value=json.dumps(body).encode())
         
         # Setup payment context in request state
-        mock_request.state.payment_payload = {"amount": 100}
-        mock_request.state.payment_requirements = {"token": "USDC"}
-        mock_request.state.verify_response = {"status": "verified"}
+        class MockState:
+            payment_payload = {"amount": 100}
+            payment_requirements = {"token": "USDC"}
+            verify_response = {"status": "verified"}
+        mock_request.state = MockState()
 
         # Call endpoint
         await agent_run_endpoint(mock_app, mock_request)
