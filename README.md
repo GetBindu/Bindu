@@ -31,6 +31,7 @@
         <a href="i18n/README.bn.md">বাংলা</a> |
         <a href="i18n/README.zh.md">中文</a> |
         <a href="i18n/README.nl.md">Nederlands</a> |
+        <a href="i18n/README.id.md">Bahasa Indonesia</a> |
         <a href="i18n/README.ta.md">தமிழ்</a>
     </p>
 </h4>
