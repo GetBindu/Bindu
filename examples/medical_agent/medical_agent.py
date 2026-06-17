@@ -1,100 +1,108 @@
-"""Medical Research Agent with Web Search
+"""Medical Research Agent with Web Search.
 
-A Bindu agent that provides medical information and health guidance using DuckDuckGo web search.
-Provides general health information, symptom analysis, and wellness recommendations.
-
-Features:
-- Web search via DuckDuckGo for real-time medical information
-- Medical research and symptom analysis capabilities
-- OpenRouter integration with google/gemini-2.0-flash-001
-- Clean, synthesized responses with medical disclaimers
-- Health and wellness guidance
-
-Usage:
+Run:
     python medical_agent.py
-
-Environment:
-    Requires OPENROUTER_API_KEY in .env file
 """
 
 import os
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
-
-from bindu.penguin.bindufy import bindufy
 from agno.agent import Agent
-from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.models.openrouter import OpenRouter
+from agno.tools.duckduckgo import DuckDuckGoTools
+from bindu.penguin.bindufy import bindufy
 
+from pathlib import Path
+load_dotenv(Path(__file__).parent / ".env")
 
-# Initialize the medical research agent
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+
+if not OPENROUTER_API_KEY:
+    raise RuntimeError(
+        "OPENROUTER_API_KEY is missing. Create a .env file and add your OpenRouter API key."
+    )
+
 agent = Agent(
-    instructions="""You are a medical research assistant. When asked about health or medical topics, provide clear, accurate information with appropriate disclaimers.
+    name="Medical Research Agent",
+    instructions="""
+You are a medical research assistant.
 
-Key guidelines:
-- Always include a medical disclaimer stating this is not professional medical advice
-- Provide general health information and educational content
-- For specific medical concerns, recommend consulting healthcare professionals
-- Use web search to find current, reliable medical information
-- Present information in an organized, easy-to-read format
-- Avoid making definitive diagnoses or treatment recommendations
-- Focus on evidence-based information from reputable sources
+Your job:
+- Provide general health and wellness information.
+- Explain symptoms in an educational way.
+- Use web search when useful.
+- Do not diagnose the user.
+- Do not prescribe medication.
+- Do not replace a doctor.
 
-Response format:
-- Start with relevant medical information
-- Include supporting details and context
-- End with a clear medical disclaimer
-- Avoid showing multiple search results - synthesize information coherently""",
+Safety rules:
+- Always include a clear medical disclaimer.
+- For serious symptoms like chest pain, breathing difficulty, severe bleeding,
+  fainting, stroke symptoms, severe allergic reaction, or suicidal thoughts,
+  advise the user to seek emergency medical help immediately.
+- Recommend consulting a qualified healthcare professional for personal diagnosis or treatment.
+
+Response style:
+- Be clear and simple.
+- Give practical general guidance.
+- Mention when urgent care is needed.
+- End with: "Disclaimer: This is general health information, not professional medical advice."
+""",
     model=OpenRouter(
         id="google/gemini-2.0-flash-001",
-        api_key=os.getenv("OPENROUTER_API_KEY")
+        api_key=OPENROUTER_API_KEY,
     ),
     tools=[DuckDuckGoTools()],
-    markdown=True
+    markdown=True,
 )
 
-# Agent configuration for Bindu
 config = {
     "author": "bindu.builder@getbindu.com",
     "name": "medical_agent",
-    "description": "Medical research agent that provides health information, symptom analysis, and wellness guidance",
+    "description": (
+        "A medical research agent that provides general health information, "
+        "symptom education, and wellness guidance with safety disclaimers."
+    ),
     "deployment": {
         "url": "http://localhost:3773",
         "expose": True,
-        "cors_origins": ["http://localhost:5173"]
+        "cors_origins": ["http://localhost:5173"],
     },
     "skills": ["skills/medical-research-skill"],
 }
 
-# Message handler function
-def handler(messages: list[dict[str, str]]):
-    """
-    Process incoming messages and return agent response.
 
-    Args:
-        messages: List of message dictionaries containing conversation history
+def handler(messages: list[dict[str, str]]) -> str:
+    """Handle incoming Bindu messages."""
+    if not messages:
+        return (
+            "Please ask a health-related question. "
+            "Disclaimer: This is general health information, not professional medical advice."
+        )
 
-    Returns:
-        Agent response with medical information and appropriate disclaimers
-    """
-    # Extract the latest user message
-    if messages:
-        latest_message = messages[-1].get('content', '') if isinstance(messages[-1], dict) else str(messages[-1])
+    latest_message = messages[-1]
 
-        # Run the agent with the latest message
-        result = agent.run(input=latest_message)
+    if isinstance(latest_message, dict):
+        user_message = latest_message.get("content", "")
+    else:
+        user_message = str(latest_message)
 
-        # Format the response to be cleaner
-        if hasattr(result, 'content'):
-            return result.content
-        elif hasattr(result, 'response'):
-            return result.response
-        else:
-            return str(result)
+    if not user_message.strip():
+        return (
+            "Please provide a health-related question. "
+            "Disclaimer: This is general health information, not professional medical advice."
+        )
 
-    return "Please provide a health or medical question. Remember, I provide general information for educational purposes only."
+    result = agent.run(input=user_message)
 
-# Bindu-fy the agent - converts it to a discoverable, interoperable Bindu agent
-bindufy(config, handler)
+    if hasattr(result, "content"):
+        return str(result.content)
+
+    if hasattr(result, "response"):
+        return str(result.response)
+
+    return str(result)
+
+
+if __name__ == "__main__":
+    bindufy(config, handler)
