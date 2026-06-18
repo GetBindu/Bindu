@@ -1,3 +1,5 @@
+[![Listed on TakoAPI](https://img.shields.io/badge/Listed%20on-TakoAPI-7c3aed)](https://takoapi.com/agents/getbindu-bindu)
+
 <p align="center">
   <img src="./assets/bindu_logo.png" alt="Bindu" width="120" />
 </p>
