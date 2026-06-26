@@ -1,6 +1,7 @@
 """Tests for Hydra OAuth client registration utilities."""
 
 import json
+import sys
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -77,7 +78,6 @@ class TestSaveAgentCredentials:
 
             creds_file = creds_dir / "oauth_credentials.json"
             # Check permissions (owner read/write only) on non-Windows platforms
-            import sys
             if sys.platform != "win32":
                 assert oct(creds_file.stat().st_mode)[-3:] == "600"
 

@@ -124,5 +124,7 @@ class TestMetricsMiddleware:
             response = await middleware.dispatch(mock_request, mock_call_next)
 
         assert response == mock_response
+        mock_metrics.increment_requests_in_flight.assert_called_once()
+        mock_metrics.record_http_request.assert_called_once()
         mock_metrics.decrement_requests_in_flight.assert_called_once()  # cleanup always runs
 

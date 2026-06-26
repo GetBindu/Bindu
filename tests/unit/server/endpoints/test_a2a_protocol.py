@@ -22,8 +22,12 @@ def mock_app():
     """Create a mock BinduApplication."""
     app = MagicMock(spec=BinduApplication)
     app.task_manager = MagicMock()
-    # Mock the handler method on task_manager
-    app.task_manager.mock_handler = AsyncMock(return_value={"result": "success"})
+    # Mock the handler method on task_manager with a complete JSON-RPC 2.0 response
+    app.task_manager.mock_handler = AsyncMock(return_value={
+        "jsonrpc": "2.0",
+        "result": "success",
+        "id": "123"
+    })
     return app
 
 
@@ -58,8 +62,9 @@ async def test_valid_request(mock_app, mock_settings):
         pass
     mock_request.state = MockState()
 
-    # Call endpoint
-    response = await agent_run_endpoint(mock_app, mock_request)
+    with patch("bindu.server.endpoints.a2a_protocol.get_client_ip", return_value="127.0.0.1"):
+        # Call endpoint
+        response = await agent_run_endpoint(mock_app, mock_request)
 
     # Verify task manager handler was called
     mock_app.task_manager.mock_handler.assert_called_once()
@@ -68,7 +73,9 @@ async def test_valid_request(mock_app, mock_settings):
     assert isinstance(response, Response)
     assert response.status_code == 200
     content = json.loads(response.body)
+    assert content["jsonrpc"] == "2.0"
     assert content["result"] == "success"
+    assert "id" in content
 
 
 @pytest.mark.asyncio
@@ -77,14 +84,19 @@ async def test_invalid_json(mock_app):
     mock_request = MagicMock(spec=Request)
     mock_request.body = AsyncMock(return_value=b"invalid json")
 
-    response = await agent_run_endpoint(mock_app, mock_request)
+    with patch("bindu.server.endpoints.a2a_protocol.get_client_ip", return_value="127.0.0.1"):
+        response = await agent_run_endpoint(mock_app, mock_request)
 
     assert response.status_code == 400
+    content = json.loads(response.body)
+    assert "error" in content
+    assert content["error"]["code"] == -32700
+    assert "message" in content["error"]
 
 
 @pytest.mark.asyncio
-async def test_unsupported_method(mock_app, mock_settings):
-    """Test handling of unsupported method."""
+async def test_unsupported_method_schema_validation_error(mock_app, mock_settings):
+    """Test that an unrecognized method tag causes discriminated union validation to fail, returning 400."""
     body = {
         "jsonrpc": "2.0",
         "method": "unknown/method",
@@ -94,10 +106,42 @@ async def test_unsupported_method(mock_app, mock_settings):
     mock_request = MagicMock(spec=Request)
     mock_request.body = AsyncMock(return_value=json.dumps(body).encode())
 
-    response = await agent_run_endpoint(mock_app, mock_request)
+    with patch("bindu.server.endpoints.a2a_protocol.get_client_ip", return_value="127.0.0.1"):
+        response = await agent_run_endpoint(mock_app, mock_request)
 
     assert response.status_code == 400
-    # Validation fails for unknown method tag in discriminated union
+    content = json.loads(response.body)
+    assert "error" in content
+    assert content["error"]["code"] == -32700
+    assert "message" in content["error"]
+
+
+@pytest.mark.asyncio
+async def test_method_not_found_error(mock_app, mock_settings):
+    """Test that a valid method literal that has no handler triggers MethodNotFoundError and returns 404."""
+    # "tasks/get" is a valid union discriminator method, but it is not present in mock_settings handler list
+    body = {
+        "jsonrpc": "2.0",
+        "method": "tasks/get",
+        "params": {"taskId": str(uuid.uuid4())},
+        "id": str(uuid.uuid4()),
+    }
+    
+    mock_request = MagicMock(spec=Request)
+    mock_request.body = AsyncMock(return_value=json.dumps(body).encode())
+    
+    class MockState:
+        pass
+    mock_request.state = MockState()
+
+    with patch("bindu.server.endpoints.a2a_protocol.get_client_ip", return_value="127.0.0.1"):
+        response = await agent_run_endpoint(mock_app, mock_request)
+
+    assert response.status_code == 404
+    content = json.loads(response.body)
+    assert "error" in content
+    assert content["error"]["code"] == -32601
+    assert "message" in content["error"]
 
 
 @pytest.mark.asyncio

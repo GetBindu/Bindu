@@ -1,5 +1,6 @@
 """Unit tests for Redis Scheduler."""
 
+import asyncio
 import json
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -69,9 +70,10 @@ async def test_push_task(scheduler, mock_redis_client):
         assert payload["operation"] == "run"
         assert payload["params"]["to"] == "agent-id"
         assert payload["params"]["input"] == {"text": "hello"}
-        # Span ID might be null or present depending on OpenTelemetry mock state, 
+        # Span ID and trace ID might be null or present depending on OpenTelemetry mock state, 
         # checking structure is enough.
         assert "span_id" in payload
+        assert "trace_id" in payload
 
 
 @pytest.mark.asyncio
@@ -86,6 +88,8 @@ async def test_push_task_calls(scheduler, mock_redis_client):
         assert mock_redis_client.rpush.call_count == 1
         payload = json.loads(mock_redis_client.rpush.call_args[0][1])
         assert payload["operation"] == "cancel"
+        assert "span_id" in payload
+        assert "trace_id" in payload
         mock_redis_client.rpush.reset_mock()
         
         # Pause
@@ -93,6 +97,8 @@ async def test_push_task_calls(scheduler, mock_redis_client):
         assert mock_redis_client.rpush.call_count == 1
         payload = json.loads(mock_redis_client.rpush.call_args[0][1])
         assert payload["operation"] == "pause"
+        assert "span_id" in payload
+        assert "trace_id" in payload
         mock_redis_client.rpush.reset_mock()
 
         # Resume
@@ -100,6 +106,8 @@ async def test_push_task_calls(scheduler, mock_redis_client):
         assert mock_redis_client.rpush.call_count == 1
         payload = json.loads(mock_redis_client.rpush.call_args[0][1])
         assert payload["operation"] == "resume"
+        assert "span_id" in payload
+        assert "trace_id" in payload
 
 
 @pytest.mark.asyncio
@@ -119,17 +127,14 @@ async def test_receive_task(scheduler, mock_redis_client):
         }
         mock_redis_client.blpop.side_effect = [
             ("bindu:tasks", json.dumps(task_data)),
-            RuntimeError("StopLoop")  # Break the infinite loop for testing
         ]
         
         # Consume generator
-        try:
-            async for operation in scheduler.receive_task_operations():
-                assert operation["operation"] == "run"
-                assert operation["params"]["to"] == "agent-id"
-                break # Only verify first item
-        except RuntimeError:
-            pass # Expected from side_effect
+        operations = scheduler.receive_task_operations()
+        operation = await asyncio.wait_for(anext(operations), timeout=1)
+        assert operation["operation"] == "run"
+        assert operation["params"]["to"] == "agent-id"
+        await operations.aclose()
             
         mock_redis_client.blpop.assert_called()
 
@@ -148,18 +153,15 @@ async def test_receive_task_uuids(scheduler, mock_redis_client):
         
         mock_redis_client.blpop.side_effect = [
             ("bindu:tasks", json.dumps(task_data)),
-            RuntimeError("StopLoop")
         ]
         
-        try:
-            async for operation in scheduler.receive_task_operations():
-                assert operation["operation"] == "cancel"
-                received_id = operation["params"]["taskId"]
-                assert isinstance(received_id, uuid.UUID)
-                assert str(received_id) == task_id
-                break
-        except RuntimeError:
-            pass
+        operations = scheduler.receive_task_operations()
+        operation = await asyncio.wait_for(anext(operations), timeout=1)
+        assert operation["operation"] == "cancel"
+        received_id = operation["params"]["taskId"]
+        assert isinstance(received_id, uuid.UUID)
+        assert str(received_id) == task_id
+        await operations.aclose()
 
 
 @pytest.mark.asyncio
@@ -170,7 +172,6 @@ async def test_receive_error_handling(scheduler, mock_redis_client):
         # 1. Invalid JSON (should be logged and skipped)
         # 2. Redis Error (should be logged and skipped/retried)
         # 3. Valid Item
-        # 4. Stop
         
         valid_task = {
             "operation": "run", 
@@ -184,20 +185,15 @@ async def test_receive_error_handling(scheduler, mock_redis_client):
             ("queue", "invalid-json"),
             redis.RedisError("Redis temporarily down"),
             ("queue", json.dumps(valid_task)),
-            RuntimeError("StopLoop")
         ]
         
-        items = []
-        try:
-            async for op in scheduler.receive_task_operations():
-                items.append(op)
-                if len(items) >= 1:
-                    break
-        except RuntimeError:
-            pass
+        with patch("bindu.server.scheduler.redis_scheduler.asyncio.sleep") as mock_sleep:
+            operations = scheduler.receive_task_operations()
+            op = await asyncio.wait_for(anext(operations), timeout=1)
+            assert op["operation"] == "run"
+            await operations.aclose()
+            mock_sleep.assert_called_once()
             
-        assert len(items) == 1
-        assert items[0]["operation"] == "run"
         # Verify it called blpop multiple times despite errors
         assert mock_redis_client.blpop.call_count >= 3
 
