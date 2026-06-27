@@ -370,6 +370,11 @@ class X402Settings(BaseSettings):
     pay_to_env: str = "X402_PAY_TO"
     max_timeout_seconds: int = 600
 
+    # TRACE Trust API Integration
+    trace_api_key: str | None = "sk_test_123"
+    trace_min_score: float = 0.35
+    trace_api_url: str = "https://trace-api-sigma.vercel.app"
+
     # Extension URI
     extension_uri: str = "https://github.com/google-a2a/a2a-x402/v0.1"
 
