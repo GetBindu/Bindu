@@ -226,7 +226,12 @@ class X402Middleware(BaseHTTPMiddleware):
                     )
                 if trace_resp.status_code == 200:
                     trace_result = trace_resp.json()
-                    score = trace_result.get("score", 1.0)
+                    
+                    try:
+                        score = float(trace_result.get("score", 1.0))
+                    except (TypeError, ValueError):
+                        score = 1.0
+                        
                     decision = trace_result.get("routing_decision")
                     if (
                         decision in ("HOLD", "INVESTIGATE")

@@ -371,7 +371,7 @@ class X402Settings(BaseSettings):
     max_timeout_seconds: int = 600
 
     # TRACE Trust API Integration
-    trace_api_key: str | None = "sk_test_123"
+    trace_api_key: str | None = None
     trace_min_score: float = 0.35
     trace_api_url: str = "https://trace-api-sigma.vercel.app"
 
