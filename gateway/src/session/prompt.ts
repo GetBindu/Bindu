@@ -239,6 +239,7 @@ export const layer = Layer.effect(
             abortSignal: input.abort,
           })
 
+          const partsByReasoning = new Map<string, import("./message").ReasoningPart>()
           const partsByText = new Map<string, TextPart>()
           const partsByCall = new Map<string, ToolPart>()
           let stopReason: AssistantMessageInfo["stopReason"] = "stop"
@@ -253,6 +254,22 @@ export const layer = Layer.effect(
               switch (evt.type) {
                 case "start":
                   return
+                case "reasoning-delta":
+                case "reasoning-end": {
+                  // Keep MiniMax reasoning for later tool/history replay, not UI text.
+                  if (providerID !== "minimax") return
+                  const part = partsByReasoning.get(evt.id) ?? {
+                    id: newPartID(),
+                    type: "reasoning" as const,
+                    text: "",
+                  }
+                  part.text += evt.delta ?? ""
+                  if (evt.providerMetadata) {
+                    part.providerMetadata = { ...part.providerMetadata, ...evt.providerMetadata }
+                  }
+                  partsByReasoning.set(evt.id, part)
+                  return
+                }
                 case "text-delta": {
                   const existing = partsByText.get(evt.id)
                   if (existing) {
@@ -410,8 +427,9 @@ export const layer = Layer.effect(
             })
           }
 
-          // Assemble final parts in the order they arrived: text first, then tool calls.
+          // Keep reasoning before text and tool calls when replaying the assistant turn.
           const finalParts: Part[] = [
+            ...Array.from(partsByReasoning.values()),
             ...Array.from(partsByText.values()),
             ...Array.from(partsByCall.values()),
           ]

@@ -44,6 +44,12 @@ export type StreamEvent =
   | { type: "text-delta"; id: string; delta: string }
   | { type: "text-end"; id: string }
   | {
+      type: "reasoning-delta" | "reasoning-end"
+      id: string
+      delta?: string
+      providerMetadata?: import("./message").ReasoningPart["providerMetadata"]
+    }
+  | {
       type: "tool-call"
       toolCallId: string
       toolName: string
@@ -146,6 +152,14 @@ function mapEvent(evt: any): StreamEvent | null {
       return { type: "text-delta", id: evt.id, delta: evt.text }
     case "text-end":
       return { type: "text-end", id: evt.id }
+    case "reasoning-delta":
+    case "reasoning-end":
+      return {
+        type: evt.type,
+        id: evt.id,
+        delta: evt.text,
+        providerMetadata: evt.providerMetadata,
+      }
     case "tool-call":
       return {
         type: "tool-call",

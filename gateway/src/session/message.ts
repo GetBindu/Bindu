@@ -83,7 +83,15 @@ export const ToolPart = z.object({
 })
 export type ToolPart = z.infer<typeof ToolPart>
 
-export const Part = z.discriminatedUnion("type", [TextPart, FilePart, ToolPart])
+export const ReasoningPart = z.object({
+  id: PartID,
+  type: z.literal("reasoning"),
+  text: z.string(),
+  providerMetadata: z.record(z.string(), z.record(z.string(), z.json())).optional(),
+})
+export type ReasoningPart = z.infer<typeof ReasoningPart>
+
+export const Part = z.discriminatedUnion("type", [TextPart, FilePart, ToolPart, ReasoningPart])
 export type Part = z.infer<typeof Part>
 
 export const UserMessageInfo = z.object({
@@ -165,6 +173,9 @@ export function toModelMessages(messages: MessageWithParts[]): import("ai").Mode
     let text = ""
     for (const p of msg.parts) {
       if (p.type === "text") text += p.text
+      if (p.type === "reasoning") {
+        toolCalls.push({ type: "reasoning", text: p.text, providerOptions: p.providerMetadata })
+      }
       if (p.type === "tool") {
         toolCalls.push({
           type: "tool-call",
@@ -174,7 +185,10 @@ export function toModelMessages(messages: MessageWithParts[]): import("ai").Mode
         })
       }
     }
-    if (text) toolCalls.unshift({ type: "text", text })
+    if (text) {
+      const reasoningCount = toolCalls.filter((part) => part.type === "reasoning").length
+      toolCalls.splice(reasoningCount, 0, { type: "text", text })
+    }
     if (toolCalls.length > 0) out.push({ role: "assistant", content: toolCalls })
     else if (text) out.push({ role: "assistant", content: text })
 

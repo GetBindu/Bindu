@@ -1,10 +1,10 @@
 """MiniMax AI Research Agent
 
-A Bindu agent powered by MiniMax's M3 model via OpenAI-compatible API.
+A Bindu agent powered by MiniMax-M3.1-Flash via OpenAI-compatible API.
 MiniMax offers high-performance models with up to 1M context window.
 
 Features:
-- MiniMax M3 model (1M context)
+- MiniMax M3.1 Flash model (1M context)
 - Web search integration via DuckDuckGo
 - Research and summarization capabilities
 
@@ -13,6 +13,7 @@ Usage:
 
 Environment:
     Requires MINIMAX_API_KEY in .env file
+    MINIMAX_MODEL optionally selects MiniMax-M3 or an explicit saved/custom ID
     Get your API key at https://platform.minimaxi.com
 """
 
@@ -31,11 +32,11 @@ load_dotenv()
 MINIMAX_API_KEY = os.getenv("MINIMAX_API_KEY")
 MINIMAX_BASE_URL = "https://api.minimax.io/v1"
 
-# Define your agent with MiniMax M3
+# Define your agent with MiniMax M3.1 Flash
 agent = Agent(
     instructions="You are a research assistant that finds and summarizes information.",
     model=OpenAILike(
-        id="MiniMax-M3",
+        id=os.getenv("MINIMAX_MODEL", "MiniMax-M3.1-Flash"),
         api_key=MINIMAX_API_KEY,
         base_url=MINIMAX_BASE_URL,
     ),

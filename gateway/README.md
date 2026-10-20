@@ -21,7 +21,7 @@ This README is the **operator's reference** — configuration, troubleshooting, 
 ```bash
 cd gateway
 npm install
-cp .env.example .env.local    # fill in GATEWAY_API_KEY, OPENROUTER_API_KEY
+cp .env.example .env.local    # fill in GATEWAY_API_KEY and one planner provider key
 npm run dev
 ```
 
@@ -84,7 +84,8 @@ For a runnable multi-agent walkthrough, see [`docs/GATEWAY.md`](../docs/GATEWAY.
 | Variable | Purpose |
 |---|---|
 | `GATEWAY_API_KEY` | Bearer token that callers must send |
-| `OPENROUTER_API_KEY` | Planner LLM provider |
+| `OPENROUTER_API_KEY` | Planner LLM provider when using an OpenRouter model |
+| `MINIMAX_API_KEY` | Planner LLM provider when using a direct MiniMax model |
 
 The gateway used to require `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` for session storage. Those are no longer used — sessions live in-memory, the calling client owns durable history.
 
@@ -106,6 +107,66 @@ See `.env.example` for the full template.
 ### Config file
 
 Some settings live in a TOML/JSON config file (path resolved hierarchically like OpenCode). Source of truth: [`src/config/schema.ts`](./src/config/schema.ts) — defaults are inline.
+
+### Direct MiniMax provider
+
+The provider registry offers these current models, with Flash first:
+
+| Model | Context window | Input modalities | Thinking |
+|---|---:|---|---|
+| `MiniMax-M3.1-Flash` | 1,000,000 | text, image, video | adaptive only |
+| `MiniMax-M3` | 1,000,000 | text, image, video | adaptive, disabled |
+
+Flash supports up to 524,288 output tokens. Its default reasoning effort is
+`max`; the API also supports `low`, `medium`, `high`, and `xhigh`. The gateway
+uses the API's effort default and enables adaptive thinking for Flash on the
+Anthropic-compatible route. M3 retains each protocol's thinking default.
+
+The registry carries standard token pricing (USD per million tokens):
+
+| Model / input length | Input | Output | Cache read | Cache write |
+|---|---:|---:|---:|---:|
+| `MiniMax-M3.1-Flash` | 0.15 | 0.60 | 0.015 | Unknown |
+| `MiniMax-M3`, up to 512k | 0.30 | 1.20 | 0.06 | Unknown |
+| `MiniMax-M3`, above 512k | 0.60 | 2.40 | 0.12 | Unknown |
+
+An empty MiniMax model suffix (`minimax/`) selects Flash. Explicit saved IDs,
+including legacy models and custom deployments, are preserved. The planner's
+default provider is unchanged. Model capabilities describe the API; the gateway's
+existing attachment path currently handles images.
+
+Use the provider prefix in the planner configuration:
+
+```json
+{
+  "provider": {
+    "minimax": {
+      "apiKey": "$MINIMAX_API_KEY",
+      "region": "global_en",
+      "protocol": "openai"
+    }
+  },
+  "agent": {
+    "planner": { "model": "minimax/MiniMax-M3.1-Flash" }
+  }
+}
+```
+
+The regional endpoint map is available through the `region` setting:
+
+| Region | OpenAI-compatible base | Anthropic-compatible base |
+|---|---|---|
+| `global_en` | `https://api.minimax.io/v1` | `https://api.minimax.io/anthropic` |
+| `cn_zh` | `https://api.minimaxi.com/v1` | `https://api.minimaxi.com/anthropic` |
+
+Set `protocol` to `anthropic` for the Anthropic-compatible adapter. The public
+base has `/v1` appended for the AI SDK's `/messages` route. Custom bases already
+ending in `/v1` are accepted unchanged.
+
+Model details and endpoint documentation:
+
+- [MiniMax global API overview](https://platform.minimax.io/docs/api-reference/api-overview)
+- [MiniMax China API overview](https://platform.minimaxi.com/docs/api-reference/api-overview)
 
 ---
 

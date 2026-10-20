@@ -55,10 +55,26 @@ class TestMiniMaxExampleFile:
         source = EXAMPLE_PATH.read_text()
         assert "https://api.minimax.io/v1" in source
 
-    def test_example_uses_minimax_m3(self):
-        """Verify the example uses MiniMax-M3 model."""
-        source = EXAMPLE_PATH.read_text()
-        assert "MiniMax-M3" in source
+    @pytest.mark.parametrize(
+        "saved_model", [None, "MiniMax-M3", "MiniMax-M2.7", "custom"]
+    )
+    def test_example_model_default_and_override(self, monkeypatch, saved_model):
+        """Default to Flash while preserving explicitly configured model IDs."""
+        if saved_model is None:
+            monkeypatch.delenv("MINIMAX_MODEL", raising=False)
+        else:
+            monkeypatch.setenv("MINIMAX_MODEL", saved_model)
+        tree = ast.parse(EXAMPLE_PATH.read_text())
+        model_call = next(
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "OpenAILike"
+        )
+        model_id = next(item.value for item in model_call.keywords if item.arg == "id")
+        expression = compile(ast.Expression(model_id), str(EXAMPLE_PATH), "eval")
+        assert eval(expression, {"os": os}) == (saved_model or "MiniMax-M3.1-Flash")
 
     def test_example_reads_api_key_from_env(self):
         """Verify the example reads MINIMAX_API_KEY from env."""
