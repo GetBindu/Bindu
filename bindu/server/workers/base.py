@@ -39,6 +39,11 @@ from bindu.utils.logging import get_logger
 tracer = get_tracer(__name__)
 logger = get_logger(__name__)
 
+# Bound on the shielded scheduler send during shutdown requeue: long enough
+# for a healthy broker round-trip, short enough that a dead consumer can't
+# wedge worker exit.
+REQUEUE_SEND_TIMEOUT_SECONDS = 5.0
+
 
 @dataclass
 class Worker(ABC):
@@ -274,10 +279,16 @@ class Worker(ABC):
         task_id = task_operation["params"]["task_id"]
         try:
             # Only run operations reach this method (_run_task_operation),
-            # so the params are TaskSendParams by construction.
-            await self.scheduler.run_task(
-                cast("TaskSendParams", task_operation["params"])
-            )
+            # so the params are TaskSendParams by construction. The send is
+            # bounded: it runs under the shutdown shield, and an in-memory
+            # stream whose consumer (this worker's loop) is already gone
+            # can fill up and would otherwise block the shielded send
+            # forever, wedging worker exit. A timeout lands in the fallback
+            # below instead.
+            with anyio.fail_after(REQUEUE_SEND_TIMEOUT_SECONDS):
+                await self.scheduler.run_task(
+                    cast("TaskSendParams", task_operation["params"])
+                )
             logger.info(f"Task {task_id} requeued; worker shut down before it started")
         except Exception as e:  # noqa: BLE001 - best-effort during shutdown
             logger.warning(f"Could not requeue task {task_id} on shutdown: {e}")

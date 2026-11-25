@@ -204,6 +204,11 @@ class ManifestWorker(Worker):
             task["id"], state="working", expected_states=("submitted",)
         )
         if updated is None:
+            # A cancel won between the queued-state check and here. If the
+            # payment already settled (shielded block above), record the
+            # orphan — money moved and no deliverable will be produced.
+            if settlement_metadata:
+                await self._record_orphaned_payment(task["id"], settlement_metadata)
             logger.info(
                 f"Task {task['id']} left 'submitted' before execution; skipping run"
             )
@@ -306,16 +311,12 @@ class ManifestWorker(Worker):
             # tasks/cancel (or shutdown) interrupted the run. If the payer
             # was already debited (settle-first), re-tag the persisted
             # receipt so operators can find canceled-but-paid tasks for
-            # reconciliation — money moved, no artifact was delivered.
+            # reconciliation — money moved, no artifact was delivered. The
+            # helper's guard keeps an interrupt that lands AFTER the
+            # completion write committed (e.g. during the notification
+            # awaits) from re-tagging a task whose deliverable exists.
             if settlement_metadata:
-                with anyio.CancelScope(shield=True):
-                    await self.storage.update_task(
-                        task["id"],
-                        metadata={
-                            **settlement_metadata,
-                            app_settings.x402.meta_status_key: "payment-orphaned",
-                        },
-                    )
+                await self._record_orphaned_payment(task["id"], settlement_metadata)
             raise
         except Exception as e:
             # Handle task failure with error message
@@ -805,10 +806,33 @@ class ManifestWorker(Worker):
         if updated is None:
             # The task went terminal (canceled) while failing. Keep the
             # orphan-payment reconciliation data without touching the state.
-            if metadata:
-                await self.storage.update_task(task["id"], metadata=metadata)
+            if settlement_metadata:
+                await self._record_orphaned_payment(task["id"], settlement_metadata)
             return
         await self._notify_lifecycle(task["id"], task["context_id"], "failed", True)
+
+    async def _record_orphaned_payment(
+        self, task_id: UUID, settlement_metadata: dict[str, Any]
+    ) -> None:
+        """Tag a settled payment whose run ended without a committed deliverable.
+
+        Shielded, so an in-flight cancellation cannot drop the
+        reconciliation record; guarded, so a completion that already
+        committed its artifacts is never re-tagged — the write lands only
+        in non-terminal states or 'canceled', never over
+        completed/failed/rejected (the failure path tags orphans inside its
+        own guarded write).
+        """
+        allowed = tuple(app_settings.agent.non_terminal_states) + ("canceled",)
+        with anyio.CancelScope(shield=True):
+            await self.storage.update_task(
+                task_id,
+                metadata={
+                    **settlement_metadata,
+                    app_settings.x402.meta_status_key: "payment-orphaned",
+                },
+                expected_states=allowed,
+            )
 
     async def _settle_payment(self, payment_context: dict[str, Any]) -> dict[str, Any]:
         """Settle payment after successful task completion.

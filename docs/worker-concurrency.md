@@ -62,9 +62,12 @@ once in one agent process; it is the spend bound for provider calls.
 - **A crash can drop consumed operations.** The dispatcher drains the
   scheduler eagerly (that is what keeps cancels from queueing), so with the
   Redis scheduler a hard kill loses operations that were popped but not yet
-  finished; the tasks stay `submitted` in storage. Graceful shutdown
-  requeues them (see above). The planned fix is a separate control channel
-  plus bounded prefetch with acknowledged delivery.
+  finished. A task that never started stays `submitted`; one that was
+  mid-run stays `working` — sweep for both states after a hard kill, or
+  you will miss interrupted runs. Graceful shutdown requeues the former
+  and finalizes the latter as `canceled` (see above). The planned fix is a
+  separate control channel plus bounded prefetch with acknowledged
+  delivery.
 
 ## Verifying it on your agent
 

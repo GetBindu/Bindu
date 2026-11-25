@@ -447,7 +447,7 @@ class TestTerminalWriteGuards:
         task_id = await submit(memory_storage, ctx, "race")
         task_after = await submit(memory_storage, uuid4(), "after")
 
-        async with running_worker(scheduler, memory_storage, manifest, cap=1):
+        async with running_worker(scheduler, memory_storage, manifest, cap=1) as worker:
             await scheduler.run_task({"task_id": task_id, "context_id": ctx})
             with anyio.fail_after(WAIT):
                 await gate.started.wait()
@@ -460,10 +460,12 @@ class TestTerminalWriteGuards:
             gate.release.set()
 
             # The handler runs to completion; its write must be rejected.
+            # Explicit checkpoint: wait until the worker has finished
+            # processing the run (scope deregistered AFTER all writes), so
+            # the assertion cannot race a still-pending late write.
             with anyio.fail_after(WAIT):
-                while not gate.completed:
+                while not gate.completed or worker._in_flight_scopes:
                     await anyio.sleep(0.01)
-            await anyio.sleep(0.05)
 
             task = await memory_storage.load_task(task_id)
             assert task["status"]["state"] == "canceled"
@@ -492,7 +494,7 @@ class TestTerminalWriteGuards:
         ctx = uuid4()
         task_id = await submit(memory_storage, ctx, "failrace")
 
-        async with running_worker(scheduler, memory_storage, manifest, cap=1):
+        async with running_worker(scheduler, memory_storage, manifest, cap=1) as worker:
             await scheduler.run_task({"task_id": task_id, "context_id": ctx})
             with anyio.fail_after(WAIT):
                 await gate.started.wait()
@@ -501,7 +503,11 @@ class TestTerminalWriteGuards:
                 task_id, from_state="working", to_state="canceled"
             )
             gate.release.set()
-            await anyio.sleep(0.1)
+            # Explicit checkpoint: the failure write has happened (or been
+            # rejected) once the run deregisters its scope.
+            with anyio.fail_after(WAIT):
+                while worker._in_flight_scopes:
+                    await anyio.sleep(0.01)
 
             task = await memory_storage.load_task(task_id)
             assert task["status"]["state"] == "canceled", (
@@ -574,6 +580,60 @@ class TestTerminalWriteGuards:
             assert not stalled.completed
 
     @pytest.mark.asyncio
+    async def test_cancel_during_settlement_tags_orphan_on_skip(
+        self, scheduler, memory_storage
+    ):
+        """A cancel landing while settlement is in its shielded block makes
+        the working guard skip the run — the settled payment must still be
+        recorded as orphaned even though the handler never executed."""
+        from bindu.settings import app_settings
+
+        manifest = ScriptedManifest()
+        never = Gate()  # must never start
+        manifest.scripts = {"paidskip": never.script()}
+        ctx = uuid4()
+        task_id = await submit(memory_storage, ctx, "paidskip")
+
+        async with running_worker(scheduler, memory_storage, manifest, cap=1) as worker:
+
+            async def settle_and_lose_race(payment_context):
+                # The API cancel CAS lands while settlement is in flight.
+                await memory_storage.update_task_state_if(
+                    task_id, from_state="submitted", to_state="canceled"
+                )
+                return {
+                    app_settings.x402.meta_status_key: (
+                        app_settings.x402.status_completed
+                    ),
+                    "x402.payment.receipts": [{"transaction": "0xskip"}],
+                }
+
+            worker._settle_payment = settle_and_lose_race
+
+            await scheduler.run_task(
+                {
+                    "task_id": task_id,
+                    "context_id": ctx,
+                    "payment_context": {"simulated": True},
+                }
+            )
+
+            with anyio.fail_after(WAIT):
+                while True:
+                    task = await memory_storage.load_task(task_id)
+                    metadata = task.get("metadata") or {}
+                    if (
+                        metadata.get(app_settings.x402.meta_status_key)
+                        == "payment-orphaned"
+                    ):
+                        break
+                    await anyio.sleep(0.01)
+
+            assert task["status"]["state"] == "canceled"
+            assert metadata["x402.payment.receipts"][0]["transaction"] == "0xskip"
+            assert not never.started.is_set(), "the run must be skipped entirely"
+
+    @pytest.mark.asyncio
     async def test_shutdown_requeues_unstarted_task(self, scheduler, memory_storage):
         """Graceful shutdown: the running task is finalized as canceled, but a
         task still waiting on the concurrency gates goes back to the scheduler
@@ -605,14 +665,17 @@ class TestTerminalWriteGuards:
         t_running = await submit(memory_storage, ctx1, "running")
         t_queued = await submit(memory_storage, ctx2, "queued")
 
-        async with running_worker(spy, memory_storage, manifest, cap=1):
+        async with running_worker(spy, memory_storage, manifest, cap=1) as worker:
             await spy.run_task({"task_id": t_running, "context_id": ctx1})
             await spy.run_task({"task_id": t_queued, "context_id": ctx2})
             with anyio.fail_after(WAIT):
                 await g_running.started.wait()
-            # Let eager dispatch consume the queued operation so it is
-            # parked on the semaphore when the worker shuts down.
-            await anyio.sleep(0.1)
+            # Explicit checkpoint: the queued operation has been consumed by
+            # eager dispatch once its context guard registers — it is then
+            # parked on the semaphore and must be requeued at shutdown.
+            with anyio.fail_after(WAIT):
+                while str(ctx2) not in worker._context_lock_refs:
+                    await anyio.sleep(0.01)
 
         assert spy.run_sends == 3, "shutdown must requeue the un-started run"
         assert (await memory_storage.load_task(t_running))["status"][
@@ -721,3 +784,29 @@ class TestGuardFallbackBranches:
         reloaded = await memory_storage.load_task(task_id)
         assert reloaded["status"]["state"] == "canceled"
         assert all(m.get("role") != "agent" for m in reloaded.get("history", []))
+
+    @pytest.mark.asyncio
+    async def test_orphan_tag_never_lands_on_completed_task(self, memory_storage):
+        """An interrupt after the completion write committed (e.g. during
+        the notification awaits) must not re-tag a delivered task: the
+        payment stays payment-completed."""
+        from bindu.settings import app_settings
+
+        worker = self.make_worker(memory_storage)
+        task_id = await submit(memory_storage, uuid4(), "done")
+        receipt = {
+            app_settings.x402.meta_status_key: app_settings.x402.status_completed,
+            "x402.payment.receipts": [{"transaction": "0xdone"}],
+        }
+        await memory_storage.update_task(task_id, state="working")
+        await memory_storage.update_task(
+            task_id, state="completed", metadata=dict(receipt)
+        )
+
+        await worker._record_orphaned_payment(task_id, dict(receipt))
+
+        reloaded = await memory_storage.load_task(task_id)
+        assert (
+            reloaded["metadata"][app_settings.x402.meta_status_key]
+            == app_settings.x402.status_completed
+        ), "a committed deliverable keeps its payment-completed status"

@@ -105,6 +105,12 @@ class MessageHandlers:
                         state="failed",
                         expected_states=app_settings.agent.non_terminal_states,
                     )
+                    if updated is None:
+                        # The guard lost to a concurrent terminal transition
+                        # (e.g. cancel). Report that state — not the stale
+                        # 'working' read above, which would end the stream
+                        # on a non-final event.
+                        updated = await self.storage.load_task(task["id"])
                     if updated and "status" in updated:
                         current_state = updated["status"]["state"]
                         timestamp = updated["status"]["timestamp"]
