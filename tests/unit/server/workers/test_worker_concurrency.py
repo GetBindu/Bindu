@@ -626,3 +626,98 @@ class TestTerminalWriteGuards:
         g_queued.release.set()
         async with running_worker(spy, memory_storage, manifest, cap=1):
             await wait_for_state(memory_storage, t_queued, "completed")
+
+
+class TestGuardFallbackBranches:
+    """Direct-call coverage of the guard-failure branches: what each write
+    path does when another writer already made the task terminal."""
+
+    @staticmethod
+    def make_worker(memory_storage, scheduler=None):
+        return ManifestWorker(
+            manifest=Mock(),  # type: ignore[arg-type]
+            scheduler=scheduler or Mock(),
+            storage=memory_storage,
+        )
+
+    @pytest.mark.asyncio
+    async def test_requeue_fallback_finalizes_when_scheduler_refuses(
+        self, memory_storage
+    ):
+        """If the scheduler no longer accepts sends during shutdown, the
+        un-started task is finalized as canceled, never silently lost."""
+
+        class RefusingScheduler:
+            async def run_task(self, params):
+                raise RuntimeError("stream closed")
+
+        worker = self.make_worker(memory_storage, scheduler=RefusingScheduler())
+        task_id = await submit(memory_storage, uuid4(), "lost")
+
+        await worker._requeue_task_operation(
+            {"operation": "run", "params": {"task_id": task_id}}  # type: ignore[typeddict-item]
+        )
+
+        task = await memory_storage.load_task(task_id)
+        assert task["status"]["state"] == "canceled"
+
+    @pytest.mark.asyncio
+    async def test_settlement_failure_skips_terminal_task(self, memory_storage):
+        """A settlement-failure write only lands while the task is still
+        'submitted'; a canceled task is left untouched."""
+        worker = self.make_worker(memory_storage)
+        task_id = await submit(memory_storage, uuid4(), "paid")
+        await memory_storage.update_task(task_id, state="canceled")
+        task = await memory_storage.load_task(task_id)
+
+        await worker._handle_settlement_failure(task, {"error": "insufficient"})
+
+        reloaded = await memory_storage.load_task(task_id)
+        assert reloaded["status"]["state"] == "canceled"
+        assert all(m.get("role") != "agent" for m in reloaded.get("history", [])), (
+            "no failure message may be appended to a terminal task"
+        )
+
+    @pytest.mark.asyncio
+    async def test_task_failure_after_cancel_keeps_orphan_metadata(
+        self, memory_storage
+    ):
+        """_handle_task_failure losing the race to a cancel must still
+        persist the orphan-payment reconciliation data, without flipping
+        the state to failed."""
+        from bindu.settings import app_settings
+
+        worker = self.make_worker(memory_storage)
+        task_id = await submit(memory_storage, uuid4(), "paid")
+        await memory_storage.update_task(task_id, state="canceled")
+        task = await memory_storage.load_task(task_id)
+
+        await worker._handle_task_failure(
+            task,
+            "boom",
+            settlement_metadata={
+                app_settings.x402.meta_status_key: app_settings.x402.status_completed,
+                "x402.payment.receipts": [{"transaction": "0xdef"}],
+            },
+        )
+
+        reloaded = await memory_storage.load_task(task_id)
+        assert reloaded["status"]["state"] == "canceled"
+        metadata = reloaded.get("metadata") or {}
+        assert metadata.get(app_settings.x402.meta_status_key) == "payment-orphaned"
+        assert metadata["x402.payment.receipts"][0]["transaction"] == "0xdef"
+
+    @pytest.mark.asyncio
+    async def test_intermediate_state_discarded_when_not_working(self, memory_storage):
+        """A late input-required transition is discarded once the task is
+        no longer 'working'."""
+        worker = self.make_worker(memory_storage)
+        task_id = await submit(memory_storage, uuid4(), "ask")
+        await memory_storage.update_task(task_id, state="canceled")
+        task = await memory_storage.load_task(task_id)
+
+        await worker._handle_intermediate_state(task, "input-required", "more info?")
+
+        reloaded = await memory_storage.load_task(task_id)
+        assert reloaded["status"]["state"] == "canceled"
+        assert all(m.get("role") != "agent" for m in reloaded.get("history", []))
