@@ -22,7 +22,7 @@ from __future__ import annotations as _annotations
 
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager, nullcontext
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, AsyncIterator
 
 import anyio
@@ -69,6 +69,35 @@ class Worker(ABC):
     storage: Storage[Any]
     """Storage backend for task and context persistence."""
 
+    max_concurrent_tasks: int = field(default=1, kw_only=True)
+    """Maximum run operations this worker executes concurrently.
+
+    Defaults to 1 — strict serial execution, identical to the historical
+    behaviour. Regardless of this cap, run operations that share a
+    context_id are always serialized in arrival order: agents with
+    enable_context_based_history build their message list from the
+    context's pre-turn history, so two same-context tasks running at once
+    would read the same history and write over each other.
+    """
+
+    _run_semaphore: anyio.Semaphore | None = field(default=None, init=False, repr=False)
+    """Caps concurrent run executions. Created when the worker starts."""
+
+    _context_locks: dict[str, anyio.Lock] = field(
+        default_factory=dict, init=False, repr=False
+    )
+    """Per-context_id locks serializing same-context runs in arrival order."""
+
+    _context_lock_refs: dict[str, int] = field(
+        default_factory=dict, init=False, repr=False
+    )
+    """Holder/waiter counts for _context_locks so idle locks are dropped."""
+
+    _in_flight_scopes: dict[Any, anyio.CancelScope] = field(
+        default_factory=dict, init=False, repr=False
+    )
+    """Cancel scope per executing task_id, so cancel_task can interrupt the run."""
+
     # -------------------------------------------------------------------------
     # Worker Lifecycle
     # -------------------------------------------------------------------------
@@ -80,7 +109,8 @@ class Worker(ABC):
         Context manager that:
         1. Starts the worker loop in a task group
         2. Yields control to caller
-        3. Cancels worker on exit
+        3. Cancels worker on exit (in-flight runs are marked canceled, not
+           stranded in 'working' — see _finalize_interrupted_task)
 
         Usage:
             async with worker.run():
@@ -88,19 +118,136 @@ class Worker(ABC):
                 ...
             # Worker stopped
         """
+        self._run_semaphore = anyio.Semaphore(max(1, self.max_concurrent_tasks))
         async with anyio.create_task_group() as tg:
             tg.start_soon(self._loop)
             yield
             tg.cancel_scope.cancel()
 
     async def _loop(self) -> None:
-        """Process task operations continuously.
+        """Dispatch task operations as they arrive.
 
-        Receives task operations from scheduler and dispatches them to handlers.
-        Runs until cancelled by the task group.
+        Run operations are spawned into a task group — gated by the
+        concurrency cap and a per-context lock — instead of being awaited
+        inline, so one slow task cannot stall every task queued behind it.
+        Control operations (cancel/pause/resume) are spawned ungated: a
+        cancel must never wait behind the run it is trying to stop, which
+        also requires this loop to keep draining the scheduler stream
+        eagerly. The semaphore in _run_task_operation, not this loop or
+        the scheduler buffer, is what bounds concurrent provider spend.
         """
-        async for task_operation in self.scheduler.receive_task_operations():
+        async with anyio.create_task_group() as tg:
+            async for task_operation in self.scheduler.receive_task_operations():
+                if task_operation["operation"] == "run":
+                    tg.start_soon(self._run_task_operation, task_operation)
+                else:
+                    tg.start_soon(self._control_task_operation, task_operation)
+
+    async def _run_task_operation(self, task_operation: TaskOperation) -> None:
+        """Execute one run operation under the worker's concurrency gates.
+
+        Gate order matters: the context lock is taken before the semaphore
+        so a same-context task waiting its turn does not occupy one of the
+        max_concurrent_tasks slots while it blocks.
+
+        Each spawned operation keeps its own failure guard — the task group
+        would otherwise cancel every sibling (and the dispatch loop) when
+        one operation raises.
+        """
+        params = task_operation["params"]
+        task_id = self._normalize_uuid(params["task_id"])
+        context_key = str(params.get("context_id") or task_id)
+        try:
+            async with self._context_guard(context_key):
+                assert self._run_semaphore is not None, "worker not started via run()"
+                async with self._run_semaphore:
+                    with anyio.CancelScope() as cancel_scope:
+                        self._in_flight_scopes[task_id] = cancel_scope
+                        try:
+                            await self._handle_task_operation(task_operation)
+                        finally:
+                            self._in_flight_scopes.pop(task_id, None)
+                    if cancel_scope.cancelled_caught:
+                        # tasks/cancel interrupted this run mid-flight. The
+                        # cancel handler records the canceled state; this is
+                        # a backstop for the write racing the interruption.
+                        logger.info(f"Task {task_id} run interrupted by cancel")
+                        await self._finalize_interrupted_task(task_id)
+        except anyio.get_cancelled_exc_class():
+            # Worker shutdown: don't strand an in-flight task in 'working'.
+            with anyio.CancelScope(shield=True):
+                await self._finalize_interrupted_task(task_id)
+            raise
+        except Exception as e:  # noqa: BLE001 - last-resort guard so no operation can kill the dispatch loop
+            logger.error(
+                f"Unhandled error dispatching task {task_id}: {e}", exc_info=True
+            )
+
+    async def _control_task_operation(self, task_operation: TaskOperation) -> None:
+        """Execute a control operation (cancel/pause/resume) immediately."""
+        try:
             await self._handle_task_operation(task_operation)
+        except Exception as e:  # noqa: BLE001 - last-resort guard so no operation can kill the dispatch loop
+            logger.error(
+                f"Unhandled error in {task_operation['operation']} operation: {e}",
+                exc_info=True,
+            )
+
+    @asynccontextmanager
+    async def _context_guard(self, context_key: str) -> AsyncIterator[None]:
+        """Serialize run operations sharing a context_id, in arrival order.
+
+        Locks are created on demand and dropped once no task holds or
+        waits on them, so the map does not grow with context cardinality.
+        """
+        lock = self._context_locks.get(context_key)
+        if lock is None:
+            lock = anyio.Lock()
+            self._context_locks[context_key] = lock
+        self._context_lock_refs[context_key] = (
+            self._context_lock_refs.get(context_key, 0) + 1
+        )
+        try:
+            async with lock:
+                yield
+        finally:
+            remaining = self._context_lock_refs[context_key] - 1
+            if remaining:
+                self._context_lock_refs[context_key] = remaining
+            else:
+                del self._context_lock_refs[context_key]
+                self._context_locks.pop(context_key, None)
+
+    def _cancel_in_flight(self, task_id: Any) -> bool:
+        """Cancel the in-flight run for task_id, if one is executing.
+
+        Returns:
+            True if a running execution was found and its scope cancelled.
+        """
+        scope = self._in_flight_scopes.get(self._normalize_uuid(task_id))
+        if scope is None:
+            return False
+        scope.cancel()
+        return True
+
+    async def _finalize_interrupted_task(self, task_id: Any) -> None:
+        """Move an interrupted task out of non-terminal states.
+
+        Uses the storage CAS so a task that already reached a terminal
+        state (completed/failed/canceled) is never overwritten. Best-effort:
+        on the shutdown path storage may already be closing.
+        """
+        try:
+            for from_state in ("working", "submitted"):
+                if await self.storage.update_task_state_if(
+                    self._normalize_uuid(task_id), from_state, "canceled"
+                ):
+                    logger.info(
+                        f"Task {task_id} interrupted while {from_state}; marked canceled"
+                    )
+                    return
+        except Exception as e:  # noqa: BLE001 - best-effort cleanup during interruption/shutdown
+            logger.warning(f"Could not finalize interrupted task {task_id}: {e}")
 
     async def _handle_task_operation(self, task_operation: TaskOperation) -> None:
         """Dispatch task operation to appropriate handler.

@@ -93,6 +93,7 @@ from bindu.common.protocol.types import (
     TaskFeedbackRequest,
     TaskFeedbackResponse,
 )
+from bindu.settings import app_settings
 
 from ..utils.logging import get_logger
 from .errors import MalformedContextIdError
@@ -146,6 +147,7 @@ class TaskManager:
                 storage=self.storage,
                 manifest=self.manifest,
                 lifecycle_notifier=self._push_manager.notify_lifecycle,
+                max_concurrent_tasks=app_settings.agent.max_concurrent_tasks,
             )
             self._workers.append(worker)
             await self._aexit_stack.enter_async_context(worker.run())

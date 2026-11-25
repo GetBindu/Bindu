@@ -1,10 +1,51 @@
 """Tests for GrpcAgentClient — the callable that replaces manifest.run."""
 
+import asyncio
 from unittest.mock import MagicMock, patch
 
 
 from bindu.grpc.client import GrpcAgentClient
 from bindu.grpc.generated import agent_handler_pb2
+
+
+class FakeUnaryCall:
+    """Stands in for the grpc future returned by stub.HandleMessages.future()."""
+
+    def __init__(self, response=None, complete=True):
+        self._response = response
+        self._complete = complete
+        self.cancelled = False
+
+    def add_done_callback(self, cb):
+        if self._complete:
+            cb(self)
+
+    def result(self):
+        return self._response
+
+    def cancel(self):
+        self.cancelled = True
+        return True
+
+
+def stub_unary_response(mock_stub, response):
+    mock_stub.HandleMessages.future.return_value = FakeUnaryCall(response)
+
+
+def drain_unary(client, messages):
+    """The worker's view: ResultProcessor drains the async generator."""
+
+    async def _drain():
+        value = None
+        async for item in client(messages):
+            value = item
+        return value
+
+    return asyncio.run(_drain())
+
+
+def unary_request(mock_stub):
+    return mock_stub.HandleMessages.future.call_args[0][0]
 
 
 class TestGrpcAgentClient:
@@ -30,14 +71,17 @@ class TestGrpcAgentClient:
         """Test that plain text response returns str (maps to 'completed')."""
         mock_stub = MagicMock()
         mock_stub_class.return_value = mock_stub
-        mock_stub.HandleMessages.return_value = agent_handler_pb2.HandleResponse(
-            content="Hello from agent",
-            state="",
-            prompt="",
+        stub_unary_response(
+            mock_stub,
+            agent_handler_pb2.HandleResponse(
+                content="Hello from agent",
+                state="",
+                prompt="",
+            ),
         )
 
         client = GrpcAgentClient("localhost:50052")
-        result = client([{"role": "user", "content": "Hi"}])
+        result = drain_unary(client, [{"role": "user", "content": "Hi"}])
 
         assert isinstance(result, str)
         assert result == "Hello from agent"
@@ -48,14 +92,17 @@ class TestGrpcAgentClient:
         """Test that input-required state returns dict with state key."""
         mock_stub = MagicMock()
         mock_stub_class.return_value = mock_stub
-        mock_stub.HandleMessages.return_value = agent_handler_pb2.HandleResponse(
-            content="",
-            state="input-required",
-            prompt="Can you clarify?",
+        stub_unary_response(
+            mock_stub,
+            agent_handler_pb2.HandleResponse(
+                content="",
+                state="input-required",
+                prompt="Can you clarify?",
+            ),
         )
 
         client = GrpcAgentClient("localhost:50052")
-        result = client([{"role": "user", "content": "Do something"}])
+        result = drain_unary(client, [{"role": "user", "content": "Do something"}])
 
         assert isinstance(result, dict)
         assert result["state"] == "input-required"
@@ -67,14 +114,17 @@ class TestGrpcAgentClient:
         """Test that auth-required state returns dict with state key."""
         mock_stub = MagicMock()
         mock_stub_class.return_value = mock_stub
-        mock_stub.HandleMessages.return_value = agent_handler_pb2.HandleResponse(
-            content="",
-            state="auth-required",
-            prompt="Please authenticate",
+        stub_unary_response(
+            mock_stub,
+            agent_handler_pb2.HandleResponse(
+                content="",
+                state="auth-required",
+                prompt="Please authenticate",
+            ),
         )
 
         client = GrpcAgentClient("localhost:50052")
-        result = client([{"role": "user", "content": "Secret data"}])
+        result = drain_unary(client, [{"role": "user", "content": "Secret data"}])
 
         assert isinstance(result, dict)
         assert result["state"] == "auth-required"
@@ -93,10 +143,10 @@ class TestGrpcAgentClient:
             prompt="Which format?",
         )
         response.metadata["source"] = "test"
-        mock_stub.HandleMessages.return_value = response
+        stub_unary_response(mock_stub, response)
 
         client = GrpcAgentClient("localhost:50052")
-        result = client([{"role": "user", "content": "Convert"}])
+        result = drain_unary(client, [{"role": "user", "content": "Convert"}])
 
         assert isinstance(result, dict)
         assert result["source"] == "test"
@@ -107,8 +157,8 @@ class TestGrpcAgentClient:
         """Test that input messages are correctly converted to proto format."""
         mock_stub = MagicMock()
         mock_stub_class.return_value = mock_stub
-        mock_stub.HandleMessages.return_value = agent_handler_pb2.HandleResponse(
-            content="ok", state=""
+        stub_unary_response(
+            mock_stub, agent_handler_pb2.HandleResponse(content="ok", state="")
         )
 
         client = GrpcAgentClient("localhost:50052")
@@ -117,11 +167,10 @@ class TestGrpcAgentClient:
             {"role": "user", "content": "Hello"},
             {"role": "assistant", "content": "Hi there"},
         ]
-        client(messages)
+        drain_unary(client, messages)
 
         # Verify the proto request was constructed correctly
-        call_args = mock_stub.HandleMessages.call_args
-        request = call_args[0][0]
+        request = unary_request(mock_stub)
         assert len(request.messages) == 3
         assert request.messages[0].role == "system"
         assert request.messages[0].content == "You are helpful"
@@ -144,8 +193,8 @@ class TestGrpcAgentClient:
 
         mock_stub = MagicMock()
         mock_stub_class.return_value = mock_stub
-        mock_stub.HandleMessages.return_value = agent_handler_pb2.HandleResponse(
-            content="ok", state=""
+        stub_unary_response(
+            mock_stub, agent_handler_pb2.HandleResponse(content="ok", state="")
         )
 
         client = GrpcAgentClient("localhost:50052")
@@ -176,9 +225,9 @@ class TestGrpcAgentClient:
                 ],
             },
         ]
-        client(messages)
+        drain_unary(client, messages)
 
-        request = mock_stub.HandleMessages.call_args[0][0]
+        request = unary_request(mock_stub)
         assert len(request.messages) == 4
         assert request.messages[0].role == "system"
         assert request.messages[0].content == "You are helpful"
@@ -195,12 +244,13 @@ class TestGrpcAgentClient:
         """The A2A-shaped injected system prompt reaches the wire as 'system'."""
         mock_stub = MagicMock()
         mock_stub_class.return_value = mock_stub
-        mock_stub.HandleMessages.return_value = agent_handler_pb2.HandleResponse(
-            content="ok", state=""
+        stub_unary_response(
+            mock_stub, agent_handler_pb2.HandleResponse(content="ok", state="")
         )
 
         client = GrpcAgentClient("localhost:50052")
-        client(
+        drain_unary(
+            client,
             [
                 {
                     "role": "system",
@@ -212,10 +262,10 @@ class TestGrpcAgentClient:
                     "kind": "message",
                     "parts": [{"kind": "text", "text": "hi"}],
                 },
-            ]
+            ],
         )
 
-        request = mock_stub.HandleMessages.call_args[0][0]
+        request = unary_request(mock_stub)
         assert len(request.messages) == 2
         assert request.messages[0].role == "system"
         assert request.messages[0].content == "Respond in JSON."
@@ -230,8 +280,8 @@ class TestGrpcAgentClient:
 
         mock_stub = MagicMock()
         mock_stub_class.return_value = mock_stub
-        mock_stub.HandleMessages.return_value = agent_handler_pb2.HandleResponse(
-            content="ok", state=""
+        stub_unary_response(
+            mock_stub, agent_handler_pb2.HandleResponse(content="ok", state="")
         )
 
         client([{"role": "user", "content": "test"}])
@@ -380,15 +430,46 @@ class TestGrpcAgentClient:
     @patch("bindu.grpc.client.grpc.insecure_channel")
     @patch("bindu.grpc.client.agent_handler_pb2_grpc.AgentHandlerStub")
     def test_unary_calls_correct_rpc(self, mock_stub_class, mock_channel):
-        """Test unary mode calls HandleMessages, not HandleMessagesStream."""
+        """Test unary mode calls HandleMessages.future, not HandleMessagesStream."""
         mock_stub = MagicMock()
         mock_stub_class.return_value = mock_stub
-        mock_stub.HandleMessages.return_value = agent_handler_pb2.HandleResponse(
-            content="ok", state=""
+        stub_unary_response(
+            mock_stub, agent_handler_pb2.HandleResponse(content="ok", state="")
         )
 
         client = GrpcAgentClient("localhost:50052", use_streaming=False)
-        client([{"role": "user", "content": "Hi"}])
+        drain_unary(client, [{"role": "user", "content": "Hi"}])
 
-        mock_stub.HandleMessages.assert_called_once()
+        mock_stub.HandleMessages.future.assert_called_once()
         mock_stub.HandleMessagesStream.assert_not_called()
+
+    @patch("bindu.grpc.client.grpc.insecure_channel")
+    @patch("bindu.grpc.client.agent_handler_pb2_grpc.AgentHandlerStub")
+    def test_unary_cancellation_aborts_rpc(self, mock_stub_class, mock_channel):
+        """Cancelling the consuming task (tasks/cancel) aborts the RPC.
+
+        Pins the phase-2 contract for gRPC agents: the remote handler call
+        is torn down, not left running for a caller that is gone.
+        """
+        mock_stub = MagicMock()
+        mock_stub_class.return_value = mock_stub
+        never_completes = FakeUnaryCall(complete=False)
+        mock_stub.HandleMessages.future.return_value = never_completes
+
+        client = GrpcAgentClient("localhost:50052")
+
+        async def _run():
+            async def _drain():
+                async for _ in client([{"role": "user", "content": "Hi"}]):
+                    pass
+
+            task = asyncio.ensure_future(_drain())
+            await asyncio.sleep(0.05)  # let the RPC start
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+        asyncio.run(_run())
+        assert never_completes.cancelled, "cancel must abort the in-flight RPC"
