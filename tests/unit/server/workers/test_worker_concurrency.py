@@ -634,6 +634,63 @@ class TestTerminalWriteGuards:
             assert not never.started.is_set(), "the run must be skipped entirely"
 
     @pytest.mark.asyncio
+    async def test_discarded_paid_completion_tags_orphan(
+        self, scheduler, memory_storage
+    ):
+        """Delayed-signal race on a PAID run: the API cancels in storage but
+        the interrupt never arrives, the handler completes, and the guard
+        discards the late result — the settled payment must then be
+        recorded as orphaned (money moved, nothing delivered)."""
+        from bindu.settings import app_settings
+
+        manifest = ScriptedManifest()
+        gate = Gate()
+        manifest.scripts = {"paidrace": gate.script("late-paid-result")}
+        ctx = uuid4()
+        task_id = await submit(memory_storage, ctx, "paidrace")
+
+        receipt = {
+            app_settings.x402.meta_status_key: app_settings.x402.status_completed,
+            "x402.payment.receipts": [{"transaction": "0xrace"}],
+        }
+
+        async with running_worker(scheduler, memory_storage, manifest, cap=1) as worker:
+
+            async def fake_settle(payment_context):
+                return dict(receipt)
+
+            worker._settle_payment = fake_settle
+
+            await scheduler.run_task(
+                {
+                    "task_id": task_id,
+                    "context_id": ctx,
+                    "payment_context": {"simulated": True},
+                }
+            )
+            with anyio.fail_after(WAIT):
+                await gate.started.wait()
+
+            # API CAS with NO scheduler signal — the interrupt never lands.
+            assert await memory_storage.update_task_state_if(
+                task_id, from_state="working", to_state="canceled"
+            )
+            gate.release.set()
+
+            with anyio.fail_after(WAIT):
+                while not gate.completed or worker._in_flight_scopes:
+                    await anyio.sleep(0.01)
+
+            task = await memory_storage.load_task(task_id)
+            assert task["status"]["state"] == "canceled"
+            assert not task.get("artifacts"), "late artifacts must be discarded"
+            metadata = task.get("metadata") or {}
+            assert (
+                metadata.get(app_settings.x402.meta_status_key) == "payment-orphaned"
+            ), "a discarded paid completion must be recorded as orphaned"
+            assert metadata["x402.payment.receipts"][0]["transaction"] == "0xrace"
+
+    @pytest.mark.asyncio
     async def test_shutdown_requeues_unstarted_task(self, scheduler, memory_storage):
         """Graceful shutdown: the running task is finalized as canceled, but a
         task still waiting on the concurrency gates goes back to the scheduler
@@ -810,3 +867,45 @@ class TestGuardFallbackBranches:
             reloaded["metadata"][app_settings.x402.meta_status_key]
             == app_settings.x402.status_completed
         ), "a committed deliverable keeps its payment-completed status"
+
+    @pytest.mark.asyncio
+    async def test_orphan_tag_lands_on_independently_failed_task(self, memory_storage):
+        """A writer that knows nothing about payments (e.g. the stream
+        error handler) can mark a paid task failed; the orphan re-tag must
+        still land there — only 'completed' proves a deliverable."""
+        from bindu.settings import app_settings
+
+        worker = self.make_worker(memory_storage)
+        task_id = await submit(memory_storage, uuid4(), "streamfail")
+        await memory_storage.update_task(task_id, state="working")
+        await memory_storage.update_task(task_id, state="failed")
+
+        await worker._record_orphaned_payment(
+            task_id,
+            {
+                app_settings.x402.meta_status_key: app_settings.x402.status_completed,
+                "x402.payment.receipts": [{"transaction": "0xsfail"}],
+            },
+        )
+
+        reloaded = await memory_storage.load_task(task_id)
+        assert reloaded["status"]["state"] == "failed"
+        metadata = reloaded.get("metadata") or {}
+        assert metadata.get(app_settings.x402.meta_status_key) == "payment-orphaned"
+        assert metadata["x402.payment.receipts"][0]["transaction"] == "0xsfail"
+
+    @pytest.mark.asyncio
+    async def test_orphan_tag_is_best_effort_on_storage_failure(self, memory_storage):
+        """The shielded, bounded orphan write must never raise out of the
+        shutdown/cancel path — a storage failure is logged, not propagated
+        (the settle-time receipt remains the reconciliation record)."""
+        worker = self.make_worker(memory_storage)
+        task_id = await submit(memory_storage, uuid4(), "broken")
+
+        async def broken_update(*args, **kwargs):
+            raise RuntimeError("storage down")
+
+        memory_storage.update_task = broken_update  # instance-level stub
+
+        # Must not raise.
+        await worker._record_orphaned_payment(task_id, {"r": 1})

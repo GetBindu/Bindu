@@ -39,7 +39,9 @@ once in one agent process; it is the spend bound for provider calls.
 - **Graceful shutdown loses no queued work.** A task interrupted mid-run is
   finalized as `canceled` (re-running half-executed handlers is not safe).
   A task that never started is handed back to the scheduler and stays
-  `submitted` for the next worker.
+  `submitted` for the next worker — unless the scheduler refuses the send
+  or does not accept it within 5 s, in which case the task is finalized as
+  `canceled` rather than left stranded with its operation consumed.
 
 ## What to know before relying on it
 

@@ -59,6 +59,10 @@ logger = get_logger("bindu.server.workers.manifest_worker")
 
 # Constants
 TASK_NOT_FOUND_ERROR = "Task {task_id} not found"
+
+# Bound on the shielded orphan-payment metadata write: a storage row held by
+# another transaction must not be able to stall worker shutdown forever.
+ORPHAN_TAG_TIMEOUT_SECONDS = 5.0
 INVALID_TERMINAL_STATE_ERROR = (
     "Invalid terminal state '{state}'. Must be one of: {terminal_states}"
 )
@@ -677,6 +681,12 @@ class ManifestWorker(Worker):
                 expected_states=("working",),
             )
             if updated is None:
+                # A cancel won the race (e.g. the scheduler interrupt never
+                # reached this worker): the late result is discarded with no
+                # artifacts committed, so a settled payment is an orphan —
+                # money moved, nothing delivered.
+                if settlement_metadata:
+                    await self._record_orphaned_payment(task["id"], settlement_metadata)
                 logger.info(
                     f"Task {task['id']} already terminal; completed result discarded"
                 )
@@ -817,21 +827,36 @@ class ManifestWorker(Worker):
         """Tag a settled payment whose run ended without a committed deliverable.
 
         Shielded, so an in-flight cancellation cannot drop the
-        reconciliation record; guarded, so a completion that already
-        committed its artifacts is never re-tagged — the write lands only
-        in non-terminal states or 'canceled', never over
-        completed/failed/rejected (the failure path tags orphans inside its
-        own guarded write).
+        reconciliation record, and bounded, so a contended storage row
+        cannot stall shutdown behind the shield. The guarded write excludes
+        exactly 'completed' — the one state that proves a deliverable was
+        committed — so a late interrupt never re-tags a delivered task,
+        while canceled and independently failed paid runs (e.g. a stream
+        error marked the task failed before the worker's own write) stay
+        reconcilable. Best-effort: on timeout or storage failure the task
+        still carries its settle-time receipt; only the orphan re-tag is
+        lost, and the loss is logged for the operator.
         """
-        allowed = tuple(app_settings.agent.non_terminal_states) + ("canceled",)
-        with anyio.CancelScope(shield=True):
-            await self.storage.update_task(
-                task_id,
-                metadata={
-                    **settlement_metadata,
-                    app_settings.x402.meta_status_key: "payment-orphaned",
-                },
-                expected_states=allowed,
+        allowed = tuple(app_settings.agent.non_terminal_states) + (
+            "canceled",
+            "failed",
+            "rejected",
+        )
+        try:
+            with anyio.CancelScope(shield=True):
+                with anyio.fail_after(ORPHAN_TAG_TIMEOUT_SECONDS):
+                    await self.storage.update_task(
+                        task_id,
+                        metadata={
+                            **settlement_metadata,
+                            app_settings.x402.meta_status_key: "payment-orphaned",
+                        },
+                        expected_states=allowed,
+                    )
+        except Exception as e:  # noqa: BLE001 - best-effort reconciliation tag
+            logger.warning(
+                f"Could not record orphaned payment for task {task_id}: {e}; "
+                "the settle-time receipt on the task remains the reconciliation record"
             )
 
     async def _settle_payment(self, payment_context: dict[str, Any]) -> dict[str, Any]:
