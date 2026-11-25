@@ -1,8 +1,10 @@
 # Redis Scheduler
 
-Bindu uses Redis as its distributed task scheduler for coordinating work across multiple workers and processes. The scheduler uses Redis lists with blocking operations for efficient task distribution.
+Bindu can use Redis as its task scheduler. The scheduler uses Redis lists with blocking operations for efficient task distribution. Operations still in the Redis list survive a worker restart, and a graceful shutdown hands back operations the worker had taken but not started. An operation the worker has already taken is lost on a hard kill (its task stays `submitted`).
 
 **Scheduler is optional** - InMemoryScheduler is used by default for single-process deployments.
+
+> **One worker per queue today.** Run one agent process per Redis queue. Concurrency inside that process comes from `AGENT__MAX_CONCURRENT_TASKS`, not from adding replicas: each operation is delivered to exactly one consumer, so with two workers a `tasks/cancel` can land on the worker that isn't running the task, and two replicas can overlap a shared `context_id`. See [worker-concurrency.md](worker-concurrency.md) for the guarantees and limits.
 
 ## Architecture
 
@@ -73,7 +75,7 @@ Configure Redis connection via environment variables (see `.env.example`):
 
 ```bash
 # Scheduler Configuration
-# Type: "redis" for distributed scheduling or "memory" for single-process
+# Type: "redis" for a durable queue or "memory" for an in-process buffer
 SCHEDULER_TYPE=redis
 
 # Redis connection string

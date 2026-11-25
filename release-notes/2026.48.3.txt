@@ -1,0 +1,196 @@
+Release: one slow task no longer stalls your agent
+====================================================
+
+Version: 2026.48.3
+Date: November 25, 2026
+Author: Raahul Dutta
+
+OVERVIEW
+--------
+Until this release, a Bindu agent ran one task at a time, end to end. The
+worker awaited each task to completion before looking at the next, so a
+single slow or hung model call queued every other task behind it — in
+production we measured tasks starting 5-11 ms after the previous one
+ended, back to back, while users waited. And `tasks/cancel` only flipped
+a row in storage: the model call kept running, kept billing, and could
+overwrite the canceled state when it finished.
+
+Both are fixed (#619, #620). Set `AGENT__MAX_CONCURRENT_TASKS` and tasks in
+different conversations run side by side, while tasks in the same
+conversation (`context_id`) still run one at a time, in order. Cancel now
+stops the run mid-flight and the task stays canceled — a late result is
+discarded, never written over it.
+
+The default cap is 1, so tasks still run one at a time until you opt in;
+cancellation and the shutdown behavior below change for everyone. To
+benefit, your handler has to be async: a plain `def` handler blocks the
+event loop and still runs one task at a time (see docs/worker-concurrency.md
+for the one-line fix). TypeScript SDK agents are already async and get the
+win as soon as you raise the cap.
+
+Also in this release: agno 2.6.5 -> 2.9.0 for an SQL-injection CVE
+(#607) and a 226-alert Dependabot sweep across Python and npm (#618).
+
+BREAKING CHANGES
+----------------
+None for agents. Two notes for people who implemented their own backends:
+
+- Custom Storage implementations: `update_task` gains two optional
+  parameters — `expected_states` (apply the write only while the task is
+  in one of these states, atomically) and `state=None` (metadata-only
+  write) — and returns `None` when the precondition fails. The worker now
+  passes both, so a custom backend must accept them. The in-memory and
+  Postgres backends are updated.
+- Custom Scheduler implementations: a new class attribute
+  `requeue_survives_shutdown` (default False) tells the worker whether
+  operations sent back at shutdown outlive the process. Leave it False
+  unless your queue is durable.
+
+IMPROVEMENTS
+------------
+Concurrency (#619)
+  - `AGENT__MAX_CONCURRENT_TASKS` (default 1) caps how many tasks one
+    agent process runs at once. It limits tasks, not model calls: a
+    handler that makes several calls at once still makes all of them.
+  - Same-context tasks are serialized in arrival order regardless of the
+    cap, so agents that build on conversation history stay correct.
+  - One task's exception no longer cancels its siblings or kills the
+    dispatch loop.
+  - TypeScript/gRPC agents: the core's call to your handler was a
+    blocking call on the event loop, which made every SDK agent strictly
+    serial and impossible to cancel. It is now async. A burst of three 4 s
+    tasks went from 12.07 s to 4.18 s.
+
+Cancellation (#619, #620)
+  - `tasks/cancel` interrupts the in-flight run and the provider call is
+    abandoned; it never waits in line behind the task it targets.
+  - Every worker state write is a guarded compare-and-swap: a run that
+    finishes after its task was canceled has its late result discarded
+    (state, artifacts and messages together), with no artifact webhooks.
+  - A task canceled while still queued is skipped instead of failing.
+
+Payments (#620)
+  - Under x402 settle-first, the settlement receipt is written to the task
+    before your handler runs. If the run is then canceled, discarded, or
+    fails after settlement, the receipt is re-tagged `payment-orphaned`
+    so you can find paid-but-undelivered tasks and refund them.
+
+Shutdown and retries (#620)
+  - Graceful shutdown finalizes interrupted runs as `canceled` instead of
+    stranding them in `working`. With the Redis scheduler, tasks that
+    never started are handed back to the queue and stay `submitted`; with
+    the in-memory scheduler they are finalized as `canceled`.
+  - A transient storage error before your handler runs (connection blip,
+    timeout) leaves the task `submitted` so the built-in retry can run it,
+    instead of failing it. Paid runs are the exception: retrying would
+    settle the same payment twice, so they fail and get the orphan tag.
+
+KNOWN ISSUES
+------------
+- Sync `def` handlers never overlap and cannot be interrupted mid-run;
+  while one runs, the whole process (including the HTTP server) waits.
+  Most examples in examples/ use sync handlers. Make the handler async to
+  benefit — see docs/worker-concurrency.md.
+- One worker per queue: concurrency, context ordering and cancel
+  interrupts live inside a single process. Two workers on one Redis queue
+  can deliver a cancel to the wrong worker and overlap a shared context.
+  Scale up (raise the cap), not out.
+- A hard kill can drop operations already popped from Redis: never-started
+  tasks stay `submitted`, interrupted ones stay `working`. Sweep for both
+  after a crash.
+- Cross-context start order is not global FIFO once same-context tasks
+  queue (A1, A2 same context + B1 can run A1, B1, A2). Per-context order
+  is always preserved.
+- TypeScript SDK: cancelling tears down the gRPC call and the task stays
+  canceled, but the SDK does not yet abort your in-process JS handler, so
+  that function may keep running to completion.
+- Frameworks that run steps in their own tasks may finish the step already
+  in flight after a cancel. With LangGraph the current node's model call
+  completed ~13 s after the cancel, then the graph stopped. The task stays
+  canceled and the result is discarded; only that one call is billed.
+- File uploads (pre-existing): a file part sent in the standard A2A shape
+  is rejected with "parts.N.file.text Field required" unless it also
+  carries an empty `text` field. Tools like document-analyzer need that
+  workaround until the FilePart fix lands.
+- `message/stream` (pre-existing, not from this release): the
+  `final: true` status event is sent before the artifact that carries the
+  reply. A client that stops reading at the final event gets no content;
+  keep reading until the stream closes.
+
+TECHNICAL DETAILS
+-----------------
+- Dispatch: ManifestWorker._loop spawns each operation into an anyio task
+  group. Run operations pass a per-context lock (taken first, so queued
+  same-context tasks don't hold cap slots) and then the cap semaphore;
+  each run executes in its own CancelScope that tasks/cancel cancels.
+  Control operations bypass both gates.
+- Trade-off: operations are drained from the scheduler eagerly, so the
+  scheduler buffer no longer applies HTTP backpressure under a deep
+  backlog; the cap semaphore bounds actual execution.
+- Guarded writes: Postgres uses a single `UPDATE ... WHERE state IN (...)`
+  under the row lock; in-memory has no await between check and write.
+- Writes made under a cancel shield (receipt persist, orphan tag, shutdown
+  requeue) are bounded at 5 s so a contended row or dead broker cannot
+  wedge worker exit. If both payment writes fail, the full settlement
+  metadata is logged at ERROR as the record of last resort.
+
+TESTING
+-------
+Unit: 1,177 tests across both schedulers (in-memory and real Redis),
+covering overlap, same-context order, failure isolation, the cap,
+cancel mid-run / queued / terminal, shutdown, guarded-write races, and
+every receipt path (settle, pause, complete, fail, cancel, storage down).
+
+Live, against a real model (OpenRouter), on the released code with
+AGENT__MAX_CONCURRENT_TASKS=3 — 11 agents tested in parallel:
+
+  Async handlers (where the fix applies)
+  - agno `arun` probe (the production incident's shape): 3 concurrent
+    tasks took 0.98x the time of one; cancel 0.02 s, stayed canceled.
+  - cerina_bindu (LangGraph): all 3 burst tasks entered the handler in
+    the same second; cancel 0.02 s, stayed canceled 60 s later.
+  - typescript-langchain-quiz-agent and typescript-langchain-agent (gRPC):
+    all 3 tasks `working` within 30 ms; bursts ~0.9-1.5x one task vs 3x
+    serial; cancel 0.01 s, stayed canceled 20-45 s later.
+
+  Sync handlers (documented limitation)
+  - summarizer, song-meaning-agent, weather-research, document-analyzer
+    (PDF input, sent with a workaround — see known issues), medical_agent,
+    langgraph_blog_writing_agent,
+    private_skills_agent: correct replies and streams; bursts ran
+    2.3-3.2x one task (serial, as documented; 5.2x for weather-research,
+    whose web-search tool was retrying); a cancel aimed at a running
+    sync task is answered only after it finishes. A cancel on a queued
+    task landed and held for 40 s.
+
+  Across all 11 agents, a canceled task never became completed.
+
+The run also caught four examples broken before this release, fixed
+in the same docs change: weather-research and premium-advisor read the
+retired `content` field (the model got an empty prompt), medical_agent
+crashed at import, and document-analyzer and medical_agent pinned
+models OpenRouter has retired.
+
+COMMIT DETAILS
+--------------
+Commits since 2026.36.7:
+
+  - 518fba24: fix(worker): guard terminal writes, persist x402 receipts, requeue on shutdown (#620)
+  - 7986e29a: fix(security): bump agno 2.6.5 -> 2.9.0 to clear SQL injection (CVE-2026-10105) (#607)
+  - d487940f: fix(worker): concurrent task dispatch and a cancel that interrupts runs (#619)
+  - b0342bf6: fix(deps): resolve 226 Dependabot alerts across Python and npm lockfiles (#618)
+
+USAGE WITH GIT
+--------------
+# View this release
+git show 2026.48.3
+
+# Compare to previous release
+git diff 2026.36.7..2026.48.3 --stat
+
+LINKS
+-----
+- Concurrency + cancel PR: https://github.com/GetBindu/Bindu/pull/619
+- Guarded writes + receipts PR: https://github.com/GetBindu/Bindu/pull/620
+- Guide: docs/worker-concurrency.md
+- Compare: https://github.com/GetBindu/Bindu/compare/2026.36.7...2026.48.3
