@@ -50,7 +50,9 @@ Response style:
 - End with: "Disclaimer: This is general health information, not professional medical advice."
 """,
     model=OpenRouter(
-        id="openai/gpt-4o-mini",
+        # Any OpenRouter model id; set OPENROUTER_MODEL to a ":free" model
+        # to run without credits (free models rotate, so none is pinned).
+        id=os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini"),
         api_key=OPENROUTER_API_KEY,
     ),
     tools=[DuckDuckGoTools()],

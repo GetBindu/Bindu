@@ -43,7 +43,9 @@ Guidelines:
 - Do not hallucinate information outside the document
 """,
     model = OpenRouter(
-        id = "openai/gpt-4o-mini",
+        # Any OpenRouter model id; set OPENROUTER_MODEL to a ":free" model
+        # to run without credits (free models rotate, so none is pinned).
+        id = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini"),
         api_key=os.getenv("OPENROUTER_API_KEY"),
     ),
 )

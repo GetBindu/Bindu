@@ -21,7 +21,8 @@ conversation (`context_id`) still run one at a time, in order. Cancel now
 stops the run mid-flight and the task stays canceled — a late result is
 discarded, never written over it.
 
-The default cap is 1, so upgrading changes nothing until you opt in. To
+The default cap is 1, so tasks still run one at a time until you opt in;
+cancellation and the shutdown behavior below change for everyone. To
 benefit, your handler has to be async: a plain `def` handler blocks the
 event loop and still runs one task at a time (see docs/worker-concurrency.md
 for the one-line fix). TypeScript SDK agents are already async and get the
@@ -49,8 +50,8 @@ IMPROVEMENTS
 ------------
 Concurrency (#619)
   - `AGENT__MAX_CONCURRENT_TASKS` (default 1) caps how many tasks one
-    agent process runs at once. It is also your spend bound for model
-    calls.
+    agent process runs at once. It limits tasks, not model calls: a
+    handler that makes several calls at once still makes all of them.
   - Same-context tasks are serialized in arrival order regardless of the
     cap, so agents that build on conversation history stay correct.
   - One task's exception no longer cancels its siblings or kills the
@@ -107,6 +108,10 @@ KNOWN ISSUES
   in flight after a cancel. With LangGraph the current node's model call
   completed ~13 s after the cancel, then the graph stopped. The task stays
   canceled and the result is discarded; only that one call is billed.
+- File uploads (pre-existing): a file part sent in the standard A2A shape
+  is rejected with "parts.N.file.text Field required" unless it also
+  carries an empty `text` field. Tools like document-analyzer need that
+  workaround until the FilePart fix lands.
 - `message/stream` (pre-existing, not from this release): the
   `final: true` status event is sent before the artifact that carries the
   reply. A client that stops reading at the final event gets no content;
@@ -150,7 +155,8 @@ AGENT__MAX_CONCURRENT_TASKS=3 — 11 agents tested in parallel:
 
   Sync handlers (documented limitation)
   - summarizer, song-meaning-agent, weather-research, document-analyzer
-    (PDF input), medical_agent, langgraph_blog_writing_agent,
+    (PDF input, sent with a workaround — see known issues), medical_agent,
+    langgraph_blog_writing_agent,
     private_skills_agent: correct replies and streams; bursts ran
     2.3-3.2x one task (serial, as documented; 5.2x for weather-research,
     whose web-search tool was retrying); a cancel aimed at a running

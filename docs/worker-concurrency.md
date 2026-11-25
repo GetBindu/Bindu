@@ -18,7 +18,8 @@ launch the agent from — the SDK passes it through to the core it spawns.
 
 The default is `1`, which keeps strict serial execution — upgrading changes
 nothing until you raise the cap. The cap bounds how many runs execute at
-once in one agent process; it is the spend bound for provider calls.
+once in one agent process. It limits tasks, not model calls: one task
+whose handler makes several calls at once still makes all of them.
 
 ## Your handler has to be async
 
@@ -51,8 +52,8 @@ the in-flight request. Frameworks that run steps in their own tasks may
 let the step already running finish first — with LangGraph we observed
 the current node's model call complete about 13 s after the cancel, then
 the graph stopped before its next call. Either way the task stays
-`canceled` and the late result is discarded; you only pay for that one
-in-flight call.
+`canceled` and the late result is discarded; you still pay for whatever
+calls were already in flight and didn't stop.
 
 ## What is guaranteed
 

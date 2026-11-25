@@ -1,6 +1,6 @@
 # Redis Scheduler
 
-Bindu can use Redis as its task scheduler. The scheduler uses Redis lists with blocking operations for efficient task distribution, and operations sitting in Redis survive a worker restart.
+Bindu can use Redis as its task scheduler. The scheduler uses Redis lists with blocking operations for efficient task distribution. Operations still in the Redis list survive a worker restart, and a graceful shutdown hands back operations the worker had taken but not started. An operation the worker has already taken is lost on a hard kill (its task stays `submitted`).
 
 **Scheduler is optional** - InMemoryScheduler is used by default for single-process deployments.
 
