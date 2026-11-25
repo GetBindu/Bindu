@@ -547,3 +547,22 @@ class TestStreamEventOrdering:
             ("status-update", "completed"),
         ]
         assert events[-1]["final"] is True
+
+    @pytest.mark.asyncio
+    async def test_paused_recheck_emits_working_status_before_artifacts(self):
+        """A task seen as input-required, then working again on the re-check,
+        keeps the non-final ordering: status first, then its artifacts."""
+        events = await _collect_stream_events(
+            [
+                {"status": _status("input-required")},
+                {"status": _status("working"), "artifacts": [_REPLY_ARTIFACT]},
+            ]
+        )
+
+        assert self._kinds(events) == [
+            ("status-update", "submitted"),
+            ("status-update", "input-required"),
+            ("status-update", "working"),
+            ("artifact-update", _REPLY_ARTIFACT["artifact_id"]),
+        ]
+        assert not any(e.get("final") for e in events)

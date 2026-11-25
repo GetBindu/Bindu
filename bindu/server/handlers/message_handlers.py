@@ -377,17 +377,24 @@ class MessageHandlers:
                         if latest_task:
                             latest_status = latest_task["status"]["state"]
                             if latest_status != seen_status:
-                                for artifact_event in new_artifact_events(latest_task):
-                                    yield self._sse_event(artifact_event)
-                                yield self._sse_event(
+                                is_final = latest_status in terminal_states
+                                latest_status_event = self._sse_event(
                                     {
                                         "kind": "status-update",
                                         "task_id": str(task["id"]),
                                         "context_id": str(context_id),
                                         "status": latest_task["status"],
-                                        "final": latest_status in terminal_states,
+                                        "final": is_final,
                                     }
                                 )
+                                # Same rule as the main loop: a final status
+                                # follows the artifacts, any other precedes them.
+                                if not is_final:
+                                    yield latest_status_event
+                                for artifact_event in new_artifact_events(latest_task):
+                                    yield self._sse_event(artifact_event)
+                                if is_final:
+                                    yield latest_status_event
                                 seen_status = latest_status
                                 if latest_status in terminal_states:
                                     return
