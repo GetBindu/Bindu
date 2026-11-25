@@ -633,7 +633,14 @@ class ManifestWorker(Worker):
             content, task["id"], task["context_id"]
         )
 
-        metadata: dict[str, Any] | None = None
+        # Re-attach the settlement receipt (idempotent merge): if the
+        # bounded upfront persist failed, this committed write is the
+        # recovery point for a paid run that pauses on input/auth —
+        # otherwise the receipt would exist only in run_task's locals
+        # once the run returns.
+        metadata: dict[str, Any] | None = (
+            dict(settlement_metadata) if settlement_metadata else None
+        )
 
         # Update task with state and append agent messages to history.
         # Guarded: a cancel that landed mid-run must not be overwritten by
@@ -916,9 +923,12 @@ class ManifestWorker(Worker):
                         expected_states=allowed,
                     )
         except Exception as e:  # noqa: BLE001 - best-effort reconciliation tag
-            logger.warning(
+            logger.error(
                 f"Could not record orphaned payment for task {task_id}: {e}; "
-                "the settle-time receipt on the task remains the reconciliation record"
+                "the settle-time receipt usually remains on the task, but its "
+                "bounded write is best-effort too — if both writes failed, "
+                "this log line is the reconciliation record: "
+                f"{settlement_metadata}"
             )
 
     async def _settle_payment(self, payment_context: dict[str, Any]) -> dict[str, Any]:

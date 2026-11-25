@@ -38,7 +38,9 @@ once in one agent process; it is the spend bound for provider calls.
   canceled-but-paid tasks and refund them manually. Both writes are bounded
   and best-effort, so do not sweep for the orphan tag alone: a canceled
   task whose metadata carries a settlement receipt needs reconciliation
-  even when the `payment-orphaned` tag is missing.
+  even when the `payment-orphaned` tag is missing. If storage was
+  unreachable for both writes, the worker's error log carries the full
+  settlement metadata as the record of last resort.
 - **Graceful shutdown loses no queued work.** A task interrupted mid-run is
   finalized as `canceled` (re-running half-executed handlers is not safe).
   A task that never started is handed back to the scheduler and stays

@@ -20,7 +20,7 @@ Contract pinned here:
 import os
 from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from uuid import UUID, uuid4
 
 import anyio
@@ -28,6 +28,7 @@ import pytest
 import pytest_asyncio
 
 from bindu.server.scheduler.memory_scheduler import InMemoryScheduler
+from bindu.server.storage.memory_storage import InMemoryStorage
 from bindu.server.workers.manifest_worker import ManifestWorker
 
 WAIT = 5  # seconds; every blocking wait in these tests is bounded
@@ -117,6 +118,35 @@ async def wait_for_state(storage, task_id: UUID, state: str, timeout: float = WA
             if task and task["status"]["state"] == state:
                 return task
             await anyio.sleep(0.01)
+
+
+class FlakyReceiptStorage(InMemoryStorage):
+    """Refuses exactly the upfront metadata-only receipt write.
+
+    Matches the settle-time persist's call shape (state=None, no guard,
+    metadata set); every guarded or state-changing write still works, so
+    the recovery paths that re-attach the receipt can be observed.
+    """
+
+    async def update_task(
+        self,
+        task_id,
+        state=None,
+        new_artifacts=None,
+        new_messages=None,
+        metadata=None,
+        expected_states=None,
+    ):
+        if state is None and expected_states is None and metadata:
+            raise RuntimeError("receipt write refused")
+        return await super().update_task(
+            task_id,
+            state=state,
+            new_artifacts=new_artifacts,
+            new_messages=new_messages,
+            metadata=metadata,
+            expected_states=expected_states,
+        )
 
 
 class Gate:
@@ -783,31 +813,7 @@ class TestTerminalWriteGuards:
         """The bounded settle-time persist is best-effort: when it fails,
         the paid run still executes (aborting would guarantee an orphan)
         and the completion write re-attaches the receipt."""
-        from bindu.server.storage.memory_storage import InMemoryStorage
         from bindu.settings import app_settings
-
-        class FlakyReceiptStorage(InMemoryStorage):
-            """Refuses exactly the upfront metadata-only receipt write."""
-
-            async def update_task(
-                self,
-                task_id,
-                state=None,
-                new_artifacts=None,
-                new_messages=None,
-                metadata=None,
-                expected_states=None,
-            ):
-                if state is None and expected_states is None and metadata:
-                    raise RuntimeError("receipt write refused")
-                return await super().update_task(
-                    task_id,
-                    state=state,
-                    new_artifacts=new_artifacts,
-                    new_messages=new_messages,
-                    metadata=metadata,
-                    expected_states=expected_states,
-                )
 
         storage = FlakyReceiptStorage()
         manifest = ScriptedManifest()
@@ -845,6 +851,52 @@ class TestTerminalWriteGuards:
         )
         assert metadata["x402.payment.receipts"][0]["transaction"] == "0xflaky"
         assert task.get("artifacts"), "the deliverable must be committed"
+
+    @pytest.mark.asyncio
+    async def test_intermediate_pause_reattaches_receipt(self, scheduler):
+        """If the upfront receipt persist failed and the paid run pauses on
+        input-required, the committed intermediate write re-attaches the
+        receipt — it must not exist only in run_task's locals once the run
+        returns."""
+        from bindu.settings import app_settings
+
+        storage = FlakyReceiptStorage()
+        manifest = ScriptedManifest()
+
+        async def pause_script():
+            return {"state": "input-required", "prompt": "which year?"}
+
+        manifest.scripts = {"paidpause": pause_script}
+        ctx = uuid4()
+        task_id = await submit(storage, ctx, "paidpause")
+
+        receipt = {
+            app_settings.x402.meta_status_key: app_settings.x402.status_completed,
+            "x402.payment.receipts": [{"transaction": "0xpause"}],
+        }
+
+        async with running_worker(scheduler, storage, manifest, cap=1) as worker:
+
+            async def fake_settle(payment_context):
+                return dict(receipt)
+
+            worker._settle_payment = fake_settle
+
+            await scheduler.run_task(
+                {
+                    "task_id": task_id,
+                    "context_id": ctx,
+                    "payment_context": {"simulated": True},
+                }
+            )
+            task = await wait_for_state(storage, task_id, "input-required")
+
+        metadata = task.get("metadata") or {}
+        assert (
+            metadata.get(app_settings.x402.meta_status_key)
+            == app_settings.x402.status_completed
+        ), "the paused paid task must carry its settlement receipt"
+        assert metadata["x402.payment.receipts"][0]["transaction"] == "0xpause"
 
     @pytest.mark.asyncio
     async def test_transient_error_before_handler_is_retried(self, scheduler):
@@ -1108,8 +1160,11 @@ class TestGuardFallbackBranches:
     @pytest.mark.asyncio
     async def test_orphan_tag_is_best_effort_on_storage_failure(self, memory_storage):
         """The shielded, bounded orphan write must never raise out of the
-        shutdown/cancel path — a storage failure is logged, not propagated
-        (the settle-time receipt remains the reconciliation record)."""
+        shutdown/cancel path — and when it fails (so the upfront receipt
+        write may have failed too), the error log itself must carry the
+        reconciliation data as the record of last resort."""
+        from bindu.server.workers import manifest_worker as mw
+
         worker = self.make_worker(memory_storage)
         task_id = await submit(memory_storage, uuid4(), "broken")
 
@@ -1118,8 +1173,17 @@ class TestGuardFallbackBranches:
 
         memory_storage.update_task = broken_update  # instance-level stub
 
-        # Must not raise.
-        await worker._record_orphaned_payment(task_id, {"r": 1})
+        with patch.object(mw.logger, "error") as log_error:
+            # Must not raise.
+            await worker._record_orphaned_payment(
+                task_id,
+                {"x402.payment.receipts": [{"transaction": "0xlastresort"}]},
+            )
+
+        assert log_error.called, "the combined failure must be logged"
+        assert "0xlastresort" in str(log_error.call_args), (
+            "the log line must carry the reconciliation data"
+        )
 
     @pytest.mark.asyncio
     async def test_discarded_intermediate_prompt_tags_orphan(self, memory_storage):
