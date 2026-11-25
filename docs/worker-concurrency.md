@@ -43,10 +43,11 @@ once in one agent process; it is the spend bound for provider calls.
   settlement metadata as the record of last resort.
 - **Graceful shutdown loses no queued work.** A task interrupted mid-run is
   finalized as `canceled` (re-running half-executed handlers is not safe).
-  A task that never started is handed back to the scheduler and stays
-  `submitted` for the next worker — unless the scheduler refuses the send
-  or does not accept it within 5 s, in which case the task is finalized as
-  `canceled` rather than left stranded with its operation consumed.
+  With the Redis scheduler, a task that never started is handed back to
+  the queue and stays `submitted` for the next worker; if that send fails
+  or times out (5 s), the task stays `submitted` with an error logged —
+  re-enqueue or resubmit it. With the in-memory scheduler (whose buffer
+  dies with the process) never-started tasks are finalized as `canceled`.
 
 ## What to know before relying on it
 
@@ -71,11 +72,11 @@ once in one agent process; it is the spend bound for provider calls.
   Redis scheduler a hard kill loses operations that were popped but not yet
   finished. A task that never started stays `submitted`; one that was
   mid-run stays `working` — sweep for both states after a hard kill, or
-  you will miss interrupted runs. Graceful shutdown requeues the former —
-  falling back to `canceled` when the scheduler refuses the send or times
-  out (5 s) — and finalizes the latter as `canceled` (see above). The
-  planned fix is a separate control channel plus bounded prefetch with
-  acknowledged delivery.
+  you will miss interrupted runs. Graceful shutdown requeues the former
+  on Redis (leaving them `submitted` with an error log if the send fails)
+  and finalizes the latter as `canceled` (see above). The planned fix is a
+  separate control channel plus bounded prefetch with acknowledged
+  delivery.
 
 ## Verifying it on your agent
 

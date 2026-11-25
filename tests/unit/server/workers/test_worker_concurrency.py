@@ -954,11 +954,43 @@ class TestTerminalWriteGuards:
         assert task["status"]["state"] == "completed"
 
     @pytest.mark.asyncio
+    async def test_transient_history_error_is_retried(self, scheduler):
+        """Transient failure AFTER the working write (history load): the
+        working transition is stepped back to 'submitted' so the retry
+        re-runs cleanly instead of dying on state validation."""
+        storage = InMemoryStorage()
+        manifest = ScriptedManifest()
+        done = Gate()
+        done.release.set()
+        manifest.scripts = {"histretry": done.script("ok")}
+        ctx = uuid4()
+        task_id = await submit(storage, ctx, "histretry")
+
+        async with running_worker(scheduler, storage, manifest, cap=1) as worker:
+            real_build = worker._build_complete_message_history
+            calls = {"n": 0}
+
+            async def flaky_build(task):
+                calls["n"] += 1
+                if calls["n"] == 1:
+                    raise ConnectionError("transient read blip")
+                return await real_build(task)
+
+            worker._build_complete_message_history = flaky_build
+
+            await scheduler.run_task({"task_id": task_id, "context_id": ctx})
+            await wait_for_state(storage, task_id, "completed", timeout=15)
+
+        assert calls["n"] == 2, "the run must be retried after the history error"
+
+    @pytest.mark.asyncio
     async def test_shutdown_requeues_unstarted_task(self, scheduler, memory_storage):
         """Graceful shutdown: the running task is finalized as canceled, but a
         task still waiting on the concurrency gates goes back to the scheduler
         (eager dispatch consumed its operation) and a restarted worker runs it.
         """
+        if not getattr(scheduler, "requeue_survives_shutdown", False):
+            pytest.skip("requeue applies to durable schedulers; memory cancels")
 
         class SchedulerSpy:
             """Counts run sends so the requeue is asserted, not assumed."""
@@ -1024,18 +1056,39 @@ class TestGuardFallbackBranches:
         )
 
     @pytest.mark.asyncio
-    async def test_requeue_fallback_finalizes_when_scheduler_refuses(
-        self, memory_storage
-    ):
-        """If the scheduler no longer accepts sends during shutdown, the
-        un-started task is finalized as canceled, never silently lost."""
+    async def test_requeue_failure_leaves_task_submitted(self, memory_storage):
+        """Durable scheduler whose requeue send fails at shutdown: the task
+        stays 'submitted' (recoverable by re-enqueue) rather than being
+        canceled — canceling is final, submitted is not."""
 
-        class RefusingScheduler:
+        class RefusingDurableScheduler:
+            requeue_survives_shutdown = True
+
             async def run_task(self, params):
-                raise RuntimeError("stream closed")
+                raise RuntimeError("broker unreachable")
 
-        worker = self.make_worker(memory_storage, scheduler=RefusingScheduler())
+        worker = self.make_worker(memory_storage, scheduler=RefusingDurableScheduler())
         task_id = await submit(memory_storage, uuid4(), "lost")
+
+        await worker._requeue_task_operation(
+            {"operation": "run", "params": {"task_id": task_id}}  # type: ignore[typeddict-item]
+        )
+
+        task = await memory_storage.load_task(task_id)
+        assert task["status"]["state"] == "submitted"
+
+    @pytest.mark.asyncio
+    async def test_requeue_on_memory_scheduler_cancels_instead(self, memory_storage):
+        """A non-durable scheduler's stream dies with the process, so an
+        un-started task is finalized as canceled, not requeued into a
+        buffer nobody will ever read."""
+
+        class VolatileScheduler:  # requeue_survives_shutdown defaults False
+            async def run_task(self, params):
+                raise AssertionError("must not requeue into a volatile scheduler")
+
+        worker = self.make_worker(memory_storage, scheduler=VolatileScheduler())
+        task_id = await submit(memory_storage, uuid4(), "volatile")
 
         await worker._requeue_task_operation(
             {"operation": "run", "params": {"task_id": task_id}}  # type: ignore[typeddict-item]

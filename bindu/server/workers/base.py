@@ -277,6 +277,11 @@ class Worker(ABC):
         'submitted' with its operation silently lost.
         """
         task_id = task_operation["params"]["task_id"]
+        if not getattr(self.scheduler, "requeue_survives_shutdown", False):
+            # In-memory stream: it dies with this process, so a requeue
+            # would strand the task 'submitted' forever. Cancel honestly.
+            await self._finalize_interrupted_task(task_id)
+            return
         try:
             # Only run operations reach this method (_run_task_operation),
             # so the params are TaskSendParams by construction. The send is
@@ -291,8 +296,13 @@ class Worker(ABC):
                 )
             logger.info(f"Task {task_id} requeued; worker shut down before it started")
         except Exception as e:  # noqa: BLE001 - best-effort during shutdown
-            logger.warning(f"Could not requeue task {task_id} on shutdown: {e}")
-            await self._finalize_interrupted_task(task_id)
+            # Durable scheduler but the send failed: leave the task
+            # 'submitted' (recoverable — re-enqueue or resubmit) instead of
+            # canceling work the payer/user still wants.
+            logger.error(
+                f"Could not requeue task {task_id} on shutdown: {e}; task left "
+                "'submitted' with its operation consumed — re-enqueue required"
+            )
 
     async def _handle_task_operation(self, task_operation: TaskOperation) -> None:
         """Dispatch task operation to appropriate handler.

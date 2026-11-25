@@ -372,6 +372,14 @@ class ManifestWorker(Worker):
                 # re-running would re-enter settlement, and a second settle
                 # of the same nonce fails, so the failure path below
                 # (which records the orphan) is the safer outcome.
+                # If the working transition already landed, step it back so
+                # the retry's validation and guard see 'submitted' again.
+                try:
+                    await self.storage.update_task_state_if(
+                        task["id"], "working", "submitted"
+                    )
+                except Exception:  # noqa: BLE001 - best-effort revert
+                    pass
                 raise
             # Handle task failure with error message
             # Add span event for failure
