@@ -511,9 +511,11 @@ class TestStreamEventOrdering:
 
     @pytest.mark.asyncio
     async def test_working_status_precedes_artifacts_and_final_is_last(self):
+        """A non-final status goes out before its poll's artifacts, and an
+        artifact seen on an earlier poll is not re-sent."""
         events = await _collect_stream_events(
             [
-                {"status": _status("working")},
+                {"status": _status("working"), "artifacts": [_REPLY_ARTIFACT]},
                 {"status": _status("completed"), "artifacts": [_REPLY_ARTIFACT]},
             ]
         )
