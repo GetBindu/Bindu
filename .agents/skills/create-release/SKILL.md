@@ -68,7 +68,7 @@ git pull origin main
 ```bash
 # Use provided version or generate from date
 if [ -z "$1" ]; then
-    VERSION=$(date +%Y.%W.%-d)
+    VERSION=$(date +%G.%-V.%-u)
 else
     VERSION=$1
 fi

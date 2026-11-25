@@ -149,9 +149,10 @@ def app():
 ## Versioning
 
 - **Format**: Week-based CalVer (`YYYY.W.D`)
-  - YYYY = Year
+  - YYYY = ISO week-numbering year
   - W = ISO week number (1-53)
-  - D = Day of week (1=Sunday, 7=Saturday)
+  - D = ISO day of week (1=Monday, 7=Sunday)
+  - Generate with `date +%G.%-V.%-u`
 - **Example**: `2026.8.3` (Year 2026, Week 8, Wednesday)
 
 ## Security Best Practices
