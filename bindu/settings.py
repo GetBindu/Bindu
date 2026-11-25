@@ -477,7 +477,13 @@ class AgentSettings(BaseSettings):
             "Maximum tasks a worker executes concurrently, per agent process. "
             "1 (default) keeps strict serial execution. Tasks sharing a "
             "context_id are always serialized in arrival order regardless of "
-            "this cap, so context-history agents stay correct."
+            "this cap, so context-history agents stay correct. Cross-context "
+            "start order can differ from global submission order once "
+            "same-context tasks queue. Synchronous (def) handlers execute on "
+            "the event loop and never overlap, whatever the cap — only async "
+            "handlers benefit. The cap, context locks, and cancel interrupts "
+            "are per-process: replicas sharing one Redis queue are not "
+            "coordinated. See docs/worker-concurrency.md."
         ),
     )
 

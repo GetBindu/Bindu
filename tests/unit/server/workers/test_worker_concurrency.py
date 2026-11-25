@@ -421,3 +421,208 @@ class TestCancelActuallyCancels:
         task = await memory_storage.load_task(task_id)
         assert task["status"]["state"] == "canceled"
         assert not stalled.completed
+
+
+class TestTerminalWriteGuards:
+    """Follow-up to the #619 review: worker writes must lose races against
+    terminal transitions made by other writers, settled payments must keep
+    their receipts when a run is interrupted, and graceful shutdown must
+    hand un-started operations back to the scheduler.
+    """
+
+    @pytest.mark.asyncio
+    async def test_delayed_cancel_signal_cannot_be_overwritten(
+        self, scheduler, memory_storage
+    ):
+        """The API handler CAS-cancels mid-run but the worker's interrupt
+        never arrives (delayed or misrouted scheduler delivery). The run
+        finishes anyway — its late result must be discarded, never committed
+        over 'canceled'."""
+        manifest = ScriptedManifest()
+        gate = Gate()
+        after = Gate()
+        after.release.set()
+        manifest.scripts = {"race": gate.script("late-result"), "after": after.script()}
+        ctx = uuid4()
+        task_id = await submit(memory_storage, ctx, "race")
+        task_after = await submit(memory_storage, uuid4(), "after")
+
+        async with running_worker(scheduler, memory_storage, manifest, cap=1):
+            await scheduler.run_task({"task_id": task_id, "context_id": ctx})
+            with anyio.fail_after(WAIT):
+                await gate.started.wait()
+
+            # task_handlers.cancel_task's CAS — with NO scheduler signal
+            # afterwards, simulating delivery that never reached this worker.
+            assert await memory_storage.update_task_state_if(
+                task_id, from_state="working", to_state="canceled"
+            )
+            gate.release.set()
+
+            # The handler runs to completion; its write must be rejected.
+            with anyio.fail_after(WAIT):
+                while not gate.completed:
+                    await anyio.sleep(0.01)
+            await anyio.sleep(0.05)
+
+            task = await memory_storage.load_task(task_id)
+            assert task["status"]["state"] == "canceled"
+            assert not task.get("artifacts"), "late artifacts must be discarded"
+            assert all(m.get("role") != "agent" for m in task.get("history", [])), (
+                "late agent messages must be discarded"
+            )
+
+            # The discarded result did not wedge the loop.
+            await scheduler.run_task({"task_id": task_after, "context_id": uuid4()})
+            await wait_for_state(memory_storage, task_after, "completed")
+
+    @pytest.mark.asyncio
+    async def test_failure_after_cancel_stays_canceled(self, scheduler, memory_storage):
+        """A handler that raises after a cancel already landed must not
+        re-mark the canceled task as failed."""
+        manifest = ScriptedManifest()
+        gate = Gate()
+
+        async def fail_after_release():
+            gate.started.set()
+            await gate.release.wait()
+            raise RuntimeError("boom after cancel")
+
+        manifest.scripts = {"failrace": fail_after_release}
+        ctx = uuid4()
+        task_id = await submit(memory_storage, ctx, "failrace")
+
+        async with running_worker(scheduler, memory_storage, manifest, cap=1):
+            await scheduler.run_task({"task_id": task_id, "context_id": ctx})
+            with anyio.fail_after(WAIT):
+                await gate.started.wait()
+
+            assert await memory_storage.update_task_state_if(
+                task_id, from_state="working", to_state="canceled"
+            )
+            gate.release.set()
+            await anyio.sleep(0.1)
+
+            task = await memory_storage.load_task(task_id)
+            assert task["status"]["state"] == "canceled", (
+                "failure path must not overwrite a terminal state"
+            )
+
+    @pytest.mark.asyncio
+    async def test_cancel_mid_run_keeps_settlement_receipt(
+        self, scheduler, memory_storage
+    ):
+        """settle-first + cancel: the receipt is persisted before the handler
+        runs and re-tagged payment-orphaned when the run is interrupted, so
+        a canceled-but-paid task stays reconcilable."""
+        from bindu.settings import app_settings
+
+        manifest = ScriptedManifest()
+        stalled = Gate()  # never released: cancel interrupts it
+        manifest.scripts = {"paid": stalled.script("paid-result")}
+        ctx = uuid4()
+        task_id = await submit(memory_storage, ctx, "paid")
+
+        receipt = {
+            app_settings.x402.meta_status_key: app_settings.x402.status_completed,
+            "x402.payment.receipts": [{"transaction": "0xabc", "network": "base"}],
+        }
+
+        async with running_worker(scheduler, memory_storage, manifest, cap=1) as worker:
+
+            async def fake_settle(payment_context):
+                return dict(receipt)
+
+            worker._settle_payment = fake_settle  # simulated successful settle
+
+            await scheduler.run_task(
+                {
+                    "task_id": task_id,
+                    "context_id": ctx,
+                    "payment_context": {"simulated": True},
+                }
+            )
+            with anyio.fail_after(WAIT):
+                await stalled.started.wait()
+
+            # Receipt was persisted BEFORE the handler ran (settle-time write).
+            task = await memory_storage.load_task(task_id)
+            metadata = task.get("metadata") or {}
+            assert metadata.get("x402.payment.receipts"), (
+                "receipt must be durable before execution"
+            )
+
+            # Real cancel sequence: API CAS, then the scheduler signal.
+            assert await memory_storage.update_task_state_if(
+                task_id, from_state="working", to_state="canceled"
+            )
+            await scheduler.cancel_task({"task_id": task_id})
+            await wait_for_state(memory_storage, task_id, "canceled")
+
+            # Interrupt re-tags the settled payment for reconciliation.
+            with anyio.fail_after(WAIT):
+                while True:
+                    task = await memory_storage.load_task(task_id)
+                    metadata = task.get("metadata") or {}
+                    if (
+                        metadata.get(app_settings.x402.meta_status_key)
+                        == "payment-orphaned"
+                    ):
+                        break
+                    await anyio.sleep(0.01)
+            assert metadata["x402.payment.receipts"][0]["transaction"] == "0xabc"
+            assert not stalled.completed
+
+    @pytest.mark.asyncio
+    async def test_shutdown_requeues_unstarted_task(self, scheduler, memory_storage):
+        """Graceful shutdown: the running task is finalized as canceled, but a
+        task still waiting on the concurrency gates goes back to the scheduler
+        (eager dispatch consumed its operation) and a restarted worker runs it.
+        """
+
+        class SchedulerSpy:
+            """Counts run sends so the requeue is asserted, not assumed."""
+
+            def __init__(self, inner):
+                self.inner = inner
+                self.run_sends = 0
+
+            async def run_task(self, params):
+                self.run_sends += 1
+                await self.inner.run_task(params)
+
+            def __getattr__(self, name):
+                return getattr(self.inner, name)
+
+        spy = SchedulerSpy(scheduler)
+        manifest = ScriptedManifest()
+        g_running, g_queued = Gate(), Gate()
+        manifest.scripts = {
+            "running": g_running.script(),
+            "queued": g_queued.script(),
+        }
+        ctx1, ctx2 = uuid4(), uuid4()
+        t_running = await submit(memory_storage, ctx1, "running")
+        t_queued = await submit(memory_storage, ctx2, "queued")
+
+        async with running_worker(spy, memory_storage, manifest, cap=1):
+            await spy.run_task({"task_id": t_running, "context_id": ctx1})
+            await spy.run_task({"task_id": t_queued, "context_id": ctx2})
+            with anyio.fail_after(WAIT):
+                await g_running.started.wait()
+            # Let eager dispatch consume the queued operation so it is
+            # parked on the semaphore when the worker shuts down.
+            await anyio.sleep(0.1)
+
+        assert spy.run_sends == 3, "shutdown must requeue the un-started run"
+        assert (await memory_storage.load_task(t_running))["status"][
+            "state"
+        ] == "canceled"
+        assert (await memory_storage.load_task(t_queued))["status"][
+            "state"
+        ] == "submitted", "an un-started task must stay submitted, not canceled"
+
+        # A restarted worker picks the requeued operation up and completes it.
+        g_queued.release.set()
+        async with running_worker(spy, memory_storage, manifest, cap=1):
+            await wait_for_state(memory_storage, t_queued, "completed")

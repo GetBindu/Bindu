@@ -3,6 +3,7 @@
 from __future__ import annotations as _annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Collection
 from typing import Any, Generic
 from uuid import UUID
 
@@ -97,22 +98,38 @@ class Storage(ABC, Generic[ContextT]):
     async def update_task(
         self,
         task_id: UUID,
-        state: TaskState,
+        state: TaskState | None = None,
         new_artifacts: list[Artifact] | None = None,
         new_messages: list[Message] | None = None,
         metadata: dict[str, Any] | None = None,
-    ) -> Task:
+        expected_states: Collection[str] | None = None,
+    ) -> Task | None:
         """Update task state and append new content.
 
         Args:
             task_id: Task to update
-            state: New task state (working, completed, failed, etc.)
+            state: New task state (working, completed, failed, etc.), or
+                ``None`` to leave the current state untouched — used for
+                metadata-only writes such as persisting a payment receipt.
             new_artifacts: Optional artifacts to append
             new_messages: Optional messages to append to history
             metadata: Optional metadata to update/merge with task metadata
+            expected_states: Optional precondition. When given, the update
+                applies only while the task's current state is one of these.
+                Implementations MUST evaluate the precondition and the write
+                atomically with respect to other writers — a single
+                conditional ``UPDATE`` for SQL backends, no ``await`` between
+                check and mutation in-memory — so a worker finishing a run
+                can never overwrite a concurrent terminal transition such as
+                an API cancel (same contract as ``update_task_state_if``).
 
         Returns:
-            Updated task object
+            Updated task object, or ``None`` when ``expected_states`` was
+            given and the task's current state was not among them (nothing
+            was changed).
+
+        Raises:
+            KeyError: If task not found.
         """
 
     @abstractmethod

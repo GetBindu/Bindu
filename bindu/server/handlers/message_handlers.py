@@ -98,7 +98,13 @@ class MessageHandlers:
             timestamp = loaded_task["status"]["timestamp"]
             if current_state not in terminal_states:
                 try:
-                    updated = await self.storage.update_task(task["id"], state="failed")
+                    # Guarded: the read above is racy; the precondition makes
+                    # sure a concurrent terminal transition is not overwritten.
+                    updated = await self.storage.update_task(
+                        task["id"],
+                        state="failed",
+                        expected_states=app_settings.agent.non_terminal_states,
+                    )
                     if updated and "status" in updated:
                         current_state = updated["status"]["state"]
                         timestamp = updated["status"]["timestamp"]

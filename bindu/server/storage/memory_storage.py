@@ -18,6 +18,7 @@ from __future__ import annotations as _annotations
 
 import copy
 from datetime import datetime, timezone
+from collections.abc import Collection
 from typing import Any
 from uuid import UUID
 
@@ -272,11 +273,12 @@ class InMemoryStorage(Storage[dict[str, Any]]):
     async def update_task(
         self,
         task_id: UUID,
-        state: TaskState,
+        state: TaskState | None = None,
         new_artifacts: list[Artifact] | None = None,
         new_messages: list[Message] | None = None,
         metadata: dict[str, Any] | None = None,
-    ) -> Task:
+        expected_states: Collection[str] | None = None,
+    ) -> Task | None:
         """Update task state and append new content.
 
         Hybrid Pattern Support:
@@ -285,13 +287,17 @@ class InMemoryStorage(Storage[dict[str, Any]]):
 
         Args:
             task_id: Task to update
-            state: New task state (working, completed, failed, etc.)
+            state: New task state, or None to leave the state untouched
+                (metadata-only write)
             new_artifacts: Optional artifacts to append (for completion)
             new_messages: Optional messages to append to history
             metadata: Optional metadata to update/merge with task metadata
+            expected_states: Optional precondition — apply the update only
+                while the current state is one of these
 
         Returns:
-            Updated task object
+            Updated task object, or None when expected_states was given and
+            the current state was not among them (nothing changed)
 
         Raises:
             TypeError: If task_id is not UUID
@@ -303,9 +309,20 @@ class InMemoryStorage(Storage[dict[str, Any]]):
             raise KeyError(f"Task {task_id} not found")
 
         task = self.tasks[task_id]
-        task["status"] = TaskStatus(
-            state=state, timestamp=datetime.now(timezone.utc).isoformat()
-        )
+
+        # Precondition check and mutation have no ``await`` between them, so
+        # the guarded update is atomic under cooperative scheduling — the
+        # same contract update_task_state_if relies on.
+        if (
+            expected_states is not None
+            and task["status"]["state"] not in expected_states
+        ):
+            return None
+
+        if state is not None:
+            task["status"] = TaskStatus(
+                state=state, timestamp=datetime.now(timezone.utc).isoformat()
+            )
 
         if metadata:
             if "metadata" not in task:

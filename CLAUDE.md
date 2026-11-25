@@ -316,7 +316,7 @@ bindu/
 ## Environment Variables
 
 ### Core (Python)
-- `AGENT__MAX_CONCURRENT_TASKS` - Tasks a worker executes concurrently, per agent process (default: 1 = serial; tasks sharing a context_id always run serially in arrival order)
+- `AGENT__MAX_CONCURRENT_TASKS` - Tasks a worker executes concurrently, per agent process (default: 1 = serial; tasks sharing a context_id always run serially in arrival order; sync `def` handlers never overlap; per-process only — see `docs/worker-concurrency.md`)
 - `GRPC__ENABLED` - Enable gRPC server (default: false)
 - `GRPC__PORT` - gRPC server port (default: 3774)
 - `GRPC__HOST` - gRPC server host (default: 0.0.0.0)
