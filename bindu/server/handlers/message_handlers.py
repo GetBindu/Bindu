@@ -288,6 +288,26 @@ class MessageHandlers:
             )
             terminal_states = app_settings.agent.terminal_states
 
+            def new_artifact_events(current_task: Task) -> list[dict[str, Any]]:
+                """Build artifact-update events for artifacts not yet streamed."""
+                events = []
+                for artifact in current_task.get("artifacts", []):
+                    artifact_id = str(artifact["artifact_id"])
+                    if artifact_id in seen_artifact_ids:
+                        continue
+                    seen_artifact_ids.add(artifact_id)
+                    events.append(
+                        {
+                            "kind": "artifact-update",
+                            "task_id": str(task["id"]),
+                            "context_id": str(context_id),
+                            "artifact": artifact,
+                            "append": artifact.get("append", False),
+                            "last_chunk": artifact.get("last_chunk", False),
+                        }
+                    )
+                return events
+
             submitted_event = {
                 "kind": "status-update",
                 "task_id": str(task["id"]),
@@ -322,32 +342,30 @@ class MessageHandlers:
                         return
 
                     status = loaded_task["status"]["state"]
+                    status_event = None
                     if status != seen_status:
                         status_event = {
                             "kind": "status-update",
                             "task_id": str(task["id"]),
                             "context_id": str(context_id),
                             "status": loaded_task["status"],
-                            "final": status in app_settings.agent.terminal_states,
+                            "final": status in terminal_states,
                         }
-                        yield self._sse_event(status_event)
                         seen_status = status
 
-                    for artifact in loaded_task.get("artifacts", []):
-                        artifact_id = str(artifact["artifact_id"])
-                        if artifact_id in seen_artifact_ids:
-                            continue
-                        seen_artifact_ids.add(artifact_id)
+                    # A status that ends the stream (terminal, or paused for
+                    # input/auth) goes out after this poll's artifacts, so the
+                    # `final: true` event is always the last one a client reads.
+                    # A non-ending status (e.g. working) still precedes them.
+                    ends_stream = status in terminal_states or status in PAUSED_STATES
+                    if status_event is not None and not ends_stream:
+                        yield self._sse_event(status_event)
 
-                        artifact_event = {
-                            "kind": "artifact-update",
-                            "task_id": str(task["id"]),
-                            "context_id": str(context_id),
-                            "artifact": artifact,
-                            "append": artifact.get("append", False),
-                            "last_chunk": artifact.get("last_chunk", False),
-                        }
+                    for artifact_event in new_artifact_events(loaded_task):
                         yield self._sse_event(artifact_event)
+
+                    if status_event is not None and ends_stream:
+                        yield self._sse_event(status_event)
 
                     if status in terminal_states:
                         return
@@ -359,6 +377,8 @@ class MessageHandlers:
                         if latest_task:
                             latest_status = latest_task["status"]["state"]
                             if latest_status != seen_status:
+                                for artifact_event in new_artifact_events(latest_task):
+                                    yield self._sse_event(artifact_event)
                                 yield self._sse_event(
                                     {
                                         "kind": "status-update",

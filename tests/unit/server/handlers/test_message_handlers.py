@@ -1,5 +1,6 @@
 """Minimal tests for message handler utilities."""
 
+import json
 from unittest.mock import AsyncMock, Mock
 import pytest
 from datetime import datetime, timezone
@@ -431,3 +432,116 @@ class TestMessageHandlers:
         assert response["error"]["code"] == -32602
         assert "not-a-uuid" in response["error"]["message"]
         assert captured["request_id"] == "req-bad-ctx"
+
+
+async def _collect_stream_events(load_task_sequence):
+    """Run stream_message against a scripted load_task sequence; return events."""
+    task_id = uuid4()
+    context_id = uuid4()
+    submitted = {
+        "id": task_id,
+        "context_id": context_id,
+        "status": {"state": "submitted", "timestamp": "2024-01-01T00:00:00Z"},
+    }
+    mock_storage = AsyncMock()
+    mock_storage.submit_task.return_value = submitted
+    mock_storage.load_task.side_effect = [
+        {**submitted, **snapshot} for snapshot in load_task_sequence
+    ]
+
+    handler = MessageHandlers(
+        scheduler=AsyncMock(),
+        storage=mock_storage,
+        context_id_parser=lambda x: context_id,
+    )
+    request = {
+        "jsonrpc": "2.0",
+        "id": "req1",
+        "params": {"message": {"content": "test", "context_id": str(context_id)}},
+    }
+
+    response = await handler.stream_message(request)
+    events = []
+    async for chunk in response.body_iterator:
+        text = chunk.decode() if isinstance(chunk, bytes) else chunk
+        assert text.startswith("data: ")
+        events.append(json.loads(text[len("data: ") :]))
+    return events
+
+
+def _status(state):
+    return {"state": state, "timestamp": "2024-01-01T00:00:01Z"}
+
+
+_REPLY_ARTIFACT = {
+    "artifact_id": str(uuid4()),
+    "parts": [{"kind": "text", "text": "reply"}],
+}
+
+
+class TestStreamEventOrdering:
+    """The `final: true` status-update must be the last event of a stream.
+
+    A2A clients stop reading at `final: true`, so any artifact emitted after it
+    is never delivered.
+    """
+
+    @staticmethod
+    def _kinds(events):
+        return [
+            (e["kind"], e["status"]["state"])
+            if e["kind"] == "status-update"
+            else (e["kind"], e["artifact"]["artifact_id"])
+            for e in events
+        ]
+
+    @pytest.mark.asyncio
+    async def test_artifact_precedes_final_status_in_same_poll(self):
+        events = await _collect_stream_events(
+            [{"status": _status("completed"), "artifacts": [_REPLY_ARTIFACT]}]
+        )
+
+        assert self._kinds(events) == [
+            ("status-update", "submitted"),
+            ("artifact-update", _REPLY_ARTIFACT["artifact_id"]),
+            ("status-update", "completed"),
+        ]
+        assert events[-1]["final"] is True
+        assert [e.get("final") for e in events[:-1]] == [False, None]
+
+    @pytest.mark.asyncio
+    async def test_working_status_precedes_artifacts_and_final_is_last(self):
+        events = await _collect_stream_events(
+            [
+                {"status": _status("working")},
+                {"status": _status("completed"), "artifacts": [_REPLY_ARTIFACT]},
+            ]
+        )
+
+        assert self._kinds(events) == [
+            ("status-update", "submitted"),
+            ("status-update", "working"),
+            ("artifact-update", _REPLY_ARTIFACT["artifact_id"]),
+            ("status-update", "completed"),
+        ]
+        assert events[-1]["final"] is True
+        assert not any(e.get("final") for e in events[:-1])
+
+    @pytest.mark.asyncio
+    async def test_paused_recheck_emits_artifacts_before_final_status(self):
+        """A task seen as input-required, then terminal on the re-check, must
+        still deliver its artifact before the final event."""
+        events = await _collect_stream_events(
+            [
+                {"status": _status("input-required")},
+                {"status": _status("completed"), "artifacts": [_REPLY_ARTIFACT]},
+            ]
+        )
+
+        assert self._kinds(events) == [
+            ("status-update", "submitted"),
+            ("status-update", "input-required"),
+            ("artifact-update", _REPLY_ARTIFACT["artifact_id"]),
+            ("status-update", "completed"),
+        ]
+        assert events[-1]["final"] is True
