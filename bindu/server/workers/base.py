@@ -23,7 +23,7 @@ from __future__ import annotations as _annotations
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager, nullcontext
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, cast
 
 import anyio
 from opentelemetry.trace import get_tracer, use_span
@@ -33,10 +33,16 @@ from bindu.server.scheduler import TaskOperation
 from bindu.common.protocol.types import Artifact, Message, TaskIdParams, TaskSendParams
 from bindu.server.scheduler.base import Scheduler
 from bindu.server.storage.base import Storage
+from bindu.settings import app_settings
 from bindu.utils.logging import get_logger
 
 tracer = get_tracer(__name__)
 logger = get_logger(__name__)
+
+# Bound on the shielded scheduler send during shutdown requeue: long enough
+# for a healthy broker round-trip, short enough that a dead consumer can't
+# wedge worker exit.
+REQUEUE_SEND_TIMEOUT_SECONDS = 5.0
 
 
 @dataclass
@@ -157,12 +163,14 @@ class Worker(ABC):
         params = task_operation["params"]
         task_id = self._normalize_uuid(params["task_id"])
         context_key = str(params.get("context_id") or task_id)
+        run_started = False
         try:
             async with self._context_guard(context_key):
                 assert self._run_semaphore is not None, "worker not started via run()"
                 async with self._run_semaphore:
                     with anyio.CancelScope() as cancel_scope:
                         self._in_flight_scopes[task_id] = cancel_scope
+                        run_started = True
                         try:
                             await self._handle_task_operation(task_operation)
                         finally:
@@ -174,9 +182,17 @@ class Worker(ABC):
                         logger.info(f"Task {task_id} run interrupted by cancel")
                         await self._finalize_interrupted_task(task_id)
         except anyio.get_cancelled_exc_class():
-            # Worker shutdown: don't strand an in-flight task in 'working'.
+            # Worker shutdown.
             with anyio.CancelScope(shield=True):
-                await self._finalize_interrupted_task(task_id)
+                if run_started:
+                    # Mid-run: side effects may have happened, so re-running
+                    # is not safe — don't strand it in 'working'.
+                    await self._finalize_interrupted_task(task_id)
+                else:
+                    # Still waiting on the concurrency gates: eager dispatch
+                    # already consumed the operation from the scheduler, so
+                    # hand it back for a restarted worker to run.
+                    await self._requeue_task_operation(task_operation)
             raise
         except Exception as e:  # noqa: BLE001 - last-resort guard so no operation can kill the dispatch loop
             logger.error(
@@ -249,6 +265,45 @@ class Worker(ABC):
         except Exception as e:  # noqa: BLE001 - best-effort cleanup during interruption/shutdown
             logger.warning(f"Could not finalize interrupted task {task_id}: {e}")
 
+    async def _requeue_task_operation(self, task_operation: TaskOperation) -> None:
+        """Return an un-started run operation to the scheduler on shutdown.
+
+        Eager dispatch pops operations off the scheduler queue before a
+        concurrency slot is free, so a graceful shutdown would otherwise
+        consume queued work without ever running it. Requeueing keeps the
+        task 'submitted' with its operation back on the queue (durable for
+        Redis). Best-effort: when the scheduler no longer accepts sends,
+        fall back to finalizing the task as canceled so it is never left
+        'submitted' with its operation silently lost.
+        """
+        task_id = task_operation["params"]["task_id"]
+        if not getattr(self.scheduler, "requeue_survives_shutdown", False):
+            # In-memory stream: it dies with this process, so a requeue
+            # would strand the task 'submitted' forever. Cancel honestly.
+            await self._finalize_interrupted_task(task_id)
+            return
+        try:
+            # Only run operations reach this method (_run_task_operation),
+            # so the params are TaskSendParams by construction. The send is
+            # bounded: it runs under the shutdown shield, and an in-memory
+            # stream whose consumer (this worker's loop) is already gone
+            # can fill up and would otherwise block the shielded send
+            # forever, wedging worker exit. A timeout lands in the fallback
+            # below instead.
+            with anyio.fail_after(REQUEUE_SEND_TIMEOUT_SECONDS):
+                await self.scheduler.run_task(
+                    cast("TaskSendParams", task_operation["params"])
+                )
+            logger.info(f"Task {task_id} requeued; worker shut down before it started")
+        except Exception as e:  # noqa: BLE001 - best-effort during shutdown
+            # Durable scheduler but the send failed: leave the task
+            # 'submitted' (recoverable — re-enqueue or resubmit) instead of
+            # canceling work the payer/user still wants.
+            logger.error(
+                f"Could not requeue task {task_id} on shutdown: {e}; task left "
+                "'submitted' with its operation consumed — re-enqueue required"
+            )
+
     async def _handle_task_operation(self, task_operation: TaskOperation) -> None:
         """Dispatch task operation to appropriate handler.
 
@@ -289,10 +344,20 @@ class Worker(ABC):
                             f"Unknown operation: {task_operation['operation']}"
                         )
         except Exception as e:  # noqa: BLE001 - intentionally broad: any unhandled worker failure must mark the task as failed
-            # Update task status to failed on any exception
+            # Update task status to failed on any exception — guarded so a
+            # state another writer already made terminal (e.g. an API cancel
+            # racing this failure) is never overwritten.
             task_id = self._normalize_uuid(task_operation["params"]["task_id"])
             logger.error(f"Task {task_id} failed: {e}", exc_info=True)
-            await self.storage.update_task(task_id, state="failed")
+            updated = await self.storage.update_task(
+                task_id,
+                state="failed",
+                expected_states=app_settings.agent.non_terminal_states,
+            )
+            if updated is None:
+                logger.debug(
+                    f"Task {task_id} already terminal; failure state not recorded"
+                )
 
     # -------------------------------------------------------------------------
     # Helper Methods

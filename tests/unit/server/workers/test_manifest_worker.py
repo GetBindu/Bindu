@@ -7,6 +7,7 @@ import pytest
 
 from bindu.common.protocol.types import Task, TaskSendParams
 from bindu.server.workers.manifest_worker import ManifestWorker
+from bindu.settings import app_settings
 
 
 class TestManifestWorker:
@@ -257,7 +258,11 @@ class TestManifestWorker:
 
         await worker.cancel_task({"task_id": task_id})
 
-        mock_storage.update_task.assert_called_once_with(task_id, state="canceled")
+        mock_storage.update_task.assert_called_once_with(
+            task_id,
+            state="canceled",
+            expected_states=app_settings.agent.non_terminal_states,
+        )
 
     @pytest.mark.asyncio
     async def test_cancel_task_not_found(self):

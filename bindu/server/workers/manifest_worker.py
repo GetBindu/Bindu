@@ -32,6 +32,8 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 from uuid import UUID
 
+import anyio
+
 from opentelemetry.trace import Status, StatusCode, get_current_span, get_tracer
 from x402.http import FacilitatorConfig, HTTPFacilitatorClient
 
@@ -49,7 +51,7 @@ from bindu.penguin.manifest import AgentManifest
 from bindu.server.workers.base import Worker
 from bindu.server.workers.helpers import ResponseDetector, ResultProcessor
 from bindu.utils.logging import get_logger
-from bindu.utils.retry import retry_worker_operation
+from bindu.utils.retry import TRANSIENT_EXCEPTIONS, retry_worker_operation
 from bindu.utils.worker import ArtifactBuilder, MessageConverter, TaskStateManager
 
 tracer = get_tracer("bindu.server.workers.manifest_worker")
@@ -57,6 +59,14 @@ logger = get_logger("bindu.server.workers.manifest_worker")
 
 # Constants
 TASK_NOT_FOUND_ERROR = "Task {task_id} not found"
+
+# Bound on the shielded orphan-payment metadata write: a storage row held by
+# another transaction must not be able to stall worker shutdown forever.
+ORPHAN_TAG_TIMEOUT_SECONDS = 5.0
+
+# Bound on the shielded settle-time receipt persist, for the same reason;
+# on timeout the run proceeds and later writes re-attach the receipt.
+RECEIPT_PERSIST_TIMEOUT_SECONDS = 5.0
 INVALID_TERMINAL_STATE_ERROR = (
     "Invalid terminal state '{state}'. Must be one of: {terminal_states}"
 )
@@ -168,11 +178,38 @@ class ManifestWorker(Worker):
         # wall-clock is unchanged.
         settlement_metadata: dict[str, Any] | None = None
         if payment_context:
-            settlement_metadata = await self._settle_payment(payment_context)
-            settled_ok = (
-                settlement_metadata.get(app_settings.x402.meta_status_key)
-                == app_settings.x402.status_completed
-            )
+            # Shielded: a cancel landing mid-settle must not leave moved
+            # money known only to this coroutine's locals. The facilitator
+            # call is bounded by its own HTTP timeout; once it returns, the
+            # receipt is persisted on the task BEFORE any cancellation point,
+            # so an interrupted run can never drop a settled payment's
+            # reconciliation data.
+            with anyio.CancelScope(shield=True):
+                settlement_metadata = await self._settle_payment(payment_context)
+                settled_ok = (
+                    settlement_metadata.get(app_settings.x402.meta_status_key)
+                    == app_settings.x402.status_completed
+                )
+                if settled_ok:
+                    # Receipt durability: persist before any cancellation
+                    # point. Bounded — this write runs shielded, and a
+                    # contended storage row must not stall worker shutdown
+                    # behind the shield — and best-effort: on timeout or
+                    # failure the paid run still proceeds (aborting would
+                    # guarantee an orphan), and every later terminal/orphan
+                    # write re-attaches the receipt from
+                    # settlement_metadata. Settlement is never repeated.
+                    try:
+                        with anyio.fail_after(RECEIPT_PERSIST_TIMEOUT_SECONDS):
+                            await self.storage.update_task(
+                                task["id"], metadata=settlement_metadata
+                            )
+                    except Exception as e:  # noqa: BLE001 - best-effort upfront persist
+                        logger.warning(
+                            f"Could not persist settlement receipt for task "
+                            f"{task['id']} upfront: {e}; continuing — later "
+                            "writes re-attach it"
+                        )
             if not settled_ok:
                 # No state transition to "working", no LLM call — just record
                 # the failure and exit. Reconciliation metadata is already in
@@ -180,17 +217,46 @@ class ManifestWorker(Worker):
                 await self._handle_settlement_failure(task, settlement_metadata)
                 return
 
-        # Add span event for state transition
-        self._add_state_change_event(to_state="working")
-
-        # Transition to working
-        await self.storage.update_task(task["id"], state="working")
-        await self._notify_lifecycle(task["id"], task["context_id"], "working", False)
-
-        # Step 2: Build conversation history (A2A Protocol)
-        message_history = await self._build_complete_message_history(task)
-
+        # Everything after settlement runs inside the try so the
+        # cancellation handler below covers EVERY post-settlement
+        # checkpoint — the working update, the lifecycle notification, and
+        # the history build, not just handler execution. A cancel deferred
+        # by the shielded settle block above is delivered at the first of
+        # these awaits, and a paid run interrupted there must still be
+        # tagged as orphaned. pre_handler_phase keeps transient
+        # infrastructure errors in this region retryable (see the
+        # exception handler below).
+        pre_handler_phase = True
         try:
+            # Add span event for state transition
+            self._add_state_change_event(to_state="working")
+
+            # Transition to working — guarded: only from 'submitted'. A
+            # cancel can CAS the task away between the queued-state check
+            # above and here; the guard makes this write lose that race
+            # instead of resurrecting the task (any settled receipt is
+            # already persisted).
+            updated = await self.storage.update_task(
+                task["id"], state="working", expected_states=("submitted",)
+            )
+            if updated is None:
+                # A cancel won between the queued-state check and here. If
+                # the payment already settled (shielded block above), record
+                # the orphan — money moved, nothing will be produced.
+                if settlement_metadata:
+                    await self._record_orphaned_payment(task["id"], settlement_metadata)
+                logger.info(
+                    f"Task {task['id']} left 'submitted' before execution; skipping run"
+                )
+                return
+            await self._notify_lifecycle(
+                task["id"], task["context_id"], "working", False
+            )
+
+            # Step 2: Build conversation history (A2A Protocol)
+            message_history = await self._build_complete_message_history(task)
+            pre_handler_phase = False
+
             # Step 3: Execute manifest with system prompt (if enabled)
             if (
                 self.manifest.enable_system_message
@@ -270,7 +336,9 @@ class ManifestWorker(Worker):
                 # Hybrid Pattern: Return Message only, keep task open
                 # Add span event for state transition
                 self._add_state_change_event(from_state="working", to_state=state)
-                await self._handle_intermediate_state(task, state, message_content)
+                await self._handle_intermediate_state(
+                    task, state, message_content, settlement_metadata
+                )
             else:
                 # Hybrid Pattern: Task complete - generate Message + Artifacts
                 # Add span event for state transition
@@ -279,7 +347,40 @@ class ManifestWorker(Worker):
                     task, results, state, settlement_metadata=settlement_metadata
                 )
 
+        except anyio.get_cancelled_exc_class():
+            # tasks/cancel (or shutdown) interrupted the run. If the payer
+            # was already debited (settle-first), re-tag the persisted
+            # receipt so operators can find canceled-but-paid tasks for
+            # reconciliation — money moved, no artifact was delivered. The
+            # helper's guard keeps an interrupt that lands AFTER the
+            # completion write committed (e.g. during the notification
+            # awaits) from re-tagging a task whose deliverable exists.
+            if settlement_metadata:
+                await self._record_orphaned_payment(task["id"], settlement_metadata)
+            raise
         except Exception as e:
+            if (
+                pre_handler_phase
+                and settlement_metadata is None
+                and isinstance(e, TRANSIENT_EXCEPTIONS)
+            ):
+                # A retryable infrastructure error before any handler work
+                # on an UNPAID run: re-raise untouched so the retry
+                # decorator re-runs the task while it is still 'submitted'
+                # — a failure write here would make the retry a no-op (the
+                # working guard would reject it). Paid runs are excluded:
+                # re-running would re-enter settlement, and a second settle
+                # of the same nonce fails, so the failure path below
+                # (which records the orphan) is the safer outcome.
+                # If the working transition already landed, step it back so
+                # the retry's validation and guard see 'submitted' again.
+                try:
+                    await self.storage.update_task_state_if(
+                        task["id"], "working", "submitted"
+                    )
+                except Exception:  # noqa: BLE001 - best-effort revert
+                    pass
+                raise
             # Handle task failure with error message
             # Add span event for failure
             self._add_state_change_event(
@@ -334,8 +435,16 @@ class ManifestWorker(Worker):
             return
 
         # Direct scheduler-path cancel (no API CAS): record and notify.
+        # Guarded — if another writer made the task terminal between the
+        # load above and this write, that transition wins (and notified).
         self._add_state_change_event(from_state=current_state, to_state="canceled")
-        await self.storage.update_task(params["task_id"], state="canceled")
+        updated = await self.storage.update_task(
+            params["task_id"],
+            state="canceled",
+            expected_states=app_settings.agent.non_terminal_states,
+        )
+        if updated is None:
+            return
         await self._notify_lifecycle(
             params["task_id"], task["context_id"], "canceled", True
         )
@@ -501,7 +610,11 @@ class ManifestWorker(Worker):
     # -------------------------------------------------------------------------
 
     async def _handle_intermediate_state(
-        self, task: Task, state: TaskState, message_content: Any
+        self,
+        task: Task,
+        state: TaskState,
+        message_content: Any,
+        settlement_metadata: dict[str, Any] | None = None,
     ) -> None:
         """Handle intermediate task states (input-required, auth-required).
 
@@ -514,6 +627,9 @@ class ManifestWorker(Worker):
             task: Current task
             state: Task state to set
             message_content: Content for agent message (any type: str, dict, list, etc.)
+            settlement_metadata: Pre-settled payment metadata, if the run was
+                paid — used to record an orphan when the guarded write loses
+                to a cancel and the prompt is discarded
         """
         # Render message content for user; for structured, prefer 'prompt' field
         content = (
@@ -525,12 +641,35 @@ class ManifestWorker(Worker):
             content, task["id"], task["context_id"]
         )
 
-        metadata: dict[str, Any] | None = None
-
-        # Update task with state and append agent messages to history
-        await self.storage.update_task(
-            task["id"], state=state, new_messages=agent_messages, metadata=metadata
+        # Re-attach the settlement receipt (idempotent merge): if the
+        # bounded upfront persist failed, this committed write is the
+        # recovery point for a paid run that pauses on input/auth —
+        # otherwise the receipt would exist only in run_task's locals
+        # once the run returns.
+        metadata: dict[str, Any] | None = (
+            dict(settlement_metadata) if settlement_metadata else None
         )
+
+        # Update task with state and append agent messages to history.
+        # Guarded: a cancel that landed mid-run must not be overwritten by
+        # a late input-required/auth-required transition.
+        updated = await self.storage.update_task(
+            task["id"],
+            state=state,
+            new_messages=agent_messages,
+            metadata=metadata,
+            expected_states=("working",),
+        )
+        if updated is None:
+            # A cancel won the race: the prompt is discarded, so a paid run
+            # delivered nothing — record the orphan (a committed intermediate
+            # prompt never reaches this branch and keeps payment-completed).
+            if settlement_metadata:
+                await self._record_orphaned_payment(task["id"], settlement_metadata)
+            logger.info(
+                f"Task {task['id']} no longer 'working'; {state} update discarded"
+            )
+            return
         # Forward the rendered prompt to the operator inbox via the
         # lifecycle webhook. Coerce to a string conservatively — if the
         # handler returned a structured value without a "prompt" key,
@@ -604,13 +743,31 @@ class ManifestWorker(Worker):
             # If a notification fires before the DB write and then the process crashes,
             # clients receive an artifact webhook but the task is still "working" in the
             # DB — an inconsistent state.  Write first, then notify.
-            await self.storage.update_task(
+            #
+            # Guarded ('working' only): if a cancel won the race while the
+            # handler was finishing, the task is already terminal — per A2A
+            # immutability the late result is discarded, with no artifact or
+            # completion notifications. A settled payment receipt was
+            # persisted at settle time, so nothing is lost with it.
+            updated = await self.storage.update_task(
                 task["id"],
                 state=state,
                 new_artifacts=artifacts,
                 new_messages=agent_messages,
                 metadata=additional_metadata,
+                expected_states=("working",),
             )
+            if updated is None:
+                # A cancel won the race (e.g. the scheduler interrupt never
+                # reached this worker): the late result is discarded with no
+                # artifacts committed, so a settled payment is an orphan —
+                # money moved, nothing delivered.
+                if settlement_metadata:
+                    await self._record_orphaned_payment(task["id"], settlement_metadata)
+                logger.info(
+                    f"Task {task['id']} already terminal; completed result discarded"
+                )
+                return
 
             # Send artifact notifications after the DB is committed
             for artifact in artifacts:
@@ -623,17 +780,29 @@ class ManifestWorker(Worker):
             error_message = MessageConverter.to_protocol_messages(
                 results, task["id"], task["context_id"]
             )
-            await self.storage.update_task(
+            updated = await self.storage.update_task(
                 task["id"],
                 state=state,
                 new_messages=error_message,
                 metadata=additional_metadata,
+                expected_states=("working",),
             )
+            if updated is None:
+                logger.info(
+                    f"Task {task['id']} already terminal; {state} result discarded"
+                )
+                return
             await self._notify_lifecycle(task["id"], task["context_id"], state, True)
 
         elif state == "canceled":
             # Canceled: State change only, NO new content
-            await self.storage.update_task(task["id"], state=state)
+            updated = await self.storage.update_task(
+                task["id"],
+                state=state,
+                expected_states=app_settings.agent.non_terminal_states,
+            )
+            if updated is None:
+                return
             await self._notify_lifecycle(task["id"], task["context_id"], state, True)
 
     async def _handle_settlement_failure(
@@ -659,12 +828,21 @@ class ManifestWorker(Worker):
         self._add_state_change_event(
             from_state="submitted", to_state="failed", error="settlement_failed"
         )
-        await self.storage.update_task(
+        # Guarded: settle-first runs before the working transition, so this
+        # write only lands while the task is still 'submitted'. If a cancel
+        # got there first, nothing moved (the settle failed) — skip.
+        updated = await self.storage.update_task(
             task["id"],
             state="failed",
             new_messages=error_message,
             metadata=settlement_metadata,
+            expected_states=("submitted",),
         )
+        if updated is None:
+            logger.info(
+                f"Task {task['id']} no longer 'submitted'; settlement failure not recorded"
+            )
+            return
         await self._notify_lifecycle(task["id"], task["context_id"], "failed", True)
 
     async def _handle_task_failure(
@@ -705,10 +883,61 @@ class ManifestWorker(Worker):
                 **settlement_metadata,
                 app_settings.x402.meta_status_key: "payment-orphaned",
             }
-        await self.storage.update_task(
-            task["id"], state="failed", new_messages=error_message, metadata=metadata
+        updated = await self.storage.update_task(
+            task["id"],
+            state="failed",
+            new_messages=error_message,
+            metadata=metadata,
+            expected_states=app_settings.agent.non_terminal_states,
         )
+        if updated is None:
+            # The task went terminal (canceled) while failing. Keep the
+            # orphan-payment reconciliation data without touching the state.
+            if settlement_metadata:
+                await self._record_orphaned_payment(task["id"], settlement_metadata)
+            return
         await self._notify_lifecycle(task["id"], task["context_id"], "failed", True)
+
+    async def _record_orphaned_payment(
+        self, task_id: UUID, settlement_metadata: dict[str, Any]
+    ) -> None:
+        """Tag a settled payment whose run ended without a committed deliverable.
+
+        Shielded, so an in-flight cancellation cannot drop the
+        reconciliation record, and bounded, so a contended storage row
+        cannot stall shutdown behind the shield. The guarded write excludes
+        exactly 'completed' — the one state that proves a deliverable was
+        committed — so a late interrupt never re-tags a delivered task,
+        while canceled and independently failed paid runs (e.g. a stream
+        error marked the task failed before the worker's own write) stay
+        reconcilable. Best-effort: on timeout or storage failure the task
+        still carries its settle-time receipt; only the orphan re-tag is
+        lost, and the loss is logged for the operator.
+        """
+        allowed = tuple(app_settings.agent.non_terminal_states) + (
+            "canceled",
+            "failed",
+            "rejected",
+        )
+        try:
+            with anyio.CancelScope(shield=True):
+                with anyio.fail_after(ORPHAN_TAG_TIMEOUT_SECONDS):
+                    await self.storage.update_task(
+                        task_id,
+                        metadata={
+                            **settlement_metadata,
+                            app_settings.x402.meta_status_key: "payment-orphaned",
+                        },
+                        expected_states=allowed,
+                    )
+        except Exception as e:  # noqa: BLE001 - best-effort reconciliation tag
+            logger.error(
+                f"Could not record orphaned payment for task {task_id}: {e}; "
+                "the settle-time receipt usually remains on the task, but its "
+                "bounded write is best-effort too — if both writes failed, "
+                "this log line is the reconciliation record: "
+                f"{settlement_metadata}"
+            )
 
     async def _settle_payment(self, payment_context: dict[str, Any]) -> dict[str, Any]:
         """Settle payment after successful task completion.

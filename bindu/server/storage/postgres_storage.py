@@ -25,6 +25,7 @@ Features:
 
 from __future__ import annotations as _annotations
 
+from collections.abc import Collection
 from typing import Any
 from uuid import UUID
 
@@ -465,22 +466,29 @@ class PostgresStorage(Storage[dict[str, Any]]):
     async def update_task(
         self,
         task_id: UUID,
-        state: TaskState,
+        state: TaskState | None = None,
         new_artifacts: list[Artifact] | None = None,
         new_messages: list[Message] | None = None,
         metadata: dict[str, Any] | None = None,
-    ) -> Task:
+        expected_states: Collection[str] | None = None,
+    ) -> Task | None:
         """Update task state and append new content using SQLAlchemy.
 
         Args:
             task_id: Task to update
-            state: New task state
+            state: New task state, or None to leave the state untouched
+                (metadata-only write)
             new_artifacts: Optional artifacts to append
             new_messages: Optional messages to append to history
             metadata: Optional metadata to update/merge
+            expected_states: Optional precondition — the guarded write is a
+                single conditional UPDATE (``WHERE state IN (...)``), so the
+                state check, the state write, and the content append commit
+                atomically under the row lock, like update_task_state_if
 
         Returns:
-            Updated task object
+            Updated task object, or None when expected_states was given and
+            the current state was not among them (nothing changed)
 
         Raises:
             TypeError: If task_id is not UUID
@@ -503,10 +511,12 @@ class PostgresStorage(Storage[dict[str, Any]]):
 
                     now = get_current_utc_timestamp()
                     update_values: dict[str, Any] = {
-                        "state": state,
-                        "state_timestamp": now,
                         "updated_at": now,
                     }
+
+                    if state is not None:
+                        update_values["state"] = state
+                        update_values["state_timestamp"] = now
 
                     if metadata:
                         update_values["metadata"] = func.jsonb_concat(
@@ -532,15 +542,21 @@ class PostgresStorage(Storage[dict[str, Any]]):
                             tasks_table.c.history, prepare_jsonb_value(new_messages)
                         )
 
-                    # Execute update
-                    stmt = (
-                        update(tasks_table)
-                        .where(tasks_table.c.id == task_id)
-                        .values(**update_values)
-                        .returning(tasks_table)
-                    )
+                    # Execute update. With expected_states this is a single
+                    # conditional UPDATE: Postgres takes the row lock, so the
+                    # precondition and every value above commit atomically.
+                    stmt = update(tasks_table).where(tasks_table.c.id == task_id)
+                    if expected_states is not None:
+                        stmt = stmt.where(tasks_table.c.state.in_(expected_states))
+                    stmt = stmt.values(**update_values).returning(tasks_table)
                     result = await session.execute(stmt)
                     updated_row = result.first()
+
+                    if updated_row is None:
+                        # The row exists (checked above) but its state moved
+                        # outside expected_states concurrently — precondition
+                        # failed, nothing written.
+                        return None
 
                     return self._row_to_task(updated_row)
 

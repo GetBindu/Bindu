@@ -548,6 +548,103 @@ class TestTaskOperations:
         assert len(context2_tasks) == 2
 
 
+class TestGuardedUpdates:
+    """update_task with expected_states / state=None (#619 follow-up).
+
+    Worker transitions pass expected_states so they can never overwrite a
+    state another writer already made terminal; metadata-only writes (state
+    None) persist payment receipts without touching the lifecycle.
+    """
+
+    @pytest.mark.asyncio
+    async def test_guard_passes_when_state_matches(
+        self, storage, sample_context_id, sample_message
+    ):
+        """The guarded write applies when the current state is expected."""
+        task = await storage.submit_task(sample_context_id, sample_message)
+
+        updated = await storage.update_task(
+            task["id"], state="working", expected_states=("submitted",)
+        )
+
+        assert updated is not None
+        assert updated["status"]["state"] == "working"
+
+    @pytest.mark.asyncio
+    async def test_guard_mismatch_changes_nothing(
+        self, storage, sample_context_id, sample_message
+    ):
+        """A rejected write returns None and leaves state, artifacts,
+        history, and metadata untouched — the canceled-vs-completed race."""
+        from bindu.common.protocol.types import TextPart
+
+        task = await storage.submit_task(sample_context_id, sample_message)
+        await storage.update_task(task["id"], state="canceled")
+
+        late_artifact = Artifact(
+            artifact_id=uuid4(),
+            parts=[TextPart(kind="text", text="late artifact")],
+        )
+        late_message = Message(
+            message_id=uuid4(),
+            task_id=task["id"],
+            context_id=sample_context_id,
+            kind="message",
+            role="agent",
+            parts=[TextPart(kind="text", text="late reply")],
+        )
+
+        result = await storage.update_task(
+            task["id"],
+            state="completed",
+            new_artifacts=[late_artifact],
+            new_messages=[late_message],
+            metadata={"late": True},
+            expected_states=("working",),
+        )
+
+        assert result is None
+        reloaded = await storage.load_task(task["id"])
+        assert reloaded["status"]["state"] == "canceled"
+        assert not reloaded.get("artifacts")
+        assert all(m.get("role") != "agent" for m in reloaded.get("history", []))
+        assert "late" not in (reloaded.get("metadata") or {})
+
+    @pytest.mark.asyncio
+    async def test_metadata_only_write_keeps_state(
+        self, storage, sample_context_id, sample_message
+    ):
+        """state=None merges metadata without touching the lifecycle."""
+        task = await storage.submit_task(sample_context_id, sample_message)
+        timestamp_before = task["status"]["timestamp"]
+
+        updated = await storage.update_task(
+            task["id"], metadata={"x402.payment.status": "payment-completed"}
+        )
+
+        assert updated is not None
+        assert updated["status"]["state"] == "submitted"
+        assert updated["status"]["timestamp"] == timestamp_before
+        assert updated["metadata"]["x402.payment.status"] == "payment-completed"
+
+    @pytest.mark.asyncio
+    async def test_metadata_only_write_lands_on_terminal_task(
+        self, storage, sample_context_id, sample_message
+    ):
+        """Reconciliation data (orphaned-payment tag) must attach even after
+        the task went terminal via cancel."""
+        task = await storage.submit_task(sample_context_id, sample_message)
+        await storage.update_task(task["id"], state="canceled")
+
+        updated = await storage.update_task(
+            task["id"], metadata={"x402.payment.status": "payment-orphaned"}
+        )
+
+        assert updated is not None
+        assert updated["status"]["state"] == "canceled"
+        assert updated["metadata"]["x402.payment.status"] == "payment-orphaned"
+
+
 class TestContextOperations:
     """Test context operations."""
 

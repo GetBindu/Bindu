@@ -19,6 +19,11 @@ logger = get_logger("bindu.server.scheduler.base")
 class Scheduler(ABC):
     """The scheduler class is in charge of scheduling the tasks."""
 
+    requeue_survives_shutdown: bool = False
+    """True when operations sent back to this scheduler outlive the worker
+    process (durable broker, e.g. Redis). The in-memory stream dies with
+    the process, so requeueing into it at shutdown would strand tasks."""
+
     @abstractmethod
     async def run_task(self, params: TaskSendParams) -> None:
         """Send a task to be executed by the worker."""

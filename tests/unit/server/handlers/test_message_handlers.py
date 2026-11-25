@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from bindu.common.protocol.types import Task
 from bindu.server.errors import MalformedContextIdError
+from bindu.settings import app_settings
 from bindu.server.handlers.message_handlers import MessageHandlers
 
 
@@ -78,7 +79,11 @@ class TestMessageHandlers:
 
         assert result["status"]["state"] == "failed"
         assert result["final"] is True
-        mock_storage.update_task.assert_called_once_with("task123", state="failed")
+        mock_storage.update_task.assert_called_once_with(
+            "task123",
+            state="failed",
+            expected_states=app_settings.agent.non_terminal_states,
+        )
 
     @pytest.mark.asyncio
     async def test_handle_stream_error_handles_load_failure(self):

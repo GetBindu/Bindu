@@ -42,6 +42,8 @@ OPERATION_TYPES = {
 class RedisScheduler(Scheduler):
     """A Redis-based scheduler for distributed task operations."""
 
+    requeue_survives_shutdown = True
+
     def __init__(
         self,
         redis_url: str,
