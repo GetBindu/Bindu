@@ -69,10 +69,11 @@ once in one agent process; it is the spend bound for provider calls.
   Redis scheduler a hard kill loses operations that were popped but not yet
   finished. A task that never started stays `submitted`; one that was
   mid-run stays `working` — sweep for both states after a hard kill, or
-  you will miss interrupted runs. Graceful shutdown requeues the former
-  and finalizes the latter as `canceled` (see above). The planned fix is a
-  separate control channel plus bounded prefetch with acknowledged
-  delivery.
+  you will miss interrupted runs. Graceful shutdown requeues the former —
+  falling back to `canceled` when the scheduler refuses the send or times
+  out (5 s) — and finalizes the latter as `canceled` (see above). The
+  planned fix is a separate control channel plus bounded prefetch with
+  acknowledged delivery.
 
 ## Verifying it on your agent
 
