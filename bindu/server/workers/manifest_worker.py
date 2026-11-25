@@ -51,7 +51,7 @@ from bindu.penguin.manifest import AgentManifest
 from bindu.server.workers.base import Worker
 from bindu.server.workers.helpers import ResponseDetector, ResultProcessor
 from bindu.utils.logging import get_logger
-from bindu.utils.retry import retry_worker_operation
+from bindu.utils.retry import TRANSIENT_EXCEPTIONS, retry_worker_operation
 from bindu.utils.worker import ArtifactBuilder, MessageConverter, TaskStateManager
 
 tracer = get_tracer("bindu.server.workers.manifest_worker")
@@ -223,7 +223,10 @@ class ManifestWorker(Worker):
         # the history build, not just handler execution. A cancel deferred
         # by the shielded settle block above is delivered at the first of
         # these awaits, and a paid run interrupted there must still be
-        # tagged as orphaned.
+        # tagged as orphaned. pre_handler_phase keeps transient
+        # infrastructure errors in this region retryable (see the
+        # exception handler below).
+        pre_handler_phase = True
         try:
             # Add span event for state transition
             self._add_state_change_event(to_state="working")
@@ -252,6 +255,7 @@ class ManifestWorker(Worker):
 
             # Step 2: Build conversation history (A2A Protocol)
             message_history = await self._build_complete_message_history(task)
+            pre_handler_phase = False
 
             # Step 3: Execute manifest with system prompt (if enabled)
             if (
@@ -355,6 +359,20 @@ class ManifestWorker(Worker):
                 await self._record_orphaned_payment(task["id"], settlement_metadata)
             raise
         except Exception as e:
+            if (
+                pre_handler_phase
+                and settlement_metadata is None
+                and isinstance(e, TRANSIENT_EXCEPTIONS)
+            ):
+                # A retryable infrastructure error before any handler work
+                # on an UNPAID run: re-raise untouched so the retry
+                # decorator re-runs the task while it is still 'submitted'
+                # — a failure write here would make the retry a no-op (the
+                # working guard would reject it). Paid runs are excluded:
+                # re-running would re-enter settlement, and a second settle
+                # of the same nonce fails, so the failure path below
+                # (which records the orphan) is the safer outcome.
+                raise
             # Handle task failure with error message
             # Add span event for failure
             self._add_state_change_event(

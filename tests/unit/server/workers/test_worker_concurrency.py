@@ -724,6 +724,19 @@ class TestTerminalWriteGuards:
 
             worker._settle_payment = blocking_settle
 
+            # Deliver the deferred cancellation AT the working write: every
+            # update_task call passes a cancellable checkpoint first, so
+            # the interrupt deferred by the settle shield lands inside the
+            # expanded cancellation handler — not in the working guard's
+            # skip branch, which could satisfy the assertions on its own.
+            real_update = memory_storage.update_task
+
+            async def checkpointing_update(*args, **kwargs):
+                await anyio.sleep(0)  # cancellable checkpoint
+                return await real_update(*args, **kwargs)
+
+            memory_storage.update_task = checkpointing_update
+
             await scheduler.run_task(
                 {
                     "task_id": task_id,
@@ -734,10 +747,16 @@ class TestTerminalWriteGuards:
             with anyio.fail_after(WAIT):
                 await settle_entered.wait()
 
-            # Real cancel path: scope interrupt + state flip, deferred by
-            # the shield until settlement returns.
+            # Real cancel path: wait for the scope interrupt itself (not
+            # the storage state) before releasing settlement, so the orphan
+            # tag demonstrably comes from the cancellation handler.
             await scheduler.cancel_task({"task_id": task_id})
-            await wait_for_state(memory_storage, task_id, "canceled")
+            with anyio.fail_after(WAIT):
+                while True:
+                    scope = worker._in_flight_scopes.get(task_id)
+                    if scope is not None and scope.cancel_called:
+                        break
+                    await anyio.sleep(0.01)
             release_settle.set()
 
             with anyio.fail_after(WAIT):
@@ -753,6 +772,9 @@ class TestTerminalWriteGuards:
 
             assert task["status"]["state"] == "canceled"
             assert not task.get("artifacts"), "no deliverable may be committed"
+            assert not handler_gate.started.is_set(), (
+                "cancellation landed before the handler, so it must never start"
+            )
             assert not handler_gate.completed, "the run must never complete"
             assert metadata["x402.payment.receipts"][0]["transaction"] == "0xsig"
 
@@ -823,6 +845,61 @@ class TestTerminalWriteGuards:
         )
         assert metadata["x402.payment.receipts"][0]["transaction"] == "0xflaky"
         assert task.get("artifacts"), "the deliverable must be committed"
+
+    @pytest.mark.asyncio
+    async def test_transient_error_before_handler_is_retried(self, scheduler):
+        """A retryable infrastructure error on the working write must leave
+        the task 'submitted' so the retry decorator can re-run it — not
+        mark it failed, which would make the retry a no-op against the
+        working guard."""
+        from bindu.server.storage.memory_storage import InMemoryStorage
+
+        class FlakyWorkingWriteStorage(InMemoryStorage):
+            """First working transition raises a TRANSIENT_EXCEPTIONS error."""
+
+            def __init__(self):
+                super().__init__()
+                self.working_write_attempts = 0
+
+            async def update_task(
+                self,
+                task_id,
+                state=None,
+                new_artifacts=None,
+                new_messages=None,
+                metadata=None,
+                expected_states=None,
+            ):
+                if state == "working":
+                    self.working_write_attempts += 1
+                    if self.working_write_attempts == 1:
+                        raise ConnectionError("transient storage blip")
+                return await super().update_task(
+                    task_id,
+                    state=state,
+                    new_artifacts=new_artifacts,
+                    new_messages=new_messages,
+                    metadata=metadata,
+                    expected_states=expected_states,
+                )
+
+        storage = FlakyWorkingWriteStorage()
+        manifest = ScriptedManifest()
+        done = Gate()
+        done.release.set()
+        manifest.scripts = {"retryme": done.script("recovered")}
+        ctx = uuid4()
+        task_id = await submit(storage, ctx, "retryme")
+
+        async with running_worker(scheduler, storage, manifest, cap=1):
+            await scheduler.run_task({"task_id": task_id, "context_id": ctx})
+            # Generous timeout: the retry decorator backs off with jitter
+            # before the second attempt. wait_for_state fails fast if the
+            # task is wrongly marked 'failed'.
+            task = await wait_for_state(storage, task_id, "completed", timeout=15)
+
+        assert storage.working_write_attempts == 2, "the run must be retried"
+        assert task["status"]["state"] == "completed"
 
     @pytest.mark.asyncio
     async def test_shutdown_requeues_unstarted_task(self, scheduler, memory_storage):
