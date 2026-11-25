@@ -691,6 +691,72 @@ class TestTerminalWriteGuards:
             assert metadata["x402.payment.receipts"][0]["transaction"] == "0xrace"
 
     @pytest.mark.asyncio
+    async def test_cancel_signal_during_shielded_settlement_tags_orphan(
+        self, scheduler, memory_storage
+    ):
+        """The real cancel interrupt arrives while settlement sits in its
+        shielded block: the shield defers it, the deferred cancellation
+        lands at a post-settlement checkpoint, and the settled payment is
+        still tagged orphaned with no deliverable committed."""
+        from bindu.settings import app_settings
+
+        manifest = ScriptedManifest()
+        handler_gate = Gate()
+        manifest.scripts = {"paidsig": handler_gate.script("never-delivered")}
+        ctx = uuid4()
+        task_id = await submit(memory_storage, ctx, "paidsig")
+
+        settle_entered = anyio.Event()
+        release_settle = anyio.Event()
+
+        async with running_worker(scheduler, memory_storage, manifest, cap=1) as worker:
+
+            async def blocking_settle(payment_context):
+                settle_entered.set()
+                # The cancel interrupt arrives while we sit here, shielded.
+                await release_settle.wait()
+                return {
+                    app_settings.x402.meta_status_key: (
+                        app_settings.x402.status_completed
+                    ),
+                    "x402.payment.receipts": [{"transaction": "0xsig"}],
+                }
+
+            worker._settle_payment = blocking_settle
+
+            await scheduler.run_task(
+                {
+                    "task_id": task_id,
+                    "context_id": ctx,
+                    "payment_context": {"simulated": True},
+                }
+            )
+            with anyio.fail_after(WAIT):
+                await settle_entered.wait()
+
+            # Real cancel path: scope interrupt + state flip, deferred by
+            # the shield until settlement returns.
+            await scheduler.cancel_task({"task_id": task_id})
+            await wait_for_state(memory_storage, task_id, "canceled")
+            release_settle.set()
+
+            with anyio.fail_after(WAIT):
+                while True:
+                    task = await memory_storage.load_task(task_id)
+                    metadata = task.get("metadata") or {}
+                    if (
+                        metadata.get(app_settings.x402.meta_status_key)
+                        == "payment-orphaned"
+                    ):
+                        break
+                    await anyio.sleep(0.01)
+
+            assert task["status"]["state"] == "canceled"
+            assert not task.get("artifacts"), "no deliverable may be committed"
+            assert not handler_gate.completed, "the run must never complete"
+            assert metadata["x402.payment.receipts"][0]["transaction"] == "0xsig"
+
+    @pytest.mark.asyncio
     async def test_shutdown_requeues_unstarted_task(self, scheduler, memory_storage):
         """Graceful shutdown: the running task is finalized as canceled, but a
         task still waiting on the concurrency gates goes back to the scheduler

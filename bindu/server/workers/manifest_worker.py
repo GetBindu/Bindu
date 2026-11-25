@@ -197,32 +197,42 @@ class ManifestWorker(Worker):
                 await self._handle_settlement_failure(task, settlement_metadata)
                 return
 
-        # Add span event for state transition
-        self._add_state_change_event(to_state="working")
-
-        # Transition to working — guarded: only from 'submitted'. A cancel
-        # can CAS the task away between the queued-state check above and
-        # here; the guard makes this write lose that race instead of
-        # resurrecting the task (any settled receipt is already persisted).
-        updated = await self.storage.update_task(
-            task["id"], state="working", expected_states=("submitted",)
-        )
-        if updated is None:
-            # A cancel won between the queued-state check and here. If the
-            # payment already settled (shielded block above), record the
-            # orphan — money moved and no deliverable will be produced.
-            if settlement_metadata:
-                await self._record_orphaned_payment(task["id"], settlement_metadata)
-            logger.info(
-                f"Task {task['id']} left 'submitted' before execution; skipping run"
-            )
-            return
-        await self._notify_lifecycle(task["id"], task["context_id"], "working", False)
-
-        # Step 2: Build conversation history (A2A Protocol)
-        message_history = await self._build_complete_message_history(task)
-
+        # Everything after settlement runs inside the try so the
+        # cancellation handler below covers EVERY post-settlement
+        # checkpoint — the working update, the lifecycle notification, and
+        # the history build, not just handler execution. A cancel deferred
+        # by the shielded settle block above is delivered at the first of
+        # these awaits, and a paid run interrupted there must still be
+        # tagged as orphaned.
         try:
+            # Add span event for state transition
+            self._add_state_change_event(to_state="working")
+
+            # Transition to working — guarded: only from 'submitted'. A
+            # cancel can CAS the task away between the queued-state check
+            # above and here; the guard makes this write lose that race
+            # instead of resurrecting the task (any settled receipt is
+            # already persisted).
+            updated = await self.storage.update_task(
+                task["id"], state="working", expected_states=("submitted",)
+            )
+            if updated is None:
+                # A cancel won between the queued-state check and here. If
+                # the payment already settled (shielded block above), record
+                # the orphan — money moved, nothing will be produced.
+                if settlement_metadata:
+                    await self._record_orphaned_payment(task["id"], settlement_metadata)
+                logger.info(
+                    f"Task {task['id']} left 'submitted' before execution; skipping run"
+                )
+                return
+            await self._notify_lifecycle(
+                task["id"], task["context_id"], "working", False
+            )
+
+            # Step 2: Build conversation history (A2A Protocol)
+            message_history = await self._build_complete_message_history(task)
+
             # Step 3: Execute manifest with system prompt (if enabled)
             if (
                 self.manifest.enable_system_message
