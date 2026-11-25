@@ -43,7 +43,7 @@ Guidelines:
 - Do not hallucinate information outside the document
 """,
     model = OpenRouter(
-        id = "arcee-ai/trinity-large-preview:free",
+        id = "openai/gpt-4o-mini",
         api_key=os.getenv("OPENROUTER_API_KEY"),
     ),
 )

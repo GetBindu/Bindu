@@ -213,6 +213,7 @@ Every row here links out to the guide that actually goes into it.
 | **Agent negotiation** | Two agents agree on price, latency, and SLA up front. No surprise bills. | [NEGOTIATION.md](docs/NEGOTIATION.md) |
 | **Storage** | Postgres for tasks and messages. Swap the backend if you've got a preference. | [STORAGE.md](docs/STORAGE.md) |
 | **Scheduler** | Redis-backed retries, timeouts, and recurring tasks. | [SCHEDULER.md](docs/SCHEDULER.md) |
+| **Concurrency & cancel** | One slow model call no longer stalls every other task: set `AGENT__MAX_CONCURRENT_TASKS` and tasks in different conversations run side by side, while one conversation stays in order. `tasks/cancel` stops the run mid-flight and the task stays canceled. | [worker-concurrency.md](docs/worker-concurrency.md) |
 | **Public tunnel** | `expose: true` puts your laptop on the internet. No port forwarding, no router config. | [TUNNELING.md](docs/TUNNELING.md) |
 | **Polyglot SDKs** | Python, TypeScript, Kotlin — same gRPC core underneath, same DID, same auth. | [GRPC_LANGUAGE_AGNOSTIC.md](docs/GRPC_LANGUAGE_AGNOSTIC.md) |
 | **Cloud deploy** | `bindu deploy agent.py --runtime=boxd` ships your script to a microVM and prints the HTTPS URL. No Dockerfile. | [runtime/quickstart.md](docs/runtime/quickstart.md) |

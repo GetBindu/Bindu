@@ -4,6 +4,7 @@ Run:
     python medical_agent.py
 """
 
+import os
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -12,11 +13,10 @@ from agno.agent import Agent
 from agno.models.openrouter import OpenRouter
 from agno.tools.duckduckgo import DuckDuckGoTools
 from bindu.penguin.bindufy import bindufy
-from bindu.settings import app_settings
 
 load_dotenv(Path(__file__).parent / ".env")
 
-OPENROUTER_API_KEY = app_settings.OPENROUTER_API_KEY
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 if not OPENROUTER_API_KEY:
     raise RuntimeError(
@@ -50,7 +50,7 @@ Response style:
 - End with: "Disclaimer: This is general health information, not professional medical advice."
 """,
     model=OpenRouter(
-        id="google/gemini-2.0-flash-001",
+        id="openai/gpt-4o-mini",
         api_key=OPENROUTER_API_KEY,
     ),
     tools=[DuckDuckGoTools()],

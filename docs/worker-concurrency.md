@@ -10,12 +10,49 @@ what is guaranteed, and where the boundaries are.
 ## Turning concurrency on
 
 ```bash
-AGENT__MAX_CONCURRENT_TASKS=3 bindu serve
+AGENT__MAX_CONCURRENT_TASKS=3 uv run python my_agent.py
 ```
+
+For a TypeScript (or other gRPC SDK) agent, set it in the environment you
+launch the agent from — the SDK passes it through to the core it spawns.
 
 The default is `1`, which keeps strict serial execution — upgrading changes
 nothing until you raise the cap. The cap bounds how many runs execute at
 once in one agent process; it is the spend bound for provider calls.
+
+## Your handler has to be async
+
+Raising the cap does nothing for a plain `def` handler. A sync handler runs
+on the event loop, so while it waits on the model, nothing else in the
+process moves — not the next task, not the cancel aimed at it. Most
+examples in `examples/` use a sync handler because it is the shortest thing
+that works; they run correctly, just one task at a time.
+
+The fix is usually one line. With agno:
+
+```python
+# Serial: blocks the event loop for the whole model call.
+def handler(messages):
+    return agent.run(input=messages)
+
+# Concurrent and cancellable: the model call is an await point.
+async def handler(messages):
+    return await agent.arun(input=messages)
+```
+
+Any async client works the same way (`AsyncOpenAI`, LangChain's `ainvoke`,
+`httpx.AsyncClient`): what matters is that the slow part is awaited.
+TypeScript SDK handlers are already async, so they get concurrency and
+cancellation as soon as the cap is raised.
+
+How far a cancel reaches depends on that call chain. When your handler
+awaits the model call directly (agno `arun`, `AsyncOpenAI`), cancel aborts
+the in-flight request. Frameworks that run steps in their own tasks may
+let the step already running finish first — with LangGraph we observed
+the current node's model call complete about 13 s after the cancel, then
+the graph stopped before its next call. Either way the task stays
+`canceled` and the late result is discarded; you only pay for that one
+in-flight call.
 
 ## What is guaranteed
 
@@ -58,8 +95,7 @@ once in one agent process; it is the spend bound for provider calls.
   behind a busy context.
 - **Synchronous handlers do not overlap.** A plain `def` handler executes
   on the event loop, so it blocks everything — including cancel delivery —
-  until it returns, whatever the cap. Write `async def` handlers (awaiting
-  your model SDK) to benefit from concurrency and interruption.
+  until it returns, whatever the cap (see "Your handler has to be async").
 - **One process, one worker.** The cap, the context locks, and the cancel
   interrupts all live inside a single agent process. Running two workers
   against one Redis queue is unsupported today: each operation is delivered
@@ -84,4 +120,11 @@ Send three `message/send` requests with distinct `contextId`s and watch the
 working windows overlap (three 5 s calls finish in ~5 s wall, not ~15 s).
 Send two with the same `contextId` and they run back to back in order. Then
 `tasks/cancel` a long run mid-flight: the state flips to `canceled`
-immediately and the provider-side connection is torn down.
+immediately and stays there; with a directly awaited model call, the
+provider-side connection is torn down too.
+
+If your test prompts are short or vague, the model may answer with a
+clarifying question and the task stops in `input-required` instead of
+`completed` (Bindu's default structured-response prompt invites this).
+Wait for that state too, or make the prompt specific ("pick sensible
+defaults, don't ask questions").

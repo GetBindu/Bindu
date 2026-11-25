@@ -72,7 +72,11 @@ def handler(messages: list[dict[str, str]]):
     """
     # Extract the latest user message
     if messages:
-        latest_message = messages[-1].get('content', '') if isinstance(messages[-1], dict) else str(messages[-1])
+        latest_message = " ".join(
+            part.get("text", "")
+            for part in messages[-1].get("parts", [])
+            if part.get("kind") == "text"
+        ).strip()
 
         # Run the agent with the latest message
         result = agent.run(input=latest_message)
