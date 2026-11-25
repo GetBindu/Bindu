@@ -13,6 +13,7 @@ import type { Def } from "../tool/tool"
 import type { PeerDescriptor } from "../bindu/client"
 import type { PeerAuth } from "../bindu/auth/resolver"
 import { newMessageID, type SessionID } from "../session/schema"
+import { estimatePartTokens } from "../session/overflow"
 import { buildSkillTool } from "./skill-tool"
 import { buildPriorTaskIdLookup } from "./task-continuity"
 
@@ -323,12 +324,20 @@ export const layer = Layer.effect(
             if (turn.role === "user") {
               yield* sessions.appendUser({ sessionID, parts })
             } else {
+              // estimateHistoryTokens trusts a tokens object over part text,
+              // so a zero count would hide imported turns from compaction.
+              const importedTokens = estimatePartTokens(parts)
               yield* sessions.appendAssistant({
                 sessionID,
                 info: {
                   id: newMessageID(),
                   sessionID,
                   role: "assistant",
+                  // Caller-supplied history: the generating model isn't known here.
+                  modelID: "unknown",
+                  providerID: "unknown",
+                  agent: "history-import",
+                  tokens: { input: 0, output: importedTokens, total: importedTokens, cache: { read: 0, write: 0 } },
                   time: { created: Date.now() },
                 },
                 parts,
