@@ -7,7 +7,9 @@ AgentHandler endpoint and returns the result in the same format that
 ResultProcessor and ResponseDetector expect.
 
 Supports both unary and streaming responses:
-    - Unary (HandleMessages): Returns str or dict directly.
+    - Unary (HandleMessages): Returns an async generator yielding one
+      str or dict. ResultProcessor.collect_results() drains it, and the
+      await inside is where worker cancellation lands (aborting the RPC).
     - Streaming (HandleMessagesStream): Returns a generator that yields
       chunks. ResultProcessor.collect_results() drains it automatically.
 
@@ -28,6 +30,8 @@ and a remote gRPC handler.
 
 from __future__ import annotations
 
+import asyncio
+from collections.abc import AsyncIterator
 from typing import Any, cast
 
 import grpc
@@ -169,7 +173,9 @@ class GrpcAgentClient:
             raw_results = self.manifest.run(message_history or [])
 
         Supports two modes:
-            - Unary (default): Calls HandleMessages, returns str or dict.
+            - Unary (default): Calls HandleMessages, returns an async
+              generator yielding one str or dict. ResultProcessor
+              .collect_results() drains it via __anext__.
             - Streaming: Calls HandleMessagesStream, returns a generator.
               ResultProcessor.collect_results() drains generators via __next__.
 
@@ -180,8 +186,8 @@ class GrpcAgentClient:
 
         Returns:
             Unary mode:
-                str: Plain text response (maps to "completed" task state).
-                dict: Structured response with "state" key for state transitions.
+                AsyncIterator yielding one str (plain text response, maps to
+                "completed") or dict (structured response with "state" key).
             Streaming mode:
                 Generator[str | dict]: Yields chunks. ResultProcessor.collect_results()
                 uses the last yielded value as the final result.
@@ -208,20 +214,50 @@ class GrpcAgentClient:
             )
             return self._handle_unary(request)
 
-    def _handle_unary(
+    async def _handle_unary(
         self, request: agent_handler_pb2.HandleRequest
-    ) -> str | dict[str, Any]:
-        """Make a unary HandleMessages call.
+    ) -> AsyncIterator[str | dict[str, Any]]:
+        """Make a non-blocking, cancellable unary HandleMessages call.
 
-        Args:
-            request: Proto HandleRequest.
+        The stub's .future() form keeps the event loop free. The previous
+        blocking invocation (`self._stub.HandleMessages(request, ...)`) ran
+        the whole RPC on the loop thread, which serialized every task in
+        the process for the duration of each remote handler call and gave
+        worker cancellation no await point to land on.
 
-        Returns:
-            str or dict from _response_to_result().
+        Cancellation of the consuming task (tasks/cancel, worker shutdown)
+        aborts the RPC itself, so the SDK is told the caller is gone
+        instead of the handler running on unobserved.
+
+        Yields:
+            Exactly one str or dict from _response_to_result();
+            ResultProcessor.collect_results() drains it like any async
+            handler result.
+
+        Raises:
+            grpc.RpcError: If the RPC fails (surfaces in ManifestWorker's
+                agent-execution try/except, marking the task failed).
         """
         assert self._stub is not None
-        response = self._stub.HandleMessages(request, timeout=self._timeout)
-        return self._response_to_result(response)
+        loop = asyncio.get_running_loop()
+        call = self._stub.HandleMessages.future(request, timeout=self._timeout)
+        waiter: asyncio.Future[Any] = loop.create_future()
+
+        def _on_done(completed_call: Any) -> None:
+            def _resolve() -> None:
+                if not waiter.done():
+                    waiter.set_result(completed_call)
+
+            # Runs on a gRPC worker thread; hop back to the event loop.
+            loop.call_soon_threadsafe(_resolve)
+
+        call.add_done_callback(_on_done)
+        try:
+            completed = await waiter
+        except BaseException:
+            call.cancel()
+            raise
+        yield self._response_to_result(completed.result())
 
     def _handle_streaming(self, request: agent_handler_pb2.HandleRequest) -> Any:
         """Make a streaming HandleMessagesStream call.

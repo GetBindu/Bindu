@@ -141,6 +141,15 @@ class ManifestWorker(Worker):
         if task is None:
             raise ValueError(TASK_NOT_FOUND_ERROR.format(task_id=params["task_id"]))
 
+        # A cancel can now land while the run is still queued behind the
+        # concurrency gates. Skip silently — validate_task_state would raise
+        # and the failure guard would overwrite 'canceled' with 'failed'.
+        if task["status"]["state"] == "canceled":
+            logger.info(
+                f"Task {task['id']} canceled before execution started; skipping"
+            )
+            return
+
         # Extract payment context if available (from x402 middleware)
         payment_context = params.get("payment_context")
 
@@ -288,21 +297,48 @@ class ManifestWorker(Worker):
 
     @retry_worker_operation(max_attempts=2)
     async def cancel_task(self, params: TaskIdParams) -> None:
-        """Cancel a running task.
+        """Cancel a task — and actually stop its in-flight execution.
+
+        Interrupting the run comes FIRST, unconditionally: the API handler
+        (task_handlers.cancel_task) CAS-flips the task to 'canceled' before
+        signaling the scheduler, so by the time this operation arrives the
+        storage row usually already reads 'canceled' — the provider call it
+        is paying for is still running until the scope here is cancelled.
 
         Args:
             params: Task identification parameters containing task_id
         """
         task = await self.storage.load_task(params["task_id"])
-        if task:
-            # Add span event for cancellation
-            self._add_state_change_event(
-                from_state=task["status"]["state"], to_state="canceled"
-            )
-            await self.storage.update_task(params["task_id"], state="canceled")
+        if not task:
+            return
+
+        interrupted = self._cancel_in_flight(params["task_id"])
+        if interrupted:
+            logger.info(f"Task {task['id']} execution interrupted by cancel")
+
+        current_state = task["status"]["state"]
+        if current_state == "canceled":
+            # The API handler already claimed the state transition; this
+            # operation still owed the interrupt above and the lifecycle
+            # notification below.
             await self._notify_lifecycle(
                 params["task_id"], task["context_id"], "canceled", True
             )
+            return
+
+        if current_state in app_settings.agent.terminal_states:
+            # completed/failed/rejected: immutable per A2A, nothing ran.
+            logger.debug(
+                f"Task {task['id']} already terminal ({current_state}); cancel ignored"
+            )
+            return
+
+        # Direct scheduler-path cancel (no API CAS): record and notify.
+        self._add_state_change_event(from_state=current_state, to_state="canceled")
+        await self.storage.update_task(params["task_id"], state="canceled")
+        await self._notify_lifecycle(
+            params["task_id"], task["context_id"], "canceled", True
+        )
 
     def build_message_history(self, history: list[Message]) -> list[dict[str, Any]]:
         """Pass A2A protocol messages through — each keeps its ``parts``.

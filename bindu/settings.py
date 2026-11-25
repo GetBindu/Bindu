@@ -469,6 +469,18 @@ class AgentSettings(BaseSettings):
         }
     )
 
+    # Worker Concurrency (env: AGENT__MAX_CONCURRENT_TASKS)
+    max_concurrent_tasks: int = Field(
+        default=1,
+        ge=1,
+        description=(
+            "Maximum tasks a worker executes concurrently, per agent process. "
+            "1 (default) keeps strict serial execution. Tasks sharing a "
+            "context_id are always serialized in arrival order regardless of "
+            "this cap, so context-history agents stay correct."
+        ),
+    )
+
     # message/stream polling behavior
     stream_poll_interval_seconds: float = 0.1
     stream_missing_task_retries: int = 2
