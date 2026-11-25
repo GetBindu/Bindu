@@ -10,7 +10,7 @@ Quick workflow to create releases using week-based versioning: `YYYY.W.D`
 
 ```bash
 # Generate version (Year.Week.DayOfWeek)
-VERSION=$(date +%Y.%-V.%-u)  # e.g., 2026.8.3
+VERSION=$(date +%G.%-V.%-u)  # e.g., 2026.8.3
 
 # Create release notes
 vim release-notes/$VERSION.txt
@@ -30,11 +30,14 @@ gh release create $VERSION \
 ## Versioning Format
 
 **Week-based**: `YYYY.W.D`
-- YYYY = Year (2026)
-- W = ISO week number (1-53)
-- D = Day of week (1=Sunday, 7=Saturday)
+- YYYY = ISO week-numbering year (`%G`) — usually the calendar year, but
+  the last days of December can belong to week 1 of the next year
+- W = ISO week number (1-53, `%-V`)
+- D = ISO day of week (1=Monday, 7=Sunday, `%-u`)
 
 Examples: `2026.8.3` (Wed, Week 8), `2026.52.5` (Fri, Week 52)
+
+Two releases on the same day take a suffix: `2026.9.2.1`, `2026.9.2.2`.
 
 ---
 
@@ -55,7 +58,7 @@ git pull origin main
 ### 2. Create Release Notes
 
 ```bash
-VERSION=$(date +%Y.%-V.%-u)
+VERSION=$(date +%G.%-V.%-u)
 vim release-notes/$VERSION.txt
 ```
 
@@ -82,7 +85,7 @@ TESTING
 ### 3. Create and Push Release
 
 ```bash
-VERSION=$(date +%Y.%-V.%-u)
+VERSION=$(date +%G.%-V.%-u)
 
 # Create tag
 git tag -a $VERSION -F release-notes/$VERSION.txt
@@ -102,7 +105,7 @@ gh release create $VERSION \
 
 ```bash
 # One-liner release (after creating release notes)
-VERSION=$(date +%Y.%-V.%-u) && \
+VERSION=$(date +%G.%-V.%-u) && \
 git tag -a $VERSION -F release-notes/$VERSION.txt && \
 git push origin $VERSION && \
 gh release create $VERSION --notes-file release-notes/$VERSION.txt
