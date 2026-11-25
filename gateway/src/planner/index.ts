@@ -329,6 +329,11 @@ export const layer = Layer.effect(
                   id: newMessageID(),
                   sessionID,
                   role: "assistant",
+                  // Caller-supplied history: the generating model isn't known here.
+                  modelID: "unknown",
+                  providerID: "unknown",
+                  agent: "history-import",
+                  tokens: { input: 0, output: 0, total: 0, cache: { read: 0, write: 0 } },
                   time: { created: Date.now() },
                 },
                 parts,
