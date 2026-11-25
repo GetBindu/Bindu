@@ -757,6 +757,74 @@ class TestTerminalWriteGuards:
             assert metadata["x402.payment.receipts"][0]["transaction"] == "0xsig"
 
     @pytest.mark.asyncio
+    async def test_paid_run_survives_failed_upfront_receipt_write(self, scheduler):
+        """The bounded settle-time persist is best-effort: when it fails,
+        the paid run still executes (aborting would guarantee an orphan)
+        and the completion write re-attaches the receipt."""
+        from bindu.server.storage.memory_storage import InMemoryStorage
+        from bindu.settings import app_settings
+
+        class FlakyReceiptStorage(InMemoryStorage):
+            """Refuses exactly the upfront metadata-only receipt write."""
+
+            async def update_task(
+                self,
+                task_id,
+                state=None,
+                new_artifacts=None,
+                new_messages=None,
+                metadata=None,
+                expected_states=None,
+            ):
+                if state is None and expected_states is None and metadata:
+                    raise RuntimeError("receipt write refused")
+                return await super().update_task(
+                    task_id,
+                    state=state,
+                    new_artifacts=new_artifacts,
+                    new_messages=new_messages,
+                    metadata=metadata,
+                    expected_states=expected_states,
+                )
+
+        storage = FlakyReceiptStorage()
+        manifest = ScriptedManifest()
+        done = Gate()
+        done.release.set()
+        manifest.scripts = {"paidflaky": done.script("delivered")}
+        ctx = uuid4()
+        task_id = await submit(storage, ctx, "paidflaky")
+
+        receipt = {
+            app_settings.x402.meta_status_key: app_settings.x402.status_completed,
+            "x402.payment.receipts": [{"transaction": "0xflaky"}],
+        }
+
+        async with running_worker(scheduler, storage, manifest, cap=1) as worker:
+
+            async def fake_settle(payment_context):
+                return dict(receipt)
+
+            worker._settle_payment = fake_settle
+
+            await scheduler.run_task(
+                {
+                    "task_id": task_id,
+                    "context_id": ctx,
+                    "payment_context": {"simulated": True},
+                }
+            )
+            task = await wait_for_state(storage, task_id, "completed")
+
+        metadata = task.get("metadata") or {}
+        assert (
+            metadata.get(app_settings.x402.meta_status_key)
+            == app_settings.x402.status_completed
+        )
+        assert metadata["x402.payment.receipts"][0]["transaction"] == "0xflaky"
+        assert task.get("artifacts"), "the deliverable must be committed"
+
+    @pytest.mark.asyncio
     async def test_shutdown_requeues_unstarted_task(self, scheduler, memory_storage):
         """Graceful shutdown: the running task is finalized as canceled, but a
         task still waiting on the concurrency gates goes back to the scheduler
@@ -975,3 +1043,32 @@ class TestGuardFallbackBranches:
 
         # Must not raise.
         await worker._record_orphaned_payment(task_id, {"r": 1})
+
+    @pytest.mark.asyncio
+    async def test_discarded_intermediate_prompt_tags_orphan(self, memory_storage):
+        """A paid handler returning input-required after a cancel landed in
+        storage: the prompt is discarded, and the settled payment must be
+        recorded as orphaned — nothing was delivered."""
+        from bindu.settings import app_settings
+
+        worker = self.make_worker(memory_storage)
+        task_id = await submit(memory_storage, uuid4(), "paidask")
+        await memory_storage.update_task(task_id, state="canceled")
+        task = await memory_storage.load_task(task_id)
+
+        await worker._handle_intermediate_state(
+            task,
+            "input-required",
+            "need more?",
+            settlement_metadata={
+                app_settings.x402.meta_status_key: app_settings.x402.status_completed,
+                "x402.payment.receipts": [{"transaction": "0xint"}],
+            },
+        )
+
+        reloaded = await memory_storage.load_task(task_id)
+        assert reloaded["status"]["state"] == "canceled"
+        metadata = reloaded.get("metadata") or {}
+        assert metadata.get(app_settings.x402.meta_status_key) == "payment-orphaned"
+        assert metadata["x402.payment.receipts"][0]["transaction"] == "0xint"
+        assert all(m.get("role") != "agent" for m in reloaded.get("history", []))

@@ -63,6 +63,10 @@ TASK_NOT_FOUND_ERROR = "Task {task_id} not found"
 # Bound on the shielded orphan-payment metadata write: a storage row held by
 # another transaction must not be able to stall worker shutdown forever.
 ORPHAN_TAG_TIMEOUT_SECONDS = 5.0
+
+# Bound on the shielded settle-time receipt persist, for the same reason;
+# on timeout the run proceeds and later writes re-attach the receipt.
+RECEIPT_PERSIST_TIMEOUT_SECONDS = 5.0
 INVALID_TERMINAL_STATE_ERROR = (
     "Invalid terminal state '{state}'. Must be one of: {terminal_states}"
 )
@@ -187,9 +191,25 @@ class ManifestWorker(Worker):
                     == app_settings.x402.status_completed
                 )
                 if settled_ok:
-                    await self.storage.update_task(
-                        task["id"], metadata=settlement_metadata
-                    )
+                    # Receipt durability: persist before any cancellation
+                    # point. Bounded — this write runs shielded, and a
+                    # contended storage row must not stall worker shutdown
+                    # behind the shield — and best-effort: on timeout or
+                    # failure the paid run still proceeds (aborting would
+                    # guarantee an orphan), and every later terminal/orphan
+                    # write re-attaches the receipt from
+                    # settlement_metadata. Settlement is never repeated.
+                    try:
+                        with anyio.fail_after(RECEIPT_PERSIST_TIMEOUT_SECONDS):
+                            await self.storage.update_task(
+                                task["id"], metadata=settlement_metadata
+                            )
+                    except Exception as e:  # noqa: BLE001 - best-effort upfront persist
+                        logger.warning(
+                            f"Could not persist settlement receipt for task "
+                            f"{task['id']} upfront: {e}; continuing — later "
+                            "writes re-attach it"
+                        )
             if not settled_ok:
                 # No state transition to "working", no LLM call — just record
                 # the failure and exit. Reconciliation metadata is already in
@@ -312,7 +332,9 @@ class ManifestWorker(Worker):
                 # Hybrid Pattern: Return Message only, keep task open
                 # Add span event for state transition
                 self._add_state_change_event(from_state="working", to_state=state)
-                await self._handle_intermediate_state(task, state, message_content)
+                await self._handle_intermediate_state(
+                    task, state, message_content, settlement_metadata
+                )
             else:
                 # Hybrid Pattern: Task complete - generate Message + Artifacts
                 # Add span event for state transition
@@ -562,7 +584,11 @@ class ManifestWorker(Worker):
     # -------------------------------------------------------------------------
 
     async def _handle_intermediate_state(
-        self, task: Task, state: TaskState, message_content: Any
+        self,
+        task: Task,
+        state: TaskState,
+        message_content: Any,
+        settlement_metadata: dict[str, Any] | None = None,
     ) -> None:
         """Handle intermediate task states (input-required, auth-required).
 
@@ -575,6 +601,9 @@ class ManifestWorker(Worker):
             task: Current task
             state: Task state to set
             message_content: Content for agent message (any type: str, dict, list, etc.)
+            settlement_metadata: Pre-settled payment metadata, if the run was
+                paid — used to record an orphan when the guarded write loses
+                to a cancel and the prompt is discarded
         """
         # Render message content for user; for structured, prefer 'prompt' field
         content = (
@@ -599,6 +628,11 @@ class ManifestWorker(Worker):
             expected_states=("working",),
         )
         if updated is None:
+            # A cancel won the race: the prompt is discarded, so a paid run
+            # delivered nothing — record the orphan (a committed intermediate
+            # prompt never reaches this branch and keeps payment-completed).
+            if settlement_metadata:
+                await self._record_orphaned_payment(task["id"], settlement_metadata)
             logger.info(
                 f"Task {task['id']} no longer 'working'; {state} update discarded"
             )

@@ -35,7 +35,10 @@ once in one agent process; it is the spend bound for provider calls.
 - **Paid tasks stay reconcilable.** Under x402 settle-first, the settlement
   receipt is persisted to the task before the handler runs. If the run is
   then canceled, the receipt is re-tagged `payment-orphaned` so you can find
-  canceled-but-paid tasks and refund them manually.
+  canceled-but-paid tasks and refund them manually. Both writes are bounded
+  and best-effort, so do not sweep for the orphan tag alone: a canceled
+  task whose metadata carries a settlement receipt needs reconciliation
+  even when the `payment-orphaned` tag is missing.
 - **Graceful shutdown loses no queued work.** A task interrupted mid-run is
   finalized as `canceled` (re-running half-executed handlers is not safe).
   A task that never started is handed back to the scheduler and stays
