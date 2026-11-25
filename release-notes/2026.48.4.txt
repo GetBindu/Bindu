@@ -1,0 +1,100 @@
+Release: your stream client now gets the reply
+====================================================
+
+Version: 2026.48.4
+Date: November 25, 2026
+Author: Raahul Dutta
+
+OVERVIEW
+--------
+`message/stream` sent its events in the wrong order: the `final: true`
+status-update went out before the artifact that carries the agent's
+reply. A2A clients stop reading at the final event — that is what
+`final` means — so a well-behaved client streamed a task to completion
+and received no answer. Only clients that kept reading until the
+connection closed saw the content.
+
+Fixed in #622: the event that ends a stream (a terminal state, or a
+pause on `input-required` / `auth-required`) is now always the last
+event, after every artifact. A status that doesn't end the stream, like
+`working`, still arrives before its artifacts. No API changes; your
+client gets the reply whether it stops at `final` or reads to the end.
+
+The same day's docs change (#621) ships the 2026.48.3 release notes and
+the concurrency guide, and fixes four examples that were broken before
+2026.48.3 — those live in the repo, not the package, so you get them
+from GitHub.
+
+BREAKING CHANGES
+----------------
+None.
+
+IMPROVEMENTS
+------------
+Streaming (#622)
+  - The stream-ending status-update (`final: true`, or a pause for
+    input/auth) is emitted after all new artifacts in the same poll, in
+    the main polling loop and in the paused-state re-check.
+  - Non-ending statuses (`working`) keep their place before artifacts.
+
+Docs and examples (#621, repo only — not in the package)
+  - release-notes/2026.48.3.txt, and docs/worker-concurrency.md now
+    explains that only async handlers get concurrency, with the one-line
+    agno change (`agent.run` -> `await agent.arun`).
+  - docs/SCHEDULER.md: one worker per Redis queue; scale up with
+    AGENT__MAX_CONCURRENT_TASKS, not out.
+  - weather-research and premium-advisor read the A2A `parts` field again
+    (they read the retired `content` field and sent the model an empty
+    prompt); medical_agent no longer crashes at import; medical_agent and
+    document-analyzer take their model from OPENROUTER_MODEL instead of
+    pinning ones OpenRouter retired.
+
+KNOWN ISSUES
+------------
+Carried over from 2026.48.3 (see release-notes/2026.48.3.txt for detail):
+- Sync `def` handlers never overlap and can't be interrupted mid-run;
+  make the handler async to get concurrency and cancellation.
+- One worker per queue; a hard kill can lose an operation the worker
+  already took from Redis.
+- The TypeScript SDK doesn't yet abort your in-process JS handler on
+  cancel (the task still stays canceled).
+- A file part in the standard A2A shape needs an empty `text` field
+  until the FilePart fix lands.
+
+TECHNICAL DETAILS
+-----------------
+- bindu/server/handlers/message_handlers.py: artifact events for a poll
+  are collected first; the status event is emitted before them only if it
+  does not end the stream, otherwise after them. The paused re-check path
+  follows the same rule.
+
+TESTING
+-------
+- Full suite on a clean main: 1,161 passed, 28 skipped (Redis and
+  live-network tests that need extra setup); all 10 pre-commit hooks pass
+  on every file.
+- New stream tests assert that the artifact precedes the final event,
+  that nothing follows the final event, and that a `working` status
+  arriving with its artifact still comes first; one covers the paused
+  re-check.
+
+COMMIT DETAILS
+--------------
+Commits since 2026.48.3:
+
+  - 0b024504: fix(stream): emit artifacts before the final status-update in message/stream (#622)
+  - add2e95c: docs(release): notes for 2026.48.3, concurrency guide, example fixes (#621)
+
+USAGE WITH GIT
+--------------
+# View this release
+git show 2026.48.4
+
+# Compare to previous release
+git diff 2026.48.3..2026.48.4 --stat
+
+LINKS
+-----
+- Stream ordering PR: https://github.com/GetBindu/Bindu/pull/622
+- Docs and examples PR: https://github.com/GetBindu/Bindu/pull/621
+- Compare: https://github.com/GetBindu/Bindu/compare/2026.48.3...2026.48.4
